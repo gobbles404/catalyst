@@ -50,6 +50,7 @@ from goosedove.trades.resolution import (
 )
 from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 from goosedove.trades.template import (
+    DayOrRule,
     payment_rule_of,
     quantity_per_of,
     route_of,
@@ -77,14 +78,16 @@ PRICE_REDUCTIONS: Final = "price_reductions"  # the sums formed: the months' pri
 
 @dataclass(frozen=True, slots=True)
 class _Terms:
-    """The template's terms as the quote reads them: the four codes as their enums, the payment
-    rule read whole with its text and its calendar for a financial settlement, and the curve key
-    on the bilateral route."""
+    """The template's terms as the quote reads them: the four codes as their enums; for a
+    financial settlement the payment day, since payment-day-date-or-rule.md a date as entered
+    or a rule read whole with its text, the other None, and the calendar; and the curve key on
+    the bilateral route."""
 
     route: Route
     settlement: Settlement
     method: ScheduleMethod
     quantity_per: QuantityPer
+    payment_day: np.datetime64 | None
     payment_rule: tuple[Instruction, ...] | None
     payment_rule_text: str | None
     payment_calendar: HolidayCalendar | None
@@ -107,7 +110,8 @@ def quote(
     lastday alone; the period, a label or since balance-of-period-quotes.md the balance of one
     from the valuation day, every month of it a contract of the schedule; the observations,
     their pricing contracts and their calendar rows by the pipeline's rules, a fixed day's price
-    off the history and a live day's off the market's quotes; a financial quote's payments after
+    off the history and a live day's off the market's quotes; a financial quote's payments, the
+    template's date on every month or its rule's day from each month's last observation, after
     each month's last observation, within the sheet's calendar, and a physical quote's contracts
     not yet expired; and the selected curve covering every payment after the valuation day.
     The price is a convex combination of the months' prices, each a convex combination of
@@ -164,9 +168,9 @@ def _the_terms(template: QuoteTemplate, counter: WorkCounter) -> _Terms:
     """The template's terms, complete for a quote: each field the definition always requires of a
     quote present, the four codes read as their enums, a physical settlement on the cleared route
     alone, and each conditional field present exactly when its condition holds, the condition
-    the definition's own words; then the payment rule read whole for a financial settlement, with
-    its calendar, and the key for a bilateral route. Work: the template's values, each read
-    once."""
+    the definition's own words; then the payment day for a financial settlement, a date as it is
+    or a rule read whole, with its calendar, and the key for a bilateral route. Work: the
+    template's values, each read once."""
     values = template.values
     fields = template.instrument.fields
     for field in fields:
@@ -198,13 +202,26 @@ def _the_terms(template: QuoteTemplate, counter: WorkCounter) -> _Terms:
                 f"template unless {condition}"
             )
     counter.hit(TEMPLATE_FIELDS_READ, len(values))
-    rule_text = rule = payment_calendar = None
+    payment_day = rule_text = rule = payment_calendar = None
     if settlement is Settlement.FINANCIAL:
-        rule_text = _text(values, "payment_time_lag")
-        rule = payment_rule_of("payment_time_lag", rule_text)
+        entered = cast(DayOrRule, values["payment_day"])
+        payment_day = entered.day
+        if entered.rule is not None:
+            rule_text = entered.rule
+            rule = payment_rule_of("payment_day", rule_text)
         payment_calendar = cast(HolidayCalendar, values["payment_holiday_calendar"])
     key = _text(values, "discount_curve_key") if route is Route.BILATERAL else None
-    return _Terms(route, settlement, method, quantity_per, rule, rule_text, payment_calendar, key)
+    return _Terms(
+        route,
+        settlement,
+        method,
+        quantity_per,
+        payment_day,
+        rule,
+        rule_text,
+        payment_calendar,
+        key,
+    )
 
 
 def _text(values: Mapping[str, object], name: str) -> str:
@@ -212,7 +229,10 @@ def _text(values: Mapping[str, object], name: str) -> str:
 
 
 def _shown(value: object) -> str:
-    """A template's value named in a refusal: text in quotes, an object by its kind."""
+    """A template's value named in a refusal: text in quotes, a payment day as its day or its
+    rule in quotes, an object by its kind."""
+    if isinstance(value, DayOrRule):
+        return repr(value.rule) if value.day is None else str(value.day)
     return repr(value) if isinstance(value, str) else named(value)
 
 
@@ -399,27 +419,37 @@ def _the_payments(
     component: Callable[[int], str],
     counter: WorkCounter,
 ) -> NDArray[np.datetime64] | None:
-    """A financial quote's payment days, the batch's rules: each month's rule applied to its last
-    observation day, the expiry under lastday on a futures index and the publication day on an
-    IFERC one, instruction by instruction on the payment calendar, within the sheet's calendar and
-    after that last observation, when the month's final price exists, the kernel's own rule for
-    it; None for a physical settlement, which pays on no day. Work: the rule read, its
-    instructions applied once over the months, and the payment days made."""
-    if terms.payment_rule is None:
+    """A financial quote's payment days, the batch's rules: since payment-day-date-or-rule.md
+    the template's date on every month, as entered and never rolled, or each month's rule
+    applied to its last observation day, the expiry under lastday on a futures index and the
+    publication day on an IFERC one, instruction by instruction on the payment calendar, within
+    the sheet's calendar; either way after each month's last observation, when the month's final
+    price exists, the kernel's own rule for it, so a dated template serves any request whose
+    last observation falls before its date; None for a physical settlement, which pays on no
+    day. Work: the rule read and its instructions applied once over the months, none of either
+    for a date, and the payment days made."""
+    if terms.settlement is Settlement.PHYSICAL:
         return None
     anchors = last_days(observations, components)
-    shifted = shift_days(anchors, terms.payment_rule, terms.payment_calendar)
+    if terms.payment_day is not None:
+        pays = np.full(components, terms.payment_day, dtype="datetime64[D]")
+        counter.hit(PAYMENT_RULES_READ, 0)
+        counter.hit(PAYMENT_SHIFTS, 0)
+        counter.hit(PAYMENT_DAYS_MADE, components)
+        payments_after_observations(pays, anchors, component)
+        return pays
+    rule = cast(tuple[Instruction, ...], terms.payment_rule)  # financial: the terms' rule
+    shifted = shift_days(anchors, rule, terms.payment_calendar)
     counter.hit(PAYMENT_RULES_READ, 1)
-    counter.hit(PAYMENT_SHIFTS, len(terms.payment_rule))
+    counter.hit(PAYMENT_SHIFTS, len(rule))
     counter.hit(PAYMENT_DAYS_MADE, components)
     strayed = shifted.strayed_at >= 0
     if strayed.any():
         k = int(strayed.argmax())
         step = int(shifted.strayed_at[k])
-        rule = terms.payment_rule
         at = "" if len(rule) == 1 else f" at instruction {step + 1}, {rule[step].text!r}"
         raise ValueError(
-            f"payment_time_lag is {terms.payment_rule_text!r}, counted from {anchors[k]} to "
+            f"payment_day is {terms.payment_rule_text!r}, counted from {anchors[k]} to "
             f"{shifted.strayed_to[k]}{at}, expected a payment day within the sheet's calendar, "
             f"{SHEET_FIRST_DAY} to {SHEET_LAST_DAY}"
         )

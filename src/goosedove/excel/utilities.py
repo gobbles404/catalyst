@@ -47,6 +47,7 @@ from goosedove.index_definitions.kind import named
 from goosedove.index_definitions.periods import end_date, start_date
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FieldType, Instrument
+from goosedove.instruments.fields import DatesOrTexts
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.futures_fixings import FuturesFixings
@@ -61,7 +62,7 @@ from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.resolution import Trades
 from goosedove.trades.results import TradeResults
 from goosedove.trades.schedule_methods import METHOD_NAMES
-from goosedove.trades.template import TradeTemplate
+from goosedove.trades.template import DayOrRule, TradeTemplate
 from goosedove.trades.terms import BASIS_NAMES
 
 
@@ -421,6 +422,14 @@ def template_table(
             case FieldType.HOLIDAY_CALENDAR:
                 types.append("str")
                 columns.append((named(value),))
+            case FieldType.DATE_OR_TEXT:  # the day or the rule, payment-day-date-or-rule.md
+                entered = cast(DayOrRule, value)
+                if entered.day is not None:
+                    types.append("datetime64[D]")
+                    columns.append(np.array([entered.day], dtype="datetime64[D]"))
+                else:
+                    types.append("str")
+                    columns.append((cast(str, entered.rule),))
             case _:
                 assert_never(field_type)
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
@@ -434,7 +443,8 @@ def trades_table(obj: Trades) -> MixedArray:
     # reader of one row should see the whole deal and the template need not have supplied them,
     # then what the encoding made of the terms. trade_id, a number since #168,
     # clearing_house, since #175 counterparty, and broker where the batch has them; quantity_unit
-    # the specification's name as the index spells it; the payment lag and the day it gives for a
+    # the specification's name as the index spells it; the payment day as entered, a date a date
+    # and a rule its text since payment-day-date-or-rule.md, and the day it gives for a
     # financial settlement; since #175 marketing_reserve where the batch has it, the amount the
     # row booked shown on each of its components, the one amount and no allocation among them,
     # so a reader never sums the column down a strip;
@@ -454,7 +464,7 @@ def trades_table(obj: Trades) -> MixedArray:
     codes = np.array(terms.schedule.codes, dtype=object)[terms.contract]
     headers: list[str] = ["row"]
     types: list[str] = ["int64"]
-    columns: list[NDArray[Any] | tuple[str, ...]] = [(rows + 1).astype(np.int64)]
+    columns: list[NDArray[Any] | tuple[str, ...] | DatesOrTexts] = [(rows + 1).astype(np.int64)]
 
     def text(name: str, column: tuple[str, ...]) -> None:
         headers.append(name)
@@ -489,8 +499,9 @@ def trades_table(obj: Trades) -> MixedArray:
     text("quantity_per", tuple(BASIS_NAMES[terms.quantity_per[rows]]))
     numbers("fixed_price", "float64", terms.fixed_price)
     if terms.payment is not None:
-        lags = np.array(terms.payment.lag, dtype=object)  # as the ticket or the template wrote
-        text("payment_time_lag", tuple(lags[rows]))
+        headers.append("payment_day")  # as the ticket or the template wrote, each kind its own
+        types.append("date or text")
+        columns.append(_entered_by_component(terms.payment.entered, rows))
         numbers("payment_date", "datetime64[D]", terms.payment.date)
     if terms.marketing_reserve is not None:  # the row's one amount on each of its components
         numbers("marketing_reserve", "float64", terms.marketing_reserve[rows])
@@ -505,6 +516,21 @@ def trades_table(obj: Trades) -> MixedArray:
     numbers("coefficient", "float64", encoding.coefficient)
     numbers("offset", "float64", encoding.offset)
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
+
+
+def _entered_by_component(entered: DatesOrTexts, rows: NDArray[np.intp]) -> DatesOrTexts:
+    """The entered payment day of each component's row, a date or a rule text, since
+    payment-day-date-or-rule.md: the rows' mask taken by the components' rows, and each kind's
+    values found at their rows' positions among the rows of that kind, one search each."""
+    is_date = entered.is_date[rows]
+    dated_rows = np.flatnonzero(entered.is_date)
+    ruled_rows = np.flatnonzero(~entered.is_date)
+    texts = np.array(entered.texts, dtype=object)
+    return DatesOrTexts(
+        is_date,
+        entered.dates[np.searchsorted(dated_rows, rows[is_date])],
+        tuple(texts[np.searchsorted(ruled_rows, rows[~is_date])]),
+    )
 
 
 def _slot_names(

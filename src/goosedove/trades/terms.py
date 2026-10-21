@@ -26,6 +26,7 @@ from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index, ReportingLot
 from goosedove.index_definitions.kind import Kind, described
 from goosedove.instruments.definitions import Instrument
+from goosedove.instruments.fields import DatesOrTexts
 from goosedove.trades.schedule_methods import (
     METHODS,
     ScheduleMethod,
@@ -78,15 +79,16 @@ def one_choice[E: Enum](members: tuple[E, ...], choice: E, occurrences: int) -> 
 @dataclass(frozen=True, slots=True)
 class PaymentTerms:
     """How a financial settlement pays, kept with the days it gives so that a batch explains its
-    own payment days. Per occurrence: lag[i], the payment rule as the ticket or the template wrote
-    it, `+2bd` or since #181 a chain such as `+3em+25cd-1bd+1bd`, its instructions read once at
-    creation and applied then, and calendar[i], the holiday calendar its business days are counted
-    on, the object the ticket's handle stood for, held by reference. Per component: date[k], the
-    day it pays, its occurrence's rule applied instruction by instruction to its anchor, its
-    contract's expiry under lastday and the business day before under penultimate, on its
-    occurrence's calendar."""
+    own payment days. Per occurrence: entered, what the ticket or the template wrote for the
+    row's payment_day since payment-day-date-or-rule.md, a date or a rule text each, `+2bd` or
+    since #181 a chain such as `+3em+25cd-1bd+1bd`, a rule's instructions read once at creation
+    and applied then; and calendar[i], the holiday calendar a rule's business days are counted
+    on, the object the ticket's handle stood for, held by reference, read for nothing by a row
+    that entered a date. Per component: date[k], the day it pays, its row's date as entered or
+    its row's rule applied instruction by instruction to its anchor, its contract's expiry under
+    lastday and the business day before under penultimate, on its occurrence's calendar."""
 
-    lag: tuple[str, ...]
+    entered: DatesOrTexts
     calendar: tuple[HolidayCalendar, ...]
     date: NDArray[np.datetime64]
 
@@ -703,17 +705,17 @@ def _the_component_quantity(
 def _the_payment(
     settlement: Settlement, payment: PaymentTerms | None, occurrences: int, components: int
 ) -> PaymentTerms | None:
-    """For a financial settlement the terms, a lag and a calendar per occurrence and a day per
-    component, the arrays frozen; for a physical one none."""
+    """For a financial settlement the terms, an entered payment day and a calendar per occurrence
+    and a day per component, the arrays frozen; for a physical one none."""
     match settlement:
         case Settlement.FINANCIAL:
             if payment is None:
                 raise ValueError(
-                    "payment is missing, expected a lag and a calendar per occurrence and one "
-                    "date per component with a financial settlement"
+                    "payment is missing, expected a payment day and a calendar per occurrence and "
+                    "one date per component with a financial settlement"
                 )
             for name, count in (
-                ("lag", len(payment.lag)),
+                ("day", payment.entered.is_date.size),
                 ("calendar", len(payment.calendar)),
             ):
                 if count != occurrences:
@@ -725,7 +727,7 @@ def _the_payment(
                     f"payment date has {payment.date.size} dates, expected {components}, "
                     "one per component"
                 )
-            return PaymentTerms(tuple(payment.lag), payment.calendar, _frozen_days(payment.date))
+            return PaymentTerms(payment.entered, payment.calendar, _frozen_days(payment.date))
         case Settlement.PHYSICAL:
             if payment is not None:
                 raise ValueError(

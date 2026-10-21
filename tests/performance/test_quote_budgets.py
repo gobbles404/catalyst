@@ -34,6 +34,7 @@ from goosedove.market_data.futures_fixings import futures_fixings
 from goosedove.market_data.price_vector import price_vector
 from goosedove.quoting.quote import quote
 from goosedove.quoting.template import QuoteTemplate
+from goosedove.trades.template import DayOrRule
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 PATH = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
@@ -44,7 +45,7 @@ TEMPLATE_FIELDS: dict[str, object] = {
     "settlement_method": "financial",
     "schedule_method": "asian",
     "quantity_per": "calday",
-    "payment_time_lag": "+5bd",
+    "payment_day": "+5bd",
     "payment_holiday_calendar": None,
     "discount_curve_key": "SOFR",
 }
@@ -83,7 +84,11 @@ def test_the_quote_template_creator_reads_each_value_once_and_publishes_once(
         "instrument": 1,
         "_bind_fields": 1,
         "_field_body": 1,  # the cells placed among the texts once
-        "_field_texts": 6,  # six text and code columns
+        "_field_texts": 5,  # five text and code columns
+        "_field_dates_or_texts": 1,  # the payment day, a date or a text, since
+        # payment-day-date-or-rule.md: its two looks
+        "_not_dates": 1,
+        "_as_days": 1,
         "_field_handles": 1,
         "_resolve": 1,  # the one handle cell
         "_CreateQuoteTemplate": 1,
@@ -92,7 +97,8 @@ def test_the_quote_template_creator_reads_each_value_once_and_publishes_once(
         "FieldValues.field": 14,  # each field once for its header's rule, once for its value's type
         "FieldValues.field.<locals>.<genexpr>": 28,
         "field_value": 7,  # one per field, no mask of supplied cells to read
-        "FieldValues.texts": 6,
+        "FieldValues.texts": 5,
+        "FieldValues.dates_or_texts": 1,
         "FieldValues.objects": 1,
         "route_of": 1,
         "settlement_of": 1,
@@ -147,7 +153,7 @@ def a_template(route: str) -> QuoteTemplate:
         "settlement_method": "financial",
         "schedule_method": "asian",
         "quantity_per": "month",
-        "payment_time_lag": "+1bd",
+        "payment_day": DayOrRule(None, "+1bd"),  # the rule as the template holds it
         "payment_holiday_calendar": WEEKENDS_ONLY,
     }
     if route == "bilateral":
@@ -239,7 +245,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
 LEDGER = {
     "quote": 1,
     "_the_terms": 1,
-    "_text": 6,  # the six texts the bilateral template holds
+    "_text": 5,  # the five texts the bilateral template holds beside its payment day
     "route_of": 1,
     "settlement_of": 1,
     "schedule_method_of": 1,

@@ -1153,7 +1153,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
                 "route",
                 "settlement_method",
                 "clearing_house",
-                "payment_time_lag",
+                "payment_day",
                 "payment_holiday_calendar",
             ]
         ]
@@ -1161,11 +1161,13 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
     values = Cells.from_rows(
         [["lot", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays]]
     )
+    # Since payment-day-date-or-rule.md the payment day's column is typed cell by cell, its two
+    # masks, its dates and its record beside the texts: within six slacks, four before.
     assert (
-        least_peak(lambda: ENTRY["_CreateTradeTemplate"]("fixed_float", names, values)) <= 4 * SLACK
+        least_peak(lambda: ENTRY["_CreateTradeTemplate"]("fixed_float", names, values)) <= 6 * SLACK
     )
     # A quote template of the ticket's seven fields, since template-based-quoting.md, the same
-    # readers over one fewer field and no mask of supplied cells: within the same four slacks.
+    # readers over one fewer field and no mask of supplied cells: within the same six slacks.
     quote_names = Cells.from_rows(
         [
             [
@@ -1173,7 +1175,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
                 "settlement_method",
                 "schedule_method",
                 "quantity_per",
-                "payment_time_lag",
+                "payment_day",
                 "payment_holiday_calendar",
                 "discount_curve_key",
             ]
@@ -1186,7 +1188,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
     def a_quote() -> object:
         return ENTRY["_CreateQuoteTemplate"]("fixed_float", quote_names, quote_values)
 
-    assert least_peak(a_quote) <= 4 * SLACK
+    assert least_peak(a_quote) <= 6 * SLACK
     template = ENTRY["_CreateTradeTemplate"]("fixed_float", names, values)
     rows = N // 4
     headers = Cells.from_rows([["trade_date", "contract_code", "quantity", "fixed_price"]])

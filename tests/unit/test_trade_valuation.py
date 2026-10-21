@@ -352,7 +352,7 @@ def toy() -> dict[str, Any]:
         "quantity_unit": "TOY",
         "settlement_method": "financial",
         "clearing_house": "TEST_CLEARER",
-        "payment_time_lag": "+2bd",
+        "payment_day": "+2bd",
         "payment_holiday_calendar": calendar,
     }
     template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*fields.values()))
@@ -560,37 +560,37 @@ def test_a_lag_past_the_sheets_calendar_fails_the_template_or_the_batch_in_the_l
         "clearing_house": "TEST_CLEARER",
         "payment_holiday_calendar": ENTRY["_CreateHolidayCalendar"](column([serial("2026-01-01")])),
     }
-    beyond = {**fields, "payment_time_lag": "+99999999999999999999bd"}
+    beyond = {**fields, "payment_day": "+99999999999999999999bd"}
     assert ENTRY["_CreateTradeTemplate"]("fixed_float", row(*beyond), row(*beyond.values())) == (
-        "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag has a count of 20 digits, "
+        "#ERROR _CreateTradeTemplate: ValueError: payment_day has a count of 20 digits, "
         "expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
     )
-    far = {**fields, "payment_time_lag": "+2100000bd"}
+    far = {**fields, "payment_day": "+2100000bd"}
     template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*far), row(*far.values()))
     assert ":trade_template:" in str(template)  # a lag the template cannot yet see past
     assert ENTRY["_CreateTrades"](toy["index"], row(*NG_HEADERS), rows(*NG_ROWS), template) == (
-        "#ERROR _CreateTrades: ValueError: payment_time_lag is '+2100000bd', counted from "
+        "#ERROR _CreateTrades: ValueError: payment_day is '+2100000bd', counted from "
         "2026-11-25 to 10076-05-06, expected a payment day within the sheet's calendar, "
         "1900-03-01 to 9999-12-31"
     )
-    long_lag = {**fields, "payment_time_lag": "+" + "9" * 4301 + "bd"}
+    long_lag = {**fields, "payment_day": "+" + "9" * 4301 + "bd"}
     shown = str(
         ENTRY["_CreateTradeTemplate"]("fixed_float", row(*long_lag), row(*long_lag.values()))
     )
     assert shown == (
-        "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag has a count of 4301 digits, "
+        "#ERROR _CreateTradeTemplate: ValueError: payment_day has a count of 4301 digits, "
         "expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
     )
     # Since #181 a chain, compound-date-offsets.md: read back as written beside the day it made,
     # the month's end, the business day before and the one after, 30 November for Z26 and 31
     # December for F27, under a payment calendar closing New Year's Day.
-    chain = {**fields, "payment_time_lag": "+0EM-1bd+1BD"}
+    chain = {**fields, "payment_day": "+0EM-1bd+1BD"}
     template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*chain), row(*chain.values()))
     made = ENTRY["_CreateTrades"](toy["index"], row(*NG_HEADERS), rows(*NG_ROWS), template)
     assert ":trades:" in str(made), made
     table = spilled(ENTRY["util_ReadHandle"](made))
     code, lag, pay = (
-        table[0].index(name) for name in ("contract_code", "payment_time_lag", "payment_date")
+        table[0].index(name) for name in ("contract_code", "payment_day", "payment_date")
     )
     assert pay == lag + 1  # the rule beside the day it made
     assert {line[lag] for line in table[2:]} == {"+0EM-1bd+1BD"}
@@ -633,7 +633,7 @@ PEN_FIELDS = (
     "route",
     "settlement_method",
     "clearing_house",
-    "payment_time_lag",
+    "payment_day",
     "payment_holiday_calendar",
 )
 
@@ -725,7 +725,7 @@ def test_the_phh_pen_values_on_the_sheet_as_the_page_says(
 def test_the_pens_dates_read_back_from_the_batch_and_the_preparation(phh: dict[str, Any]) -> None:
     batch = spilled(ENTRY["util_ReadHandle"](phh["trades"]))
     assert batch[0][batch[0].index("payment_date")] == "payment_date"
-    assert batch[2][batch[0].index("payment_time_lag")] == "+1bd"
+    assert batch[2][batch[0].index("payment_day")] == "+1bd"
     assert batch[2][batch[0].index("payment_date")] == serial("2027-06-28")
     assert batch[2][batch[0].index("contract_code")] == "N27"
     assert batch[2][batch[0].index("quote_quantity")] == 5_000.0
@@ -2139,7 +2139,7 @@ def test_two_starts_on_one_contract_share_a_batch_and_two_ends_pay_apart(
 # paying Monday 7 December, and B, -30 at 72 at +3bd, paying Wednesday the 9th; the settles of
 # the 2nd, 3rd and 4th 71, 75 and 73.
 PAYS_FIELDS = (*PEN_FIELDS[:6], "payment_holiday_calendar")
-PAYS_HEADERS = (*NG_HEADERS, "payment_time_lag")
+PAYS_HEADERS = (*NG_HEADERS, "payment_day")
 PAYS_HOLIDAYS = ["2026-01-01"]
 PAYS_A: list[object] = [1.0, serial("2026-11-30"), "Z26", 60.0, 70.0, "+1bd"]
 PAYS_B: list[object] = [2.0, serial("2026-11-30"), "Z26", -30.0, 72.0, "+3bd"]
@@ -2281,7 +2281,7 @@ def test_the_two_lags_read_back_from_the_batch_and_the_preparation_outlives_a_ti
 ) -> None:
     batch = spilled(ENTRY["util_ReadHandle"](pays["trades"]))
     columns = batch[0]
-    assert [line[columns.index("payment_time_lag")] for line in batch[2:]] == ["+1bd", "+3bd"]
+    assert [line[columns.index("payment_day")] for line in batch[2:]] == ["+1bd", "+3bd"]
     assert [line[columns.index("payment_date")] for line in batch[2:]] == [
         serial("2026-12-07"),
         serial("2026-12-09"),
@@ -2336,7 +2336,7 @@ MIXED_FIELDS = (
     "settlement_method",
     "trade_date",
     "fixed_price",
-    "payment_time_lag",
+    "payment_day",
     "payment_holiday_calendar",
 )
 MIXED_HEADERS = (
@@ -2489,7 +2489,7 @@ def test_the_mixed_batch_reads_back_each_rows_own_choices(mixed: dict[str, Any])
     assert column_of("quantity") == [1.0, -2.0, 3.0, 22.0, 5.0, 5.0]
     assert column_of("component_quantity") == [1.0, -62.0, 3.0, 22.0, 5.0, 5.0]
     assert column_of("quote_quantity") == [42.0, -62.0, 126.0, 22.0, 5.0, 5.0]
-    assert column_of("payment_time_lag") == ["+1bd"] * 6
+    assert column_of("payment_day") == ["+1bd"] * 6
     assert column_of("payment_date") == [
         serial("2027-01-04"),
         serial("2026-12-31"),
@@ -2584,7 +2584,7 @@ def test_the_mixed_batch_equals_its_singletons_on_the_sheet_and_a_uniform_field_
 ETE_CONTRACTS = [("X26", "2026-11-30"), ("Z26", "2026-12-31"), ("F27", "2027-01-29")]
 ETE_HOLIDAYS = ["2026-12-25"]
 ETE_LOTS: list[list[object]] = [["LOT", 1000.0, "BBL"], ["BBL", 1.0, "BBL"], ["GAL", 1.0, "GAL"]]
-ETE_FIELDS = ("route", "settlement_method", "clearing_house", "payment_time_lag")
+ETE_FIELDS = ("route", "settlement_method", "clearing_house", "payment_day")
 ETE_HEADERS = (
     "trade_id",
     "trade_date",
@@ -3476,7 +3476,7 @@ def waha() -> dict[str, Any]:
         "route": "cleared",
         "settlement_method": "financial",
         "clearing_house": "ICE Clear Europe",
-        "payment_time_lag": "+2bd",
+        "payment_day": "+2bd",
         "payment_holiday_calendar": pays,
     }
     template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*fields.values()))
@@ -3581,7 +3581,7 @@ def test_the_waha_batch_reads_back_its_days_and_a_tick_reuses_its_preparation(
     at = dict(zip(headers, table[2], strict=True))
     assert headers[13] == "payment_date"
     assert (at["contract_code"], at["schedule_method"]) == ("Z26", "lastday")
-    assert (at["payment_time_lag"], at["payment_date"]) == ("+2bd", serial("2026-12-03"))
+    assert (at["payment_day"], at["payment_date"]) == ("+2bd", serial("2026-12-03"))
     history, prepared, results = waha_state(waha, "2026-12-01", WAHA_X26, (-0.30, -0.10))
     ticked = str(
         ENTRY["_EvaluateTrades"](prepared, a_market(history, "WAHA", -0.25, -0.10), bridge.MISSING)
@@ -3602,7 +3602,7 @@ def test_an_iferc_batch_that_is_not_a_financial_lastday_one_is_refused_when_made
         **{
             key: value
             for key, value in waha["fields"].items()
-            if key not in ("payment_time_lag", "payment_holiday_calendar")
+            if key not in ("payment_day", "payment_holiday_calendar")
         },
         "settlement_method": "physical",
     }
@@ -4167,7 +4167,7 @@ BILATERAL_FIELDS = (
     "route",
     "settlement_method",
     "discount_curve_key",
-    "payment_time_lag",
+    "payment_day",
 )
 BILATERAL_VALUES: tuple[object, ...] = ("month", "bilateral", "financial", "SOFR", "+1bd")
 BILATERAL_REFUSAL = (
@@ -4352,7 +4352,7 @@ UNIT_FIELDS = (
     "payment_holiday_calendar",
     "marketing_reserve",
 )
-UNIT_HEADERS = (*NG_HEADERS, "payment_time_lag")
+UNIT_HEADERS = (*NG_HEADERS, "payment_day")
 UNIT_ROWS: list[list[object]] = [
     [1001.0, serial("2027-01-04"), "F27", 10.0, 70.0, "+261bd"],
     [1002.0, serial("2027-01-04"), "F27", -10.0, 70.0, "+522bd"],
@@ -5049,7 +5049,7 @@ def test_a_half_year_values_as_its_six_months_do() -> None:
         "quantity_unit": "LOT",
         "settlement_method": "financial",
         "clearing_house": "TEST_CLEARER",
-        "payment_time_lag": "+2bd",
+        "payment_day": "+2bd",
         "payment_holiday_calendar": ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")])),
     }
     template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*fields.values()))
@@ -5120,7 +5120,7 @@ def fee_template(route: str, broker: str | None = None) -> str:
         "route",
         "settlement_method",
         "clearing_house" if cleared else "counterparty",
-        "payment_time_lag",
+        "payment_day",
     ]
     values: list[object] = [
         "month",

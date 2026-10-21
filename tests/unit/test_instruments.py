@@ -65,7 +65,7 @@ def test_the_catalog_holds_the_fixed_float_with_its_nineteen_fields_in_order() -
         "quantity_unit",
         "quantity_per",
         "fixed_price",
-        "payment_time_lag",
+        "payment_day",
         "payment_holiday_calendar",
         "marketing_reserve",
     )
@@ -92,9 +92,10 @@ def test_the_catalog_holds_the_fixed_float_with_its_nineteen_fields_in_order() -
         "start_date",
         "end_date",
     ]
-    assert by_name["payment_time_lag"].required_when == "settlement_method = financial"
+    assert by_name["payment_day"].required_when == "settlement_method = financial"
     assert by_name["payment_holiday_calendar"].required_when == "settlement_method = financial"
     assert by_name["payment_holiday_calendar"].type is FieldType.HOLIDAY_CALENDAR
+    assert by_name["payment_day"].type is FieldType.DATE_OR_TEXT  # a date or a rule
     assert {field.name for field in FIXED_FLOAT.fields if field.type is FieldType.CODE} == {
         "schedule_method",
         "route",
@@ -118,7 +119,7 @@ def test_the_quote_metadata_says_what_a_quote_template_may_hold_and_a_quote_requ
         "settlement_method",
         "discount_curve_key",
         "quantity_per",
-        "payment_time_lag",
+        "payment_day",
         "payment_holiday_calendar",
     ]
     assert [field.name for field in FIXED_FLOAT.fields if field.quote_required] == [
@@ -128,7 +129,7 @@ def test_the_quote_metadata_says_what_a_quote_template_may_hold_and_a_quote_requ
         "quantity_per",
     ]
     assert by_name["discount_curve_key"].quote_required_when == "route = bilateral"
-    assert by_name["payment_time_lag"].quote_required_when == "settlement_method = financial"
+    assert by_name["payment_day"].quote_required_when == "settlement_method = financial"
     assert by_name["payment_holiday_calendar"].quote_required_when == (
         "settlement_method = financial"
     )

@@ -2,9 +2,10 @@
 template's row and taken, last and required, by every batch of trades whose ticket supplies the
 rest. The template retains the definition, the fields its row named and its own values and no
 index, so one template serves every compatible index. It reads each value it holds for the rule
-intrinsic to its field, a code from its list, a payment rule of one or more date instructions
-read whole, a whole quantity, zero included, a finite price, and leaves the rules that need the
-ticket or the index, which fields are required, whether the two overlap, the schedule, whether a
+intrinsic to its field, a code from its list, a payment day as the date it holds or as a rule
+of one or more date instructions read whole, a whole quantity, zero included, a finite price,
+and leaves the rules that need the ticket or the index, which fields are required, whether the
+two overlap, the schedule, whether a
 contract code is the period of any row, to the resolution of a batch: since #172 a template's
 contract_code is text the seam typed and nothing more until a row without dates uses it, and a
 period field's cell may hold nothing, the header then owning the field for every batch while no
@@ -45,8 +46,10 @@ class TradeTemplate:
     under it, so that a ticket's column of the same name is refused whatever either holds; and
     the defaults by field name, in the same order: each the one value the row held, a number as
     a float, a date as a numpy day, text and a code as text, a holiday calendar as the object its
-    handle stood for; owned, each being a scalar or an object the library already holds, and
-    read for nothing until a batch is resolved. Since #172 a name may stand with no default: a
+    handle stood for, and since payment-day-date-or-rule.md the payment day as a DayOrRule, the
+    day or the rule text the row held; owned, each being a scalar or an object the library
+    already holds, and read for nothing until a batch is resolved. Since #172 a name may stand
+    with no default: a
     period field, contract_code, start_date or end_date, whose cell held nothing, which the
     template then supplies to no row, as its page says."""
 
@@ -81,12 +84,25 @@ def by_template(selector: TradeTemplate) -> Instrument:
     return selector.instrument
 
 
+@dataclass(frozen=True, slots=True)
+class DayOrRule:
+    """A payment day as a template holds it, since payment-day-date-or-rule.md: the one day the
+    row entered, or the one rule text it entered, read whole for the grammar when the template
+    was made, the other None; the seam told the two apart by type, so nothing here or after
+    asks which a value is."""
+
+    day: np.datetime64 | None
+    rule: str | None
+
+
 def field_value(values: FieldValues, name: str) -> object:
     """The one value of a field in a one-row record, as the scalar its type names, read for the
     field's own rule where it has one: a number for the kernel's, text for its list or grammar; a
     date, a holiday calendar and since #172 a contract code mean what they are, the code read for
-    its months by the resolution, for the rows that book by it, and by nothing here. A quote
-    template reads its values by the same rule, since template-based-quoting.md."""
+    its months by the resolution, for the rows that book by it, and by nothing here; a payment
+    day, since payment-day-date-or-rule.md, is the day it holds, or its rule text read for the
+    grammar, as a DayOrRule. A quote template reads its values by the same rule, since
+    template-based-quoting.md."""
     field_type = values.field(name).type
     match field_type:
         case FieldType.NUMBER:
@@ -103,6 +119,15 @@ def field_value(values: FieldValues, name: str) -> object:
             return text
         case FieldType.HOLIDAY_CALENDAR:
             return values.objects(name)[0]
+        case FieldType.DATE_OR_TEXT:
+            entered = values.dates_or_texts(name)
+            if entered.is_date[0]:
+                return DayOrRule(entered.dates[0], None)
+            text = entered.texts[0]
+            read = READERS.get(name)
+            if read is not None:
+                read(name, text)
+            return DayOrRule(None, text)
         case _:
             assert_never(field_type)
 
@@ -204,7 +229,7 @@ READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
         "route": route_of,
         "settlement_method": settlement_of,
         "quantity_per": quantity_per_of,
-        "payment_time_lag": payment_rule_of,
+        "payment_day": payment_rule_of,  # the rule form; a date is read by nobody
         "discount_curve_key": curve_name,  # the curve's own name rule, named-curves-slice-3.md
         "currency": currency_of,  # the cashflow instrument's, since #200
     }

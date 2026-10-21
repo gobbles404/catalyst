@@ -33,7 +33,7 @@ FIELDS = (
     "route",
     "settlement_method",
     "clearing_house",
-    "payment_time_lag",
+    "payment_day",
     "payment_holiday_calendar",
 )
 # An NG-like index, one lot a unit: V26 the boundary, X26 observing 28 October, Z26 25 November and
@@ -76,7 +76,7 @@ def a_template(
         calendar,
     ]
     if lag is None:
-        k = fields.index("payment_time_lag")
+        k = fields.index("payment_day")
         del fields[k], values[k]
     if route == "bilateral":  # a bilateral row faces a counterparty and names no clearing house
         k = fields.index("clearing_house")
@@ -320,7 +320,7 @@ def test_discounting_and_collection_keep_the_contract_month_and_the_payment_mont
             [6.0, serial("2026-10-01"), "X26", 10.0, 3.0, "+2bd"],
             [7.0, serial("2026-10-01"), "X26", 10.0, 3.0, "+5bd"],
         ],
-        (*HEADERS, "payment_time_lag"),
+        (*HEADERS, "payment_day"),
     )
     curve = unit_curve((AS_OF, 1.0), ("2026-10-30", 0.95), ("2026-11-04", 0.90))
     results = valued_on(two_groups, history, market, curve)

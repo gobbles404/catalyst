@@ -44,7 +44,7 @@ from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
-from goosedove.instruments.fields import FieldValues
+from goosedove.instruments.fields import DatesOrTexts, FieldValues
 from goosedove.trades.contributions import CrossContribution, RateContribution
 from goosedove.trades.encoding import PaymentAxes, encoded
 from goosedove.trades.evaluation import trade_results
@@ -155,7 +155,11 @@ def terms_of(
     payment = (
         None
         if settlement is Settlement.PHYSICAL
-        else PaymentTerms(tuple(f"+{lag}bd" for lag in lags[:n]), (PAY_DAYS,) * n, dates(*pays[:n]))
+        else PaymentTerms(
+            DatesOrTexts.of_texts(tuple(f"+{lag}bd" for lag in lags[:n])),
+            (PAY_DAYS,) * n,
+            dates(*pays[:n]),
+        )
     )
     return resolved_trades(
         FIXED_FLOAT, ix, spec(n), route, settlement,
@@ -503,7 +507,7 @@ def test_the_two_trades_made_through_the_creators_value_the_same() -> None:
         "contract_code": ("F27", "F27"),
         "quantity": numbers(10.0, -10.0),
         "fixed_price": numbers(70.0, 70.0),
-        "payment_time_lag": ("+261bd", "+522bd"),
+        "payment_day": DatesOrTexts.of_texts(("+261bd", "+522bd")),
     }
     ticket = FieldValues(FIXED_FLOAT, 2, tuple(columns), columns)
     batch = trades(UNIT, ticket, template, UNITS, WorkCounter())

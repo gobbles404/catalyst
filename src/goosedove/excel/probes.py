@@ -190,6 +190,11 @@ def _typed(values: FieldValues, name: str) -> list[object]:
             return list(values.texts(name))
         case FieldType.HOLIDAY_CALENDAR:
             return [named(obj) for obj in values.objects(name)]
+        case FieldType.DATE_OR_TEXT:  # a date's serial or the text, payment-day-date-or-rule.md
+            entered = values.dates_or_texts(name)
+            serials = iter((entered.dates - EXCEL_EPOCH).astype(np.int64).tolist())
+            texts = iter(entered.texts)
+            return [next(serials) if dated else next(texts) for dated in entered.is_date]
         case _:
             assert_never(values.field(name).type)
 

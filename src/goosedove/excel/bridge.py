@@ -61,7 +61,7 @@ from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index import Index
 from goosedove.instruments.definitions import FieldType, Instrument
-from goosedove.instruments.fields import FieldValues, selected
+from goosedove.instruments.fields import DatesOrTexts, FieldValues, selected
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.futures_fixings import FuturesFixings
@@ -109,6 +109,47 @@ type FieldRow[S] = FieldValues
 type FieldRows[S] = FieldValues
 
 
+def _mixed_column(
+    kinds: NDArray[np.uint8],
+    slots: NDArray[np.float64],
+    top: int,
+    j: int,
+    column: DatesOrTexts,
+    rows: int,
+) -> None:
+    """A table column of a date or a text per cell, since payment-day-date-or-rule.md: as long
+    as the first column by its mask, the kinds by that mask, the dated cells' serials into the
+    slots, checked as a date column is and a bad day named by its cell."""
+    if column.is_date.size != rows:
+        raise ValueError(
+            f"column {j + 1} holds {column.is_date.size} rows, expected {rows}, as column 1 does"
+        )
+    kinds[top:, j] = np.where(column.is_date, NUMBER_CODE, TEXT_CODE)
+    serials, bad, reason = _serials(column.dates)
+    if bad is not None:
+        r = int(np.flatnonzero(column.is_date)[bad])
+        raise _BadResult(f"result cell ({top + 1 + r}, {j + 1}) {reason}")
+    slots[top:, j][column.is_date] = serials
+
+
+def _gathered_texts(
+    headings: Sequence[Sequence[str]],
+    columns: "Sequence[NDArray[Any] | tuple[str, ...] | DatesOrTexts]",
+    body_kinds: NDArray[np.uint8],
+) -> tuple[str, ...]:
+    """The texts of a table with a column of two kinds, in sheet order: the headings, then the
+    body's text cells row by row, found through one object grid of the body, each text column
+    and each mixed column's texts assigned whole, and taken where the kinds say text."""
+    grid = np.empty(body_kinds.shape, dtype=object)
+    for j, column in enumerate(columns):
+        if isinstance(column, tuple):
+            grid[:, j] = column
+        elif isinstance(column, DatesOrTexts):
+            grid[~column.is_date, j] = np.array(column.texts, dtype=object)
+    body = grid[body_kinds == TEXT_CODE].tolist()
+    return tuple(itertools.chain(itertools.chain.from_iterable(headings), body))
+
+
 @dataclass(frozen=True, slots=True, eq=False)
 class MixedArray:
     """A range whose cells may be numbers, nonempty text and booleans together, in any shape.
@@ -143,18 +184,25 @@ class MixedArray:
 
     @classmethod
     def table(
-        cls, headings: Sequence[Sequence[str]], *columns: NDArray[Any] | tuple[str, ...]
+        cls,
+        headings: Sequence[Sequence[str]],
+        *columns: NDArray[Any] | tuple[str, ...] | DatesOrTexts,
     ) -> "MixedArray":
-        """A rectangle for the way out: rows of text over columns of one kind each.
+        """A rectangle for the way out: rows of text over columns of one kind each, or since
+        payment-day-date-or-rule.md of a date or a text per cell.
 
         Each heading row holds one text per column. Each column is a tuple of texts, an array
-        of numbers, an array of numpy days, which go out as the serials the sheet formats, or an
-        array of booleans, all of one length. The kinds and the slots are filled a column at a
-        time and the texts gathered in sheet order, so nothing runs per cell. A day outside the
-        calendar fails as a date result fails, naming the cell.
+        of numbers, an array of numpy days, which go out as the serials the sheet formats, an
+        array of booleans, or a DatesOrTexts record, its dates serials and its texts texts by
+        its mask, all of one length. The kinds and the slots are filled a column at a time and
+        the texts gathered in sheet order, so nothing runs per cell; with a column of two kinds
+        the texts are gathered through one object grid of the body, taken where the kinds say
+        text, since a stride no longer finds them. A day outside the calendar fails as a date
+        result fails, naming the cell.
         """
         width = len(columns)
-        rows = len(columns[0]) if columns else 0
+        first = columns[0] if columns else ()
+        rows = first.is_date.size if isinstance(first, DatesOrTexts) else len(first)
         top = len(headings)
         for r, row in enumerate(headings):
             if len(row) != width:
@@ -165,7 +213,12 @@ class MixedArray:
         slots = np.full((top + rows, width), np.nan)
         kinds[:top] = TEXT_CODE
         text_columns: list[tuple[str, ...]] = []
+        mixed = False
         for j, column in enumerate(columns):
+            if isinstance(column, DatesOrTexts):
+                _mixed_column(kinds, slots, top, j, column, rows)
+                mixed = True
+                continue
             if len(column) != rows:
                 raise ValueError(
                     f"column {j + 1} holds {len(column)} rows, expected {rows}, as column 1 does"
@@ -174,11 +227,9 @@ class MixedArray:
                 kinds[top:, j] = TEXT_CODE
                 text_columns.append(column)
                 continue
-            # Exactly a plain one-dimensional array: a subclass, a masked array say, could hide
-            # cells behind the storage the copy below would take, as the array results refuse.
-            if type(column) is not np.ndarray or column.ndim != 1:
-                raise TypeError(f"column {j + 1} is {describe(column)}, which a table cannot hold")
             kinds[top:, j], slots[top:, j] = _table_column(column, top + 1, j + 1)
+        if mixed:
+            return cls(kinds, slots, _gathered_texts(headings, columns, kinds[top:]))
         # Sheet order: the heading rows, then each body row's texts left to right, which is the
         # transpose of the text columns laid side by side: of every k texts of the body, the j-th
         # is from text column j. One list is made at its full length, the headings assigned to its
@@ -1024,8 +1075,34 @@ def _field_handles(
     return tuple(held)
 
 
-# Each field type's words for a cell and its column rule: text for a code, and a handle column
-# for a field that holds one.
+def _field_dates_or_texts(body: _FieldBody, j: int, rows: NDArray[np.bool_] | None) -> DatesOrTexts:
+    """A column whose cells hold a date or a text, since payment-day-date-or-rule.md, told apart
+    by type and nothing else: a number that is a whole serial inside the calendar is a date, a
+    nonempty text is a text, and any other cell, a boolean, a fraction of a day, a number
+    outside the calendar, a blank or an empty text, is named as the first bad one down the
+    column, `expected date or text`. Two looks at the column, one per kind, the typed values
+    of each kind taken once in row order, and the mask that says which rows hold a date, read-
+    only, beside them."""
+    kinds = body.cells.kinds[:, j]
+    is_date = (kinds == NUMBER_CODE) & ~_not_dates(body.cells.numbers[:, j])
+    is_text = kinds == TEXT_CODE
+    if body.empty is not None:
+        is_text &= ~body.empty[:, j]
+    bad = ~(is_date | is_text)
+    if rows is not None:
+        bad &= rows
+        is_date &= rows
+        is_text &= rows
+    if bad.any():
+        raise _field_bad(body, j, bad, "date or text")
+    dates = _as_days(body.cells.numbers[is_date, j])
+    is_date.setflags(write=False)
+    dates.setflags(write=False)
+    return DatesOrTexts(is_date, dates, tuple(body.texts[body.places[is_text, j]]))
+
+
+# Each field type's words for a cell and its column rule: text for a code, a handle column
+# for a field that holds one, and a date or a text for the payment day.
 _FIELD_COLUMNS: Final[
     dict[FieldType, tuple[str, Callable[[_FieldBody, int, NDArray[np.bool_] | None], object]]]
 ] = {
@@ -1037,6 +1114,7 @@ _FIELD_COLUMNS: Final[
         "holiday calendar handle",
         partial(_field_handles, HolidayCalendar, "holiday calendar handle"),
     ),
+    FieldType.DATE_OR_TEXT: ("date or text", _field_dates_or_texts),
 }
 
 
@@ -1226,7 +1304,11 @@ def _beyond_exact(array: NDArray[Any]) -> NDArray[np.bool_]:
 def _table_column(column: NDArray[Any], row: int, col: int) -> tuple[int, NDArray[Any]]:
     """A table column's kind code and what fills its slots, checked before the copy into the
     slots would hide what the rule could no longer see, as the array results check before their
-    conversion; a bad cell is named as INDEX counts it, `row` being the first body row."""
+    conversion; a bad cell is named as INDEX counts it, `row` being the first body row. Exactly
+    a plain one-dimensional array: a subclass, a masked array say, could hide cells behind the
+    storage the copy would take, as the array results refuse."""
+    if type(column) is not np.ndarray or column.ndim != 1:
+        raise TypeError(f"column {col} is {describe(column)}, which a table cannot hold")
     kind = column.dtype.kind
     if kind == "M" and _unit(column) == "D":
         serials, bad, reason = _serials(column)
