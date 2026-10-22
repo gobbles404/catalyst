@@ -7,7 +7,7 @@ selects among. One record per
 history; a tick reads it and makes nothing of it again. docs/library/trades/kernel.md is the
 page."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import assert_never, cast
 
@@ -22,7 +22,7 @@ from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market_history import MarketHistory
 from goosedove.trades.display_axes import EarlyRisk, PeriodAxis, early_risk, period_axis
-from goosedove.trades.encoding import Encoded, group_words
+from goosedove.trades.encoding import Encoded, EncodedLeg, group_words
 from goosedove.trades.terms import Route
 
 PREPARED_SLOTS = "prepared_slots"  # slots placed on the calendar and told live from fixed
@@ -60,84 +60,96 @@ class UnpaidPayments:
 
 
 @dataclass(frozen=True, slots=True)
-class PreparedTrades:
-    """The encoding and the history, by reference, and what the two make together, read-only.
+class PreparedLeg:
+    """One leg's side of the preparation, since two-index-fixed-float.md: the leg's encoding and
+    the history it was prepared against, by reference, and what the two make together, read-only.
 
-    Per slot, aligned with the encoding's slots: is_fixed[s], whether the slot's day is on the
-    fixed side of the valuation date, so its price is the history's settle on that day, else a
-    quote; dated_live_exposure[s], the slot's exposure where it is live and zero where it has
-    fixed, a contribution of nothing rather than a price of nothing, the settlement currency per
-    unit of quote price; dated_live_lots[s], the same exposure counted in lots of the index's
-    reporting lot, the exposure over the lot's coefficient. Per payment group, aligned
-    with the encoding's groups, a contract paying on two days being two of them: set_amount[g],
-    the sum over the group's fixed slots of exposure times settle; is_settled[g], whether every
-    slot of the group has fixed and it pays on or before the valuation date, so its amount is
-    modeled as cash.
+    Per slot, aligned with the leg's slots: is_fixed[s], whether the slot's day is on the fixed
+    side of the valuation date, so its price is the history's settle on that day, else a quote;
+    dated_live_exposure[s], the slot's exposure where it is live and zero where it has fixed, a
+    contribution of nothing rather than a price of nothing, the settlement currency per unit of
+    quote price; dated_live_lots[s], the same exposure counted in lots of the index's reporting
+    lot, the exposure over the lot's coefficient. Per payment group, aligned with the trade's
+    groups: set_amount[g], the sum over the group's fixed slots on this leg of exposure times
+    settle, the leg's fixed amount of the group.
 
     Then the live side for the tick: live_slot, the positions of the live slots on the dated axis;
     live_references, the schedule rows of the distinct contracts those slots reference, in the
     schedule's order, which the market takes to answer their quotes; reference_of_live_slot, each
     live slot's place among them, so that one quote per reference is gathered onto the slots.
-    And three sums: offset_unsettled and set_unsettled, the entry-price offsets and set amounts
-    of the groups not yet settled, which the tick adds to the live amount for the mark; and cash,
-    the whole amounts of the settled groups, offset and set together, moved out of the mark on
-    the day they pay and never discounted. And the risk, which no tick changes:
-    price_sensitivity[r], the live exposure summed by reference over the batch's whole axis, the
-    encoding's references, zero where every slot of a reference has fixed, the settlement
-    currency the mark moves for a move of one unit of quote price in that contract;
-    nominal_delta[r],
-    the same sensitivity over the reporting lot's coefficient, the batch's exposure still to
-    price in lots of that specification, signed and fractional, a fully live lot one and a lot
-    half of whose observation weight has fixed a half; nominal_delta_total, their sum; and
-    since #166
-    the same lots by time, daily_lots[d] the live lots summed onto the encoding's observation
-    days, and since #186 monthly_lots[m] the nominal delta by reference summed onto the encoding's
-    contract months and yearly_lots[y] onto its contract years, the month and the year a
-    contract is named for whatever days it is observed on, the three views _ReportRisk selects
-    among, a bucket's lots zero once its contracts have fixed and its row kept; every one of
-    them checked finite before the record is
-    made; the result shares them. And since #176, for a bilateral financial batch, unpaid_payments,
-    the distinct payment days of the groups not yet settled with each such group's place among
-    them and its time fraction, made once here, since the groups settled and the valuation date
-    change only when a batch is prepared again, so that a tick gathers the curve's factors and
-    sorts nothing; None for a cleared batch and for a physical one. And since #186,
-    risk-contract-month-bucketing.md, by_month and by_year, the display axes of the month and
-    the year reports, PeriodAxis, consecutive periods from the valuation day's through the
-    farthest contract or payment period with every saved period's place, made here since the
-    valuation day is the history's; and early_nominal, the facts refusing a month or a year
-    report whose nominal lots stand in a period before the start, or none, which a reader words
-    with the measure asked for and raises, scanning nothing; a cleared result's delta, the same
-    lots, is refused from the same facts."""
+    And the risk, which no tick changes: price_sensitivity[r], the live exposure summed by
+    reference over the leg's whole axis, the encoding's references, zero where every slot of a
+    reference has fixed, the settlement currency the mark moves for a move of one unit of quote
+    price in that contract; nominal_delta[r], the same sensitivity over the reporting lot's
+    coefficient, the leg's exposure still to price in lots of that specification, signed and
+    fractional, a fully live lot one and a lot half of whose observation weight has fixed a
+    half; nominal_delta_total, their sum; and since #166 the same lots by time, daily_lots[d]
+    the live lots summed onto the encoding's observation days, and since #186 monthly_lots[m]
+    the nominal delta by reference summed onto the encoding's contract months and yearly_lots[y]
+    onto its contract years, the month and the year a contract is named for whatever days it is
+    observed on, the three views _ReportRisk selects among, a bucket's lots zero once its
+    contracts have fixed and its row kept; every one of them checked finite before the record is
+    made; the result shares them. And since #186, risk-contract-month-bucketing.md, by_month and
+    by_year, the display axes of the month and the year reports, PeriodAxis, consecutive periods
+    from the valuation day's through the farthest contract or payment period with every saved
+    period's place, made here since the valuation day is the history's; and early_nominal, the
+    facts refusing a month or a year report whose nominal lots stand in a period before the
+    start, or none, which a reader words with the measure asked for and raises, scanning
+    nothing; a cleared result's delta, the same lots, is refused from the same facts."""
 
-    encoded: Encoded
+    encoded: EncodedLeg
     history: MarketHistory
     is_fixed: NDArray[np.bool_]
     dated_live_exposure: NDArray[np.float64]
     dated_live_lots: NDArray[np.float64]
     set_amount: NDArray[np.float64]
-    is_settled: NDArray[np.bool_]
     live_slot: NDArray[np.intp]
     live_references: NDArray[np.intp]
     reference_of_live_slot: NDArray[np.intp]
-    offset_unsettled: float
-    set_unsettled: float
-    cash: float
     price_sensitivity: NDArray[np.float64]
     nominal_delta: NDArray[np.float64]
     nominal_delta_total: float
     daily_lots: NDArray[np.float64]
     monthly_lots: NDArray[np.float64]
     yearly_lots: NDArray[np.float64]
-    unpaid_payments: UnpaidPayments | None
     by_month: PeriodAxis
     by_year: PeriodAxis
     early_nominal: EarlyRisk
 
 
-def _the_slot_rows(encoded: Encoded, calendar: Calendar) -> NDArray[np.intp]:
-    """Each slot's row of the calendar: calendar_rows over the slots' days, a slot named by its
-    first trade."""
-    return calendar_rows(encoded.terms.schedule, encoded.slot_date, calendar, encoded.slot_trade)
+@dataclass(frozen=True, slots=True)
+class PreparedTrades:
+    """The encoding by reference, the legs, one PreparedLeg per leg of the encoding in leg order,
+    one today, each prepared against its own history, and what the trade makes of them together,
+    read-only, since two-index-fixed-float.md.
+
+    Per payment group, aligned with the encoding's groups, a contract paying on two days being
+    two of them: set_amount[g], the legs' set amounts summed, the trade's fixed amount of the
+    group, the one leg's own array today; is_settled[g], whether every slot of the group on every
+    leg has fixed and it pays on or before the valuation date, so its amount is modeled as cash.
+    Then three sums: offset_unsettled and set_unsettled, the entry-price offsets and set amounts
+    of the groups not yet settled, which the tick adds to the live amount for the mark; and cash,
+    the whole amounts of the settled groups, offset and set together, moved out of the mark on
+    the day they pay and never discounted. And since #176, for a bilateral financial batch,
+    unpaid_payments, the distinct payment days of the groups not yet settled with each such
+    group's place among them and its time fraction, made once here, since the groups settled and
+    the valuation date change only when a batch is prepared again, so that a tick gathers the
+    curve's factors and sorts nothing; None for a cleared batch and for a physical one."""
+
+    encoded: Encoded
+    legs: tuple[PreparedLeg, ...]
+    set_amount: NDArray[np.float64]
+    is_settled: NDArray[np.bool_]
+    offset_unsettled: float
+    set_unsettled: float
+    cash: float
+    unpaid_payments: UnpaidPayments | None
+
+
+def _the_slot_rows(leg: EncodedLeg, calendar: Calendar) -> NDArray[np.intp]:
+    """Each slot's row of the calendar: calendar_rows over the leg's slots' days, a slot named by
+    its first trade."""
+    return calendar_rows(leg.leg.schedule, leg.slot_date, calendar, leg.slot_trade)
 
 
 def calendar_rows(
@@ -214,6 +226,7 @@ def _unpaid_payments(
 
 def _the_set_amounts(
     encoded: Encoded,
+    leg: EncodedLeg,
     is_fixed: NDArray[np.bool_],
     settles: NDArray[np.float64],
     currency: str,
@@ -225,16 +238,16 @@ def _the_set_amounts(
     the group and never on one of its trades."""
     with np.errstate(over="ignore", invalid="ignore"):
         set_of_slot = np.zeros(is_fixed.size)
-        set_of_slot[is_fixed] = encoded.slot_exposure[is_fixed] * settles
+        set_of_slot[is_fixed] = leg.slot_exposure[is_fixed] * settles
         set_amount = np.bincount(
-            encoded.slot_group, weights=set_of_slot, minlength=encoded.group_contract.size
+            leg.slot_group, weights=set_of_slot, minlength=leg.group_contract.size
         )
     outrun = ~np.isfinite(set_of_slot)
     if outrun.any():
         s = int(outrun.argmax())
         settle = float(settles[int(np.count_nonzero(is_fixed[:s]))])  # the fixed slots before it
         raise ValueError(
-            f"{encoded.named_slot(s)}, fixed at {settle!r}, has {float(set_of_slot[s])!r} of set "
+            f"{leg.named_slot(s)}, fixed at {settle!r}, has {float(set_of_slot[s])!r} of set "
             f"amount, expected a finite amount of {currency}; its exposure times the settle "
             "outruns the largest number"
         )
@@ -242,8 +255,8 @@ def _the_set_amounts(
     if outrun.any():
         g = int(outrun.argmax())
         group = group_words(
-            encoded.terms.schedule.codes,
-            encoded.group_contract,
+            leg.leg.schedule.codes,
+            leg.group_contract,
             encoded.payment_date,
             g,
             encoded.keys,
@@ -257,7 +270,7 @@ def _the_set_amounts(
 
 
 def _the_sensitivity(
-    encoded: Encoded, dated_live_exposure: NDArray[np.float64], conventions: IndexConventions
+    leg: EncodedLeg, dated_live_exposure: NDArray[np.float64], conventions: IndexConventions
 ) -> NDArray[np.float64]:
     """The price sensitivity by reference, the live exposure summed over the batch's whole axis,
     one bincount, zero where every slot of a reference has fixed; since #190 finite by contract,
@@ -265,15 +278,15 @@ def _the_sensitivity(
     contract."""
     with np.errstate(over="ignore", invalid="ignore"):
         price_sensitivity = np.bincount(
-            encoded.reference_of_slot,
+            leg.reference_of_slot,
             weights=dated_live_exposure,
-            minlength=encoded.references.size,
+            minlength=leg.references.size,
         )
     outrun = ~np.isfinite(price_sensitivity)
     if outrun.any():
         r = int(outrun.argmax())
         raise ValueError(
-            f"{encoded.terms.schedule.codes[int(encoded.references[r])]} has "
+            f"{leg.leg.schedule.codes[int(leg.references[r])]} has "
             f"{float(price_sensitivity[r])!r} of price sensitivity, expected a finite amount of "
             f"{conventions.currency_unit} per {conventions.quote_currency_unit}/"
             f"{conventions.quote_quantity_unit}; its live exposures, each finite, sum past the "
@@ -305,16 +318,18 @@ def _the_unsettled_totals(
 
 
 def prepared_trades(
-    encoded: Encoded, history: MarketHistory, counter: WorkCounter
+    encoded: Encoded, histories: Sequence[MarketHistory], counter: WorkCounter
 ) -> PreparedTrades:
     """The one way to make a PreparedTrades: four rules, checked once, in this order, the first
     failure being the message; then the arrays, one pass over the slots and one read per fixed slot.
 
-    The history is over the trades' index, the one object the terms hold, as the history itself
-    requires of its fixings; another index of the same name is another index. On a futures index
-    each slot's day is a day of the calendar, which runs from the day after the schedule's first
-    expiry to its last: the first contract only bounds the calendar, so a slot on or before its
-    expiry is refused by name, nothing ever pricing it. On an IFERC index, since #167, each slot's
+    The histories are one per leg of the trades, in leg order, since two-index-fixed-float.md,
+    else refused; each is over its leg's index, the one object the leg holds, as the history
+    itself requires of its fixings; another index of the same name is another index. On a
+    futures index each slot's day is a day of the calendar, which runs from the day after the
+    schedule's first expiry to its last: the first contract only bounds the calendar, so a slot
+    on or before its expiry is refused by name, nothing ever pricing it. On an IFERC index,
+    since #167, each slot's
     day is a month's publication day and its row that month's, found by one search, the first
     month a month like any other. A slot has fixed when the calendar marks its day fixed, which
     is the day after it at the earliest, an observation staying live on its own day as the
@@ -353,51 +368,56 @@ def prepared_trades(
     nothing per observation, nothing per day of the calendar.
     """
     terms = encoded.terms
+    if len(histories) != len(terms.legs):
+        raise ValueError(
+            f"histories are {len(histories)}, expected {len(terms.legs)}, one per leg of the trades"
+        )
+    leg = encoded.legs[0]
+    index = leg.leg.index
+    history = histories[0]
     calendar = history.calendar
-    if calendar.index is not terms.index:
+    if calendar.index is not index:
         raise ValueError(
             f"history is over another index, {calendar.index.name!r}, "
-            f"expected the trades', {terms.index.name!r}"
+            f"expected the trades', {index.name!r}"
         )
-    codes = terms.schedule.codes
-    slot_rows = _the_slot_rows(encoded, calendar)
+    codes = leg.leg.schedule.codes
+    slot_rows = _the_slot_rows(leg, calendar)
     is_fixed = calendar.is_fixed[slot_rows]
     as_of = calendar.valuation_date.as_of
     if encoded.payment_date is None:
         # A physical batch is a futures batch: the kernel refuses a physical IFERC one.
-        expiries = cast(FuturesSchedule, terms.schedule).future_expiry[encoded.group_contract]
+        expiries = cast(FuturesSchedule, leg.leg.schedule).future_expiry[leg.group_contract]
         expired = calendar.is_fixed[(expiries - calendar.dates[0]).astype(np.intp)]
         if expired.any():
             g = int(expired.argmax())
             k = int((encoded.group_of_component == g).argmax())  # its first component
             raise ValueError(
-                f"{terms.named(k)} on {codes[int(encoded.group_contract[g])]} expired "
+                f"{terms.named(k)} on {codes[int(leg.group_contract[g])]} expired "
                 f"{expiries[g]}, "
                 f"before valuation date {as_of}; "
                 "a physical fixed_float after its expiry is not supported"
             )
-        is_settled = np.zeros(encoded.group_contract.size, dtype=np.bool_)
+        is_settled = np.zeros(leg.group_contract.size, dtype=np.bool_)
     else:
-        unfixed = np.bincount(
-            encoded.slot_group, weights=~is_fixed, minlength=encoded.group_contract.size
-        )
+        unfixed = np.bincount(leg.slot_group, weights=~is_fixed, minlength=leg.group_contract.size)
         is_settled = (unfixed == 0) & (encoded.payment_date <= as_of)
     fixed_rows = slot_rows[is_fixed]
     settles = history.fixing_prices[np.searchsorted(history.fixed_rows, fixed_rows)]
-    conventions = terms.index.conventions
+    conventions = index.conventions
     currency = conventions.currency_unit
     # Since #190 each number made here is finite before the record is made, the arithmetic
     # running with numpy's flags down and the rules judging, else the first that is not is
     # refused by its operation and its slot, group, contract or the batch.
-    set_amount = _the_set_amounts(encoded, is_fixed, settles, currency)
+    set_amount = _the_set_amounts(encoded, leg, is_fixed, settles, currency)
     is_live = ~is_fixed
-    dated_live_exposure = np.where(is_live, encoded.slot_exposure, 0.0)
+    dated_live_exposure = np.where(is_live, leg.slot_exposure, 0.0)
     live_slot = np.flatnonzero(is_live)
     live_references, reference_of_live_slot = np.unique(
-        encoded.slot_reference[live_slot], return_inverse=True
+        leg.slot_reference[live_slot], return_inverse=True
     )
-    lot = terms.reporting_lot
-    price_sensitivity = _the_sensitivity(encoded, dated_live_exposure, conventions)
+    lot = leg.leg.reporting_lot
+    price_sensitivity = _the_sensitivity(leg, dated_live_exposure, conventions)
     # Finite legs may outrun the largest number, each way at once; the overflow and the invalid
     # flags stay down and the rules judge, a sum of opposite infinities among them.
     with np.errstate(over="ignore", invalid="ignore"):
@@ -410,14 +430,14 @@ def prepared_trades(
     if outrun.any():
         s = int(outrun.argmax())
         raise ValueError(
-            f"{encoded.named_slot(s)}, has {float(dated_live_lots[s])!r} live lots, expected a "
+            f"{leg.named_slot(s)}, has {float(dated_live_lots[s])!r} live lots, expected a "
             f"finite number of {words}; the exposure in lots outruns the largest number"
         )
     outrun = ~np.isfinite(nominal_delta)
     if outrun.any():
         r = int(outrun.argmax())
         raise ValueError(
-            f"{codes[int(encoded.references[r])]} has {float(nominal_delta[r])!r} of nominal "
+            f"{codes[int(leg.references[r])]} has {float(nominal_delta[r])!r} of nominal "
             "delta, "
             f"expected a finite number of {words}; the exposure in lots outruns the largest number"
         )
@@ -427,21 +447,19 @@ def prepared_trades(
             "number of "
             f"{words}; the contracts' deltas, each finite, sum past the largest number"
         )
-    daily_lots = np.bincount(
-        encoded.day_of_slot, weights=dated_live_lots, minlength=encoded.days.size
-    )
+    daily_lots = np.bincount(leg.day_of_slot, weights=dated_live_lots, minlength=leg.days.size)
     monthly_lots = np.bincount(
-        encoded.contract_month_of_reference,
+        leg.contract_month_of_reference,
         weights=nominal_delta,
-        minlength=encoded.contract_months.size,
+        minlength=leg.contract_months.size,
     )
     yearly_lots = np.bincount(
-        encoded.contract_year_of_month, weights=monthly_lots, minlength=encoded.contract_years.size
+        leg.contract_year_of_month, weights=monthly_lots, minlength=leg.contract_years.size
     )
     for label, starts, lots in (
-        ("the day", encoded.days, daily_lots),
-        ("the contract month from", encoded.contract_months, monthly_lots),
-        ("the contract year from", encoded.contract_years, yearly_lots),
+        ("the day", leg.days, daily_lots),
+        ("the contract month from", leg.contract_months, monthly_lots),
+        ("the contract year from", leg.contract_years, yearly_lots),
     ):  # the three views, not the rows: a bucket's sum can outrun what its parts did not
         outrun = ~np.isfinite(lots)
         if outrun.any():
@@ -462,19 +480,17 @@ def prepared_trades(
     # Since #186 the month and year displays start at the valuation day's period: the axes made
     # once here, two searches a bucket, and the nominal lots before the start checked zero.
     paid = encoded.payment_axes
-    by_month = period_axis(
-        as_of, encoded.contract_months, None if paid is None else paid.months, "M"
-    )
-    by_year = period_axis(as_of, encoded.contract_years, None if paid is None else paid.years, "Y")
+    by_month = period_axis(as_of, leg.contract_months, None if paid is None else paid.months, "M")
+    by_year = period_axis(as_of, leg.contract_years, None if paid is None else paid.years, "Y")
     early_nominal = early_risk(
-        f"index {terms.index.name!r}",
+        f"index {index.name!r}",
         "contract",
         as_of,
         words,
-        encoded.contract_months,
+        leg.contract_months,
         monthly_lots,
         by_month.contract_from,
-        encoded.contract_years,
+        leg.contract_years,
         yearly_lots,
         by_year.contract_from,
     )
@@ -492,28 +508,34 @@ def prepared_trades(
         dated_live_exposure,
         dated_live_lots,
         set_amount,
-        is_settled,
         live_slot,
         live_references,
         reference_of_live_slot,
-    )
-    for array in (*arrays, price_sensitivity, nominal_delta, daily_lots, monthly_lots, yearly_lots):
-        array.setflags(write=False)
-    return PreparedTrades(
-        encoded,
-        history,
-        *arrays,
-        offset_unsettled,
-        set_unsettled,
-        cash,
         price_sensitivity,
         nominal_delta,
+    )
+    for array in (*arrays, is_settled, daily_lots, monthly_lots, yearly_lots):
+        array.setflags(write=False)
+    prepared_leg = PreparedLeg(
+        leg,
+        history,
+        *arrays,
         nominal_delta_total,
         daily_lots,
         monthly_lots,
         yearly_lots,
-        unpaid_payments,
         by_month,
         by_year,
         early_nominal,
+    )
+    # The trade's set amounts are the legs' summed, the one leg's own array today.
+    return PreparedTrades(
+        encoded,
+        (prepared_leg,),
+        set_amount,
+        is_settled,
+        offset_unsettled,
+        set_unsettled,
+        cash,
+        unpaid_payments,
     )

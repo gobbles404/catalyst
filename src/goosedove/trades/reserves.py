@@ -81,10 +81,11 @@ def reserves(terms: ResolvedTrades, counter: WorkCounter) -> Reserves:
     marketing reserve stands, as reserved_occurrences; nothing per observation, group or slot, and
     nothing again at preparation, evaluation or reading.
     """
-    specifications = terms.index.specifications
-    selection = terms.specification[terms.occurrence]
+    leg = terms.legs[0]  # the first leg's index charges the fees, two-index-fixed-float.md
+    specifications = leg.index.specifications
+    selection = leg.specification[terms.occurrence]
     counts = np.abs(terms.component_quantity)
-    currency = terms.index.conventions.currency_unit
+    currency = leg.index.conventions.currency_unit
     charged = 0
     brokerage = 0.0
     brokered = terms.brokered[terms.occurrence]
@@ -155,7 +156,7 @@ def _charged(
         raise ValueError(
             f"{fee} reserve of {terms.named(k)} is {float(amounts[j])!r}, expected a finite "
             f"amount of {currency}; {float(counts[j])!r} of "
-            f"{terms.index.specifications.names[row]!r} at {float(rates[row])!r} a lot"
+            f"{terms.legs[0].index.specifications.names[row]!r} at {float(rates[row])!r} a lot"
         )
     if not np.isfinite(total):
         raise ValueError(

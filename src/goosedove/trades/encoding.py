@@ -16,7 +16,7 @@ batch.
 Nothing here changes on a tick, a fixing
 or a roll of the valuation date. docs/library/trades/kernel.md is the page."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, assert_never
 
@@ -34,7 +34,7 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.observations import Observations
 from goosedove.trades.reserves import Reserves, reserves
 from goosedove.trades.schedule_methods import METHODS, requires_booked_reference
-from goosedove.trades.terms import ResolvedTrades, Route, payments_after_observations
+from goosedove.trades.terms import LegTerms, ResolvedTrades, Route, payments_after_observations
 
 ENCODED_COMPONENTS = "encoded_components"  # components turned into quantities and offsets
 ENCODED_GROUPS = "encoded_groups"  # payment groups formed, summed into and checked
@@ -94,32 +94,24 @@ class CurveAxes:
 
 
 @dataclass(frozen=True, slots=True)
-class Encoded:
-    """The terms and the observations, by reference, and the arrays derived from them once, all
-    read-only.
+class EncodedLeg:
+    """One leg's side of the encoding, since two-index-fixed-float.md: the arrays an index owns,
+    derived once from the trade's terms, the leg's terms and the leg's observations, all read-only;
+    terms and leg by reference, the leg's observations too.
 
     Per component, aligned with the terms' components: quote_quantity[k], the signed quantity in
-    the quote quantity unit, the component's count, the quantity the basis formed, times the
-    specification's lot size, converted where the lot unit differs; coefficient[k], the
+    the leg's quote quantity unit, the component's count, the quantity the basis formed, times
+    the specification's lot size, converted where the lot unit differs; coefficient[k], the
     settlement currency the component makes for a move of one unit of quote price, the quote
     quantity converted from the quote currency to the settlement currency, so that a cent-quoted
     price settles in dollars, and the quote quantity itself where the two are one; and
-    offset[k], the entry-price offset in the settlement currency, minus the coefficient times the
-    fixed price, so that the coefficient times the contract's price plus the offset is the
-    component's entry-to-price P&L.
+    offset[k], the leg's entry-price offset in the settlement currency, minus the coefficient
+    times the leg's fixed price, so that the coefficient times the contract's price plus the
+    offset is the component's entry-to-price P&L on this leg.
 
-    Per payment group, the components of one contract that pay on one day and, since
-    named-curves-slice-3.md, under one discount_curve_key: group_contract[g], the
-    schedule row of the g-th group's contract, the contract its components were booked on, which
-    owns their fixed leg and their payment, the groups in the schedule's order, within a
-    contract by the day they pay and within a day by their key, the keys in the order the rows
-    first name them, so that a contract whose components pay on two days is two groups, two
-    components paying on one day under two keys two groups never netted before discounting, and
-    a contract under a physical settlement, which pays on no day, one; keys, the batch's distinct
-    keys in that order, and key_of_group[g] each group's place among them, None with no key, a
-    cleared batch's;
-    group_of_component[k]; offset_of_group[g], the components' offsets summed; payment_date[g],
-    the day the group pays, an array for a financial settlement and None for a physical one.
+    Per payment group, aligned with the trade's groups: group_contract[g], the schedule row of
+    the g-th group's contract on this leg's schedule, the contract its components were booked on,
+    which owns the fixed leg and, with its payment day, names the group.
 
     Per slot, the dated inputs: slot_group[s], the group the slot belongs to; slot_date[s], the
     observation day; slot_reference[s], the schedule row of the contract pricing that day, the
@@ -127,16 +119,17 @@ class Encoded:
     quote projects it while live, the group's own contract under the expiry-based methods and,
     under asian, whichever contract the calendar prices the day with, F27 and then G27 for a
     December booked as Z26 on a schedule whose contracts expire the month before;
-    slot_exposure[s], the sum over the slot's observations of the
-    component's coefficient times the observation's weight, what every price of the slot
-    multiplies. The slots are in group order and by date within a group, so a group's slots are
-    together with its last observation last, and one day observed by two groups of one contract
-    is two slots. slot_of_observation[j] places each observation. references[r], the distinct
-    slot references, increasing, is the batch's delta axis, each contract once whatever groups
-    hold it, and reference_of_slot[s] each slot's place on it. A slot's position is its position
-    in this list and nothing else: not a position in any price vector.
+    slot_exposure[s], the sum over the slot's observations of the component's coefficient times
+    the observation's weight, what every price of the slot multiplies. The slots are in group
+    order and by date within a group, so a group's slots are together with its last observation
+    last, and one day observed by two groups of one contract is two slots. slot_of_observation[j]
+    places each observation. references[r], the distinct slot references, increasing, is the
+    leg's delta axis, each contract once whatever groups hold it, and reference_of_slot[s] each
+    slot's place on it. A slot's position is its position in this list and nothing else: not a
+    position in any price vector, and never a slot of another leg, two legs observing one day
+    being two slots.
 
-    Then the time axes a delta report is summed onto, static for the batch: since #166 days[d],
+    Then the time axes a delta report is summed onto, static for the leg: since #166 days[d],
     the distinct observation days, increasing, day_of_slot[s] each slot's day and
     day_reference[d] the contract pricing each day, one per day by the calendar's rule; and
     since #186, risk-contract-month-bucketing.md, contract_months[m], the first day of the
@@ -144,34 +137,19 @@ class Encoded:
     contract is named for and not the month its days are observed in,
     contract_month_of_reference[r] each reference's place, contract_years[y], the first day of
     each of those months' calendar years, increasing, and contract_year_of_month[m]. A day
-    bucket is a day the batch observes on, a month or a year bucket a contract month or year
-    the batch prices off, and nothing else: no period without a reference, and a payment day
-    moves nothing.
-
-    Then reserves, since #170, the batch's booked brokerage and clearing, each charged component's
-    count of its specification times the specification's rate per lot, summed, since #188 the
-    brokered rows' components charged brokerage and every component clearing on a cleared route
-    and none on a bilateral one, since #175 the
-    marketing reserve the rows booked, summed once per row, and their currency, the Reserves
-    record, static for the batch and entering no number
-    here; _ReportReserves spills the totals and the results readback shows them once.
-
-    Then, since #178, payment_axes, the payment-time axes a DV01 report is summed onto and the
-    union of their days with the observation days, PaymentAxes, made once here for a bilateral
-    batch and None for a cleared or a physical one; the month and year displays are the
-    preparation's since #186. And curve_axes, since named-curves-slice-3.md, the places the
-    by-curve risk arrays are summed into, CurveAxes, for a bilateral batch and None for the
-    rest."""
+    bucket is a day the leg observes on, a month or a year bucket a contract month or year the
+    leg prices off, and nothing else: no period without a reference, and a payment day moves
+    nothing. And curve_axes, since named-curves-slice-3.md, the places the by-curve risk arrays
+    are summed into, CurveAxes, for a bilateral batch and None for the rest, the leg's slot and
+    reference places beside the trade's group places."""
 
     terms: ResolvedTrades
+    leg: LegTerms
     observations: Observations
     quote_quantity: NDArray[np.float64]
     coefficient: NDArray[np.float64]
     offset: NDArray[np.float64]
     group_contract: NDArray[np.intp]
-    group_of_component: NDArray[np.intp]
-    offset_of_group: NDArray[np.float64]
-    payment_date: NDArray[np.datetime64] | None
     slot_group: NDArray[np.intp]
     slot_date: NDArray[np.datetime64]
     slot_reference: NDArray[np.intp]
@@ -186,10 +164,6 @@ class Encoded:
     contract_month_of_reference: NDArray[np.intp]
     contract_years: NDArray[np.datetime64]
     contract_year_of_month: NDArray[np.intp]
-    reserves: Reserves
-    payment_axes: PaymentAxes | None
-    keys: tuple[str, ...]
-    key_of_group: NDArray[np.intp] | None
     curve_axes: CurveAxes | None
 
     def slot_trade(self, slot: int) -> str:
@@ -202,19 +176,63 @@ class Encoded:
         """A slot's first trade named in a message with the slot's day and the contract pricing
         it, which under asian need not be the trade's own: `trade 'NG-001' at row 1 on
         2026-11-25, a day Z26 prices`."""
-        code = self.terms.schedule.codes[int(self.slot_reference[slot])]
+        code = self.leg.schedule.codes[int(self.slot_reference[slot])]
         return f"{self.slot_trade(slot)} on {self.slot_date[slot]}, a day {code} prices"
+
+
+@dataclass(frozen=True, slots=True)
+class Encoded:
+    """The terms by reference, the trade's own arrays derived from them once, all read-only, and
+    the legs, one EncodedLeg per leg of the terms in leg order, one today, each holding what its
+    index owns, since two-index-fixed-float.md.
+
+    Per payment group, the components of one contract that pay on one day and, since
+    named-curves-slice-3.md, under one discount_curve_key: the groups in the schedule's order,
+    within a contract by the day they pay and within a day by their key, the keys in the order
+    the rows first name them, so that a contract whose components pay on two days is two groups,
+    two components paying on one day under two keys two groups never netted before discounting,
+    and a contract under a physical settlement, which pays on no day, one; each group's contract
+    on each leg's schedule is the leg's group_contract; keys, the batch's distinct keys in that
+    order, and key_of_group[g] each group's place among them, None with no key, a cleared
+    batch's; group_of_component[k]; offset_of_group[g], the legs' offsets summed, the trade's
+    fixed leg of the group; payment_date[g], the day the group pays, an array for a financial
+    settlement and None for a physical one.
+
+    Then reserves, since #170, the batch's booked brokerage and clearing, each charged component's
+    count of the first leg's specification times the specification's rate per lot, summed, since
+    #188 the brokered rows' components charged brokerage and every component clearing on a
+    cleared route and none on a bilateral one, since #175 the marketing reserve the rows booked,
+    summed once per row, and their currency, the Reserves record, static for the batch and
+    entering no number here; _ReportReserves spills the totals and the results readback shows
+    them once.
+
+    Then, since #178, payment_axes, the payment-time axes a DV01 report is summed onto and the
+    union of their days with the first leg's observation days, PaymentAxes, made once here for a
+    bilateral batch and None for a cleared or a physical one; the month and year displays are
+    the preparation's since #186."""
+
+    terms: ResolvedTrades
+    legs: tuple[EncodedLeg, ...]
+    group_of_component: NDArray[np.intp]
+    offset_of_group: NDArray[np.float64]
+    payment_date: NDArray[np.datetime64] | None
+    reserves: Reserves
+    payment_axes: PaymentAxes | None
+    keys: tuple[str, ...]
+    key_of_group: NDArray[np.intp] | None
 
 
 def encoded(
     terms: ResolvedTrades,
-    observations: Observations,
+    observations: Sequence[Observations],
     units: UnitConversions,
     counter: WorkCounter,
 ) -> Encoded:
-    """The one way to make an Encoded: the conversions formed once, the arrays made in one pass
-    each over the components, the groups, the observations and the slots, and the rules of the
-    dated axis and of a financial settlement, checked once, the first failure being the message.
+    """The one way to make an Encoded: one Observations per leg of the terms, in leg order, else
+    refused; the conversions formed once, the arrays made in one pass each over the components,
+    the groups, the observations and the slots, and the rules of the dated axis and of a
+    financial settlement, checked once, the first failure being the message; the index's own
+    arrays kept in the leg, since two-index-fixed-float.md, and the trade's own in the record.
 
     The quote quantity: the component quantity, the count the terms formed by its occurrence's
     basis, the entered quantity times its covered days under calday, times its occurrence's
@@ -295,10 +313,17 @@ def encoded(
     specification the batch selects; the reserves once over the components each fee charges; and,
     for a bilateral batch, one payment day per distinct payment day, the axes made once.
     """
-    index = terms.index
+    if len(observations) != len(terms.legs):
+        raise ValueError(
+            f"observations are {len(observations)} legs' worth, expected {len(terms.legs)}, one "
+            "per leg of the terms"
+        )
+    leg = terms.legs[0]
+    observed = observations[0]
+    index = leg.index
     conventions = index.conventions
     specifications = index.specifications
-    selection = terms.specification[terms.occurrence]  # each component's specification row
+    selection = leg.specification[terms.occurrence]  # each component's specification row
     currency = conventions.currency_unit
     quote_unit = conventions.quote_quantity_unit
     per_price = f"{currency} per {conventions.quote_currency_unit}/{quote_unit}"
@@ -328,7 +353,7 @@ def encoded(
         )
         quote_quantity = terms.component_quantity * to_quote_unit[selection]
         coefficient = quote_quantity * to_currency
-        offset = -coefficient * terms.fixed_price
+        offset = -coefficient * leg.fixed_price
     for values, what, unit, why in (
         (
             quote_quantity,
@@ -356,7 +381,7 @@ def encoded(
                 f"{terms.named(k)} has {float(values[k])!r} of {what}, expected a finite {unit}; "
                 f"{why}"
             )
-    group_contract, payment_date, group_of_component, keys, key_of_group = _the_groups(terms)
+    group_contract, payment_date, group_of_component, keys, key_of_group = _the_groups(terms, leg)
     with np.errstate(over="ignore", invalid="ignore"):
         offset_of_group = np.bincount(
             group_of_component, weights=offset, minlength=group_contract.size
@@ -364,39 +389,37 @@ def encoded(
     outrun = ~np.isfinite(offset_of_group)
     if outrun.any():
         g = int(outrun.argmax())
-        group = group_words(
-            terms.schedule.codes, group_contract, payment_date, g, keys, key_of_group
-        )
+        group = group_words(leg.schedule.codes, group_contract, payment_date, g, keys, key_of_group)
         raise ValueError(
             f"the fixed leg of {group} is {float(offset_of_group[g])!r}, expected a finite amount "
             f"of {currency}; its components' fixed legs, each finite, sum past the largest number"
         )
-    reference = _the_references(terms, observations)
+    reference = _the_references(terms, leg, observed)
     slot_of_observation, slot_group, slot_date, slot_reference = _the_slots(
-        group_of_component[observations.component], observations.date, reference
+        group_of_component[observed.component], observed.date, reference
     )
     with np.errstate(over="ignore", invalid="ignore"):
         # A weight is at most one, so a finite coefficient's weighted exposure is finite; the
         # slot's sum of them is what can outrun, and is what the record keeps.
         slot_exposure = np.bincount(
             slot_of_observation,
-            weights=coefficient[observations.component] * observations.weight,
+            weights=coefficient[observed.component] * observed.weight,
             minlength=slot_group.size,
         )
     outrun = ~np.isfinite(slot_exposure)
     if outrun.any():
         s = int(outrun.argmax())
         j = int((slot_of_observation == s).argmax())  # its first observation
-        code = terms.schedule.codes[int(slot_reference[s])]
+        code = leg.schedule.codes[int(slot_reference[s])]
         raise ValueError(
-            f"{terms.named(int(observations.component[j]))} on {slot_date[s]}, a day {code} "
+            f"{terms.named(int(observed.component[j]))} on {slot_date[s]}, a day {code} "
             f"prices, has {float(slot_exposure[s])!r} of exposure, expected a finite amount of "
             f"{per_price}; its observations' coefficients times their weights sum past the "
             "largest number"
         )
     references, reference_of_slot = np.unique(slot_reference, return_inverse=True)
     days = _the_day_axis(slot_date, slot_reference)
-    periods = _the_contract_periods(terms.schedule_month[references])
+    periods = _the_contract_periods(leg.schedule_month[references])
     # A cleared batch's DV01 has no dated axis; nothing more is made for it and its ledger stands.
     payment_axes = (
         _the_payment_axes(payment_date, days[0], counter)
@@ -424,13 +447,13 @@ def encoded(
         else None
     )
     if payment_date is not None:
-        _payments_after_observations(terms, group_contract, payment_date, slot_group, slot_date)
+        _payments_after_observations(leg, group_contract, payment_date, slot_group, slot_date)
         payment_date.setflags(write=False)
     if key_of_group is not None:
         key_of_group.setflags(write=False)
-    counter.hit(ENCODED_COMPONENTS, int(terms.contract.size))
+    counter.hit(ENCODED_COMPONENTS, int(leg.contract.size))
     counter.hit(ENCODED_GROUPS, int(group_contract.size))
-    counter.hit(ENCODED_OBSERVATIONS, int(observations.component.size))
+    counter.hit(ENCODED_OBSERVATIONS, int(observed.component.size))
     counter.hit(ENCODED_SLOTS, int(slot_group.size))
     reserved = reserves(terms, counter)
     arrays = (
@@ -438,8 +461,6 @@ def encoded(
         coefficient,
         offset,
         group_contract,
-        group_of_component,
-        offset_of_group,
         slot_group,
         slot_date,
         slot_reference,
@@ -450,19 +471,18 @@ def encoded(
         *days,
         *periods,
     )
-    for array in arrays:
+    for array in (*arrays, group_of_component, offset_of_group):
         array.setflags(write=False)
     return Encoded(
         terms,
-        observations,
-        *arrays[:6],
+        (EncodedLeg(terms, leg, observed, *arrays, curve_axes),),
+        group_of_component,
+        offset_of_group,
         payment_date,
-        *arrays[6:],
         reserved,
         payment_axes,
         keys,
         key_of_group,
-        curve_axes,
     )
 
 
@@ -488,6 +508,7 @@ def group_words(
 
 def _the_groups(
     terms: ResolvedTrades,
+    leg: LegTerms,
 ) -> tuple[
     NDArray[np.intp],
     NDArray[np.datetime64] | None,
@@ -501,8 +522,9 @@ def _the_groups(
     key within a day, the keys in the order the rows first name them; under a physical settlement,
     which pays on no day, the distinct contracts. Each group's contract, its payment day or None,
     each component's group, the batch's distinct keys and each group's key, the keys empty and
-    the key of each group None where the batch has none."""
-    contract = terms.contract
+    the key of each group None where the batch has none. The contracts are the leg's rows of
+    its schedule, the first leg's naming the groups."""
+    contract = leg.contract
     if terms.payment is None:
         group_contract, group_of_component = np.unique(contract, return_inverse=True)
         return group_contract, None, group_of_component, (), None
@@ -585,15 +607,17 @@ def _the_curve_axes(
     return CurveAxes(curves, *arrays)
 
 
-def _the_references(terms: ResolvedTrades, observations: Observations) -> NDArray[np.intp]:
-    """Each observation's reference for a batch: observation_references over the terms' schedule,
+def _the_references(
+    terms: ResolvedTrades, leg: LegTerms, observations: Observations
+) -> NDArray[np.intp]:
+    """Each observation's reference for a leg: observation_references over the leg's schedule,
     holiday calendar, contracts and methods, each component named as the terms name its trade."""
     return observation_references(
-        terms.schedule,
-        terms.index.holiday_calendar,
+        leg.schedule,
+        leg.index.holiday_calendar,
         observations,
-        terms.contract,
-        terms.schedule_method[terms.occurrence],
+        leg.contract,
+        leg.schedule_method[terms.occurrence],
         terms.named,
     )
 
@@ -743,7 +767,7 @@ def _the_slots(
 
 
 def _payments_after_observations(
-    terms: ResolvedTrades,
+    leg: LegTerms,
     group_contract: NDArray[np.intp],
     payment_date: NDArray[np.datetime64],
     slot_group: NDArray[np.intp],
@@ -760,5 +784,5 @@ def _payments_after_observations(
     payments_after_observations(
         payment_date,
         slot_date[last],
-        lambda g: terms.schedule.codes[int(group_contract[g])],
+        lambda g: leg.schedule.codes[int(group_contract[g])],
     )

@@ -57,7 +57,7 @@ from goosedove.market_data.interpolated_contracts import interpolate_contracts
 from goosedove.market_data.price_vector import PriceVector
 from goosedove.quoting.template import QuoteTemplate
 from goosedove.trades.aggregation import AggregateResults
-from goosedove.trades.encoding import Encoded
+from goosedove.trades.encoding import Encoded, EncodedLeg
 from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.resolution import Trades
 from goosedove.trades.results import TradeResults
@@ -459,9 +459,10 @@ def trades_table(obj: Trades) -> MixedArray:
     # then what the encoding made, quote_quantity the component quantity in the index's quote
     # quantity unit, coefficient and offset in the settlement currency.
     terms, encoding = obj.resolved, obj.encoded
+    leg, leg_encoding = terms.legs[0], encoding.legs[0]  # one leg today, two-index-fixed-float.md
     rows = terms.occurrence
     n = rows.size
-    codes = np.array(terms.schedule.codes, dtype=object)[terms.contract]
+    codes = np.array(leg.schedule.codes, dtype=object)[leg.contract]
     headers: list[str] = ["row"]
     types: list[str] = ["int64"]
     columns: list[NDArray[Any] | tuple[str, ...] | DatesOrTexts] = [(rows + 1).astype(np.int64)]
@@ -484,7 +485,7 @@ def trades_table(obj: Trades) -> MixedArray:
         numbers("trade_id", "int64", terms.trade_ids[rows])
     numbers("trade_date", "datetime64[D]", terms.trade_dates[rows])
     text("contract_code", tuple(codes))
-    text("schedule_method", tuple(METHOD_NAMES[terms.schedule_method[rows]]))
+    text("schedule_method", tuple(METHOD_NAMES[leg.schedule_method[rows]]))
     text("route", (terms.route.value,) * n)
     text("settlement_method", (terms.settlement.value,) * n)
     labels("clearing_house", terms.clearing_house)
@@ -494,10 +495,10 @@ def trades_table(obj: Trades) -> MixedArray:
     numbers("quantity", "float64", terms.quantity)
     text(
         "quantity_unit",
-        tuple(np.array(terms.index.specifications.names, dtype=object)[terms.specification[rows]]),
+        tuple(np.array(leg.index.specifications.names, dtype=object)[leg.specification[rows]]),
     )
     text("quantity_per", tuple(BASIS_NAMES[terms.quantity_per[rows]]))
-    numbers("fixed_price", "float64", terms.fixed_price)
+    numbers("fixed_price", "float64", leg.fixed_price)
     if terms.payment is not None:
         headers.append("payment_day")  # as the ticket or the template wrote, each kind its own
         types.append("date or text")
@@ -512,9 +513,9 @@ def trades_table(obj: Trades) -> MixedArray:
     numbers("end_date", "datetime64[D]", terms.end_date)
     numbers("covered_days", "int64", terms.covered_days)
     numbers("component_quantity", "float64", terms.component_quantity)
-    numbers("quote_quantity", "float64", encoding.quote_quantity)
-    numbers("coefficient", "float64", encoding.coefficient)
-    numbers("offset", "float64", encoding.offset)
+    numbers("quote_quantity", "float64", leg_encoding.quote_quantity)
+    numbers("coefficient", "float64", leg_encoding.coefficient)
+    numbers("offset", "float64", leg_encoding.offset)
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
 
@@ -534,26 +535,26 @@ def _entered_by_component(entered: DatesOrTexts, rows: NDArray[np.intp]) -> Date
 
 
 def _slot_names(
-    encoding: Encoded,
+    encoding: Encoded, leg: EncodedLeg
 ) -> tuple[list[str], list[str], list[NDArray[Any] | tuple[str, ...]]]:
     # The columns that name a slot: the contract pricing the day, whose settle fixes the slot and
     # whose quote projects it; the contract the slot's group was booked on, which owns the fixed
     # leg and the payment and under asian may be another; the observation day; and, for a
     # financial settlement, the day the slot's payment group pays, so that two groups observing
     # one day read apart whatever contract prices it; a physical settlement pays on no day and
-    # shows none.
-    codes = np.array(encoding.terms.schedule.codes, dtype=object)
+    # shows none. The slots are the leg's, the payment days the trade's.
+    codes = np.array(leg.leg.schedule.codes, dtype=object)
     names = ["pricing_contract", "booked_contract", "observation_date"]
     types = ["str", "str", "datetime64[D]"]
     columns: list[NDArray[Any] | tuple[str, ...]] = [
-        tuple(codes[encoding.slot_reference]),
-        tuple(codes[encoding.group_contract[encoding.slot_group]]),
-        encoding.slot_date,
+        tuple(codes[leg.slot_reference]),
+        tuple(codes[leg.group_contract[leg.slot_group]]),
+        leg.slot_date,
     ]
     if encoding.payment_date is not None:
         names.append("payment_date")
         types.append("datetime64[D]")
-        columns.append(encoding.payment_date[encoding.slot_group])
+        columns.append(encoding.payment_date[leg.slot_group])
     return names, types, columns
 
 
@@ -565,17 +566,18 @@ def prepared_trades_table(obj: PreparedTrades) -> MixedArray:
     # index's reporting lot; nothing is made again, every column the record's own or a gather of
     # one.
     encoding = obj.encoded
-    names, types, columns = _slot_names(encoding)
+    leg = obj.legs[0]  # one leg today, two-index-fixed-float.md
+    names, types, columns = _slot_names(encoding, leg.encoded)
     return MixedArray.table(
         [
             (*names, "is_fixed", "is_settled", "live_coefficient", "live_lots"),
             (*types, "bool", "bool", "float64", "float64"),
         ],
         *columns,
-        obj.is_fixed,
-        obj.is_settled[encoding.slot_group],
-        obj.dated_live_exposure,
-        obj.dated_live_lots,
+        leg.is_fixed,
+        obj.is_settled[leg.encoded.slot_group],
+        leg.dated_live_exposure,
+        leg.dated_live_lots,
     )
 
 
@@ -614,15 +616,16 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
     for k, source in enumerate(sources):
         match source:
             case TradeResults():
-                terms = source.prepared.encoded.terms
-                index_names.append(terms.index.name)
-                lots.append(terms.reporting_lot.name)
+                leg = source.legs[0]  # one leg today, two-index-fixed-float.md
+                leg_terms = leg.prepared.encoded.leg
+                index_names.append(leg_terms.index.name)
+                lots.append(leg_terms.reporting_lot.name)
                 routes.append(source.route.value)
                 trade[k] = True
-                nominal[k] = source.nominal_delta_total
-                delta[k] = source.delta_total
-                cross[k] = source.cross_gamma_total
-                units[k] = f"{source.lot_unit} per basis point"
+                nominal[k] = leg.nominal_delta_total
+                delta[k] = leg.delta_total
+                cross[k] = leg.cross_gamma_total
+                units[k] = f"{leg.lot_unit} per basis point"
             case CashflowResults():
                 index_names.append("-")
                 lots.append("-")
@@ -672,13 +675,15 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # point, on every row; appended last so that no column before them moves. Then, since
     # named-curves-slice-3.md, the slot's group's key and the name of the curve the group was
     # discounted on, on every row, a cleared result a dash in both; appended last likewise.
-    prepared = obj.prepared
-    encoding = prepared.encoded
-    names, types, columns = _slot_names(encoding)
-    slots = encoding.slot_group.size
+    encoding = obj.prepared.encoded
+    leg = obj.legs[0]  # one leg today, two-index-fixed-float.md
+    prepared = leg.prepared
+    leg_encoding = prepared.encoded
+    names, types, columns = _slot_names(encoding, leg_encoding)
+    slots = leg_encoding.slot_group.size
     contribution = np.zeros(slots)
-    contribution[prepared.live_slot] = obj.dated_live_contribution
-    reference = encoding.reference_of_slot
+    contribution[prepared.live_slot] = leg.dated_live_contribution
+    reference = leg_encoding.reference_of_slot
     table = MixedArray.table(
         [
             (
@@ -701,14 +706,14 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
         prepared.dated_live_exposure,
         prepared.dated_live_lots,
         contribution,
-        obj.price_sensitivity[reference],
-        obj.discounted_price_sensitivity[reference],
-        obj.nominal_delta[reference],
-        obj.delta[reference],
-        (obj.price_sensitivity_unit,) * slots,
-        (obj.lot_unit,) * slots,
+        leg.price_sensitivity[reference],
+        leg.discounted_price_sensitivity[reference],
+        leg.nominal_delta[reference],
+        leg.delta[reference],
+        (leg.price_sensitivity_unit,) * slots,
+        (leg.lot_unit,) * slots,
     )
-    group = encoding.slot_group
+    group = leg_encoding.slot_group
     first = np.zeros(slots, dtype=np.bool_)
     first[np.unique(group, return_index=True)[1]] = True  # each group's first slot row
     once = np.zeros(slots, dtype=np.bool_)
@@ -733,9 +738,9 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # The contract's cross-gamma with every used curve shifted together, the contributions' by
     # reference summed, one row per curve; a cleared result's zero.
     cross = np.zeros(slots)
-    for contribution in obj.cross_contributions:
+    for contribution in leg.cross_contributions:
         cross += contribution.cross_gamma[reference]
-    per_bp = np.full(slots, f"{obj.lot_unit} per basis point", dtype=object)
+    per_bp = np.full(slots, f"{leg.lot_unit} per basis point", dtype=object)
     key_of_group = encoding.key_of_group
     if key_of_group is None or not obj.curves:
         keys = np.full(slots, "-", dtype=object)

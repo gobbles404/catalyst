@@ -68,7 +68,7 @@ from goosedove.trades.display_axes import (
     places_from,
     rows_through,
 )
-from goosedove.trades.results import TradeResults
+from goosedove.trades.results import LegResults, TradeResults
 from goosedove.trades.risk_report import (
     NO_DAYS,
     NOTHING,
@@ -426,15 +426,16 @@ def _early_lots(
 
 def _grouped_by_index(
     results: tuple[Source, ...], as_of: np.datetime64
-) -> list[tuple[list[int], list[TradeResults]]]:
+) -> list[tuple[list[int], list[LegResults]]]:
     """The trade occurrences' positions grouped by the exact index object, in first-appearance
     order, each occurrence in the order given held to the valuation day, then to its group's
     first occurrence's history and price vector, the objects and not their values; a distinct
     index object whose name a group already has is refused, two indexes of one name being a
     mistake to show and not a group to make. A batch of cashflows is held to the valuation day
     and to nothing else, having no index, history or price vector, and joins no group. Each
-    group is its positions and its members, the results themselves, in the order given."""
-    groups: list[tuple[list[int], list[TradeResults]]] = []
+    group is its positions and its members, the results' legs, one per result today since
+    two-index-fixed-float.md, in the order given."""
+    groups: list[tuple[list[int], list[LegResults]]] = []
     by_identity: dict[int, int] = {}
     by_name: dict[str, int] = {}
     for k, source in enumerate(results):
@@ -450,7 +451,8 @@ def _grouped_by_index(
                 pass
             case _:
                 assert_never(source)
-        ix = source.prepared.encoded.terms.index
+        leg = source.legs[0]  # one leg today; the ticket's third PR groups every leg
+        ix = leg.prepared.encoded.leg.index
         g = by_identity.get(id(ix))
         if g is None:
             named = by_name.get(ix.name)
@@ -460,22 +462,22 @@ def _grouped_by_index(
                     f"{groups[named][0][0] + 1}, expected one index for one name"
                 )
             by_identity[id(ix)] = by_name[ix.name] = len(groups)
-            groups.append(([k], [source]))
+            groups.append(([k], [leg]))
             continue
         positions, members = groups[g]
         first = members[0]
-        if source.prepared.history is not first.prepared.history:
+        if leg.prepared.history is not first.prepared.history:
             raise ValueError(
                 f"results {k + 1} is on index {ix.name!r} over another history than results "
                 f"{positions[0] + 1}, expected one history for one index"
             )
-        if source.market.price_vector is not first.market.price_vector:
+        if leg.market.price_vector is not first.market.price_vector:
             raise ValueError(
                 f"results {k + 1} is on index {ix.name!r} quoted off another price vector than "
                 f"results {positions[0] + 1}, expected one price vector for one index"
             )
         positions.append(k)
-        members.append(source)
+        members.append(leg)
     return groups
 
 
@@ -484,7 +486,7 @@ def _cross_contributions(source: Source) -> tuple[CrossContribution, ...]:
     no commodity risk."""
     match source:
         case TradeResults():
-            return source.cross_contributions
+            return source.legs[0].cross_contributions  # one leg today
         case CashflowResults():
             return ()
         case _:
@@ -533,13 +535,13 @@ def _grouped_by_curve(
 
 
 def _index_group(
-    members: list[TradeResults], positions: list[int], counter: WorkCounter
+    members: list[LegResults], positions: list[int], counter: WorkCounter
 ) -> IndexGroup:
     """One index group's risk: the saved reference, day, month and year vectors of its
     occurrences summed onto the unions of their saved axes, both lots on each, the totals the
     saved scalars summed, every new number finite or refused."""
     first = members[0]
-    terms = first.prepared.encoded.terms
+    terms = first.prepared.encoded.leg
     references, (lots, discounted) = _summed(
         [m.prepared.encoded.references for m in members],
         ([m.nominal_delta for m in members], [m.delta for m in members]),
@@ -662,14 +664,14 @@ def _rate_group(
 
 def _grouped_by_index_and_curve(
     results: tuple[Source, ...],
-) -> list[tuple[TradeResults, list[int], list[CrossContribution | None]]]:
+) -> list[tuple[LegResults, list[int], list[CrossContribution | None]]]:
     """The trade occurrences' cross contributions grouped by the exact index object and the exact
     curve object, a cleared occurrence's pair on no curve and its member None, in first-appearance
     order of the pair, since #197, each group with its first occurrence and the positions of the
     sources contributing; the rules over the indexes are _grouped_by_index's, checked before this
     groups, so that an index's occurrences are compatible whatever curves they are on. A batch of
     cashflows, with no index, is in no group."""
-    groups: list[tuple[TradeResults, list[int], list[CrossContribution | None]]] = []
+    groups: list[tuple[LegResults, list[int], list[CrossContribution | None]]] = []
     where: dict[tuple[int, int | None], int] = {}
     for k, source in enumerate(results):
         match source:
@@ -679,14 +681,15 @@ def _grouped_by_index_and_curve(
                 pass
             case _:
                 assert_never(source)
-        ix = id(source.prepared.encoded.terms.index)
-        contributions: tuple[CrossContribution | None, ...] = source.cross_contributions or (None,)
+        leg = source.legs[0]  # one leg today, two-index-fixed-float.md
+        ix = id(leg.prepared.encoded.leg.index)
+        contributions: tuple[CrossContribution | None, ...] = leg.cross_contributions or (None,)
         for c in contributions:
             key = (ix, None if c is None else id(c.curve))
             g = where.get(key)
             if g is None:
                 where[key] = len(groups)
-                groups.append((source, [k], [c]))
+                groups.append((leg, [k], [c]))
             else:
                 _, positions, members = groups[g]
                 if positions[-1] != k:
@@ -696,7 +699,7 @@ def _grouped_by_index_and_curve(
 
 
 def _cross_group(
-    first: TradeResults,
+    first: LegResults,
     positions: list[int],
     members: list[CrossContribution | None],
     words: dict[int, str],
@@ -707,7 +710,7 @@ def _cross_group(
     saved scalars summed, every new number finite or refused by the index, the curve and the
     coordinate; a cleared pair, its members None, the known zero, empty axes and vectors,
     nothing summed and nothing counted."""
-    terms = first.prepared.encoded.terms
+    terms = first.prepared.encoded.leg
     occurrences = np.array(positions, dtype=np.intp)
     occurrences.setflags(write=False)
     contributions = [m for m in members if m is not None]

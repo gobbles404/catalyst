@@ -154,13 +154,13 @@ def test_one_lot_a_year_out_centers_on_its_cross_gamma_and_an_amount_of_a_hundre
     # 95 and the DV01 -0.0095; half the difference of the marks -0.0095000000158.
     one = prepared_on(trades_on(HNG, (1.0,), (70.0,), PAYS[:1], LAGS[:1]))
     analytic = valued(one, QUOTES, CURVE)
-    assert analytic.delta_total == pytest.approx(0.95, **CLOSE)
-    assert analytic.cross_gamma_total == pytest.approx(-0.000095, **CLOSE)
+    assert analytic.legs[0].delta_total == pytest.approx(0.95, **CLOSE)
+    assert analytic.legs[0].cross_gamma_total == pytest.approx(-0.000095, **CLOSE)
     up, down = valued(one, QUOTES, bumped(CURVE, 1.0)), valued(one, QUOTES, bumped(CURVE, -1.0))
-    assert up.delta_total == pytest.approx(0.95 * math.exp(-0.0001), **CLOSE)
-    centered = (up.delta_total - down.delta_total) / 2
+    assert up.legs[0].delta_total == pytest.approx(0.95 * math.exp(-0.0001), **CLOSE)
+    centered = (up.legs[0].delta_total - down.legs[0].delta_total) / 2
     assert centered == pytest.approx(-0.0000950000001583, rel=0, abs=1e-16)
-    assert centered == pytest.approx(analytic.cross_gamma_total, rel=0, abs=2e-13)
+    assert centered == pytest.approx(analytic.legs[0].cross_gamma_total, rel=0, abs=2e-13)
     paid = valued(one, (170.0, 50.0), CURVE)
     assert paid.mark == pytest.approx(95.0, **CLOSE)
     assert paid.dv01 == pytest.approx(-0.0095, **CLOSE)
@@ -184,15 +184,15 @@ def test_the_ticket_batch_centers_on_its_saved_dv01_and_cross_gamma_at_a_tenth_o
     analytic = valued(prep, QUOTES, CURVE)
     assert analytic.mark == pytest.approx(28.0, **CLOSE)
     assert analytic.dv01 == pytest.approx(-0.0037, **CLOSE)
-    assert analytic.cross_gamma_total == pytest.approx(-0.00005, **CLOSE)
+    assert analytic.legs[0].cross_gamma_total == pytest.approx(-0.00005, **CLOSE)
     for h, tolerance in ((0.1, 1e-12), (1.0, 1e-10)):
         up, down = valued(prep, QUOTES, bumped(CURVE, h)), valued(prep, QUOTES, bumped(CURVE, -h))
         assert (up.mark - down.mark) / (2 * h) == pytest.approx(analytic.dv01, rel=0, abs=tolerance)
-        assert (up.delta_total - down.delta_total) / (2 * h) == (
-            pytest.approx(analytic.cross_gamma_total, rel=0, abs=tolerance)
+        assert (up.legs[0].delta_total - down.legs[0].delta_total) / (2 * h) == (
+            pytest.approx(analytic.legs[0].cross_gamma_total, rel=0, abs=tolerance)
         )
         assert (
-            up.nominal_delta_total == down.nominal_delta_total == 5.0
+            up.legs[0].nominal_delta_total == down.legs[0].nominal_delta_total == 5.0
         )  # the nominal lots never move
         assert up.mark < analytic.mark < down.mark  # up lowers the factors and the mark
     # The saved results on the source stand: the bump reads the curve and writes nothing.

@@ -148,8 +148,8 @@ def a_bilateral_batch(
     components: int, contracts: int, method: ScheduleMethod, as_of: str, keys: int = 1
 ) -> PreparedTrades:
     terms = bilateral_terms(components, contracts, method, keys)
-    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
-    return prepared_trades(enc, a_history(as_of=as_of, ix=terms.index), WorkCounter())
+    enc = encoded(terms, (observed_of(terms),), UNITS, WorkCounter())
+    return prepared_trades(enc, (a_history(as_of=as_of, ix=terms.legs[0].index),), WorkCounter())
 
 
 def curve_set(*curves: DiscountCurve) -> DiscountCurveSet:
@@ -164,7 +164,7 @@ def set_on(as_of: str, curves: int = 1) -> DiscountCurveSet:
 
 
 def tick(prep: PreparedTrades, market: Market, curves: DiscountCurveSet) -> TradeResults:
-    return trade_results(prep, market, WorkCounter(), curves)
+    return trade_results(prep, (market,), WorkCounter(), curves)
 
 
 def mapped(prep: PreparedTrades) -> UnpaidPayments:
@@ -213,13 +213,14 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
     unpaid: int,
 ) -> None:
     terms = bilateral_terms(components, contracts, method)
-    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
-    history = a_history(as_of=as_of, ix=terms.index)
+    enc = encoded(terms, (observed_of(terms),), UNITS, WorkCounter())
+    history = a_history(as_of=as_of, ix=terms.legs[0].index)
     counter = WorkCounter()
-    prep = prepared_trades(enc, history, counter)
+    prep = prepared_trades(enc, (history,), counter)
     slots = slots_of(method, contracts)
     assert counter.freeze().as_dict() == {
-        "display_periods": prep.by_month.periods.size + prep.by_year.periods.size,  # since #186
+        "display_periods": prep.legs[0].by_month.periods.size
+        + prep.legs[0].by_year.periods.size,  # since #186
         "fixings_read": slots - live,
         "payment_days_mapped": unpaid,  # one payment day a contract: a day an unpaid group
         "prepared_slots": slots,
@@ -246,7 +247,7 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
     # The one helper beside the cleared preparation's functions, the unique's numpy over the
     # cleared ledger, and the peak within 192 bytes an unpaid group and two slacks of the cleared
     # preparation's, the unique's own arrays the slack when no group is unpaid.
-    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+    assert call_profile(lambda: prepared_trades(enc, (history,), WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
         "calendar_rows": 1,
@@ -265,17 +266,17 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 4,
     }
-    numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
+    numpy = numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter()))
     assert numpy == {
         k: PREPARATION_NUMPY.get(k, 0) + MAPPING_NUMPY.get(k, 0) + PAID_DISPLAY_NUMPY.get(k, 0)
         for k in PREPARATION_NUMPY | MAPPING_NUMPY | PAID_DISPLAY_NUMPY
     }, numpy
     cleared = a_batch(components, contracts) if method is ScheduleMethod.LASTDAY else None
     if cleared is not None:
-        plain = prepared_trades(cleared, history, WorkCounter())
+        plain = prepared_trades(cleared, (history,), WorkCounter())
         assert plain.unpaid_payments is None  # a cleared batch discounts nothing and maps nothing
-        assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= (
-            least_peak(lambda: prepared_trades(cleared, history, WorkCounter()))
+        assert least_peak(lambda: prepared_trades(enc, (history,), WorkCounter())) <= (
+            least_peak(lambda: prepared_trades(cleared, (history,), WorkCounter()))
             + 192 * unpaid
             + 2 * SLACK
         )
@@ -292,12 +293,12 @@ def test_a_bilateral_tick_reports_its_factors_groups_slots_and_reductions(
 ) -> None:
     prep = a_bilateral_batch(components, contracts, method, as_of)
     counter = WorkCounter()
-    trade_results(prep, a_market(prep.history), counter, set_on(as_of))
+    trade_results(prep, (a_market(prep.legs[0].history),), counter, set_on(as_of))
     assert counter.freeze().as_dict() == {
         "curves_selected": 1,  # the one key bound, since named-curves-slice-3.md
         "groups_valued": unpaid,
         "kernel": 1,
-        "live_prices_read": prep.live_references.size,  # one quote a live contract
+        "live_prices_read": prep.legs[0].live_references.size,  # one quote a live contract
         "payment_factors_read": unpaid,  # one payment day a contract: a factor an unpaid group
         # The lots onto the references, the days, the months and the years; the DV01s onto the
         # payment days, their months and their years; since #197 the cross-gammas onto the
@@ -322,7 +323,9 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
     unpaid: int,
 ) -> None:
     prep = a_bilateral_batch(components, contracts, method, as_of)
-    quoted = a_market(prep.history)  # made before the ledger looks, as the market is on a sheet
+    quoted = a_market(
+        prep.legs[0].history
+    )  # made before the ledger looks, as the market is on a sheet
     curves = set_on(as_of)  # made before the ledger looks, as a collection is on a sheet
     assert call_profile(lambda: tick(prep, quoted, curves)) == {
         "trade_results": 1,
@@ -392,14 +395,18 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
 ) -> None:
     prep = a_bilateral_batch(components, contracts, method, as_of)
     encoding = prep.encoded
-    groups = encoding.group_contract.size
-    slots = encoding.slot_group.size
-    refs = encoding.references.size
-    buckets = encoding.days.size + encoding.contract_months.size + encoding.contract_years.size
+    groups = encoding.legs[0].group_contract.size
+    slots = encoding.legs[0].slot_group.size
+    refs = encoding.legs[0].references.size
+    buckets = (
+        encoding.legs[0].days.size
+        + encoding.legs[0].contract_months.size
+        + encoding.legs[0].contract_years.size
+    )
     axes = encoding.payment_axes
     assert axes is not None
     paid = axes.days.size + axes.months.size + axes.years.size
-    quoted = a_market(prep.history)
+    quoted = a_market(prep.legs[0].history)
     curves = set_on(as_of)
     assert least_peak(lambda: tick(prep, quoted, curves)) <= (
         128 * groups
@@ -411,11 +418,11 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
     )
     result = tick(prep, quoted, curves)
     new: tuple[NDArray[np.float64] | None, ...] = (
-        result.delta,
-        result.discounted_price_sensitivity,
-        result.discounted_daily_lots,
-        result.discounted_monthly_lots,
-        result.discounted_yearly_lots,
+        result.legs[0].delta,
+        result.legs[0].discounted_price_sensitivity,
+        result.legs[0].discounted_daily_lots,
+        result.legs[0].discounted_monthly_lots,
+        result.legs[0].discounted_yearly_lots,
         result.payment_amount,
         result.npv_by_group,
         result.dv01_by_group,
@@ -423,7 +430,7 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
         *next((c.dv01_by_day, c.dv01_by_month, c.dv01_by_year) for c in result.rate_contributions),
         *next(
             (c.cross_gamma, c.cross_gamma_by_day, c.cross_gamma_by_month, c.cross_gamma_by_year)
-            for c in result.cross_contributions
+            for c in result.legs[0].cross_contributions
         ),
     )
     retained = sum(0 if array is None else array.nbytes for array in new)
@@ -431,8 +438,8 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
     assert all(array is None or array.dtype == np.float64 for array in new)
     # The nominal vectors are the preparation's, by reference, not copies.
     assert (
-        result.nominal_delta is prep.nominal_delta
-        and result.price_sensitivity is prep.price_sensitivity
+        result.legs[0].nominal_delta is prep.legs[0].nominal_delta
+        and result.legs[0].price_sensitivity is prep.legs[0].price_sensitivity
     )
 
 
@@ -459,7 +466,7 @@ def test_the_encoding_of_a_bilateral_batch_makes_its_payment_axes_once(
 ) -> None:
     terms = bilateral_terms(components, contracts, method)
     counter = WorkCounter()
-    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    enc = encoded(terms, (observed_of(terms),), UNITS, counter)
     axes = enc.payment_axes
     assert axes is not None
     payment_date = enc.payment_date
@@ -478,8 +485,8 @@ def test_the_encoding_of_a_bilateral_batch_makes_its_payment_axes_once(
     np.testing.assert_array_equal(axes.years, years)
     np.testing.assert_array_equal(axes.years[axes.year_of_month], months.astype("datetime64[Y]"))
     # The one union, the days': since #186 the month and year displays are the preparation's.
-    np.testing.assert_array_equal(axes.union_days, np.union1d(enc.days, axes.days))
-    np.testing.assert_array_equal(axes.union_days[axes.observed_in_days], enc.days)
+    np.testing.assert_array_equal(axes.union_days, np.union1d(enc.legs[0].days, axes.days))
+    np.testing.assert_array_equal(axes.union_days[axes.observed_in_days], enc.legs[0].days)
     np.testing.assert_array_equal(axes.union_days[axes.paid_in_days], axes.days)
     arrays = [getattr(axes, field.name) for field in fields(axes)]
     assert all(not array.flags.writeable for array in arrays)
@@ -487,10 +494,10 @@ def test_the_encoding_of_a_bilateral_batch_makes_its_payment_axes_once(
     # union with both kinds' places.
     d, m, y = axes.days.size, axes.months.size, axes.years.size
     assert sum(array.nbytes for array in arrays) == 8 * (
-        d + payment_date.size + m + d + y + m + axes.union_days.size + enc.days.size + d
+        d + payment_date.size + m + d + y + m + axes.union_days.size + enc.legs[0].days.size + d
     )
     # The cleared encoding's functions and, beside them, the axes once and the one union.
-    cleared = call_profile(lambda: encoded(terms, observed_of(terms), UNITS, WorkCounter()))
+    cleared = call_profile(lambda: encoded(terms, (observed_of(terms),), UNITS, WorkCounter()))
     assert cleared["_the_payment_axes"] == 1 and cleared["_the_union"] == 1
     assert cleared["WorkCounter.hit"] == 6
 
@@ -509,7 +516,7 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
     unpaid: int,
 ) -> None:
     prep = a_bilateral_batch(components, contracts, method, as_of)
-    result = tick(prep, a_market(prep.history), set_on(as_of))
+    result = tick(prep, a_market(prep.legs[0].history), set_on(as_of))
     for risk in (Risk.NOMINAL_DELTA, Risk.DELTA, Risk.DV01, Risk.CROSS_GAMMA):
         # By day, by reference: no numpy call at all and nothing allocated beyond the record. By
         # month and by year, since #186, one zeros over the display axis filled through the saved
@@ -594,17 +601,17 @@ def test_a_bilateral_tick_on_several_curves_does_no_work_per_curve_over_the_slot
     assert encoding.keys == KEYS[:curves]
     assert pays.groups.size == unpaid  # each contract under one key: the groups as at one curve
     assert sum(keyed.days.size for keyed in pays.by_key) == unpaid
-    slots = encoding.slot_group.size
+    slots = encoding.legs[0].slot_group.size
     assert slots == slots_of(method, contracts)
-    quoted = a_market(prep.history)
+    quoted = a_market(prep.legs[0].history)
     collection = set_on(as_of, curves)
     counter = WorkCounter()
-    trade_results(prep, quoted, counter, collection)
+    trade_results(prep, (quoted,), counter, collection)
     assert counter.freeze().as_dict() == {
         "curves_selected": curves,
         "groups_valued": unpaid,
         "kernel": 1,
-        "live_prices_read": prep.live_references.size,
+        "live_prices_read": prep.legs[0].live_references.size,
         "payment_factors_read": unpaid,  # each key's days, one factor a day, the days split
         "risk_reductions": 12,
         "slots_discounted": slots,  # every slot once, whatever the number of curves
@@ -628,20 +635,24 @@ def test_a_bilateral_tick_on_several_curves_does_no_work_per_curve_over_the_slot
         "WorkCounter.hit": 8,
     }
     result = tick(prep, quoted, collection)
-    assert len(result.rate_contributions) == len(result.cross_contributions) == curves
+    assert len(result.rate_contributions) == len(result.legs[0].cross_contributions) == curves
     assert tuple(c.curve.name for c in result.rate_contributions) == KEYS[:curves]
-    refs = encoding.references.size
-    buckets = encoding.days.size + encoding.contract_months.size + encoding.contract_years.size
+    refs = encoding.legs[0].references.size
+    buckets = (
+        encoding.legs[0].days.size
+        + encoding.legs[0].contract_months.size
+        + encoding.legs[0].contract_years.size
+    )
     axes = encoding.payment_axes
     assert axes is not None
     paid = axes.days.size + axes.months.size + axes.years.size
-    groups = encoding.group_contract.size
+    groups = encoding.legs[0].group_contract.size
     new: list[NDArray[np.float64] | None] = [
-        result.delta,
-        result.discounted_price_sensitivity,
-        result.discounted_daily_lots,
-        result.discounted_monthly_lots,
-        result.discounted_yearly_lots,
+        result.legs[0].delta,
+        result.legs[0].discounted_price_sensitivity,
+        result.legs[0].discounted_daily_lots,
+        result.legs[0].discounted_monthly_lots,
+        result.legs[0].discounted_yearly_lots,
         result.payment_amount,
         result.npv_by_group,
         result.dv01_by_group,
@@ -649,7 +660,7 @@ def test_a_bilateral_tick_on_several_curves_does_no_work_per_curve_over_the_slot
     ]
     for rate in result.rate_contributions:
         new += [rate.dv01_by_day, rate.dv01_by_month, rate.dv01_by_year]
-    for cross in result.cross_contributions:
+    for cross in result.legs[0].cross_contributions:
         new += [
             cross.cross_gamma,
             cross.cross_gamma_by_day,

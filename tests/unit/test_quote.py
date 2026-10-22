@@ -813,11 +813,11 @@ def test_an_equivalent_trade_booked_at_the_quote_marks_zero_with_every_payment_a
             discount_curve_key=("SOFR",) * 2 if bilateral_only else None,
         )
         prep = prepared_trades(
-            encoded(terms, observed_of(terms), UNITS, WorkCounter()),
-            m.market_history,
+            encoded(terms, (observed_of(terms),), UNITS, WorkCounter()),
+            (m.market_history,),
             WorkCounter(),
         )
-        assert trade_results(prep, m, WorkCounter(), curves).mark == pytest.approx(0.0, abs=1e-9)
+        assert trade_results(prep, (m,), WorkCounter(), curves).mark == pytest.approx(0.0, abs=1e-9)
 
 
 # --- the balance of a period, balance-of-period-quotes.md -----------------------------------------
@@ -977,11 +977,11 @@ def test_an_equivalent_trade_booked_on_the_balances_dates_marks_zero() -> None:
                 discount_curve_key=("SOFR",) * 2 if keyed else None,
             )
             prep = prepared_trades(
-                encoded(terms, observed_of(terms), UNITS, WorkCounter()),
-                m.market_history,
+                encoded(terms, (observed_of(terms),), UNITS, WorkCounter()),
+                (m.market_history,),
                 WorkCounter(),
             )
-            assert trade_results(prep, m, WorkCounter(), curves).mark == pytest.approx(
+            assert trade_results(prep, (m,), WorkCounter(), curves).mark == pytest.approx(
                 0.0, abs=1e-9
             )
 

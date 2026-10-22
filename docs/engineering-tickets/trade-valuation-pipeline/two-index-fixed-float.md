@@ -6,7 +6,8 @@ stacked pull requests after the payment-day work in #214, as the delivery sectio
 sets out. One common net payment per monthly component is the v1 rule, agreed here
 and not checked against a confirmation; separately paying legs are outside this
 version. This ticket supersedes the issue's original single-fixed-price and
-combined-index alternatives.
+combined-index alternatives. The first pull request, the internal one-leg
+representation, is #215; the second and the third follow on it.
 
 ## Outcome
 

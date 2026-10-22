@@ -62,8 +62,8 @@ pid:kind:count
 | market history | `30512:market_history:WTI:34` | `calendar.index.name` |
 | price vector | `30512:price_vector:WTI:35` | `index_name`, the text typed to `_CreatePriceVector` since #112 |
 | market | `30512:market:WTI:36` | `market_history.calendar.index.name` |
-| trades | `30512:trades:WTI:41` | `resolved.index.name`, the index the batch was resolved against, since #139 |
-| prepared trades, trade results | `30512:prepared_trades:WTI:43`, `30512:trade_results:WTI:45` | the batch's index through the records, `encoded.terms.index.name` and `prepared.encoded.terms.index.name`, since #141 |
+| trades | `30512:trades:WTI:41` | `resolved.descriptor`, the legs' index names joined by `+` in leg order since [two-index-fixed-float.md](../engineering-tickets/trade-valuation-pipeline/two-index-fixed-float.md), one index's name today, a readable descriptor and nothing more; the index the batch was resolved against since #139 |
+| prepared trades, trade results | `30512:prepared_trades:WTI:43`, `30512:trade_results:WTI:45` | the batch's descriptor through the records, `encoded.terms.descriptor` and `prepared.encoded.terms.descriptor`, since #141 |
 | cashflows, cashflow results | `30512:cashflows:USD:12`, `30512:cashflow_results:USD:13` | the batch's one currency, `currency`, where an index's name would be, since #200 |
 | discount curve | `30512:discount_curve:SOFR:2` | its own `name`, `_CreateDiscountCurve`'s first argument, kept by `util_BumpDiscountCurve` on the curve it makes, [discount-curve.md](../library/globals/discount-curve.md) |
 | valuation date, trade template, quote template, discount curve set | `30512:valuation_date:1`, `30512:trade_template:40`, `30512:quote_template:41`, `30512:discount_curve_set:4` | none: a template serves any compatible index and carries none, and a collection's members are its readback's to show |
