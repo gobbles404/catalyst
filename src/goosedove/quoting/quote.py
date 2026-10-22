@@ -1,7 +1,7 @@
 """A quote: one whole-period indicative fixed price for a contract or strip on one market from a
 quote template's static terms, template-based-quoting.md. The period's months are resolved
 against the market's schedule, each month's observations made by the template's method through
-the batch pipeline's own builders, each month's relative quantity one or its calendar days and
+the batch pipeline's own builders, each month's quantity one or its calendar days and
 its payment day the template's, the request priced at once on the market by request.py's
 calculation, every month of the period in both sums whether its payment has passed or not, the
 agreed full-period convention: a paid month at its realized price and factor one, never
@@ -144,7 +144,7 @@ def _the_span(contract_code: str, as_of: np.datetime64) -> tuple[np.datetime64, 
 def _the_quantities(
     quantity_per: QuantityPer, first: NDArray[np.datetime64], last: NDArray[np.datetime64]
 ) -> NDArray[np.float64]:
-    """Each month's relative quantity: one for a quantity per month, its calendar days, weekends
+    """Each month's quantity: one for a quantity per month, its calendar days, weekends
     and holidays included, for one per calendar day; a common scale cancels in the price."""
     match quantity_per:
         case QuantityPer.MONTH:

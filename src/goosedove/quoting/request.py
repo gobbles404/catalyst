@@ -57,8 +57,8 @@ TEMPLATE_FIELDS_READ: Final = "template_fields_read"  # the template's values re
 MONTHS_RESOLVED: Final = "months_resolved"  # the months resolved to schedule rows
 OBSERVATIONS_MADE: Final = "observations_made"  # observations made over the months
 PAYMENT_DAYS_MADE: Final = "payment_days_made"  # one per month of a financial quote or request
-PRICE_REDUCTIONS: Final = "price_reductions"  # the sums formed: the months' prices, the
-# weights and the price
+PRICE_REDUCTIONS: Final = "price_reductions"  # the reductions formed: the months' prices,
+# the largest weight's exponent, the weights and the price
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,11 +84,11 @@ class Terms:
 class Request:
     """What a quote prices, resolved once and read for nothing else: the index and its schedule,
     the terms, each month as a row of the schedule, the observations the method gives the months
-    and each observation's pricing reference, each month's relative quantity, one or its
-    calendar days for a quote and the request's quantities scaled by their largest for a request
-    for quote, and for a financial settlement each month's payment day, None for a physical one,
-    which pays on no day. No history, price, factor or valuation day: those are the market's,
-    read when the request is priced."""
+    and each observation's pricing reference, each month's quantity, one or its calendar days
+    for a quote and the month's own quantity for a request for quote, which the price weighs
+    with the factor at any scale, and for a financial settlement each month's payment day, None
+    for a physical one, which pays on no day. No history, price, factor or valuation day: those
+    are the market's, read when the request is priced."""
 
     index: Index
     schedule: FuturesSchedule | IfercSchedule
@@ -96,7 +96,7 @@ class Request:
     contract: NDArray[np.intp]
     observations: Observations
     references: NDArray[np.intp]
-    relative_quantity: NDArray[np.float64]
+    quantity: NDArray[np.float64]
     payment_date: NDArray[np.datetime64] | None
 
     def component(self, k: int) -> str:
@@ -347,14 +347,17 @@ def priced(
     fixed day's price off the history and a live day's off the market's quotes, each distinct
     live contract once; a physical request's contracts not yet expired; a financial one's
     payment factors, the selected curve covering every payment after the valuation day; then
-    each month's price and its share. Each month's share is its weight, relative quantity times
-    factor, over the weights' sum, and the price the shares' sum of the months' prices: a convex
-    combination at each step, the observations' weights summing to one and the shares to one, so
-    no product or sum runs past the largest number a finite input stays within, and a factor as
-    small as the curve allows, positive by its rule, scales nothing away: one month's share is
-    one whatever its factor, and the factors are scaled by a power of two before they weight,
-    so that a subnormal factor loses no month either, every ordinary price being as it was
-    without the scaling."""
+    each month's price and its share. Each month's share is its weight, quantity times factor,
+    over the weights' sum, and the price the shares' sum of the months' prices: a convex
+    combination at each step, the observations' weights summing to one and the shares to one.
+    The weights are formed from the mantissas and exponents of the quantities and the factors
+    apart, shifted by one power of two from the largest weight's exponent, so that the largest
+    weight is at least a quarter and none is above one: a power of two moves the exponent
+    alone, so every share and price is as the plain products give it, while no quantity or
+    factor the inputs allow, a quantity of 1e-100 beside 1e224 or a factor near the smallest
+    number, which the curve accepts, drives a positive weight below the smallest number or the
+    weights' sum above the largest; a month whose weight is negligible beside the largest
+    counts for nothing, as it should, and one month's share is one whatever its factor."""
     calendar = market.market_history.calendar
     as_of = calendar.valuation_date.as_of
     observations = request.observations
@@ -374,14 +377,18 @@ def priced(
         factor = np.ones(n)
     else:
         factor = _the_factors(curve, request.terms.key, pays, as_of, request.component, counter)
-    # The factors scaled by one power of two, the largest brought to at least a half and under
-    # one: exact, a power of two moving the exponent alone, so every share and price is as it
-    # is without it, while a factor as small as the curve allows, a subnormal number, no longer
-    # drives a relative quantity below the smallest number and its month's share to nothing.
-    _, exponent = np.frexp(factor.max())
-    weight = request.relative_quantity * np.ldexp(factor, -exponent)
+    # Each weight from the mantissas' product, a quarter to one for a month of something and
+    # zero for a month of nothing, and the exponents' sum, shifted from the largest weight's: the
+    # quantities hold at least one positive and the factors are all positive, so a largest
+    # exists and the weights' sum is at least a quarter and at most the months.
+    mantissa, exponent = np.frexp(request.quantity)
+    scale, shift = np.frexp(factor)
+    mantissa = mantissa * scale
+    exponent = exponent + shift
+    largest = exponent[mantissa > 0].max()
+    weight = np.ldexp(mantissa, exponent - largest)
     share = weight / weight.sum()
-    counter.hit(PRICE_REDUCTIONS, 3)
+    counter.hit(PRICE_REDUCTIONS, 4)
     return float((share * monthly).sum())
 
 

@@ -5,7 +5,7 @@ The pins are the ticket's work rules, template-based-quoting.md: the template's 
 every month resolved once, each distinct live contract read once, the fixings one per fixed
 observation, the payment rule read once and applied once over the months, the key bound once
 and each distinct payment day after the valuation day read once off the curve, a paid month
-reading nothing, and three reductions whatever the strip."""
+reading nothing, and four reductions whatever the strip."""
 
 from collections.abc import Callable
 from types import MappingProxyType
@@ -192,7 +192,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
         "payment_factors_read": 1,
         "payment_rules_read": 1,
         "payment_shifts": 1,
-        "price_reductions": 3,
+        "price_reductions": 4,
         "schedule_codes_read": 13,
         "template_fields_read": 7,
     }
@@ -209,7 +209,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
         "payment_factors_read": 7,
         "payment_rules_read": 1,
         "payment_shifts": 1,
-        "price_reductions": 3,
+        "price_reductions": 4,
         "schedule_codes_read": 13,
         "template_fields_read": 7,
     }
@@ -228,7 +228,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
         "payment_factors_read": 7,
         "payment_rules_read": 1,
         "payment_shifts": 1,
-        "price_reductions": 3,
+        "price_reductions": 4,
         "schedule_codes_read": 13,
         "template_fields_read": 7,
     }

@@ -67,12 +67,12 @@ The calculation is [quote.md](quote.md#the-price)'s, the two functions sharing o
 
 ```text
 P_i = sum_j(weight_ij * price_ij)
-q_i = the month's quantity, per month or per calendar day, scaled by the largest in the request
+q_i = the month's quantity, per month or per calendar day
 D_i = 1 cleared; 1 bilateral with payment_i <= as_of; curve(payment_i) bilateral otherwise
 K   = sum_i(q_i * D_i * P_i) / sum_i(q_i * D_i)
 ```
 
-The quantities are scaled by the largest of them once, when the request is made, so that the weights' sum stays within the largest number and above zero whatever the scale entered, a quantity of 1e300 or 1e-300 pricing as a convex combination like any other; a month whose weight is negligible beside the largest counts for nothing, as it should. The factors are scaled by one power of two before they weight the months, the largest brought to at least a half and under one, exact and changing no ordinary price, so that a factor near the smallest number, which the curve accepts, cannot drive a relative quantity below the smallest number and its month's share to nothing; a request of 1 and 2 at a factor of 5e-324 on both payments prices its cleared 3.4/3, not the larger month alone. One month quotes its floating price whatever its quantity and its factor, a common factor on every payment cancels, and every month stands in both sums whether its payment has passed or not, the full-period convention of the quote.
+Each month's weight, its quantity times its factor, is formed from the mantissas and exponents of the two apart and shifted by one power of two from the largest weight's exponent, so that the largest weight is at least a quarter and none is above one: a power of two moves the exponent alone, so every price is as the plain products give it, while no quantity or factor the inputs allow drives a positive weight below the smallest number or the weights' sum above the largest, a quantity of 1e300 or 1e-300 pricing as a convex combination like any other; a month whose weight is negligible beside the largest counts for nothing, as it should. A row of nothing beside a month at the smallest positive factor, which the curve accepts, prices that month; 1e-100 at a factor of one beside 1e224 at 5e-324 keeps both months, 1.166333687; and a request of 1 and 2 at 5e-324 on both payments prices its cleared 3.4/3, not the larger month alone. One month quotes its floating price whatever its quantity and its factor, a common factor on every payment cancels, and every month stands in both sums whether its payment has passed or not, the full-period convention of the quote.
 
 The ticket's worked acceptance, a month-matching asian index valued 31 December 2026 with January at 1.00 and February at 1.20, last observations Friday 29 January and Friday 26 February, a weekend-only payment calendar, a template per month paying `+5bd` and, bilateral, keyed `SOFR`; the curve 1 on the valuation day and the four payment points, fixture data and no claim about any rate:
 
@@ -118,8 +118,9 @@ Rfq
                         by reference and the entered one times the month's days per calendar day
     payment_source      template, request, or None for a physical request
     request             Request: the index and its schedule, the terms, each month as a row of the
-                        schedule, the observations and each one's pricing reference, the relative
-                        quantities, scaled by the largest, and the payment days, None for physical
+                        schedule, the observations and each one's pricing reference, the
+                        quantities, the component quantities themselves, and the payment days,
+                        None for physical
 ```
 
 No history, price, factor, curve or valuation day: those are the market's and the collection's, read when the request is priced, so a price tick, a corrected fixing, a valuation day rolled or a new collection reprices the same request and nothing of its months, observations or payments is made again, and no fixed or live flag is saved that a later day would outdate. An as-of change never shortens the request; a month whose payment has passed stays in the price at its realized price and factor one, as in the quote.
@@ -130,7 +131,7 @@ No history, price, factor, curve or valuation day: those are the market's and th
 
 ## Work
 
-The request reports what it did in the quote's counters: at creation the template's values read, the schedule's codes read, the months resolved, one per row, the observations made, the payment rule read and its instructions applied once over the months and the payment days made, none of the rule and no shift for the request's own dates; nothing of a history, a price, a curve or a factor. A quote of the request reports the curve selected, the fixings read, one per fixed observation, the live prices read, one per distinct live contract, the payment factors read, one per distinct payment day ahead, and the three reductions, and nothing of the months, the observations or the payments, which it never makes again. The readback reports nothing.
+The request reports what it did in the quote's counters: at creation the template's values read, the schedule's codes read, the months resolved, one per row, the observations made, the payment rule read and its instructions applied once over the months and the payment days made, none of the rule and no shift for the request's own dates; nothing of a history, a price, a curve or a factor. A quote of the request reports the curve selected, the fixings read, one per fixed observation, the live prices read, one per distinct live contract, the payment factors read, one per distinct payment day ahead, and the four reductions, and nothing of the months, the observations or the payments, which it never makes again. The readback reports nothing.
 
 ## Tests
 
@@ -139,7 +140,7 @@ The request reports what it did in the quote's counters: at creation the templat
 | the ticket's cases by hand: cleared on either payment input, bilateral on the template's days and on the request's, one factor cancelling, a tick repricing the same request; the readback's columns, sources and dates; a single month at any quantity; calendar-day quantities, 3,100,000 and 8,400,000; equal quantities matching `_Quote` under every method and both bases on both routes; rows reversed, a month twice, the same month paying on two days kept apart, a zero row weighed at nothing and checked | `tests/unit/test_rfq.py` |
 | the market's states through the request's reuse, half fixed, fixed and paying ahead, both months paid, a corrected fixing; a trade booked at the price marking zero; the request's dates standing in for a missing `payment_day` and for a template's date the month outruns, a weekend date kept exactly, a date on the last observation refused, a physical request without dates | the same |
 | the columns, the codes, the quantities at every edge and scale, the template, the index and the market refused in their words; the page's example through the seam and the seam's refusals in signature order | the same |
-| the request's counts at a month and a year, by the template's rule and by its own dates; a quote of a saved request reading the history, the prices and the factors and resolving nothing; the functions each runs once; the readback pricing nothing; the seam creating once and quoting over three handles, publishing nothing; the retained bytes, 32 an observation and 32 a month, and the peaks | `tests/performance/test_rfq_budgets.py` |
+| the request's counts at a month and a year, by the template's rule and by its own dates; a quote of a saved request reading the history, the prices and the factors and resolving nothing; the functions each runs once; the readback pricing nothing; the seam creating once and quoting over three handles, publishing nothing; the retained bytes, 32 an observation and 24 a month, and the peaks | `tests/performance/test_rfq_budgets.py` |
 | the request on the sheet: the host's fact, the smoke's XA block on the quoting strip, `tools/excel_lifetime.ps1 -Groups rfq` and the kept workbook's block from row 3147 | `host/Goosedove.Host.Tests/CallTests.cs`, `tools/excel_smoke.ps1`, `tools/excel_lifetime.ps1`, `workbooks/handles.xlsx` |
 
 ## Not here

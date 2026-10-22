@@ -74,7 +74,7 @@ def test_creation_resolves_once_and_reads_no_market(n: int, observations: int) -
 
 def test_quoting_a_saved_request_prices_and_resolves_nothing() -> None:
     # The year in June, as the quote reads it: 118 fixings, seven live contracts once each, the
-    # curve selected and seven factors ahead, three reductions; no month resolved, no
+    # curve selected and seven factors ahead, four reductions; no month resolved, no
     # observation made, no payment shifted. The cleared request reads no curve.
     saved = made()
     assert counted(lambda c: quote_rfq(MARKET, saved, RATES, c)) == {
@@ -82,12 +82,12 @@ def test_quoting_a_saved_request_prices_and_resolves_nothing() -> None:
         "fixings_read": 118,
         "live_prices_read": 7,
         "payment_factors_read": 7,
-        "price_reductions": 3,
+        "price_reductions": 4,
     }
     assert counted(lambda c: quote_rfq(MARKET, made(12, CLEARED), None, c)) == {
         "fixings_read": 118,
         "live_prices_read": 7,
-        "price_reductions": 3,
+        "price_reductions": 4,
     }
 
 
@@ -288,13 +288,13 @@ def test_the_seam_quotes_a_saved_request_resolving_three_handles_and_publishing_
 
 def retained(saved: Rfq) -> int:
     """The bytes a request keeps in its arrays, each counted once: the entered quantities, the
-    component quantities where they are not the entered ones, the relative quantities, the
-    contract rows, the payment days, the observations' three arrays and their references."""
+    component quantities where they are not the entered ones, the contract rows, the payment
+    days, the observations' three arrays and their references."""
     request = saved.request
     arrays = [
         saved.quantity,
         saved.component_quantity,
-        request.relative_quantity,
+        request.quantity,
         request.contract,
         request.references,
         request.observations.component,
@@ -316,11 +316,13 @@ def retained(saved: Rfq) -> int:
 def test_a_request_retains_its_arrays_and_allocates_within_its_observations(
     n: int, observations: int
 ) -> None:
-    # Retained: eight bytes a month for the quantities, the relative quantities, the contract
-    # rows and the payment days, and 32 an observation for its component, day, weight and
-    # reference; the component quantities are the entered ones per month, by reference.
+    # Retained: eight bytes a month for the quantities, the contract rows and the payment days,
+    # and 32 an observation for its component, day, weight and reference; the component
+    # quantities are the entered ones per month, by reference, and the pricing form's are the
+    # component quantities themselves.
     saved = made(n)
-    assert retained(saved) == 8 * 4 * n + 32 * observations
+    assert saved.request.quantity is saved.component_quantity
+    assert retained(saved) == 8 * 3 * n + 32 * observations
     # Creation's peak, measured on 2026-10-22: 6,568 bytes for a month's 21 observations and
     # 18,610 for the year's 261, about 50 an observation over a floor of 5,500 for the terms,
     # the columns and the arrays over the months; quoting the saved request 3,011 and 15,562,

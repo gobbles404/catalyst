@@ -526,11 +526,11 @@ def test_quantities_are_finite_nonnegative_and_not_all_zero() -> None:
         template=cleared("calday"),
     )
     # Scale invariance at the edges: the price is a convex combination whatever the scale, the
-    # quantities scaled by their largest once, and one month cancels at any scale.
+    # quantities kept as entered, and one month cancels at any scale.
     for scale in (1e-300, 1e-6, 1.0, 1e6, 1e300):
         scaled = request(CODES, (100_000.0 * scale, 300_000.0 * scale), otc(), EXPLICIT)
         assert price(MARKET, scaled, RATES) == pytest.approx(EXPLICIT_PRICE, **CLOSE)
-        assert scaled.request.relative_quantity.tolist() == pytest.approx([1 / 3, 1.0])
+        assert scaled.request.quantity is scaled.component_quantity
     tiny_beside_huge = request(CODES, (1e-300, 1e300), otc(), EXPLICIT)
     assert price(MARKET, tiny_beside_huge, RATES) == pytest.approx(1.2, **CLOSE)
 
@@ -763,4 +763,31 @@ def test_a_factor_as_small_as_the_curve_allows_weighs_every_month_exactly(tiny: 
     assert price(MARKET, request(CODES, (1.0, 1.0), otc()), lopsided) == pytest.approx(1.0, **CLOSE)
     assert price(MARKET, request(CODES, (1.0, 1.0), otc(), EXPLICIT), RATES) == pytest.approx(
         (0.98 * 1.0 + 0.96 * 1.2) / (0.98 + 0.96), **CLOSE
+    )
+
+
+def test_the_reviews_cases_a_row_of_nothing_and_a_tiny_quantity_beside_the_smallest_factor() -> (
+    None
+):
+    # The review's two cases on a curve at one on 5 February and the smallest positive number on
+    # 5 March: a row of nothing beside a month at the smallest factor prices that month, where a
+    # halved factor once became nothing; and a quantity of 1e-100 at factor one beside 1e224 at
+    # the smallest factor keeps both months, their weights 1e-100 and 1e224 times 5e-324 apart,
+    # where a quantity scaled by the largest once became nothing: 1.166333687 by hand.
+    smallest = float(np.finfo(np.float64).smallest_subnormal)
+    lopsided = curve_set(curve_of((DEC_31, 1.0), ("2027-02-05", 1.0), ("2027-03-05", smallest)))
+    nothing_beside = request(CODES, (0.0, 1.0), otc())
+    assert price(MARKET, nothing_beside, lopsided) == pytest.approx(1.2, **CLOSE)
+    both = request(CODES, (1e-100, 1e224), otc())
+    second = 1e224 * smallest
+    assert price(MARKET, both, lopsided) == pytest.approx(
+        (1e-100 * 1.0 + second * 1.2) / (1e-100 + second), **CLOSE
+    )
+    assert price(MARKET, both, lopsided) == pytest.approx(1.166333687, abs=5e-10)
+    # The same two with the factors the other way round, and at the largest quantities.
+    assert price(MARKET, request(CODES, (1.0, 0.0), otc()), lopsided) == pytest.approx(1.0, **CLOSE)
+    huge = request(CODES, (1.7e308, 1.7e308), otc())
+    assert price(MARKET, huge, lopsided) == pytest.approx(1.0, **CLOSE)
+    assert price(MARKET, huge, RATES) == pytest.approx(
+        (0.99 * 1.0 + 0.97 * 1.2) / (0.99 + 0.97), **CLOSE
     )

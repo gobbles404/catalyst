@@ -72,8 +72,8 @@ class Rfq:
     month, the entered one per month and the entered one times the month's calendar days per
     calendar day, formed once; the payment source, the template's or the request's, None for a
     physical request, which pays on no day; and the pricing form, the index, the terms, the
-    months as schedule rows, the observations and their references, the relative quantities
-    and the payment days, which every quote of the request reads and nothing rebuilds."""
+    months as schedule rows, the observations and their references, the quantities and the
+    payment days, which every quote of the request reads and nothing rebuilds."""
 
     template: QuoteTemplate
     contract_codes: tuple[str, ...]
@@ -134,8 +134,6 @@ def rfq(
     first, last = month_bounds(month)
     quantity = _the_quantities(quantities)
     component_quantity = _the_component_quantities(terms.quantity_per, quantity, first, last)
-    relative = component_quantity / component_quantity.max()  # at least one positive, finite
-    relative.setflags(write=False)
     codes = schedule.codes
 
     def component(k: int) -> str:
@@ -163,7 +161,9 @@ def rfq(
         payments_after_observations(pays, last_days(observations, n), named)
         pays.setflags(write=False)
         source = PaymentSource.REQUEST
-    request = Request(index, schedule, terms, contract, observations, references, relative, pays)
+    request = Request(
+        index, schedule, terms, contract, observations, references, component_quantity, pays
+    )
     return Rfq(template, tuple(contract_codes), quantity, component_quantity, source, request)
 
 
