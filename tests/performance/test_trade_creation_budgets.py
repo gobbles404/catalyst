@@ -646,6 +646,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 4,
+        "_resolve_each": 1,  # the index cell, one object
         "_text": 2,  # the two handles' texts
         "_resolve": 2,  # the index and the template, one lookup each
         "_text_row": 1,

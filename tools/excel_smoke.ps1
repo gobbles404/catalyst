@@ -806,7 +806,7 @@ $formulas = [ordered]@{
     "=_PrepareTrades(FG8,CT7)"  = "#ERROR _PrepareTrades: ValueError: trade 3 at row 1 observes 2026-05-19, before the calendar begins on 2026-05-20; the schedule's first contract, m26, bounds the calendar and nothing prices its days"
     "=_EvaluateTrades(FG6,CW6)" = "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'Henry Hub NYMEX', expected the one the trades were prepared against"
     '=_PrepareTrades("x:trades:9",CT7)' = "#ERROR _PrepareTrades: trades is text 'x:trades:9' naming no live object, expected trades handle"
-    "=_EvaluateTrades(FG6)" = "#ERROR _EvaluateTrades: market is missing, expected market handle"
+    "=_EvaluateTrades(FG6)" = "#ERROR _EvaluateTrades: markets is missing, expected market handles in a cell, a row or a column"
     "=_ReportValues(C2)"    = "#ERROR _ReportValues: results is blank, expected trade results or cashflow results handle"
     # The toy lifecycle's paid state: TOY_GAS in FM5, financial, paying two business days after
     # each expiry on the calendar in FM4, valued on 30-Nov-2026 in FM9 with Z26's final settle of
@@ -2014,6 +2014,86 @@ $formulas = [ordered]@{
     '=_Quote(VA7,"BALF27-G27",VF7)-VP2' = "0"
     '=_Quote(VA7,"BALZ26",VF7)' = "30"
     '=_Quote(VA7,"BALX26",VF7)' = "#ERROR _Quote: ValueError: valuation_date is 2026-12-31, after 'BALX26' ended on 2026-11-30, expected a valuation day on or before the period's last day"
+    # A pair of indexes, two-index-fixed-float.md: A a futures index and B an IFERC index over one
+    # NYMEX NG specification, booked as one row of G27 for one lot at 3.30 and -0.30 in WJ22 over
+    # the column WJ5:WJ6, prepared in WJ23 over the histories WJ13:WJ14 and valued in WJ24 over the
+    # markets WJ17:WK17, a row, on SOFR at 0.95: the ticket's hand table, 950 of mark and -0.095 of
+    # DV01, the risk report two commodity groups and one DV01 column, the readbacks naming each leg
+    # and showing the group's payment once and each leg's share; the histories B first in WJ25 and
+    # the markets as a column in WJ28 and B first in WJ29 valuing the same; the indexes B first in
+    # WJ27 a batch named B+A; the collection of the pair alone in WJ26 a row per leg; a grid of
+    # handles, one history and one market for two legs, two histories of one index and the second
+    # leg's price without a second index refused.
+    '=MID(WJ22,FIND(":",WJ22)+1,11)' = "trades:A+B:"
+    '=MID(WJ23,FIND(":",WJ23)+1,20)' = "prepared_trades:A+B:"
+    '=MID(WJ24,FIND(":",WJ24)+1,18)' = "trade_results:A+B:"
+    '=MID(WJ25,FIND(":",WJ25)+1,20)' = "prepared_trades:A+B:"
+    '=MID(WJ27,FIND(":",WJ27)+1,11)' = "trades:B+A:"
+    "=INDEX(_ReportValues(WJ24),1,1)" = "bilateral_mark"
+    "=INDEX(_ReportValues(WJ24),3,1)" = "950"
+    "=INDEX(_ReportValues(WJ24),3,2)" = "0"
+    "=INDEX(_ReportValues(WJ28),3,1)" = "950"
+    "=INDEX(_ReportValues(WJ29),3,1)" = "950"
+    '=ROWS(_ReportRisk(WJ24,"all","day"))'      = "7"
+    '=COLUMNS(_ReportRisk(WJ24,"all","day"))'   = "8"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),2,2)' = "A nominal_delta [NYMEX NG]"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),2,5)' = "B delta [NYMEX NG]"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),2,6)' = "SOFR USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),2,8)' = "B SOFR cross_gamma [NYMEX NG per basis point]"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),4,2)' = "1"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),4,5)' = "0.95"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),4,6)' = "-0.095"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),5,1)' = "46414"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),5,2)' = "1"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),6,1)' = "46419"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),6,4)' = "1"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),7,1)' = "46756"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),7,6)' = "-0.095"
+    "=ROWS(util_ReadHandle(WJ22))"       = "3"
+    "=COLUMNS(util_ReadHandle(WJ22))"    = "27"
+    "=INDEX(util_ReadHandle(WJ22),1,6)"  = "second_schedule_method"
+    "=INDEX(util_ReadHandle(WJ22),3,6)"  = "lastday"
+    "=INDEX(util_ReadHandle(WJ22),1,16)" = "combined_fixed_price"
+    "=INDEX(util_ReadHandle(WJ22),3,14)" = "3.3"
+    "=INDEX(util_ReadHandle(WJ22),3,15)" = "-0.3"
+    "=INDEX(util_ReadHandle(WJ22),3,16)" = "3"
+    "=INDEX(util_ReadHandle(WJ22),3,26)" = "-33000"
+    "=INDEX(util_ReadHandle(WJ22),3,27)" = "3000"
+    "=ROWS(util_ReadHandle(WJ23))"       = "4"
+    "=COLUMNS(util_ReadHandle(WJ23))"    = "10"
+    "=INDEX(util_ReadHandle(WJ23),1,1)"  = "leg"
+    "=INDEX(util_ReadHandle(WJ23),2,1)"  = "int64"
+    "=INDEX(util_ReadHandle(WJ23),3,1)"  = "1"
+    "=INDEX(util_ReadHandle(WJ23),4,2)"  = "B"
+    "=INDEX(util_ReadHandle(WJ23),4,5)"  = "46419"
+    "=INDEX(util_ReadHandle(WJ23),4,10)" = "1"
+    "=ROWS(util_ReadHandle(WJ24))"       = "4"
+    "=COLUMNS(util_ReadHandle(WJ24))"    = "34"
+    "=INDEX(util_ReadHandle(WJ24),1,21)" = "leg_amount"
+    "=INDEX(util_ReadHandle(WJ24),1,26)" = "leg_dv01"
+    "=INDEX(util_ReadHandle(WJ24),3,2)"  = "A"
+    "=INDEX(util_ReadHandle(WJ24),3,18)" = "1000"
+    "=INDEX(util_ReadHandle(WJ24),4,18)" = "-"
+    "=INDEX(util_ReadHandle(WJ24),3,19)" = "950"
+    "=INDEX(util_ReadHandle(WJ24),3,21)" = "2000"
+    "=INDEX(util_ReadHandle(WJ24),4,21)" = "-1000"
+    "=INDEX(util_ReadHandle(WJ24),3,22)" = "1900"
+    "=INDEX(util_ReadHandle(WJ24),4,24)" = "-950"
+    "=INDEX(util_ReadHandle(WJ24),3,26)" = "-0.19"
+    "=INDEX(util_ReadHandle(WJ24),4,26)" = "0.095"
+    "=INDEX(util_ReadHandle(WJ24),4,27)" = "-"
+    "=ROWS(util_ReadHandle(WJ26))"       = "4"
+    "=INDEX(util_ReadHandle(WJ26),3,2)"  = "A"
+    "=INDEX(util_ReadHandle(WJ26),4,2)"  = "B"
+    "=INDEX(util_ReadHandle(WJ26),3,9)"  = "-0.095"
+    "=INDEX(util_ReadHandle(WJ26),4,9)"  = "-"
+    '=INDEX(_ReportRisk(WJ26,"dv01","year"),4,2)' = "-0.095"
+    "=_CreateTrades(WJ5:WK6,WL4:WQ4,WL5:WQ5,WJ21)" = "#ERROR _CreateTrades: indexes is 2x2 array, expected one cell, one row or one column of index handles"
+    "=_CreateTrades(WJ5,WL4:WQ4,WL5:WQ5,WJ21)"     = "#ERROR _CreateTrades: ValueError: second_fixed_price is -0.3, expected none unless two indexes"
+    "=_CreateTrades(WJ5:WJ6,WL4:WP4,WL5:WP5,WJ21)" = "#ERROR _CreateTrades: ValueError: second_fixed_price is missing, expected it with two indexes"
+    "=_PrepareTrades(WJ22,WJ13)"      = "#ERROR _PrepareTrades: ValueError: histories are 1, expected 2, one per leg of the trades"
+    "=_PrepareTrades(WJ22,WK15:WK16)" = "#ERROR _PrepareTrades: ValueError: history 2 is over index 'A' as history 1 is, expected one history per index of the trades"
+    "=_EvaluateTrades(WJ23,WJ17,WJ20)" = "#ERROR _EvaluateTrades: ValueError: markets are 1, expected 2, one per leg of the trades"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -3301,6 +3381,72 @@ $cells = [ordered]@{
     "VP1" = '=_Quote(VA7,"F27-G27",VF3,VN6)'
     "VP2" = '=_Quote(VA7,"F27-G27",VF7)'
     "VP3" = '=_Quote(VA7,"F27",VF3,VN6)'
+    # The pair, two-index-fixed-float.md: A's futures schedule in WA1:WB3 with 1 January 2027 closed,
+    # B's IFERC schedule in WA5:WB9, the NYMEX NG specification in WD1:WH2 shared by the two
+    # indexes, A in WJ5 and B in WJ6, a column; the valuation day 4 January 2027 in WA11, A's two
+    # December settles in WA12:WB13 and B's Z26 index in WA14:WB14, the two histories in WJ13:WJ14
+    # with a copy B first in WK13:WK14 and a copy of A's twice in WK15:WK16; the vectors over
+    # WA15:WA16 and WB15:WB17, the markets in WJ17:WJ18 with B beside A in WK17 and B first in
+    # WK18:WK19; SOFR in WJ19 and its collection in WJ20; the template over WL1:WU2 with the second
+    # leg's method and the ticket's row in WL4:WQ5; the batch, the preparation and the results
+    # in WJ22:WJ24, the B-first preparation in WJ25, the collection in WJ26, the B+A batch in WJ27
+    # and the results over the markets as a column and B first in WJ28 and WJ29.
+    "WA1" = "F27"; "WB1" = "29-Dec-2026"
+    "WA2" = "G27"; "WB2" = "27-Jan-2027"
+    "WA3" = "H27"; "WB3" = "24-Feb-2027"
+    "WC1" = "1-Jan-2027"
+    "WD1" = "name"; "WE1" = "lot_size"; "WF1" = "lot_unit"; "WG1" = "brokerage_rate_per_lot"; "WH1" = "clearing_rate_per_lot"
+    "WD2" = "NYMEX NG"; "WE2" = "10000"; "WF2" = "MMBTU"; "WG2" = "3"; "WH2" = "2"
+    "WA5" = "Z26"; "WB5" = "1-Dec-2026"
+    "WA6" = "F27"; "WB6" = "4-Jan-2027"
+    "WA7" = "G27"; "WB7" = "1-Feb-2027"
+    "WA8" = "H27"; "WB8" = "1-Mar-2027"
+    "WA9" = "J27"; "WB9" = "1-Apr-2027"
+    "WA11" = "4-Jan-2027"
+    "WA12" = "31-Dec-2026"; "WB12" = "3.6"
+    "WA13" = "30-Dec-2026"; "WB13" = "3.58"
+    "WA14" = "Z26"; "WB14" = "-0.3"
+    "WA15" = "3.5"; "WA16" = "3.6"
+    "WB15" = "-0.38"; "WB16" = "-0.4"; "WB17" = "-0.42"
+    "WD4" = "date"; "WE4" = "discount_factor"
+    "WD5" = "4-Jan-2027"; "WE5" = "1"
+    "WD6" = "4-Jan-2028"; "WE6" = "0.95"
+    "WJ1" = "=_CreateFuturesSchedule(WA1:WA3,WB1:WB3)"
+    "WJ2" = "=_CreateHolidayCalendar(WC1)"
+    "WJ3" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "WJ4" = "=_CreateContractSpecifications(WD1:WH1,WD2:WH2)"
+    "WJ5" = '=_CreateIndex("A","Pair leg A, a futures index",WJ1,WJ3,WJ4,WJ2,"NYMEX NG")'
+    "WJ6" = '=_CreateIndex("B","Pair leg B, an IFERC index",WJ7,WJ3,WJ4,,"NYMEX NG")'
+    "WJ7" = "=_CreateIfercSchedule(WA5:WA9,WB5:WB9)"
+    "WK5" = "=WJ6"; "WK6" = "=WJ5"
+    "WJ8" = "=_CreateValuationDate(WA11,0.5)"
+    "WJ9" = "=_CreateCalendar(WJ8,WJ5)"
+    "WJ10" = "=_CreateCalendar(WJ8,WJ6)"
+    "WJ11" = "=_CreateFuturesFixings(WA12:WA13,WB12:WB13,WJ5)"
+    "WJ12" = "=_CreateIfercFixings(WA14,WB14,WJ6)"
+    "WJ13" = "=_CreateMarketHistory(WJ9,WJ11)"
+    "WJ14" = "=_CreateMarketHistory(WJ10,WJ12)"
+    "WK13" = "=WJ14"; "WK14" = "=WJ13"; "WK15" = "=WJ13"; "WK16" = "=WJ13"
+    "WJ15" = '=_CreatePriceVector("A",WA15:WA16)'
+    "WJ16" = '=_CreatePriceVector("B",WB15:WB17)'
+    "WJ17" = "=_CreateMarket(WJ13,WJ15)"
+    "WJ18" = "=_CreateMarket(WJ14,WJ16)"
+    "WK17" = "=WJ18"; "WK18" = "=WJ18"; "WK19" = "=WJ17"
+    "WJ19" = '=_CreateDiscountCurve("SOFR",WD4:WE4,WD5:WE6)'
+    "WJ20" = "=_CollectDiscountCurves(WJ19)"
+    "WL1" = "quantity_unit"; "WM1" = "quantity_per"; "WN1" = "schedule_method"; "WO1" = "second_schedule_method"; "WP1" = "route"; "WQ1" = "settlement_method"; "WR1" = "counterparty"; "WS1" = "discount_curve_key"; "WT1" = "payment_day"; "WU1" = "payment_holiday_calendar"
+    "WL2" = "NYMEX NG"; "WM2" = "month"; "WN2" = "lastday"; "WO2" = "lastday"; "WP2" = "bilateral"; "WQ2" = "financial"; "WR2" = "ACME Trading"; "WS2" = "SOFR"; "WT2" = "4-Jan-2028"; "WU2" = "=WJ2"
+    "WJ21" = '=_CreateTradeTemplate("fixed_float",WL1:WU1,WL2:WU2)'
+    "WL4" = "trade_id"; "WM4" = "trade_date"; "WN4" = "contract_code"; "WO4" = "quantity"; "WP4" = "fixed_price"; "WQ4" = "second_fixed_price"
+    "WL5" = "1"; "WM5" = "15-Dec-2026"; "WN5" = "G27"; "WO5" = "1"; "WP5" = "3.3"; "WQ5" = "-0.3"
+    "WJ22" = "=_CreateTrades(WJ5:WJ6,WL4:WQ4,WL5:WQ5,WJ21)"
+    "WJ23" = "=_PrepareTrades(WJ22,WJ13:WJ14)"
+    "WJ24" = "=_EvaluateTrades(WJ23,WJ17:WK17,WJ20)"
+    "WJ25" = "=_PrepareTrades(WJ22,WK13:WK14)"
+    "WJ26" = "=_AggregateResults(WJ24)"
+    "WJ27" = "=_CreateTrades(WK5:WK6,WL4:WQ4,WL5:WQ5,WJ21)"
+    "WJ28" = "=_EvaluateTrades(WJ23,WJ17:WJ18,WJ20)"
+    "WJ29" = "=_EvaluateTrades(WJ25,WK18:WK19,WJ20)"
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January

@@ -767,8 +767,10 @@ readback's column, text on some rows and a date on others, reads well on the she
 
 ## 27. Two index legs on fixed_float
 
-Agreed 21 October 2026, not yet built: [two-index-fixed-float.md](two-index-fixed-float.md),
-issue #212. Book a pair through direct ranges in the existing creators, with two
+Agreed 21 October 2026, built in #215, #216 and #217: [two-index-fixed-float.md](two-index-fixed-float.md),
+issue #212. The sheet types the pair as a row or a column of two index handles into `_CreateTrades`,
+the histories and the markets as a row or a column of two into `_PrepareTrades` and
+`_EvaluateTrades`, in either order; the readbacks lead with `leg` and `index`. Book a pair through direct ranges in the existing creators, with two
 leg fixed prices and shared quantity, payment and route terms. Keep index risk
 separate, rate risk primarily grouped by curve/currency, and leg value/DV01
 attribution visible in readback. First-leg specifications supply fees once.

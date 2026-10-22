@@ -49,6 +49,7 @@ ENCODED_SLOTS = "encoded_slots"  # dated slots named and summed over
 ENCODED_PAYMENT_DAYS = (
     "encoded_payment_days"  # a bilateral batch's distinct payment days, since #178
 )
+ENCODED_PAIR_DAYS = "encoded_pair_days"  # a pair's distinct observation days over both legs
 # The allowance two legs' sizes per entered unit may differ by and be one quantity, relative,
 # since two-index-fixed-float.md: the unit tables' products of a few factors agree to a few
 # ulps, 1e-16 of the size, and two quantities that are not one differ by a ratio of units.
@@ -62,9 +63,10 @@ class PaymentAxes:
     paid or not, and day_of_group[g]; months, the first day of each calendar month those days fall
     in, increasing, and month_of_day[d]; years, the first day of each calendar year, and
     year_of_month[m]. Then, for the report of every risk at once by day, the union of the
-    observation days and the payment days, increasing, with each axis's places on it:
-    union_days, observed_in_days and paid_in_days; the month and year displays are the
-    preparation's since #186, made from the valuation day. Made once when the batch is made, so
+    observation days of every leg and the payment days, increasing, union_days, with the
+    payment days' places on it, paid_in_days, each leg's observation days' places being the
+    leg's own, EncodedLeg.day_in_union; the month and year displays are the preparation's
+    since #186, made from the valuation day. Made once when the batch is made, so
     that a report copies saved vectors through saved places and discovers, sorts and sums
     nothing; None for a cleared batch, whose DV01 has no dated axis, and for a physical one."""
 
@@ -75,7 +77,6 @@ class PaymentAxes:
     years: NDArray[np.datetime64]
     year_of_month: NDArray[np.intp]
     union_days: NDArray[np.datetime64]
-    observed_in_days: NDArray[np.intp]
     paid_in_days: NDArray[np.intp]
 
 
@@ -153,7 +154,10 @@ class EncodedLeg:
     leg prices off, and nothing else: no period without a reference, and a payment day moves
     nothing. And curve_axes, since named-curves-slice-3.md, the places the by-curve risk arrays
     are summed into, CurveAxes, for a bilateral batch and None for the rest, the leg's slot and
-    reference places beside the trade's group places."""
+    reference places beside the trade's group places; and day_in_union, the leg's observation
+    days' places on the trade's union of observation and payment days, PaymentAxes.union_days,
+    for a bilateral batch and None for the rest, so that a report of every risk by day copies
+    the leg's saved vectors through saved places."""
 
     terms: ResolvedTrades
     leg: LegTerms
@@ -178,6 +182,7 @@ class EncodedLeg:
     contract_years: NDArray[np.datetime64]
     contract_year_of_month: NDArray[np.intp]
     curve_axes: CurveAxes | None
+    day_in_union: NDArray[np.intp] | None
 
     def slot_trade(self, slot: int) -> str:
         """The words for a slot's first trade, as ResolvedTrades.named gives them: `trade
@@ -191,6 +196,19 @@ class EncodedLeg:
         2026-11-25, a day Z26 prices`."""
         code = self.leg.schedule.codes[int(self.slot_reference[slot])]
         return f"{self.slot_trade(slot)} on {self.slot_date[slot]}, a day {code} prices"
+
+
+@dataclass(frozen=True, slots=True)
+class PairAxes:
+    """A pair's observation-day axis, since two-index-fixed-float.md's third pull request: days,
+    the union of the two legs' observation days, increasing, and day_in[k], each leg's days'
+    places on it, so that a pair's delta or cross-gamma report by day copies each leg's saved
+    vector through saved places onto one axis, as a collection of the two legs would; the month
+    and year displays are each leg's, made from the one valuation day and placed by their own
+    rows. Made once when the batch is made; None for one leg, whose days are the axis."""
+
+    days: NDArray[np.datetime64]
+    day_in: tuple[NDArray[np.intp], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,7 +240,8 @@ class Encoded:
     Then, since #178, payment_axes, the payment-time axes a DV01 report is summed onto and the
     union of their days with the first leg's observation days, PaymentAxes, made once here for a
     bilateral batch and None for a cleared or a physical one; the month and year displays are
-    the preparation's since #186."""
+    the preparation's since #186. And pair, since the ticket's third pull request, a pair's
+    observation-day axis with each leg's places, PairAxes, None for one leg."""
 
     terms: ResolvedTrades
     legs: tuple[EncodedLeg, ...]
@@ -233,6 +252,7 @@ class Encoded:
     payment_axes: PaymentAxes | None
     keys: tuple[str, ...]
     key_of_group: NDArray[np.intp] | None
+    pair: PairAxes | None
 
 
 def encoded(
@@ -313,9 +333,12 @@ def encoded(
     or by year sums the delta by reference onto the contracts' periods, and nothing is sorted
     or grouped when it is read. For a bilateral batch, since #178, the payment-time axes too:
     the distinct payment days of every group, their months and their years, three uniques
-    more, and the union of the payment days with the observation days with each axis's places
-    on it, one union and two searches, so that a DV01 report by payment day and a report of
-    every risk by day copy saved vectors through saved places, the month and year displays
+    more, and the union of the payment days with every leg's observation days with the payment
+    days' places and each leg's places on it, one union and a search each, so that a DV01
+    report by payment day and a report of every risk by day copy saved vectors through saved
+    places; for a pair the union of the two legs' observation days with each leg's places,
+    PairAxes, one unique and two searches, the axis a pair's delta report by day stands on, the
+    month and year displays
     being the preparation's since #186; a cleared batch, whose DV01 has no dated axis, makes none
     of this and its ledger stands.
 
@@ -341,13 +364,12 @@ def encoded(
         )
     heads, payment_date, group_of_component, keys, key_of_group = _the_groups(terms)
     groups = heads.size
-    legs: list[EncodedLeg] = []
     sizes: list[NDArray[np.float64]] = []  # each leg's specifications in the quote unit
-    payment_axes: PaymentAxes | None = None
+    parts: list[_LegParts] = []
     for leg, observed in zip(terms.legs, observations, strict=True):
         quote_quantity, coefficient, offset, to_quote_unit = _the_amounts(terms, leg, units)
-        if legs:
-            _the_same_quantity(terms, legs[0].leg, sizes[0], leg, to_quote_unit)
+        if parts:
+            _the_same_quantity(terms, terms.legs[0], sizes[0], leg, to_quote_unit)
         sizes.append(to_quote_unit)
         group_contract = leg.contract[heads]
         offset_of_group = _the_group_offsets(
@@ -370,15 +392,59 @@ def encoded(
         references, reference_of_slot = np.unique(slot_reference, return_inverse=True)
         days = _the_day_axis(slot_date, slot_reference)
         periods = _the_contract_periods(leg.schedule_month[references])
-        # A cleared batch's DV01 has no dated axis; nothing more is made for it and its ledger
-        # stands. The payment-time axes are the trade's, made once with the first leg's days.
-        if (
-            payment_axes is None
-            and terms.route is Route.BILATERAL
-            and payment_date is not None
-            and not legs
-        ):
-            payment_axes = _the_payment_axes(payment_date, days[0], counter)
+        if payment_date is not None:
+            _payments_after_observations(leg, group_contract, payment_date, slot_group, slot_date)
+        counter.hit(ENCODED_COMPONENTS, int(leg.contract.size))
+        counter.hit(ENCODED_OBSERVATIONS, int(observed.component.size))
+        counter.hit(ENCODED_SLOTS, int(slot_group.size))
+        parts.append(
+            _LegParts(
+                leg,
+                observed,
+                (
+                    quote_quantity,
+                    coefficient,
+                    offset,
+                    group_contract,
+                    offset_of_group,
+                    slot_group,
+                    slot_date,
+                    slot_reference,
+                    slot_exposure,
+                    slot_of_observation,
+                    references,
+                    reference_of_slot,
+                    *days,
+                    *periods,
+                ),
+                days[0],
+                days[1],
+                references.size,
+                periods[1],
+                periods[3],
+                periods[0].size,
+                periods[2].size,
+                slot_group,
+                reference_of_slot,
+            )
+        )
+    counter.hit(ENCODED_GROUPS, int(groups))
+    # A pair's observation-day axis, the two legs' days united, since the ticket's third pull
+    # request; one leg's days are its own axis.
+    pair = _the_pair_axes([p.days for p in parts], counter) if len(parts) > 1 else None
+    # A cleared batch's DV01 has no dated axis; nothing more is made for it and its ledger
+    # stands. The payment-time axes are the trade's, over every leg's observation days.
+    payment_axes: PaymentAxes | None = None
+    day_in_union: tuple[NDArray[np.intp] | None, ...] = (None,) * len(parts)
+    if terms.route is Route.BILATERAL and payment_date is not None:
+        payment_axes, day_in_union = _the_payment_axes(
+            payment_date,
+            parts[0].days if pair is None else pair.days,
+            [p.days for p in parts],
+            counter,
+        )
+    legs: list[EncodedLeg] = []
+    for part, places in zip(parts, day_in_union, strict=True):
         # Since named-curves-slice-3.md the places every curve's risk is summed into at once, made
         # here for a bilateral batch, each leg's over its own slots and references; a batch on
         # one key holds the places above by reference.
@@ -386,45 +452,32 @@ def encoded(
             _the_curve_axes(
                 len(keys),
                 key_of_group,
-                slot_group,
-                reference_of_slot,
-                days[1],
-                references.size,
-                days[0].size,
+                part.slot_group,
+                part.reference_of_slot,
+                part.day_of_slot,
+                part.references,
+                part.days.size,
                 payment_axes,
-                periods[1],
-                periods[3],
-                periods[0].size,
-                periods[2].size,
+                part.contract_month_of_reference,
+                part.contract_year_of_month,
+                part.contract_months,
+                part.contract_years,
             )
             if payment_axes is not None and key_of_group is not None
             else None
         )
-        if payment_date is not None:
-            _payments_after_observations(leg, group_contract, payment_date, slot_group, slot_date)
-        counter.hit(ENCODED_COMPONENTS, int(leg.contract.size))
-        counter.hit(ENCODED_OBSERVATIONS, int(observed.component.size))
-        counter.hit(ENCODED_SLOTS, int(slot_group.size))
-        arrays = (
-            quote_quantity,
-            coefficient,
-            offset,
-            group_contract,
-            offset_of_group,
-            slot_group,
-            slot_date,
-            slot_reference,
-            slot_exposure,
-            slot_of_observation,
-            references,
-            reference_of_slot,
-            *days,
-            *periods,
-        )
-        for array in arrays:
+        for array in part.arrays:
             array.setflags(write=False)
-        legs.append(EncodedLeg(terms, leg, observed, *arrays, curve_axes))
-    counter.hit(ENCODED_GROUPS, int(groups))
+        legs.append(
+            EncodedLeg(
+                terms,
+                part.leg,
+                part.observed,
+                *part.arrays,
+                curve_axes=curve_axes,
+                day_in_union=places,
+            )
+        )
     # The trade's fixed leg of each group: the one leg's own array, by reference, or the legs'
     # summed, finite or refused by the group since the legs' sums, each finite, can outrun.
     offset_of_group = legs[0].offset_of_group
@@ -464,7 +517,28 @@ def encoded(
         payment_axes,
         keys,
         key_of_group,
+        pair,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class _LegParts:
+    """One leg's arrays as the first pass over the legs made them, before the axes the trade
+    makes over every leg: the leg's terms and observations, the arrays an EncodedLeg holds in
+    its order, and the few the curve axes and the unions read, by name."""
+
+    leg: LegTerms
+    observed: Observations
+    arrays: tuple[NDArray[Any], ...]
+    days: NDArray[np.datetime64]
+    day_of_slot: NDArray[np.intp]
+    references: int
+    contract_month_of_reference: NDArray[np.intp]
+    contract_year_of_month: NDArray[np.intp]
+    contract_months: int
+    contract_years: int
+    slot_group: NDArray[np.intp]
+    reference_of_slot: NDArray[np.intp]
 
 
 def _the_amounts(
@@ -853,21 +927,24 @@ def _the_contract_periods(
 
 def _the_payment_axes(
     payment_date: NDArray[np.datetime64],
-    days: NDArray[np.datetime64],
+    observed: NDArray[np.datetime64],
+    leg_days: list[NDArray[np.datetime64]],
     counter: WorkCounter,
-) -> PaymentAxes:
+) -> tuple[PaymentAxes, tuple[NDArray[np.intp], ...]]:
     """The payment-time axes of a bilateral batch, since #178: the distinct payment days of every
     group with each group's place, the months those days fall in with each day's, the years with
-    each month's, three uniques; and the union of the observation days given and the payment
-    days, one union, with each axis's places on it, two searches, so that a report of every risk
-    by day copies the saved vectors onto one axis through saved places; the month and year
-    displays are the preparation's since #186. Every array frozen; one payment day per distinct
-    payment day reported to the counter."""
+    each month's, three uniques; and the union of the observation days given, one leg's or a
+    pair's united, and the payment days, one union, with the payment days' places and each leg's
+    days' places on it, a search each, so that a report of every risk by day copies the saved
+    vectors onto one axis through saved places; the month and year displays are the
+    preparation's since #186. Every array frozen; one payment day per distinct payment day
+    reported to the counter. The axes, and each leg's places in leg order."""
     paid, day_of_group = np.unique(payment_date, return_inverse=True)
     month_keys, month_of_day = np.unique(paid.astype("datetime64[M]"), return_inverse=True)
     year_keys, year_of_month = np.unique(month_keys.astype("datetime64[Y]"), return_inverse=True)
     paid_months = month_keys.astype("datetime64[D]")
     paid_years = year_keys.astype("datetime64[D]")
+    union, places, paid_in = _the_union(observed, paid, leg_days)
     arrays = (
         paid,
         day_of_group,
@@ -875,21 +952,37 @@ def _the_payment_axes(
         month_of_day,
         paid_years,
         year_of_month,
-        *_the_union(days, paid),
+        union,
+        paid_in,
     )
-    for array in arrays:
+    for array in (*arrays, *places):
         array.setflags(write=False)
     counter.hit(ENCODED_PAYMENT_DAYS, int(paid.size))
-    return PaymentAxes(*arrays)
+    return PaymentAxes(*arrays), places
 
 
 def _the_union(
-    observed: NDArray[np.datetime64], paid: NDArray[np.datetime64]
-) -> tuple[NDArray[np.datetime64], NDArray[np.intp], NDArray[np.intp]]:
-    """The union of the observation days and the payment days, increasing, with each axis's
-    places on it: one union, two searches."""
+    observed: NDArray[np.datetime64],
+    paid: NDArray[np.datetime64],
+    leg_days: list[NDArray[np.datetime64]],
+) -> tuple[NDArray[np.datetime64], tuple[NDArray[np.intp], ...], NDArray[np.intp]]:
+    """The union of the observation days and the payment days, increasing, with each leg's days'
+    places and the payment days' places on it: one union, a search per leg and one more."""
     union = np.union1d(observed, paid)
-    return union, np.searchsorted(union, observed), np.searchsorted(union, paid)
+    places = tuple([np.searchsorted(union, days) for days in leg_days])
+    return union, places, np.searchsorted(union, paid)
+
+
+def _the_pair_axes(leg_days: list[NDArray[np.datetime64]], counter: WorkCounter) -> PairAxes:
+    """A pair's observation-day axis, since two-index-fixed-float.md's third pull request: the
+    two legs' days united, one unique over their concatenation, with each leg's places, one
+    search each; every array frozen, the days reported to the counter."""
+    days = np.unique(np.concatenate(leg_days))
+    day_in = tuple([np.searchsorted(days, each) for each in leg_days])
+    for array in (days, *day_in):
+        array.setflags(write=False)
+    counter.hit(ENCODED_PAIR_DAYS, int(days.size))
+    return PairAxes(days, day_in)
 
 
 def _the_slots(

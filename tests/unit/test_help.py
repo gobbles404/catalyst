@@ -665,15 +665,16 @@ def test_the_trades_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateTrades"]
     assert not hidden
     assert description == (
-        "Creates a batch of trades on one index from a template's shared fields and a ticket's "
-        "rows, each contract code resolved against the index's schedule, and shows its handle, "
-        "the text other formulas take as the trades."
+        "Creates a batch of trades on one index, or on a pair as two legs, from a template's "
+        "shared fields and a ticket's rows, each contract code resolved against each index's "
+        "schedule, and shows its handle, the text other formulas take as the trades."
     )
     assert arguments == [
         (
-            "index",
-            "The index handle: the cell showing _CreateIndex's result, such as I3, or a name for "
-            "it, the one index every trade of the batch is on.",
+            "indexes",
+            "The index handle, or a row or column of two for a pair: the cells showing "
+            "_CreateIndex's results, such as I3 or I3:I4, or names for them, the first leg's "
+            "index first.",
         ),
         (
             "fields",
@@ -697,9 +698,9 @@ def test_the_preparation_explains_itself() -> None:
     description, arguments, hidden = SPECS["_PrepareTrades"]
     assert not hidden
     assert description == (
-        "Prepares a batch of trades against one market history, each observation whose day has "
-        "passed fixed at that day's settle and each payment that has fallen due settled, and shows "
-        "its handle, the text _EvaluateTrades takes as the prepared trades."
+        "Prepares a batch of trades against its market histories, one per index, each observation "
+        "whose day has passed fixed at that day's settle and each payment fallen due settled, and "
+        "shows its handle, the text _EvaluateTrades takes as the prepared trades."
     )
     assert arguments == [
         (
@@ -708,10 +709,10 @@ def test_the_preparation_explains_itself() -> None:
             "for it.",
         ),
         (
-            "history",
-            "The market-history handle of the trades' index: the cell showing "
-            "_CreateMarketHistory's result, such as I11, or a name for it, valued on the day the "
-            "trades are prepared for.",
+            "histories",
+            "The market-history handle of the trades' index, or a row or column of one per index "
+            "of a pair, such as I11 or I11:I12, each valued on the day the trades are prepared "
+            "for.",
         ),
     ]
 
@@ -720,9 +721,9 @@ def test_the_evaluation_explains_itself() -> None:
     description, arguments, hidden = SPECS["_EvaluateTrades"]
     assert not hidden
     assert description == (
-        "Evaluates prepared trades against one market, live observations at their quotes and fixed "
-        "at their settles, each bilateral payment discounted on its row's curve, into mark, cash, "
-        "delta and DV01, and shows the results' handle, which the reports take."
+        "Evaluates prepared trades against their markets, one per index, live observations at "
+        "quotes and fixed at settles, each bilateral payment discounted on its curve, into mark, "
+        "cash, delta and DV01, and shows the results' handle, which the reports take."
     )
     assert arguments == [
         (
@@ -731,9 +732,10 @@ def test_the_evaluation_explains_itself() -> None:
             "or a name for it.",
         ),
         (
-            "market",
-            "The market handle over the history the trades were prepared against: the cell "
-            "showing _CreateMarket's result, such as I12, or a name for it, with the day's quotes.",
+            "markets",
+            "The market handle over the history the trades were prepared against, or a row or "
+            "column of one per index of a pair, such as I12 or I12:I13, each with the day's "
+            "quotes.",
         ),
         (
             "[discount_curve_set]",

@@ -8,18 +8,28 @@ later observation anchoring one shared payment, histories and markets matched by
 whatever their order, and the first leg's fees. Every expected number is the ticket's or hand
 arithmetic here; the production code is never asked for an expected answer."""
 
+import os
+import re
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from test_aggregate_risk import column, same_view
 from test_bilateral_kernel import curve_of, curve_set
 from test_create_trades import a_template, a_ticket
 from test_trades import dates, day, history_on, numbers, quoted, waha_history
+from test_utilities import rows
 
+from goosedove.cashflows.booking import cashflows
+from goosedove.cashflows.valuation import cashflow_results
+from goosedove.excel import bridge
+from goosedove.excel.bridge import Cells
+from goosedove.excel.utilities import shown
 from goosedove.globals.discount_curve import DiscountCurve, bump_discount_curve
 from goosedove.globals.unit_conversions import UNITS
+from goosedove.globals.valuation_date import valuation_date
 from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import futures_schedule
 from goosedove.index_definitions.holiday_calendar import holiday_calendar
@@ -27,13 +37,16 @@ from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
+from goosedove.instruments.definitions import CASHFLOW
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.quoting.template import quote_template
+from goosedove.trades.aggregation import aggregate_results
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import PreparedTrades, prepared_trades
 from goosedove.trades.resolution import Trades, trades
 from goosedove.trades.results import TradeResults
+from goosedove.trades.risk_report import Bucket, Risk
 
 CLOSE: dict[str, Any] = {"rel": 1e-12, "abs": 1e-12}
 
@@ -787,3 +800,629 @@ def test_a_prepared_pair_settles_a_group_only_when_both_legs_have_fixed() -> Non
     assert isinstance(prep.legs[1].history, MarketHistory)
     market: Market = quoted(prep.legs[0].history, 3.60, 3.70)
     assert market.market_history is prep.legs[0].history
+
+
+# --- the pair's report and its collection --------------------------------------------------------
+
+
+def one_index(
+    ix: Index,
+    fixed_price: float,
+    template: Mapping[str, object] = BILATERAL,
+    quantity: float = 10_000,
+) -> Trades:
+    """A single-index batch of the hand table's row on one index at its own fixed price."""
+    shared = {k: v for k, v in template.items() if k != "second_schedule_method"}
+    rows: dict[str, list[object]] = {k: v for k, v in TICKET.items() if k != "second_fixed_price"}
+    rows["fixed_price"] = [fixed_price]
+    rows["quantity"] = [quantity]
+    return booked(shared, rows, (ix,))
+
+
+def valued_one(
+    batch: Trades, quotes: tuple[float, ...], curve: DiscountCurve | None = SOFR
+) -> TradeResults:
+    """A single-index batch valued against its own history and market on the hand table's day."""
+    ix = batch.resolved.legs[0].index
+    history = (
+        history_on(A, AS_OF, {"F27": 3.55}) if ix is A else waha_history(AS_OF, {"Z26": -0.30}, B)
+    )
+    prep = prepared_trades(batch.encoded, (history,), WorkCounter())
+    return trade_results(
+        prep,
+        (quoted(history, *quotes),),
+        WorkCounter(),
+        None if curve is None else curve_set(curve),
+    )
+
+
+@pytest.mark.parametrize("cleared", [False, True], ids=["bilateral", "cleared"])
+def test_a_pairs_report_reads_as_the_collection_of_its_legs(cleared: bool) -> None:
+    # Every risk by every bucket: the pair's report and the collection of the two legs booked
+    # and valued apart have the same labels, dates, Totals and columns, two commodity groups and
+    # one DV01 column, never a combined-index column.
+    template, curve = (CLEARED, None) if cleared else (BILATERAL, SOFR)
+    pair = valued(booked(template), curve=curve)
+    legs = aggregate_results(
+        (
+            valued_one(one_index(A, 3.30, template), (3.50, 3.60), curve),
+            valued_one(one_index(B, -0.30, template), (-0.38, -0.40, -0.42), curve),
+        ),
+        WorkCounter(),
+    )
+    for risk in Risk:
+        for bucket in Bucket:
+            same_view(pair.report(risk, bucket), legs.report(risk, bucket))
+    everything = pair.report(Risk.ALL, Bucket.DAY)
+    assert everything.labels[:4] == (
+        "A nominal_delta [LOT]",
+        "A delta [LOT]",
+        "B nominal_delta [LOT]",
+        "B delta [LOT]",
+    )
+    assert everything.labels[4] == ("cleared USD dv01" if cleared else "SOFR USD dv01") + (
+        " [USD per basis point]"
+    )
+    assert len(everything.labels) == 7  # the two pairs, one DV01 column and a cross-gamma a leg
+
+
+def pair_beside_alone() -> tuple[TradeResults, TradeResults]:
+    """The ticket's pair beside an A-alone batch of 5,000 MMBTU at 3.40, the two valued on one
+    history, one market and one curve set of A, as a collection takes them."""
+    hist_a, hist_b = histories()
+    market_a, market_b = quoted(hist_a, 3.50, 3.60), quoted(hist_b, -0.38, -0.40, -0.42)
+    curves = curve_set(SOFR)
+    pair = trade_results(
+        prepared_trades(booked().encoded, (hist_a, hist_b), WorkCounter()),
+        (market_a, market_b),
+        WorkCounter(),
+        curves,
+    )
+    alone = trade_results(
+        prepared_trades(one_index(A, 3.40, quantity=5_000).encoded, (hist_a,), WorkCounter()),
+        (market_a,),
+        WorkCounter(),
+        curves,
+    )
+    return pair, alone
+
+
+def test_the_pair_collects_with_a_single_index_source_and_a_cashflow() -> None:
+    # The ticket's case: the pair beside an A-alone result of 5,000 MMBTU at 3.40 against 3.50,
+    # amount 500, mark 475, nominal delta 0.5 A lots, delta 0.475 and DV01 -0.0475 on the same
+    # payment day, market and curve objects: A totals 1.5 and 1.425, B stays 4 and 3.8, SOFR's
+    # DV01 is -0.1425; a cashflow on SOFR moves that rate column alone; no combined total is
+    # added on top of the legs.
+    pair, alone = pair_beside_alone()
+    assert alone.mark == pytest.approx(475.0, **CLOSE)
+    assert alone.legs[0].nominal_delta_total == pytest.approx(0.5, **CLOSE)
+    assert alone.dv01 == pytest.approx(-0.0475, **CLOSE)
+    together = aggregate_results((pair, alone), WorkCounter())
+    a_group, b_group = together.index_groups
+    assert a_group.index is A and b_group.index is B
+    assert a_group.occurrences.tolist() == [0, 1] and b_group.occurrences.tolist() == [0]
+    assert a_group.nominal_delta_total == pytest.approx(1.5, **CLOSE)
+    assert a_group.delta_total == pytest.approx(1.425, **CLOSE)
+    assert b_group.nominal_delta_total == pytest.approx(4.0, **CLOSE)
+    assert b_group.delta_total == pytest.approx(3.8, **CLOSE)
+    (sofr,) = together.rate_groups
+    assert sofr.curve is SOFR and sofr.dv01 == pytest.approx(-0.1425, **CLOSE)
+    assert sofr.occurrences.tolist() == [0, 1]
+    assert [(c.index.name, c.word) for c in together.cross_groups] == [("A", "SOFR"), ("B", "SOFR")]
+    assert together.cross_groups[0].cross_gamma_total == pytest.approx(-0.0001425, **CLOSE)
+    assert together.cross_groups[1].cross_gamma_total == pytest.approx(-0.00038, **CLOSE)
+    view = together.report(Risk.ALL, Bucket.DAY)
+    assert len(view.labels) == 7
+    assert column(view, "SOFR USD dv01 [USD per basis point]")[0] == pytest.approx(-0.1425, **CLOSE)
+    # A cashflow of 1,000 USD on the payment day, valued on SOFR: -0.095 of DV01 more on the
+    # SOFR column and nothing else moved.
+    cash = cashflow_results(
+        cashflows(
+            a_ticket(
+                {"trade_date": ["2026-12-15"], "amount": [1_000.0], "payment_date": [PAY]},
+                CASHFLOW,
+            ),
+            a_template({"currency": "USD"}, CASHFLOW),
+            WorkCounter(),
+        ),
+        valuation_date(day(AS_OF), 0.5),
+        SOFR,
+        WorkCounter(),
+    )
+    with_cash = aggregate_results((pair, alone, cash), WorkCounter())
+    assert [g.nominal_delta_total for g in with_cash.index_groups] == pytest.approx(
+        [1.5, 4.0], **CLOSE
+    )
+    assert with_cash.rate_groups[0].dv01 == pytest.approx(-0.1425 - 0.095, **CLOSE)
+    assert with_cash.rate_groups[0].occurrences.tolist() == [0, 1, 2]
+    assert len(with_cash.cross_groups) == 2
+
+
+def test_a_repeated_pair_counts_twice_in_a_collection() -> None:
+    pair = valued(booked())
+    twice = aggregate_results((pair, pair), WorkCounter())
+    a_group, b_group = twice.index_groups
+    assert a_group.occurrences.tolist() == [0, 1] and b_group.occurrences.tolist() == [0, 1]
+    assert a_group.nominal_delta_total == pytest.approx(2.0, **CLOSE)
+    assert b_group.nominal_delta_total == pytest.approx(8.0, **CLOSE)
+    assert twice.rate_groups[0].dv01 == pytest.approx(-0.19, **CLOSE)
+
+
+def test_the_pairs_day_axes_unite_the_legs_observation_days() -> None:
+    # A's G27 expires 27 January and B's G27 publishes 1 February: two days, each leg on its
+    # own, and with the payment day a union of three for the report of every risk by day.
+    batch = booked()
+    pair = batch.encoded.pair
+    assert pair is not None
+    np.testing.assert_array_equal(pair.days, dates("2027-01-27", "2027-02-01"))
+    assert [places.tolist() for places in pair.day_in] == [[0], [1]]
+    axes = batch.encoded.payment_axes
+    assert axes is not None
+    np.testing.assert_array_equal(axes.union_days, dates("2027-01-27", "2027-02-01", PAY))
+    assert [leg.day_in_union.tolist() for leg in batch.encoded.legs] == [[0], [1]]  # type: ignore[union-attr]
+    assert axes.paid_in_days.tolist() == [2]
+    assert booked(CLEARED).encoded.legs[0].day_in_union is None
+    assert one_index(A, 3.30).encoded.pair is None
+
+
+# --- the readbacks of a pair ----------------------------------------------------------------------
+
+
+def grid(obj: object) -> list[list[object]]:
+    """A readback as the sheet shows it: the headings, the types and the body rows."""
+    table = shown(obj)
+    return rows((table.kinds, table.numeric_slots, "\0".join(table.texts)))
+
+
+def cell(table: list[list[object]], row: int, name: str) -> object:
+    """A body row's cell under a heading, the body counted from zero."""
+    return table[2 + row][table[0].index(name)]
+
+
+def test_the_created_pair_reads_back_both_prices_and_the_combined_one() -> None:
+    table = grid(booked())
+    assert len(table) == 3
+    headings = table[0]
+    assert headings.index("second_schedule_method") == headings.index("schedule_method") + 1
+    assert headings.index("second_fixed_price") == headings.index("fixed_price") + 1
+    assert headings.index("combined_fixed_price") == headings.index("fixed_price") + 2
+    assert headings.index("second_offset") == headings.index("offset") + 1
+    assert cell(table, 0, "schedule_method") == "lastday"
+    assert cell(table, 0, "second_schedule_method") == "lastday"
+    assert cell(table, 0, "fixed_price") == 3.3
+    assert cell(table, 0, "second_fixed_price") == -0.3
+    assert cell(table, 0, "combined_fixed_price") == pytest.approx(3.0, **CLOSE)
+    assert cell(table, 0, "offset") == pytest.approx(-33_000.0, **CLOSE)
+    assert cell(table, 0, "second_offset") == pytest.approx(3_000.0, **CLOSE)
+    one = grid(one_index(A, 3.30))
+    assert "second_fixed_price" not in one[0] and "second_offset" not in one[0]
+    assert len(one[0]) == len(headings) - 4
+
+
+def test_the_prepared_and_valued_pair_read_back_one_row_per_slot_naming_its_leg() -> None:
+    batch = booked()
+    hist_a, hist_b = histories()
+    prep = prepared_trades(batch.encoded, (hist_a, hist_b), WorkCounter())
+    slots = grid(prep)
+    assert slots[0][:5] == [
+        "leg",
+        "index",
+        "pricing_contract",
+        "booked_contract",
+        "observation_date",
+    ]
+    assert slots[1][:2] == ["int64", "str"]
+    assert [row[:2] for row in slots[2:]] == [[1.0, "A"], [2.0, "B"]]
+    assert (
+        cell(slots, 0, "pricing_contract") == "G27" and cell(slots, 1, "pricing_contract") == "G27"
+    )
+    assert cell(slots, 0, "is_fixed") == 0.0 and cell(slots, 1, "is_settled") == 0.0
+    assert cell(slots, 0, "live_lots") == pytest.approx(1.0, **CLOSE)  # 10,000 MMBTU in A lots
+    assert cell(slots, 1, "live_lots") == pytest.approx(4.0, **CLOSE)  # and in B's
+    results = trade_results(
+        prep,
+        (quoted(hist_a, 3.50, 3.60), quoted(hist_b, -0.38, -0.40, -0.42)),
+        WorkCounter(),
+        curve_set(SOFR),
+    )
+    table = grid(results)
+    assert len(table) == 4 and [row[:2] for row in table[2:]] == [[1.0, "A"], [2.0, "B"]]
+    # The group's combined facts once, on its first row of all; each leg's share of the group
+    # and its totals once on the leg's first row; the payment factor on every row.
+    assert cell(table, 0, "payment_amount") == pytest.approx(1000.0, **CLOSE)
+    assert cell(table, 1, "payment_amount") == "-"
+    assert cell(table, 0, "group_npv") == pytest.approx(950.0, **CLOSE)
+    assert cell(table, 0, "group_dv01") == pytest.approx(-0.095, **CLOSE)
+    assert cell(table, 0, "payment_factor") == 0.95 and cell(table, 1, "payment_factor") == 0.95
+    assert cell(table, 0, "leg_amount") == pytest.approx(2000.0, **CLOSE)
+    assert cell(table, 1, "leg_amount") == pytest.approx(-1000.0, **CLOSE)
+    assert cell(table, 0, "leg_npv") == pytest.approx(1900.0, **CLOSE)
+    assert cell(table, 1, "leg_npv") == pytest.approx(-950.0, **CLOSE)
+    assert cell(table, 0, "leg_group_dv01") == pytest.approx(-0.19, **CLOSE)
+    assert cell(table, 1, "leg_group_dv01") == pytest.approx(0.095, **CLOSE)
+    assert cell(table, 0, "leg_mark") == pytest.approx(1900.0, **CLOSE)
+    assert cell(table, 1, "leg_mark") == pytest.approx(-950.0, **CLOSE)
+    assert cell(table, 0, "leg_cash") == 0.0 and cell(table, 1, "leg_cash") == 0.0
+    assert cell(table, 0, "leg_dv01") == pytest.approx(-0.19, **CLOSE)
+    assert cell(table, 1, "leg_dv01") == pytest.approx(0.095, **CLOSE)
+    assert cell(table, 0, "brokerage_reserve") == 0.0 and cell(table, 1, "brokerage_reserve") == "-"
+    assert cell(table, 0, "contract_cross_gamma") == pytest.approx(-0.000095, **CLOSE)
+    assert cell(table, 1, "contract_cross_gamma") == pytest.approx(-0.00038, **CLOSE)
+    assert cell(table, 1, "cross_gamma_unit") != cell(table, 0, "cross_gamma_unit")
+    assert cell(table, 0, "discount_curve") == "SOFR" and cell(table, 1, "discount_curve") == "SOFR"
+    headings = table[0]
+    assert headings.index("leg_amount") == headings.index("group_dv01") + 1
+    assert headings.index("brokerage_reserve") == headings.index("leg_dv01") + 1
+    # A cleared pair: the leg totals stand, the group and leg shares are none.
+    cleared = grid(valued(booked(CLEARED), curve=None))
+    assert cell(cleared, 0, "leg_mark") == 2000.0 and cell(cleared, 1, "leg_mark") == -1000.0
+    assert cell(cleared, 0, "leg_dv01") == 0.0 and cell(cleared, 1, "leg_amount") == "-"
+    assert cell(cleared, 0, "payment_amount") == "-"
+    # A single index reads back as it did: no leg column, none of the six.
+    one = grid(valued_one(one_index(A, 3.30), (3.50, 3.60)))
+    assert one[0][0] == "pricing_contract" and "leg_amount" not in one[0] and len(one) == 3
+
+
+def test_a_collections_readback_has_a_row_per_leg_of_a_pair() -> None:
+    pair, alone = pair_beside_alone()
+    table = grid(aggregate_results((pair, alone), WorkCounter()))
+    assert len(table) == 5
+    assert [cell(table, r, "position") for r in range(3)] == [1.0, 1.0, 2.0]
+    assert [cell(table, r, "index") for r in range(3)] == ["A", "B", "A"]
+    assert [cell(table, r, "nominal_delta") for r in range(3)] == pytest.approx([1.0, 4.0, 0.5])
+    assert cell(table, 0, "dv01") == pytest.approx(-0.095, **CLOSE)
+    assert cell(table, 1, "dv01") == "-"  # the source's DV01 once, on its first leg's row
+    assert cell(table, 2, "dv01") == pytest.approx(-0.0475, **CLOSE)
+    assert [cell(table, r, "curve") for r in range(3)] == ["SOFR"] * 3
+    assert cell(table, 1, "cross_gamma") == pytest.approx(-0.00038, **CLOSE)
+
+
+# --- the pair on the sheet -----------------------------------------------------------------
+
+
+SEAM = {
+    name: bridge.entry(name)
+    for name in (
+        "_CreateFuturesSchedule",
+        "_CreateIfercSchedule",
+        "_CreateHolidayCalendar",
+        "_CreateIndexConventions",
+        "_CreateContractSpecifications",
+        "_CreateIndex",
+        "_CreateValuationDate",
+        "_CreateCalendar",
+        "_CreateFuturesFixings",
+        "_CreateIfercFixings",
+        "_CreateMarketHistory",
+        "_CreatePriceVector",
+        "_CreateMarket",
+        "_CreateDiscountCurve",
+        "_CollectDiscountCurves",
+        "_CreateTradeTemplate",
+        "_CreateTrades",
+        "_PrepareTrades",
+        "_EvaluateTrades",
+        "_ReportValues",
+        "_ReportRisk",
+        "util_ReadHandle",
+    )
+}
+PID = os.getpid()
+
+
+def serial(text: str) -> float:
+    """A day as the sheet counts it, days since 30 December 1899."""
+    return float((np.datetime64(text, "D") - np.datetime64("1899-12-30", "D")).astype(np.int64))
+
+
+def down(*values: object) -> Cells:
+    """A column of cells, as the host sends one."""
+    return Cells.from_rows([[value] for value in values])
+
+
+def across(*values: object) -> Cells:
+    """A row of cells, as the host sends one."""
+    return Cells.from_rows([list(values)])
+
+
+def spilled(result: object) -> list[list[object]]:
+    """A spill as the sheet shows it, every text and number in its cell."""
+    kinds, slots, text = cast(tuple[NDArray[np.uint8], NDArray[np.float64], str], result)
+    texts = iter(text.split("\0"))
+    return [
+        [
+            next(texts) if kinds[r, c] == bridge.TEXT_CODE else slots[r, c]
+            for c in range(kinds.shape[1])
+        ]
+        for r in range(kinds.shape[0])
+    ]
+
+
+def read(handle: object) -> list[list[object]]:
+    return spilled(SEAM["util_ReadHandle"](handle))
+
+
+def under(table: list[list[object]], heading: str) -> list[object]:
+    """A readback's body cells under a heading."""
+    at = table[0].index(heading)
+    return [line[at] for line in table[2:]]
+
+
+@pytest.fixture(scope="module")
+def sheet() -> dict[str, Any]:
+    """The ticket's pair on a sheet, the host test's cells: A a futures index over F27, G27 and
+    H27, 1 January 2027 closed, and B an IFERC index over Z26 to J27, both defining the NYMEX NG
+    lot of 10,000 MMBTU; valued on 4 January 2027, A's two December settles and B's Z26 index
+    behind the histories, A quoted 3.50 and 3.60 and B -0.38, -0.40 and -0.42, SOFR at 0.95 a
+    year on; a bilateral template carrying the second leg's method and the ticket's one row,
+    G27 for one lot at 3.30 and -0.30."""
+    conventions = SEAM["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
+    specs = SEAM["_CreateContractSpecifications"](
+        across("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
+        across("NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0),
+    )
+    holidays = SEAM["_CreateHolidayCalendar"](serial("2027-01-01"))
+    a_schedule = SEAM["_CreateFuturesSchedule"](
+        down("F27", "G27", "H27"),
+        down(serial("2026-12-29"), serial("2027-01-27"), serial("2027-02-24")),
+        bridge.MISSING,
+    )
+    a = SEAM["_CreateIndex"](
+        "A", "Pair leg A, a futures index", a_schedule, conventions, specs, holidays, "NYMEX NG"
+    )
+    b_schedule = SEAM["_CreateIfercSchedule"](
+        down("Z26", "F27", "G27", "H27", "J27"),
+        down(
+            *(
+                serial(d)
+                for d in ("2026-12-01", "2027-01-04", "2027-02-01", "2027-03-01", "2027-04-01")
+            )
+        ),
+    )
+    b = SEAM["_CreateIndex"](
+        "B",
+        "Pair leg B, an IFERC index",
+        b_schedule,
+        conventions,
+        specs,
+        bridge.MISSING,
+        "NYMEX NG",
+    )
+    date = SEAM["_CreateValuationDate"](serial(AS_OF), 0.5)
+    hist_a = SEAM["_CreateMarketHistory"](
+        SEAM["_CreateCalendar"](date, a),
+        SEAM["_CreateFuturesFixings"](
+            down(serial("2026-12-31"), serial("2026-12-30")), down(3.60, 3.58), a
+        ),
+    )
+    hist_b = SEAM["_CreateMarketHistory"](
+        SEAM["_CreateCalendar"](date, b), SEAM["_CreateIfercFixings"](down("Z26"), down(-0.30), b)
+    )
+    market_a = SEAM["_CreateMarket"](hist_a, SEAM["_CreatePriceVector"]("A", down(3.50, 3.60)))
+    market_b = SEAM["_CreateMarket"](
+        hist_b, SEAM["_CreatePriceVector"]("B", down(-0.38, -0.40, -0.42))
+    )
+    curves = SEAM["_CollectDiscountCurves"](
+        SEAM["_CreateDiscountCurve"](
+            "SOFR",
+            across("date", "discount_factor"),
+            Cells.from_rows([[serial(AS_OF), 1.0], [serial(PAY), 0.95]]),
+        )
+    )
+    template = SEAM["_CreateTradeTemplate"](
+        "fixed_float",
+        across(
+            "quantity_unit",
+            "quantity_per",
+            "schedule_method",
+            "second_schedule_method",
+            "route",
+            "settlement_method",
+            "counterparty",
+            "discount_curve_key",
+            "payment_day",
+            "payment_holiday_calendar",
+        ),
+        across(
+            "NYMEX NG",
+            "month",
+            "lastday",
+            "lastday",
+            "bilateral",
+            "financial",
+            "ACME Trading",
+            "SOFR",
+            serial(PAY),
+            holidays,
+        ),
+    )
+    return {
+        "a": a,
+        "b": b,
+        "hist_a": hist_a,
+        "hist_b": hist_b,
+        "market_a": market_a,
+        "market_b": market_b,
+        "curves": curves,
+        "template": template,
+        "headers": across(
+            "trade_id",
+            "trade_date",
+            "contract_code",
+            "quantity",
+            "fixed_price",
+            "second_fixed_price",
+        ),
+        "row": across(1.0, serial("2026-12-15"), "G27", 1.0, 3.30, -0.30),
+    }
+
+
+def test_the_sheet_books_a_pair_from_a_column_of_two_index_handles(sheet: dict[str, Any]) -> None:
+    create = SEAM["_CreateTrades"]
+    trades = create(down(sheet["a"], sheet["b"]), sheet["headers"], sheet["row"], sheet["template"])
+    assert re.fullmatch(rf"{PID}:trades:A\+B:\d+", str(trades))
+    table = read(trades)
+    assert len(table) == 3
+    assert under(table, "fixed_price") == [3.3]
+    assert under(table, "second_fixed_price") == [-0.3]
+    assert under(table, "combined_fixed_price") == pytest.approx([3.0], **CLOSE)
+    assert under(table, "second_schedule_method") == ["lastday"]
+    assert under(table, "offset") == pytest.approx([-33_000.0], **CLOSE)
+    assert under(table, "second_offset") == pytest.approx([3_000.0], **CLOSE)
+    # A row of two reads the same pair; the order entered is the legs' order and the handle's.
+    assert re.fullmatch(
+        rf"{PID}:trades:A\+B:\d+",
+        str(
+            create(
+                across(sheet["a"], sheet["b"]), sheet["headers"], sheet["row"], sheet["template"]
+            )
+        ),
+    )
+    assert re.fullmatch(
+        rf"{PID}:trades:B\+A:\d+",
+        str(
+            create(down(sheet["b"], sheet["a"]), sheet["headers"], sheet["row"], sheet["template"])
+        ),
+    )
+
+
+def test_the_sheet_prepares_and_values_a_pair_from_ranges_in_either_order(
+    sheet: dict[str, Any],
+) -> None:
+    trades = SEAM["_CreateTrades"](
+        down(sheet["a"], sheet["b"]), sheet["headers"], sheet["row"], sheet["template"]
+    )
+    # The histories as a column with B first: matched to the legs by index, not by place.
+    prepared = SEAM["_PrepareTrades"](trades, down(sheet["hist_b"], sheet["hist_a"]))
+    assert re.fullmatch(rf"{PID}:prepared_trades:A\+B:\d+", str(prepared))
+    slots = read(prepared)
+    assert slots[0][:2] == ["leg", "index"] and slots[1][:2] == ["int64", "str"]
+    assert under(slots, "leg") == [1.0, 2.0] and under(slots, "index") == ["A", "B"]
+    assert under(slots, "live_lots") == pytest.approx([1.0, 1.0], **CLOSE)  # both lots 10,000
+    # The markets as a row, A then B.
+    results = SEAM["_EvaluateTrades"](
+        prepared, across(sheet["market_a"], sheet["market_b"]), sheet["curves"]
+    )
+    assert re.fullmatch(rf"{PID}:trade_results:A\+B:\d+", str(results))
+    values = spilled(SEAM["_ReportValues"](results))
+    assert values[0][0] == "bilateral_mark"
+    assert values[2][0] == pytest.approx(950.0, **CLOSE) and values[2][1] == 0.0
+    risk = spilled(SEAM["_ReportRisk"](results, "all", "day"))
+    assert risk[1][1:] == [
+        "A nominal_delta [NYMEX NG]",
+        "A delta [NYMEX NG]",
+        "B nominal_delta [NYMEX NG]",
+        "B delta [NYMEX NG]",
+        "SOFR USD dv01 [USD per basis point]",
+        "A SOFR cross_gamma [NYMEX NG per basis point]",
+        "B SOFR cross_gamma [NYMEX NG per basis point]",
+    ]
+    assert risk[3][0] == "Total"
+    assert risk[3][1:6] == pytest.approx([1.0, 0.95, 1.0, 0.95, -0.095], **CLOSE)
+    table = read(results)
+    assert under(table, "leg") == [1.0, 2.0] and under(table, "index") == ["A", "B"]
+    assert under(table, "leg_amount") == pytest.approx([2000.0, -1000.0], **CLOSE)
+    assert under(table, "payment_amount")[0] == pytest.approx(1000.0, **CLOSE)
+    assert under(table, "payment_amount")[1] == "-"
+    assert under(table, "leg_dv01") == pytest.approx([-0.19, 0.095], **CLOSE)
+    # A single history and a single market in a cell, as every one-index sheet types them.
+    alone = SEAM["_CreateTrades"](
+        sheet["a"],
+        across("trade_id", "trade_date", "contract_code", "quantity", "fixed_price"),
+        across(2.0, serial("2026-12-15"), "G27", 1.0, 3.30),
+        SEAM["_CreateTradeTemplate"](
+            "fixed_float",
+            across(
+                "quantity_unit",
+                "quantity_per",
+                "schedule_method",
+                "route",
+                "settlement_method",
+                "counterparty",
+                "discount_curve_key",
+                "payment_day",
+                "payment_holiday_calendar",
+            ),
+            across(
+                "NYMEX NG",
+                "month",
+                "lastday",
+                "bilateral",
+                "financial",
+                "ACME Trading",
+                "SOFR",
+                serial(PAY),
+                SEAM["_CreateHolidayCalendar"](serial("2027-01-01")),
+            ),
+        ),
+    )
+    assert re.fullmatch(rf"{PID}:trades:A:\d+", str(alone))
+    one = SEAM["_EvaluateTrades"](
+        SEAM["_PrepareTrades"](alone, sheet["hist_a"]), sheet["market_a"], sheet["curves"]
+    )
+    assert spilled(SEAM["_ReportValues"](one))[2][0] == pytest.approx(1900.0, **CLOSE)
+    assert read(one)[0][0] == "pricing_contract"
+
+
+def test_the_sheet_refuses_a_pairs_ranges_in_the_seams_words_and_the_kernels(
+    sheet: dict[str, Any],
+) -> None:
+    create, prepare, evaluate = (
+        SEAM["_CreateTrades"],
+        SEAM["_PrepareTrades"],
+        SEAM["_EvaluateTrades"],
+    )
+    a, b, headers, row, template = (
+        sheet["a"],
+        sheet["b"],
+        sheet["headers"],
+        sheet["row"],
+        sheet["template"],
+    )
+    assert create(Cells.from_rows([[a, b], [a, b]]), headers, row, template) == (
+        "#ERROR _CreateTrades: indexes is 2x2 array, expected one cell, one row or one column of "
+        "index handles"
+    )
+    assert create(down(a, None), headers, row, template) == (
+        "#ERROR _CreateTrades: indexes cell (2, 1) is blank, expected index handle"
+    )
+    assert create(across(a, sheet["hist_a"]), headers, row, template) == (
+        f"#ERROR _CreateTrades: indexes cell (1, 2) is market history handle {sheet['hist_a']!r}, "
+        "expected index handle"
+    )
+    assert create(bridge.MISSING, headers, row, template) == (
+        "#ERROR _CreateTrades: indexes is missing, expected index handles in a cell, a row or a "
+        "column"
+    )
+    assert create(a, headers, row, template) == (
+        "#ERROR _CreateTrades: ValueError: second_fixed_price is -0.3, expected none unless two "
+        "indexes"
+    )
+    assert create(down(a, a), headers, row, template) == (
+        "#ERROR _CreateTrades: ValueError: index 2 is index 1, 'A', again, expected two distinct "
+        "indexes; a pair of one index is outside this version"
+    )
+    trades = create(down(a, b), headers, row, template)
+    assert prepare(trades, sheet["hist_a"]) == (
+        "#ERROR _PrepareTrades: ValueError: histories are 1, expected 2, one per leg of the trades"
+    )
+    assert prepare(trades, down(sheet["hist_a"], sheet["hist_a"])) == (
+        "#ERROR _PrepareTrades: ValueError: history 2 is over index 'A' as history 1 is, expected "
+        "one history per index of the trades"
+    )
+    assert prepare(trades, down(sheet["hist_a"], sheet["market_b"])) == (
+        f"#ERROR _PrepareTrades: histories cell (2, 1) is market handle {sheet['market_b']!r}, "
+        "expected market history handle"
+    )
+    prepared = prepare(trades, down(sheet["hist_a"], sheet["hist_b"]))
+    assert evaluate(prepared, sheet["market_a"], sheet["curves"]) == (
+        "#ERROR _EvaluateTrades: ValueError: markets are 1, expected 2, one per leg of the trades"
+    )
+    assert evaluate(prepared, down(sheet["market_a"], sheet["market_a"]), sheet["curves"]) == (
+        "#ERROR _EvaluateTrades: ValueError: market 2 is over the history of index 'A' as market 1 "
+        "is, expected one market per history of the trades"
+    )
+    assert evaluate(prepared, bridge.MISSING, sheet["curves"]) == (
+        "#ERROR _EvaluateTrades: markets is missing, expected market handles in a cell, a row or a "
+        "column"
+    )

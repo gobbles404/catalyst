@@ -1276,11 +1276,12 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
         "expected trades handle"
     )
     assert prepare(ng["trades"], ng["market"]) == (
-        f"#ERROR _PrepareTrades: history is market handle {ng['market']!r}, "
+        f"#ERROR _PrepareTrades: histories is market handle {ng['market']!r}, "
         "expected market history handle"
     )
     assert evaluate(ng["prepared"], bridge.MISSING, bridge.MISSING) == (
-        "#ERROR _EvaluateTrades: market is missing, expected market handle"
+        "#ERROR _EvaluateTrades: markets is missing, expected market handles in a cell, a row "
+        "or a column"
     )
     assert evaluate(ng["trades"], ng["market"], bridge.MISSING) == (
         f"#ERROR _EvaluateTrades: prepared is trades handle {ng['trades']!r}, "
