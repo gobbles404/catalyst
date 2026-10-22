@@ -34,7 +34,13 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.observations import Observations
 from goosedove.trades.reserves import Reserves, reserves
 from goosedove.trades.schedule_methods import METHODS, requires_booked_reference
-from goosedove.trades.terms import LegTerms, ResolvedTrades, Route, payments_after_observations
+from goosedove.trades.terms import (
+    LegTerms,
+    ResolvedTrades,
+    Route,
+    named_trade,
+    payments_after_observations,
+)
 
 ENCODED_COMPONENTS = "encoded_components"  # components turned into quantities and offsets
 ENCODED_GROUPS = "encoded_groups"  # payment groups formed, summed into and checked
@@ -43,6 +49,10 @@ ENCODED_SLOTS = "encoded_slots"  # dated slots named and summed over
 ENCODED_PAYMENT_DAYS = (
     "encoded_payment_days"  # a bilateral batch's distinct payment days, since #178
 )
+# The allowance two legs' sizes per entered unit may differ by and be one quantity, relative,
+# since two-index-fixed-float.md: the unit tables' products of a few factors agree to a few
+# ulps, 1e-16 of the size, and two quantities that are not one differ by a ratio of units.
+UNIT_ROUNDOFF = 1e-12
 
 
 @dataclass(frozen=True, slots=True)
@@ -248,6 +258,14 @@ def encoded(
     currency, USD or CENT to USD or CENT, so that a price in cents times it is an amount in
     dollars; every price the batch meets, a quote, a settle or the fixed price, multiplies the
     coefficient and never the quantity. The offset: minus the coefficient times the fixed price.
+    For a pair, since two-index-fixed-float.md, each occurrence's quantity unit is one quantity
+    per entered unit on both indexes: the specification it names on each index restates one
+    entered unit in the shared quote quantity unit, and the two sizes agree to within
+    UNIT_ROUNDOFF, whatever the row's quantity, zero included, a `LOT` of 10,000 MMBTU on one
+    index and 2,500 on the other refused as an ambiguous common quantity and not a conversion
+    to invent, a THERM on one and 100,000 BTU on the other one quantity; the first occurrence
+    that differs is refused by its unit, its trade and the two sizes. Each leg's own arrays are
+    made over its leg, the groups shared.
     The groups: under a financial settlement the distinct pairs of contract and payment day among
     the components, and since named-curves-slice-3.md the distinct triples with the row's
     discount_curve_key where the batch has keys, the components sorted by contract, then by day,
@@ -324,11 +342,13 @@ def encoded(
     heads, payment_date, group_of_component, keys, key_of_group = _the_groups(terms)
     groups = heads.size
     legs: list[EncodedLeg] = []
+    sizes: list[NDArray[np.float64]] = []  # each leg's specifications in the quote unit
     payment_axes: PaymentAxes | None = None
     for leg, observed in zip(terms.legs, observations, strict=True):
         quote_quantity, coefficient, offset, to_quote_unit = _the_amounts(terms, leg, units)
         if legs:
-            _the_same_quantity(terms, legs[0], leg, quote_quantity, to_quote_unit)
+            _the_same_quantity(terms, legs[0].leg, sizes[0], leg, to_quote_unit)
+        sizes.append(to_quote_unit)
         group_contract = leg.contract[heads]
         offset_of_group = _the_group_offsets(
             leg, group_of_component, offset, group_contract, payment_date, keys, key_of_group
@@ -517,34 +537,31 @@ def _the_amounts(
 
 def _the_same_quantity(
     terms: ResolvedTrades,
-    first: EncodedLeg,
+    first: LegTerms,
+    first_sizes: NDArray[np.float64],
     leg: LegTerms,
-    quote_quantity: NDArray[np.float64],
-    to_quote_unit: NDArray[np.float64],
+    sizes: NDArray[np.float64],
 ) -> None:
-    """The pair's rule, since two-index-fixed-float.md: both legs represent one physical quantity
-    for each component, so each component's quote quantity on the second index equals the
-    first's, the two indexes sharing the quote quantity unit; else the first component that
-    differs is refused by its trade, the two quantities and the specification its quantity unit
-    named on each index, a `LOT` of 10,000 MMBTU on one index and 2,500 on the other being an
-    ambiguous common quantity and not a conversion to invent."""
-    differs = quote_quantity != first.quote_quantity
+    """The pair's rule, since two-index-fixed-float.md: each occurrence's quantity unit is one
+    quantity per entered unit on both indexes, the size of the specification it names on each,
+    one entered unit restated in the shared quote quantity unit, agreeing to within
+    UNIT_ROUNDOFF, relative, whatever the row's quantity, zero included; else the first
+    occurrence that differs is refused by its unit, its trade and the two sizes, a `LOT` of
+    10,000 MMBTU on one index and 2,500 on the other being an ambiguous common quantity and not a
+    conversion to invent, while a THERM on one and 100,000 BTU on the other are one quantity to
+    the roundoff of their conversions."""
+    theirs = first_sizes[first.specification]
+    mine = sizes[leg.specification]
+    differs = ~np.isclose(mine, theirs, rtol=UNIT_ROUNDOFF, atol=0.0)
     if not differs.any():
         return
-    k = int(differs.argmax())
-    i = int(terms.occurrence[k])
+    i = int(differs.argmax())
     unit = leg.index.conventions.quote_quantity_unit
-    first_leg = first.leg
-    first_row, row = int(first_leg.specification[i]), int(leg.specification[i])
-    first_size = float(first.quote_quantity[k] / terms.component_quantity[k])
-    size = float(to_quote_unit[row])
+    name = first.index.specifications.names[int(first.specification[i])]
     raise ValueError(
-        f"{terms.named(k)} is {float(first.quote_quantity[k])!r} {unit} on index "
-        f"{first_leg.index.name!r} and {float(quote_quantity[k])!r} {unit} on index "
-        f"{leg.index.name!r}, expected one quantity on both legs; quantity_unit "
-        f"{first_leg.index.specifications.names[first_row]!r} is {first_size!r} {unit} a lot on "
-        f"{first_leg.index.name!r} and {leg.index.specifications.names[row]!r} is {size!r} "
-        f"{unit} a lot on {leg.index.name!r}"
+        f"quantity_unit {name!r} of {named_trade(terms.trade_ids, i)} is {float(theirs[i])!r} "
+        f"{unit} on index {first.index.name!r} and {float(mine[i])!r} {unit} on index "
+        f"{leg.index.name!r}, expected one quantity per entered unit on both legs"
     )
 
 

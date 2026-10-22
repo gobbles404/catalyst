@@ -60,6 +60,7 @@ def futures(
     clearing: float,
     quote_currency: str = "USD",
     extra: tuple[str, ...] = (),
+    spec: tuple[str, float, str] | None = None,
 ) -> Index:
     contracts = (
         ("X26", "2026-10-28"),
@@ -71,6 +72,9 @@ def futures(
     )
     names = ("LOT", "MMBTU", *extra)
     sizes = numbers(lot_size, 1.0, *([1.0] * len(extra)))
+    units = ("MMBTU",) * len(names)
+    if spec is not None:  # one more specification, in a unit of its own
+        names, sizes, units = (*names, spec[0]), np.append(sizes, spec[1]), (*units, spec[2])
     return index(
         name,
         f"Index {name}",
@@ -79,7 +83,7 @@ def futures(
         contract_specifications(
             names,
             sizes,
-            ("MMBTU",) * len(names),
+            units,
             sizes * brokerage,
             sizes * clearing,
             UNITS,
@@ -90,7 +94,17 @@ def futures(
     )
 
 
-def iferc(name: str, lot_size: float, quote_currency: str = "USD") -> Index:
+def iferc(
+    name: str,
+    lot_size: float,
+    quote_currency: str = "USD",
+    spec: tuple[str, float, str] | None = None,
+) -> Index:
+    names: tuple[str, ...] = ("LOT", "MMBTU")
+    sizes = numbers(lot_size, 1.0)
+    units: tuple[str, ...] = ("MMBTU", "MMBTU")
+    if spec is not None:
+        names, sizes, units = (*names, spec[0]), np.append(sizes, spec[1]), (*units, spec[2])
     return index(
         name,
         f"Index {name}",
@@ -99,14 +113,7 @@ def iferc(name: str, lot_size: float, quote_currency: str = "USD") -> Index:
             dates("2026-12-01", "2027-01-04", "2027-02-01", "2027-03-01", "2027-04-01"),
         ),
         index_conventions(quote_currency, "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
-        contract_specifications(
-            ("LOT", "MMBTU"),
-            numbers(lot_size, 1.0),
-            ("MMBTU", "MMBTU"),
-            numbers(0.5 * lot_size, 0.5),
-            numbers(0.5 * lot_size, 0.5),
-            UNITS,
-        ),
+        contract_specifications(names, sizes, units, sizes * 0.5, sizes * 0.5, UNITS),
         None,
         "LOT",
         UNITS,
@@ -665,11 +672,27 @@ def test_the_pair_is_two_distinct_indexes_of_one_quoting_on_a_financial_settleme
 
 
 def test_the_quantity_unit_names_one_quantity_on_both_indexes() -> None:
-    assert refused({**BILATERAL, "quantity_unit": "LOT"}, {**TICKET, "quantity": [1]}) == (
-        "trade 1 at row 1 is 10000.0 MMBTU on index 'A' and 2500.0 MMBTU on index 'B', expected "
-        "one quantity on both legs; quantity_unit 'LOT' is 10000.0 MMBTU a lot on 'A' and 'LOT' "
-        "is 2500.0 MMBTU a lot on 'B'"
+    # A LOT of 10,000 MMBTU on A against one of 2,500 on B is refused whatever the row's
+    # quantity, zero included; a THERM on one index and 100,000 BTU on the other are one
+    # quantity to the roundoff of their conversions, 0.1 against 0.09999999999999999 MMBTU.
+    ambiguous = (
+        "quantity_unit 'LOT' of trade 1 at row 1 is 10000.0 MMBTU on index 'A' and 2500.0 MMBTU "
+        "on index 'B', expected one quantity per entered unit on both legs"
     )
+    assert refused({**BILATERAL, "quantity_unit": "LOT"}) == ambiguous
+    assert refused({**BILATERAL, "quantity_unit": "LOT"}, {**TICKET, "quantity": [0]}) == ambiguous
+    heated = {**BILATERAL, "quantity_unit": "HEAT"}
+    by_therm = futures("A", 10_000.0, 0.01, 0.005, spec=("HEAT", 1.0, "THERM"))
+    by_btu = iferc("B", 2_500.0, spec=("HEAT", 100_000.0, "BTU"))
+    batch = booked(heated, {**TICKET, "quantity": [1]}, (by_therm, by_btu))
+    a, b = batch.encoded.legs
+    assert a.quote_quantity[0] == pytest.approx(0.1, rel=1e-12)
+    assert b.quote_quantity[0] == pytest.approx(0.1, rel=1e-12)
+    assert a.quote_quantity[0] != b.quote_quantity[0]  # the roundoff the rule allows for
+    # A zero row with one quantity on both legs is kept, ready for a deal, as a one-index zero is.
+    kept = booked(ticket={**TICKET, "quantity": [0]})
+    assert kept.encoded.legs[0].quote_quantity.tolist() == [0.0]
+    assert kept.encoded.legs[1].quote_quantity.tolist() == [0.0]
     assert refused({**BILATERAL, "quantity_unit": "THERM10"}) == (
         "quantity_unit is 'THERM10', expected one of the specifications of index 'B': 'LOT', "
         "'MMBTU'"
