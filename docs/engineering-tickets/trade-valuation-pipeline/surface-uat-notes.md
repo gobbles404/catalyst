@@ -786,7 +786,7 @@ legs pay apart is outside the version and is noted, not booked as one payment.
 
 ## 28. RFQ quantity and payment schedules
 
-Draft for review, not implemented: [rfq-quoting.md](rfq-quoting.md). `_CreateRFQ` takes aligned
+Built in #218: [rfq-quoting.md](rfq-quoting.md), [rfq.md](../../library/quoting/rfq.md) the page. `_CreateRFQ` takes aligned
 contract-month and quantity columns, a quote template and an optional complete payment-date
 column, retaining a resolved request. Explicit dates take precedence over the quote template's
 default `payment_day`; omitted dates use it. Booking's no-overlap rule is unchanged.

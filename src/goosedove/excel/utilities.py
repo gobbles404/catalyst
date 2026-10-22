@@ -55,6 +55,7 @@ from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.interpolated_contracts import interpolate_contracts
 from goosedove.market_data.price_vector import PriceVector
+from goosedove.quoting.rfq import Rfq
 from goosedove.quoting.template import QuoteTemplate
 from goosedove.trades.aggregation import AggregateResults
 from goosedove.trades.encoding import Encoded, EncodedLeg
@@ -389,6 +390,54 @@ def quote_template_table(obj: QuoteTemplate) -> MixedArray:
     # each field its row named under its name, every one holding a value, since no period field
     # may stand in a quote template.
     return template_table(obj.instrument, obj.names, obj.values)
+
+
+@shown.register
+def rfq_table(obj: Rfq) -> MixedArray:
+    """A request's spill, since rfq-quoting.md: one row per entered row in the order given,
+    `row`, `contract_code` in the schedule's spelling, `quantity` as entered, `quantity_per`,
+    `component_quantity`, the month's quantity by the basis, `payment_source`, template or
+    request, and `payment_date`, the month's effective day, a dash for both on a physical
+    request; then the request's facts on every row so that a row reads whole, `index`,
+    `schedule_method`, `route`, `settlement_method`, `quote_unit` and `discount_curve_key`, a
+    dash on the cleared route. Saved facts alone: nothing is priced and no factor is shown."""
+    request = obj.request
+    terms = request.terms
+    n = obj.quantity.size
+    every = np.ones(n, dtype=np.bool_)
+    conventions = request.index.conventions
+
+    def on_every(word: str) -> NDArray[np.object_]:
+        return np.full(n, word, dtype=object)
+
+    source = "-" if obj.payment_source is None else obj.payment_source.value
+    pays = request.payment_date
+    return _assembled(
+        [
+            _numbers_on("row", np.arange(1, n + 1, dtype=np.float64), every, "int64"),
+            _words_on(
+                "contract_code", np.array(request.schedule.codes, dtype=object)[request.contract]
+            ),
+            _numbers_on("quantity", obj.quantity, every),
+            _words_on("quantity_per", on_every(terms.quantity_per.value)),
+            _numbers_on("component_quantity", obj.component_quantity, every),
+            _words_on("payment_source", on_every(source)),
+            _words_on("payment_date", on_every("-"))
+            if pays is None
+            else _dates_on("payment_date", pays),
+            _words_on("index", on_every(request.index.name)),
+            _words_on("schedule_method", on_every(terms.method.value)),
+            _words_on("route", on_every(terms.route.value)),
+            _words_on("settlement_method", on_every(terms.settlement.value)),
+            _words_on(
+                "quote_unit",
+                on_every(
+                    f"{conventions.quote_currency_unit} per {conventions.quote_quantity_unit}"
+                ),
+            ),
+            _words_on("discount_curve_key", on_every("-" if terms.key is None else terms.key)),
+        ]
+    )
 
 
 def template_table(

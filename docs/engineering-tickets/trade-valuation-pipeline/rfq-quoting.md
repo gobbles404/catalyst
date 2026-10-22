@@ -1,6 +1,6 @@
 # RFQ: a saved quantity and payment schedule for quoting
 
-**Status:** Draft for owner review, 21 October 2026. Not implemented.
+**Status:** Agreed 22 October 2026 and built in #218, stacked on #217; [rfq.md](../../library/quoting/rfq.md) is the page, and the shared calculation's home is `src/goosedove/quoting/request.py`.
 
 ## Outcome
 

@@ -45,6 +45,11 @@
 #          second index's quote, a changed settle on the first, the histories retyped in the
 #          other order, the second index cleared and typed back. check.ps1 runs this group
 #          beside core.
+#   rfq    a request for quote on the chain's index under the quotes group's template, on the
+#          template's payment day and on its own: a quote tick repricing the standing request,
+#          a changed quantity remaking it, a code naming nothing and a payment day on the
+#          expiry failing it and typed back rebuilding it. check.ps1 runs this group beside
+#          core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
@@ -53,7 +58,7 @@
 # hidden_excel.ps1, which makes the refused call again until it is taken or its time runs out;
 # inside a bounded wait that time is the wait's own deadline, never more. A property is read
 # through Read-ExcelProperty, since a refused read made with a dot comes back as nothing.
-param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "bumps", "curves", "cashflows", "quotes", "pairs", "quit"), [int]$Patience = 20)
+param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "bumps", "curves", "cashflows", "quotes", "pairs", "rfq", "quit"), [int]$Patience = 20)
 $ErrorActionPreference = "Stop"
 $Groups = @($Groups | ForEach-Object { $_ -split "," })
 $root = Split-Path $PSScriptRoot -Parent
@@ -1675,7 +1680,92 @@ $pairs = {
     Close-Book $state $book
 }
 
-$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; bumps = $bumps; curves = $curves; cashflows = $cashflows; quotes = $quotes; pairs = $pairs; quit = $quit }
+# --- rfq ------------------------------------------------------------------------------------------
+# A request for quote, rfq-quoting.md, on the chain's index: the quotes group's cleared template
+# in D26, the two months n26 and q26 at one and three in K30:L31 with the request's own payment
+# days beside them in M30:M31; the request on the template's +1bd in D33 and on its own days in
+# D36, each quoted on the chain's market, 72.625 with n26 at 72.1 and q26 at 72.8, a number and
+# no handle, the readbacks reading a quantity and the payment source. A quote tick remakes the
+# vector and the market and reprices both requests, which stand; a changed quantity remakes
+# both requests and the old two are released; a code naming nothing fails the requests at their
+# cells and the quotes as consumers, and typed back rebuilds them; a payment day on n26's
+# expiry fails the dated request alone, and typed back rebuilds it.
+$rfq = {
+    param($state)
+    $book = New-Book $state
+    $sheet = Sheet $state $book
+    Build-Chain $state $sheet
+    Put $state $sheet "C13" "1-Jan-2026"
+    Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
+    Put $state $sheet "K26" "route"; Put $state $sheet "L26" "settlement_method"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "quantity_per"; Put $state $sheet "O26" "payment_day"; Put $state $sheet "P26" "payment_holiday_calendar"
+    Put $state $sheet "K27" "cleared"; Put $state $sheet "L27" "financial"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "month"; Put $state $sheet "O27" "+1bd"; Put $state $sheet "P27" "=D13"
+    Put $state $sheet "K30" "n26"; Put $state $sheet "L30" "1"; Put $state $sheet "M30" "1-Jul-2026"
+    Put $state $sheet "K31" "q26"; Put $state $sheet "L31" "3"; Put $state $sheet "M31" "1-Aug-2026"
+    Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",K26:P26,K27:P27)'
+    Put $state $sheet "D33" "=_CreateRFQ(D5,K30:K31,L30:L31,D26)"
+    Put $state $sheet "D34" "=_QuoteRFQ(D11,D33)"
+    Put $state $sheet "D35" "=INDEX(util_ReadHandle(D33),4,5)"
+    Put $state $sheet "D36" "=_CreateRFQ(D5,K30:K31,L30:L31,D26,M30:M31)"
+    Put $state $sheet "D37" "=_QuoteRFQ(D11,D36)"
+    Put $state $sheet "D38" "=INDEX(util_ReadHandle(D36),3,6)"
+    $id = Id $state
+    $saved = Text $state $sheet "D33"
+    Check "the request's cell shows its handle, named for the index" ($saved.StartsWith("${id}:rfq:WTI NYMEX:")) $saved
+    $dated = Text $state $sheet "D36"
+    Check "the dated request's cell shows its own handle" ($dated -ne $saved -and $dated.StartsWith("${id}:rfq:WTI NYMEX:")) $dated
+    Check "the request quotes 72.625, one of n26 at 72.1 and three of q26 at 72.8, a number and no handle" ((Text $state $sheet "D34") -eq "72.625") (Text $state $sheet "D34")
+    Check "and the dated request the same, no factor on a cleared route" ((Text $state $sheet "D37") -eq "72.625") (Text $state $sheet "D37")
+    Check "the readback reads q26's quantity, 3" ((Text $state $sheet "D35") -eq "3") (Text $state $sheet "D35")
+    Check "and the dated request's payment source, the request's" ((Text $state $sheet "D38") -eq "request") (Text $state $sheet "D38")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 4) }
+    Check "the chain, the calendar, the template and the two requests: fifteen live, fifteen published, the quotes publishing nothing" ($c.Live -eq 15 -and $c.Published -eq 15 -and $c.Released -eq 0) $c.Text
+
+    # A quote tick: the vector and the market publish anew, the old two released; both requests
+    # stand and reprice, 72.975 with n26 at 73.5.
+    Put $state $sheet "A10" "73.5"
+    Check "a tick leaves the request's handle as it was" ((Text $state $sheet "D33") -eq $saved) (Text $state $sheet "D33")
+    Check "and reprices it, 72.975" ((Text $state $sheet "D34") -eq "72.975" -and (Text $state $sheet "D37") -eq "72.975") ((Text $state $sheet "D34") + " " + (Text $state $sheet "D37"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 15 -and $c.Released -ge 2 }
+    Check "the old vector and market released, two more published" ($c.Live -eq 15 -and $c.Published -eq 17 -and $c.Released -eq 2) $c.Text
+
+    # A changed quantity: both requests publish anew and the old two are released; the price
+    # follows, 73.15 at one of each.
+    Put $state $sheet "L31" "1"
+    Check "a changed quantity gives the request a new handle" ((Text $state $sheet "D33") -ne $saved -and (Text $state $sheet "D33").StartsWith("${id}:rfq:WTI NYMEX:")) (Text $state $sheet "D33")
+    Check "and the price follows, 73.15" ((Text $state $sheet "D34") -eq "73.15" -and (Text $state $sheet "D35") -eq "1") ((Text $state $sheet "D34") + " " + (Text $state $sheet "D35"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 15 -and $c.Released -ge 4 }
+    Check "the old two requests released, two more published" ($c.Live -eq 15 -and $c.Published -eq 19 -and $c.Released -eq 4) $c.Text
+
+    # A code naming no month fails both requests at the row and the quotes as their consumers, the
+    # reads showing #REF!; typed back, both publish anew and the price again.
+    Put $state $sheet "K30" "x"
+    $failed = Text $state $sheet "D33"
+    Check "a code naming no month fails the request in the library's words" ($failed -eq "#ERROR _CreateRFQ: ValueError: contract_codes row 1 is 'x', expected a month letter and a two-digit year, such as F26") $failed
+    Check "and the quote as its consumer, the creator's text carried once" ((Text $state $sheet "D34") -eq "#ERROR _QuoteRFQ: rfq is the creator's failure, expected rfq handle: $failed") (Text $state $sheet "D34")
+    Check "and the read shows #REF!, no number" ((Text $state $sheet "D35") -eq "#REF!") (Text $state $sheet "D35")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 13 }
+    Check "the two requests released, thirteen live, nothing published" ($c.Live -eq 13 -and $c.Published -eq 19 -and $c.Released -eq 6) $c.Text
+    Put $state $sheet "K30" "n26"
+    Check "the code typed back rebuilds the request and the price, 73.15" ((Text $state $sheet "D33").StartsWith("${id}:rfq:WTI NYMEX:") -and (Text $state $sheet "D34") -eq "73.15") ((Text $state $sheet "D33") + " " + (Text $state $sheet "D34"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 15 }
+    Check "fifteen live again, two more published" ($c.Live -eq 15 -and $c.Published -eq 21 -and $c.Released -eq 6) $c.Text
+
+    # A payment day on n26's expiry fails the dated request alone, by the month and its row;
+    # the day after, typed back, rebuilds it.
+    $dated = Text $state $sheet "D36"
+    Put $state $sheet "M30" "22-Jun-2026"
+    Check "a payment day on the month's last observation fails the dated request by its row" ((Text $state $sheet "D36") -eq "#ERROR _CreateRFQ: ValueError: n26 of row 1 pays on 2026-06-22, expected a day after its last observation, 2026-06-22, when its final price exists") (Text $state $sheet "D36")
+    Check "while the request on the template's day stands" ((Text $state $sheet "D34") -eq "73.15") (Text $state $sheet "D34")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 14 }
+    Check "the dated request released, fourteen live" ($c.Live -eq 14 -and $c.Published -eq 21 -and $c.Released -eq 7) $c.Text
+    Put $state $sheet "M30" "1-Jul-2026"
+    Check "the day typed back rebuilds the dated request and its price" ((Text $state $sheet "D36") -ne $dated -and (Text $state $sheet "D36").StartsWith("${id}:rfq:WTI NYMEX:") -and (Text $state $sheet "D37") -eq "73.15") ((Text $state $sheet "D36") + " " + (Text $state $sheet "D37"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 15 }
+    Check "fifteen live, one more published, no misses, no disposal errors" ($c.Live -eq 15 -and $c.Published -eq 22 -and $c.Released -eq 7 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Close-Book $state $book
+}
+
+$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; bumps = $bumps; curves = $curves; cashflows = $cashflows; quotes = $quotes; pairs = $pairs; rfq = $rfq; quit = $quit }
 foreach ($name in $Groups) {
     if (-not $bodies.Contains($name)) { throw "no group named $name; the groups are $($bodies.Keys -join ', ')" }
     Run-Group $name $bodies[$name]

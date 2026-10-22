@@ -995,6 +995,72 @@ def test_an_argument_that_may_be_left_out_shows_its_sentence_alone() -> None:
     assert arguments == [("x", "A number."), ("[dates]", "A column of dates.")]
 
 
+def test_the_request_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateRFQ"]
+    assert not hidden
+    assert description == (
+        "Creates a request for quote on one index from aligned columns of contract months and "
+        "quantities under a quote template's terms, paying on the template's days or on the dates "
+        "given, and shows its handle, the text _QuoteRFQ takes as the request."
+    )
+    assert arguments == [
+        (
+            "index",
+            "The index handle: the cell showing _CreateIndex's result, such as I3, or a name for "
+            "it, the one index every row of the request is on.",
+        ),
+        (
+            "contract_codes",
+            "The contract months in one column, such as A2:A4, one month per row, F27 or g27, in "
+            "any order and a month more than once allowed; no strip or balance.",
+        ),
+        (
+            "quantities",
+            "The quantities beside them, such as B2:B4, one per row in one common unit, zero or "
+            "more with at least one positive: a month's total, or per calendar day under the "
+            "template's calday.",
+        ),
+        (
+            "template",
+            "The quote-template handle: the cell showing _CreateQuoteTemplate's result, such as "
+            "B3, or a name for it, which supplies the request's terms.",
+        ),
+        (
+            "[payment_dates]",
+            "The payment days beside them, such as C2:C4, one date per row taken exactly in place "
+            "of the template's payment_day; left out to pay by the template's day or rule.",
+        ),
+    ]
+
+
+def test_the_request_quote_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_QuoteRFQ"]
+    assert not hidden
+    assert description == (
+        "Quotes one fixed price for a saved request on one market, each month at its quantity, "
+        "fixings for the observations that have passed and the day's quotes for the rest, a "
+        "bilateral payment discounted on the template's curve on each month's own day."
+    )
+    assert arguments == [
+        (
+            "market",
+            "The market handle over the request's index: the cell showing _CreateMarket's result, "
+            "such as I12, or a name for it, with the day's quotes over the history they follow.",
+        ),
+        (
+            "rfq",
+            "The request handle: the cell showing _CreateRFQ's result, such as B5, or a name for "
+            "it.",
+        ),
+        (
+            "[discount_curve_set]",
+            "The collection handle for a bilateral request: the cell showing "
+            "_CollectDiscountCurves's result, such as I13, or a name for it, holding the curve "
+            "the template names; left out for a cleared request.",
+        ),
+    ]
+
+
 # --- what registration refuses, on a function Excel lists ----------------------------------
 
 

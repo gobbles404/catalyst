@@ -68,6 +68,7 @@ from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
+from goosedove.quoting.rfq import Rfq
 from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.resolution import Trades
 from goosedove.trades.results import TradeResults
@@ -1525,6 +1526,7 @@ _NAMED: Final[dict[type[object], str]] = {
     PreparedTrades: "encoded.terms.descriptor",
     TradeResults: "prepared.encoded.terms.descriptor",
     DiscountCurve: "name",  # the curve's name, SOFR, since #201
+    Rfq: "request.index.name",  # the request's index, rfq-quoting.md
     Cashflows: "currency",  # the batch's one currency where an index's name would be, since #200
     CashflowResults: "currency",
 }
