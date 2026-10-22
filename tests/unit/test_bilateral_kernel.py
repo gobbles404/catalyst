@@ -519,7 +519,7 @@ def test_the_two_trades_made_through_the_creators_value_the_same() -> None:
         "payment_day": DatesOrTexts.of_texts(("+261bd", "+522bd")),
     }
     ticket = FieldValues(FIXED_FLOAT, 2, tuple(columns), columns)
-    batch = trades(UNIT, ticket, template, UNITS, WorkCounter())
+    batch = trades((UNIT,), ticket, template, UNITS, WorkCounter())
     assert batch.encoded.payment_date is not None
     np.testing.assert_array_equal(batch.encoded.payment_date, dates(A_YEAR, TWO_YEARS))
     assert batch.resolved.counterparty == ("ACME Trading", "ACME Trading")

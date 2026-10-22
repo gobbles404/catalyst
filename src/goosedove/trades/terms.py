@@ -1,7 +1,8 @@
 """The resolved terms of a batch of trades: which deals were struck, under which definitions, as
 the resolution child of _CreateTrades establishes them from a template and a ticket, and as
-tests supply them in Python. One instrument and one index for the batch, one route and one
-settlement; then the occurrences, the ticket's rows, each with its date, the specification of
+tests supply them in Python. One instrument for the batch, one route and one settlement, and
+its legs, one index each, one or since two-index-fixed-float.md two; then the occurrences,
+the ticket's rows, each with its date, the specification of
 the index its quantity counts, its schedule method and its quantity basis, so that one batch
 mixes units, methods and bases row by row, its clearing house, its counterparty and its broker
 where given and the marketing reserve it booked; then the components, one per contract month
@@ -91,6 +92,25 @@ class PaymentTerms:
     entered: DatesOrTexts
     calendar: tuple[HolidayCalendar, ...]
     date: NDArray[np.datetime64]
+
+
+@dataclass(frozen=True, slots=True)
+class LegInputs:
+    """What a second leg is made from, since two-index-fixed-float.md: the second index's side of
+    the terms as the resolution hands it to resolved_trades, the first leg's being the builder's
+    positional arguments as they were with one index. The index; specification[i], the row of
+    its specifications each occurrence's quantity_unit names on this index; schedule_method[i],
+    each occurrence's second_schedule_method as a position among METHODS; contract[k], the row of
+    this index's schedule each component's month is; fixed_price[k], each component's
+    second_fixed_price; and schedule_month, this schedule's months as the resolution read them,
+    or None to read them in the builder."""
+
+    index: Index
+    specification: NDArray[np.intp]
+    schedule_method: NDArray[np.intp]
+    contract: NDArray[np.intp]
+    fixed_price: NDArray[np.float64]
+    schedule_month: NDArray[np.int64] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -224,6 +244,7 @@ def resolved_trades(
     counterparty: tuple[str, ...] | None = None,
     marketing_reserve: NDArray[np.float64] | None = None,
     discount_curve_key: tuple[str, ...] | None = None,
+    second_leg: LegInputs | None = None,
 ) -> ResolvedTrades:
     """The one way to make ResolvedTrades: the rules of the first fixed_float profile, checked once,
     in this order, the first failure being the message; then the columns copied and frozen, the
@@ -270,6 +291,18 @@ def resolved_trades(
     contract-month axes and read for nothing here. The brokered rows, since #188, are read here
     once from the broker texts, none in any case meaning a screen trade, and kept frozen for the
     reserves, which charge brokerage on their components alone.
+
+    A second leg, since two-index-fixed-float.md, is the second index's side of the same rows,
+    LegInputs, checked after the first leg's rules and before the payment's: its index is not
+    the first again and not another index of the first's name, one index for one name; it
+    quotes in the first's quote currency and quote quantity units and settles in the first's
+    currency, since the two entered prices add into one, and no conversion between differently
+    quoted legs is invented; the settlement is financial, a two-index physical delivery being
+    outside this version; then the leg's own rules, the index a futures or an IFERC one made
+    with a reporting lot, its specification rows and methods per occurrence, its methods
+    under its own kind, lastday alone on an IFERC index, and its contract rows and fixed
+    prices per component, named second_schedule_method and second_fixed_price in a refusal,
+    the fields they came from. The trade's facts are checked once, whatever the legs.
     """
     schedule = trade_schedule_of(index)
     lot = reporting_lot_of(index)
@@ -285,40 +318,33 @@ def resolved_trades(
     _the_keys(route, discount_curve_key)
     _the_selections(index, specification, schedule_method, quantity_per, occurrences)
     _the_method(schedule_method, settlement, trade_ids, index.kind)
-    _the_components(
-        occurrence,
-        contract,
-        quantity,
-        start_date,
-        end_date,
-        fixed_price,
-        trade_ids,
-        occurrences,
-        len(schedule.codes),
+    _the_components(occurrence, quantity, start_date, end_date, trade_ids, occurrences)
+    _the_leg_columns(
+        contract, fixed_price, occurrence, trade_ids, len(schedule.codes), "contract", "fixed_price"
     )
+    legs = (
+        _the_leg(
+            index,
+            schedule,
+            lot,
+            specification,
+            schedule_method,
+            contract,
+            fixed_price,
+            schedule_month,
+        ),
+    )
+    if second_leg is not None:
+        legs = (
+            *legs,
+            _the_second_leg(index, second_leg, settlement, trade_ids, occurrence, occurrences),
+        )
     pays = _the_payment(settlement, payment, occurrences, occurrence.size)
     quantities = _frozen_numbers(quantity)
     starts, ends = _frozen_days(start_date), _frozen_days(end_date)
     days = (ends - starts).astype(np.int64) + 1  # made here and owned here: frozen below
     days.setflags(write=False)
-    # The schedule's months, the resolution's reading handed over or read here once; owned here.
-    months = (
-        schedule_months(schedule)
-        if schedule_month is None
-        else np.array(schedule_month, dtype=np.int64)
-    )
-    months.setflags(write=False)
     brokered = _the_brokered(broker, occurrences)
-    leg = LegTerms(
-        index,
-        schedule,
-        lot,
-        _frozen_rows(specification),
-        _frozen_rows(schedule_method),
-        _frozen_rows(contract),
-        _frozen_numbers(fixed_price),
-        months,
-    )
     return ResolvedTrades(
         instrument,
         route,
@@ -339,7 +365,103 @@ def resolved_trades(
         _the_component_quantity(quantity_per, quantities, days, trade_ids, occurrence),
         None if marketing_reserve is None else _frozen_numbers(marketing_reserve),
         pays,
-        (leg,),
+        legs,
+    )
+
+
+def _the_leg(
+    index: Index,
+    schedule: FuturesSchedule | IfercSchedule,
+    lot: ReportingLot,
+    specification: NDArray[np.intp],
+    schedule_method: NDArray[np.intp],
+    contract: NDArray[np.intp],
+    fixed_price: NDArray[np.float64],
+    schedule_month: NDArray[np.int64] | None,
+) -> LegTerms:
+    """A leg over its checked columns, each copied into its type and frozen; the schedule's
+    months the resolution's reading handed over or read here once, owned by the leg."""
+    months = (
+        schedule_months(schedule)
+        if schedule_month is None
+        else np.array(schedule_month, dtype=np.int64)
+    )
+    months.setflags(write=False)
+    return LegTerms(
+        index,
+        schedule,
+        lot,
+        _frozen_rows(specification),
+        _frozen_rows(schedule_method),
+        _frozen_rows(contract),
+        _frozen_numbers(fixed_price),
+        months,
+    )
+
+
+def _the_second_leg(
+    first: Index,
+    second: LegInputs,
+    settlement: Settlement,
+    trade_ids: NDArray[np.int64] | None,
+    occurrence: NDArray[np.intp],
+    occurrences: int,
+) -> LegTerms:
+    """The second leg over the pair's rules and its own, since two-index-fixed-float.md, in
+    this order: another index than the first, by identity and by name; the first's quote
+    currency, quote quantity and settlement currency units; a financial settlement; then the
+    first leg's rules over this index and these columns, each refusal naming the second leg's
+    field."""
+    index = second.index
+    if index is first:
+        raise ValueError(
+            f"index 2 is index 1, {first.name!r}, again, expected two distinct indexes; a pair of "
+            "one index is outside this version"
+        )
+    if index.name == first.name:
+        raise ValueError(
+            f"index 2 is another index named {index.name!r}, the name of index 1, expected one "
+            "index for one name"
+        )
+    mine, theirs = index.conventions, first.conventions
+    if (mine.quote_currency_unit, mine.quote_quantity_unit, mine.currency_unit) != (
+        theirs.quote_currency_unit,
+        theirs.quote_quantity_unit,
+        theirs.currency_unit,
+    ):
+        raise ValueError(
+            f"index 2 {index.name!r} quotes in {mine.quote_currency_unit} per "
+            f"{mine.quote_quantity_unit} and settles in {mine.currency_unit}, expected "
+            f"{theirs.quote_currency_unit} per {theirs.quote_quantity_unit} settled in "
+            f"{theirs.currency_unit} as index 1 {first.name!r}; two legs' prices add in one unit"
+        )
+    if settlement is Settlement.PHYSICAL:
+        raise ValueError(
+            "settlement_method is 'physical', expected 'financial' with two indexes; a two-index "
+            "physical settlement is outside this version"
+        )
+    schedule = trade_schedule_of(index)
+    lot = reporting_lot_of(index)
+    _the_leg_selections(index, second.specification, second.schedule_method, occurrences, "second_")
+    _the_method(second.schedule_method, settlement, trade_ids, index.kind, "second_schedule_method")
+    _the_leg_columns(
+        second.contract,
+        second.fixed_price,
+        occurrence,
+        trade_ids,
+        len(schedule.codes),
+        "second_contract",
+        "second_fixed_price",
+    )
+    return _the_leg(
+        index,
+        schedule,
+        lot,
+        second.specification,
+        second.schedule_method,
+        second.contract,
+        second.fixed_price,
+        second.schedule_month,
     )
 
 
@@ -386,16 +508,47 @@ def _the_selections(
     """Each occurrence's three choices, one per occurrence: its specification a row of the index's
     specifications, its method a position among METHODS and its basis one among BASES, the first
     out of range refused by its row."""
-    choices = (
-        (
-            "specification",
-            specification,
-            len(index.specifications.names),
-            "a row of the index's specifications",
-        ),
-        ("schedule_method", schedule_method, len(METHODS), "a method, its position among METHODS"),
-        ("quantity_per", quantity_per, len(BASES), "a basis, its position among BASES"),
+    _the_leg_selections(index, specification, schedule_method, occurrences, "")
+    _the_choices(
+        (("quantity_per", quantity_per, len(BASES), "a basis, its position among BASES"),),
+        occurrences,
     )
+
+
+def _the_leg_selections(
+    index: Index,
+    specification: NDArray[np.intp],
+    schedule_method: NDArray[np.intp],
+    occurrences: int,
+    prefix: str,
+) -> None:
+    """A leg's two choices per occurrence, its specification a row of its index's specifications
+    and its method a position among METHODS, named with the second leg's prefix where they are
+    the second leg's."""
+    _the_choices(
+        (
+            (
+                f"{prefix}specification",
+                specification,
+                len(index.specifications.names),
+                "a row of the index's specifications",
+            ),
+            (
+                f"{prefix}schedule_method",
+                schedule_method,
+                len(METHODS),
+                "a method, its position among METHODS",
+            ),
+        ),
+        occurrences,
+    )
+
+
+def _the_choices(
+    choices: tuple[tuple[str, NDArray[np.intp], int, str], ...], occurrences: int
+) -> None:
+    """Each choice one per occurrence and within its members, the first out of range refused by
+    its row."""
     for name, column, count, words in choices:
         if column.size != occurrences:
             raise ValueError(
@@ -414,6 +567,7 @@ def _the_method(
     settlement: Settlement,
     trade_ids: NDArray[np.int64] | None,
     kind: Kind,
+    field: str = "schedule_method",
 ) -> None:
     """Each occurrence's method with the batch's settlement and the index's kind. On an IFERC
     index, since #167, the settlement is financial, an IFERC basis future being cash settled on
@@ -435,7 +589,7 @@ def _the_method(
         if not supported.all():
             i = int((~supported).argmax())
             raise ValueError(
-                f"schedule_method of {named_trade(trade_ids, i)} is "
+                f"{field} of {named_trade(trade_ids, i)} is "
                 f"{METHODS[int(schedule_method[i])].value!r}, expected 'lastday' on an IFERC "
                 "index; an IFERC month has one index, published once"
             )
@@ -550,29 +704,23 @@ def _the_keys(route: Route, discount_curve_key: tuple[str, ...] | None) -> None:
 
 def _the_components(
     occurrence: NDArray[np.intp],
-    contract: NDArray[np.intp],
     quantity: NDArray[np.float64],
     start_date: NDArray[np.datetime64],
     end_date: NDArray[np.datetime64],
-    fixed_price: NDArray[np.float64],
     trade_ids: NDArray[np.int64] | None,
     occurrences: int,
-    schedule_rows: int,
 ) -> None:
-    """Aligned, one or more, each of an occurrence and every occurrence holding one; each
-    contract a row of the schedule, each component's end on or after its start and both in one
-    calendar month, each quantity whole, zero included, each price finite, the days, a quantity
-    or a price refused naming the trade it belongs to, since a strip's component is no row of
-    the sheet."""
+    """The trade's columns, aligned, one or more, each of an occurrence and every occurrence
+    holding one; each component's end on or after its start and both in one calendar month, each
+    quantity whole, zero included, the days or a quantity refused naming the trade it belongs to,
+    since a strip's component is no row of the sheet. A leg's columns are _the_leg_columns'."""
     components = occurrence.size
     if components == 0:
         raise ValueError("occurrence has 0 rows, expected at least 1, one per component")
     for name, column in (
-        ("contract", contract),
         ("quantity", quantity),
         ("start_date", start_date),
         ("end_date", end_date),
-        ("fixed_price", fixed_price),
     ):
         if column.size != components:
             raise ValueError(
@@ -589,13 +737,6 @@ def _the_components(
     if (held == 0).any():
         i = int((held == 0).argmax())
         raise ValueError(f"{named_trade(trade_ids, i)} has no component, expected at least one")
-    outside = (contract < 0) | (contract >= schedule_rows)
-    if outside.any():
-        k = int(outside.argmax())
-        raise ValueError(
-            f"contract row {k + 1} is {contract[k]}, "
-            f"expected a row of the schedule, 0 to {schedule_rows - 1}"
-        )
     backwards = end_date < start_date
     if backwards.any():
         k = int(backwards.argmax())
@@ -613,8 +754,35 @@ def _the_components(
     whole_quantities(
         quantity, lambda k: f"quantity of {named_trade(trade_ids, int(occurrence[k]))}"
     )
+
+
+def _the_leg_columns(
+    contract: NDArray[np.intp],
+    fixed_price: NDArray[np.float64],
+    occurrence: NDArray[np.intp],
+    trade_ids: NDArray[np.int64] | None,
+    schedule_rows: int,
+    contract_name: str,
+    price_name: str,
+) -> None:
+    """A leg's two columns per component, aligned with the trade's: each contract a row of the
+    leg's schedule, each price finite, a price refused naming the trade it belongs to and the
+    field it came from, fixed_price or since two-index-fixed-float.md second_fixed_price."""
+    components = occurrence.size
+    for name, column in ((contract_name, contract), (price_name, fixed_price)):
+        if column.size != components:
+            raise ValueError(
+                f"{name} has {column.size} rows, expected {components}, one per component"
+            )
+    outside = (contract < 0) | (contract >= schedule_rows)
+    if outside.any():
+        k = int(outside.argmax())
+        raise ValueError(
+            f"{contract_name} row {k + 1} is {contract[k]}, "
+            f"expected a row of the schedule, 0 to {schedule_rows - 1}"
+        )
     finite_prices(
-        fixed_price, lambda k: f"fixed_price of {named_trade(trade_ids, int(occurrence[k]))}"
+        fixed_price, lambda k: f"{price_name} of {named_trade(trade_ids, int(occurrence[k]))}"
     )
 
 

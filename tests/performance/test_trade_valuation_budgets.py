@@ -179,8 +179,10 @@ def test_preparing_resolves_two_handles_and_runs_the_kernels_preparation_alone(
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
+        "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
-        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
+        "_the_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -214,6 +216,9 @@ def test_a_tick_resolves_two_handles_and_runs_the_evaluation_alone(
         "_resolve": 2,
         "_EvaluateTrades": 1,
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
@@ -310,6 +315,12 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
         "_resolve": 3,
         "_EvaluateTrades": 1,
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_summed": 3,  # the legs' amounts, NPVs and DV01s by group, one leg's by reference
+        "_the_lots_arrays": 1,  # the leg's discounted lots and their sums
+        "_the_lots_checked": 1,
+        "_discounted_leg": 1,  # the leg's results over them
         "_the_curves": 1,  # the rules and the key bound, since named-curves-slice-3.md
         "_each_period_finite": 2,  # each curve's DV01 views and cross-gamma views finite
         "curve_starts_on": 1,  # the start rule, shared with the cashflows since #200

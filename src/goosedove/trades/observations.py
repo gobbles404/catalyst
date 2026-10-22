@@ -120,6 +120,7 @@ def observed(
     start: NDArray[np.datetime64],
     end: NDArray[np.datetime64],
     named: Callable[[int], str],
+    field: str = "schedule_method",
 ) -> Observations:
     """The observations the schedule methods give a batch's components, each component's method
     its occurrence's, a position among METHODS, each component a row of the index's futures
@@ -154,7 +155,9 @@ def observed(
     that order; a batch of one method is in order as made. Which contract prices each day is the
     encoding's to derive from the calendar: the component's own under the expiry-based methods,
     whichever the calendar gives under asian. The method is the resolution's to read before any
-    payment is counted, so that a payment day counts from the component's last observation."""
+    payment is counted, so that a payment day counts from the component's last observation;
+    a refusal names the field it came from, schedule_method or since two-index-fixed-float.md
+    a second leg's second_schedule_method."""
     schedule = trade_schedule_of(index)
     count = contract.size
     if method.size != count:
@@ -168,7 +171,7 @@ def observed(
             if not lastday.all():
                 k = int((~lastday).argmax())
                 raise ValueError(
-                    f"schedule_method of {named(k)} is {METHODS[int(method[k])].value!r}, "
+                    f"{field} of {named(k)} is {METHODS[int(method[k])].value!r}, "
                     "expected 'lastday' on an IFERC index; an IFERC month has one index, "
                     "published once"
                 )

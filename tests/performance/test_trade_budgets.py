@@ -316,6 +316,9 @@ def test_a_tick_runs_evaluation_alone_and_nothing_of_the_steps_before(
     quoted = a_market(history)
     assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
@@ -387,6 +390,9 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
 ENCODING_LEDGER = {
     "encoded": 1,
     "_the_groups": 1,
+    "_the_amounts": 1,  # two-index-fixed-float.md: the leg's three amounts per component
+    "_the_group_offsets": 1,  # the leg's offsets by group
+    "_the_exposures": 1,  # the leg's slots' exposures
     "_distinct": 2,
     "_the_references": 1,
     "observation_references": 1,  # the reader shared with a quote, template-based-quoting.md
@@ -420,8 +426,10 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
+        "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
-        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
+        "_the_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -533,8 +541,10 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
+        "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
-        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
+        "_the_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -549,6 +559,9 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
     assert numpy == PREPARATION_NUMPY, numpy
     assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
@@ -581,8 +594,10 @@ def test_a_last3day_batch_prepares_and_ticks_with_the_same_functions_as_a_lastda
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
+        "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
-        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
+        "_the_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -597,6 +612,9 @@ def test_a_last3day_batch_prepares_and_ticks_with_the_same_functions_as_a_lastda
     assert numpy == PREPARATION_NUMPY, numpy
     assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
@@ -701,8 +719,10 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
+        "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
-        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
+        "_the_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -718,6 +738,9 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
     quoted = a_market(history)
     assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
@@ -770,8 +793,10 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
+        "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
-        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
+        "_the_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -787,6 +812,9 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
     quoted = a_market(history)
     assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
@@ -877,8 +905,10 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
+        "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
-        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
+        "_the_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -892,6 +922,9 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
     assert numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter())) == PREPARATION_NUMPY
     assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
@@ -1073,8 +1106,10 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
+        "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
-        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
+        "_the_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -1088,6 +1123,9 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
     assert numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter())) == PREPARATION_NUMPY
     assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
@@ -1218,8 +1256,10 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
+        "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
-        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
+        "_the_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -1234,6 +1274,9 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
     assert numpy == PREPARATION_NUMPY, numpy
     assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
@@ -1380,8 +1423,10 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
+        "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
-        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
+        "_the_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -1396,6 +1441,9 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
     assert numpy == IFERC_PREPARATION_NUMPY, numpy
     assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,

@@ -7,7 +7,8 @@ sets out. One common net payment per monthly component is the v1 rule, agreed he
 and not checked against a confirmation; separately paying legs are outside this
 version. This ticket supersedes the issue's original single-fixed-price and
 combined-index alternatives. The first pull request, the internal one-leg
-representation, is #215; the second and the third follow on it.
+representation, is #215; the second, two-leg resolution and pricing, is #216,
+stacked on it; the third follows.
 
 ## Outcome
 

@@ -272,6 +272,29 @@ FIXED_FLOAT = Instrument(
             "A finite number in the index's quote units; the same for every month of a strip",
         ),
         Field(
+            "second_fixed_price",
+            "The second leg's fixed price agreed when the deal was executed, with two indexes",
+            False,
+            "two indexes",
+            FieldType.NUMBER,
+            "no fixed list",
+            "A finite number in the quote units the two indexes share, the second index's "
+            "leg; required with two indexes given to _CreateTrades and refused with one, where "
+            "the index count is known; the trade's fixed price is the two legs' summed, derived "
+            "and never entered",
+        ),
+        Field(
+            "second_schedule_method",
+            "How the second leg's observations determine its floating price, with two indexes",
+            False,
+            "two indexes",
+            FieldType.CODE,
+            "asian, lastday, penultimate, last3day",
+            "The second index's method, the same choices as schedule_method under the second "
+            "index's kind, lastday alone on an IFERC index; required with two indexes and "
+            "refused with one",
+        ),
+        Field(
             "payment_day",
             "The day a component pays, as a date, or the rule that finds it from the component's "
             "last observation day",

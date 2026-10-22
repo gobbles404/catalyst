@@ -72,10 +72,23 @@ class LegResults:
     none for a cleared batch, whose lots nothing discounts, the known zero and no buffer. And
     cross_gamma_total the contributions' totals summed: the leg's cross-gamma with every used
     curve shifted by one basis point together, explicitly not the sensitivity to one curve
-    alone, zero for a cleared batch."""
+    alone, zero for a cleared batch.
+
+    Since the ticket's second pull request the leg's values, retained so that a pair's legs
+    are separable: mark, the leg's share of the batch's mark, for a cleared batch its unsettled
+    fixed legs, set amounts and live amount, for a bilateral one its NPV; cash, its share of the
+    cash, its settled fixed legs and set amounts; dv01, its share of the batch's DV01, the leg's
+    DV01 by group summed, zero for a cleared batch; and per group payment_amount[g], the leg's
+    fixed leg, set amount and live amount of the group together, npv_by_group[g] that amount
+    times the group's factor, zero for a paid group, and dv01_by_group[g] -0.0001 times the
+    group's time fraction times that NPV, the three None for a cleared batch; the trade's are
+    the legs' summed, and with one leg the leg's are the trade's own, by reference."""
 
     prepared: PreparedLeg
     market: Market
+    mark: float
+    cash: float
+    dv01: float
     dated_live_contribution: NDArray[np.float64]
     contracts: NDArray[np.intp]
     price_sensitivity: NDArray[np.float64]
@@ -89,6 +102,9 @@ class LegResults:
     discounted_daily_lots: NDArray[np.float64]
     discounted_monthly_lots: NDArray[np.float64]
     discounted_yearly_lots: NDArray[np.float64]
+    payment_amount: NDArray[np.float64] | None
+    npv_by_group: NDArray[np.float64] | None
+    dv01_by_group: NDArray[np.float64] | None
     early_delta: EarlyRisk
     cross_gamma_total: float
     cross_contributions: tuple[CrossContribution, ...]
