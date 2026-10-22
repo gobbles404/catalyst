@@ -352,7 +352,9 @@ def priced(
     combination at each step, the observations' weights summing to one and the shares to one, so
     no product or sum runs past the largest number a finite input stays within, and a factor as
     small as the curve allows, positive by its rule, scales nothing away: one month's share is
-    one whatever its factor."""
+    one whatever its factor, and the factors are scaled by a power of two before they weight,
+    so that a subnormal factor loses no month either, every ordinary price being as it was
+    without the scaling."""
     calendar = market.market_history.calendar
     as_of = calendar.valuation_date.as_of
     observations = request.observations
@@ -372,7 +374,12 @@ def priced(
         factor = np.ones(n)
     else:
         factor = _the_factors(curve, request.terms.key, pays, as_of, request.component, counter)
-    weight = request.relative_quantity * factor
+    # The factors scaled by one power of two, the largest brought to at least a half and under
+    # one: exact, a power of two moving the exponent alone, so every share and price is as it
+    # is without it, while a factor as small as the curve allows, a subnormal number, no longer
+    # drives a relative quantity below the smallest number and its month's share to nothing.
+    _, exponent = np.frexp(factor.max())
+    weight = request.relative_quantity * np.ldexp(factor, -exponent)
     share = weight / weight.sum()
     counter.hit(PRICE_REDUCTIONS, 3)
     return float((share * monthly).sum())

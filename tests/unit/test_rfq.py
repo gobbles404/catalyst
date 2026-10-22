@@ -736,3 +736,31 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         f"#ERROR _QuoteRFQ: market is market history handle {history!r}, expected market handle"
     )
     assert isinstance(saved, str) and PaymentSource.REQUEST.value == "request"
+
+
+# --- a factor near the smallest number, the review's case ----------------------------------------
+
+
+@pytest.mark.parametrize("tiny", [1e-300, 1e-310, 5e-324], ids=["normal", "subnormal", "smallest"])
+def test_a_factor_as_small_as_the_curve_allows_weighs_every_month_exactly(tiny: float) -> None:
+    # A curve at the review's factor on both payment days, down to the smallest positive number,
+    # which the curve accepts: the factors cancel, and the request prices as its cleared self,
+    # exactly, instead of losing the smaller month's weight below the smallest number; the quote
+    # of the strip likewise.
+    rates = curve_set(curve_of((DEC_31, 1.0), ("2027-02-05", tiny), ("2027-03-05", tiny)))
+    for quantities, expected in (
+        ((1.0, 2.0), 3.4 / 3),
+        ((3.0, 1.0), 4.2 / 4),
+        ((1e6, 3e6), 1.15),
+        ((1.0, 1.0), 1.1),
+    ):
+        saved = request(CODES, quantities, otc())
+        assert price(MARKET, saved, rates) == pytest.approx(expected, **CLOSE)
+    assert quote_on(MARKET, "F27-G27", otc(), rates) == pytest.approx(1.1, **CLOSE)
+    # One factor near the smallest beside one of one: the tiny month's share is nothing, the
+    # price the other month's, and the scaled weights stay finite.
+    lopsided = curve_set(curve_of((DEC_31, 1.0), ("2027-02-05", 1.0), ("2027-03-05", tiny)))
+    assert price(MARKET, request(CODES, (1.0, 1.0), otc()), lopsided) == pytest.approx(1.0, **CLOSE)
+    assert price(MARKET, request(CODES, (1.0, 1.0), otc(), EXPLICIT), RATES) == pytest.approx(
+        (0.98 * 1.0 + 0.96 * 1.2) / (0.98 + 0.96), **CLOSE
+    )
