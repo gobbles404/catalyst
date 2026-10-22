@@ -174,7 +174,11 @@ class ResolvedTrades:
     each the index a leg prices on with its schedule, reporting lot, specification rows, methods,
     contract rows and fixed prices, so that what an index owns is held once per leg and what
     the trade owns is held once. The first leg is the batch's for what a batch has one of: the
-    fee source of its reserves and the name its handle carries."""
+    fee source of its reserves and the name its handle carries. Then combined_fixed_price[k],
+    since two-index-fixed-float.md's third pull request: the trade's fixed price per
+    component, the legs' entered prices summed, derived and never entered, formed once and
+    checked finite where it is made, a one-index batch's its leg's own array by reference,
+    read by the readback and by nothing that prices."""
 
     instrument: Instrument
     route: Route
@@ -196,6 +200,7 @@ class ResolvedTrades:
     marketing_reserve: NDArray[np.float64] | None
     payment: PaymentTerms | None
     legs: tuple[LegTerms, ...]
+    combined_fixed_price: NDArray[np.float64]
 
     def named(self, component: int) -> str:
         """A component's trade named in a message, by its ID when the ticket gave one and by its
@@ -302,7 +307,11 @@ def resolved_trades(
     with a reporting lot, its specification rows and methods per occurrence, its methods
     under its own kind, lastday alone on an IFERC index, and its contract rows and fixed
     prices per component, named second_schedule_method and second_fixed_price in a refusal,
-    the fields they came from. The trade's facts are checked once, whatever the legs.
+    the fields they came from. The trade's facts are checked once, whatever the legs. The
+    pair's combined fixed price, the two entered prices summed per component, is formed once
+    here and checked finite, since two finite prices can sum past the largest number and
+    nothing is published that a reader would then fail on; a one-index batch's is its leg's
+    own.
     """
     schedule = trade_schedule_of(index)
     lot = reporting_lot_of(index)
@@ -366,7 +375,36 @@ def resolved_trades(
         None if marketing_reserve is None else _frozen_numbers(marketing_reserve),
         pays,
         legs,
+        legs[0].fixed_price if len(legs) == 1 else _the_combined_price(legs, trade_ids, occurrence),
     )
+
+
+def _the_combined_price(
+    legs: tuple[LegTerms, ...],
+    trade_ids: NDArray[np.int64] | None,
+    occurrence: NDArray[np.intp],
+) -> NDArray[np.float64]:
+    """A pair's fixed price per component, since two-index-fixed-float.md's third pull request:
+    the two legs' entered prices summed, formed once here, checked finite where it is made, since
+    two finite prices can sum past the largest number and nothing is published that a reader
+    would then fail on, the first such component refused by its trade in the pair's shared quote
+    unit, and frozen. A one-index batch's is its leg's own frozen array, which the caller takes
+    by reference with no call here, so the one-leg path runs as it did."""
+    first, second = legs[0].fixed_price, legs[1].fixed_price
+    with np.errstate(over="ignore"):  # the overflow is this rule's to catch, below
+        combined = first + second
+    outrun = ~np.isfinite(combined)
+    if outrun.any():
+        k = int(outrun.argmax())
+        quote = legs[0].index.conventions
+        raise ValueError(
+            f"{named_trade(trade_ids, int(occurrence[k]))} has {float(combined[k])!r} of combined "
+            f"fixed price, expected a finite price in {quote.quote_currency_unit} per "
+            f"{quote.quote_quantity_unit}; its legs' prices, {float(first[k])!r} and "
+            f"{float(second[k])!r}, sum past the largest number"
+        )
+    combined.setflags(write=False)
+    return combined
 
 
 def _the_leg(

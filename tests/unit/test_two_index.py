@@ -1426,3 +1426,53 @@ def test_the_sheet_refuses_a_pairs_ranges_in_the_seams_words_and_the_kernels(
         "#ERROR _EvaluateTrades: markets is missing, expected market handles in a cell, a row or a "
         "column"
     )
+
+
+# --- the combined fixed price ---------------------------------------------------------------
+
+
+OUTRUN = (
+    "trade 1 at row 1 has inf of combined fixed price, expected a finite price in USD per MMBTU; "
+    "its legs' prices, 1e+308 and 1e+308, sum past the largest number"
+)
+
+
+def test_a_pairs_combined_price_is_formed_once_at_creation_and_held_finite() -> None:
+    # Two finite prices can sum past the largest number; a row of nothing prices nothing, so no
+    # fixed leg catches it, and the sum is refused where it is made, before any handle exists.
+    extreme: dict[str, list[object]] = {
+        **TICKET,
+        "quantity": [0],
+        "fixed_price": [1e308],
+        "second_fixed_price": [1e308],
+    }
+    assert refused(ticket=extreme) == OUTRUN
+    # The sum at the edge but finite is kept, frozen, and is what the readback shows.
+    edge: dict[str, list[object]] = {**extreme, "second_fixed_price": [-1e308]}
+    batch = booked(ticket=edge)
+    combined = batch.resolved.combined_fixed_price
+    assert combined.tolist() == [0.0] and not combined.flags.writeable
+    assert cell(grid(batch), 0, "combined_fixed_price") == 0.0
+    pair = booked()
+    assert pair.resolved.combined_fixed_price.tolist() == pytest.approx([3.0], **CLOSE)
+    # A one-index batch's combined price is its leg's own array, by reference.
+    one = one_index(A, 3.30)
+    assert one.resolved.combined_fixed_price is one.resolved.legs[0].fixed_price
+
+
+def test_the_sheet_refuses_a_pair_whose_prices_sum_past_the_largest_number(
+    sheet: dict[str, Any],
+) -> None:
+    create = SEAM["_CreateTrades"]
+    extreme = across(1.0, serial("2026-12-15"), "G27", 0.0, 1e308, 1e308)
+    assert create(down(sheet["a"], sheet["b"]), sheet["headers"], extreme, sheet["template"]) == (
+        f"#ERROR _CreateTrades: ValueError: {OUTRUN}"
+    )
+    kept = create(
+        down(sheet["a"], sheet["b"]),
+        sheet["headers"],
+        across(1.0, serial("2026-12-15"), "G27", 0.0, 1e308, -1e308),
+        sheet["template"],
+    )
+    assert re.fullmatch(rf"{PID}:trades:A\+B:\d+", str(kept))
+    assert under(read(kept), "combined_fixed_price") == [0.0]

@@ -459,7 +459,8 @@ def trades_table(obj: Trades) -> MixedArray:
     # then what the encoding made, quote_quantity the component quantity in the index's quote
     # quantity unit, coefficient and offset in the settlement currency. A pair, since
     # two-index-fixed-float.md, shows the second leg's second_schedule_method after the first's
-    # method, second_fixed_price and the derived combined_fixed_price after fixed_price, and
+    # method, second_fixed_price and combined_fixed_price, the sum the terms formed and held
+    # finite at creation, after fixed_price, and
     # second_offset after offset, one row per component still; a single index shows none.
     terms, encoding = obj.resolved, obj.encoded
     leg, leg_encoding = terms.legs[0], encoding.legs[0]  # the first leg's, the batch's own
@@ -507,7 +508,7 @@ def trades_table(obj: Trades) -> MixedArray:
     numbers("fixed_price", "float64", leg.fixed_price)
     if paired:
         numbers("second_fixed_price", "float64", terms.legs[1].fixed_price)
-        numbers("combined_fixed_price", "float64", leg.fixed_price + terms.legs[1].fixed_price)
+        numbers("combined_fixed_price", "float64", terms.combined_fixed_price)
     if terms.payment is not None:
         headers.append("payment_day")  # as the ticket or the template wrote, each kind its own
         types.append("date or text")
