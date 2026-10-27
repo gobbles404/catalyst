@@ -29,24 +29,32 @@ if (Test-Path $pidFile) {
 }
 
 $xll = Build-HostAddIn -Root $root
+# Each call into Excel is made through Invoke-ExcelCall of hidden_excel.ps1, so a call Excel
+# refuses while it is busy, a workbook still calculating as it opens say, is made again until it
+# is taken or its time runs out, as every other tool's calls are.
+$helper = Join-Path $PSScriptRoot "hidden_excel.ps1"
 $open = if ($Workbook) {
     $path = (Resolve-Path $Workbook).Path
-    "[void]`$excel.Workbooks.Open('$path'); `$excel.CalculateFullRebuild()"
+    "`$books = `$excel.Workbooks; [void](Invoke-ExcelCall 'open the workbook' { , `$books.Open('$path') }); Invoke-ExcelCall 'full rebuild' { `$excel.CalculateFullRebuild() }"
 } else {
     "[void]`$excel.Workbooks.Add()"
 }
 
 # Start Excel from a throwaway process. While any automation client holds an Excel, that
-# Excel ignores asks to close, so the client must be gone before the person has it.
+# Excel ignores asks to close, so the client must be gone before the person has it. A start
+# that fails takes the terminal path of the hidden tools before Quit, since the add-in's own
+# Application reference would otherwise keep that Excel alive, hidden, holding the .xll.
 $start = @"
+. '$helper'
 `$excel = New-Object -ComObject Excel.Application
 try {
-    if (-not `$excel.RegisterXLL('$xll')) { throw 'Excel refused to load $xll' }
+    if (-not (Invoke-ExcelCall 'register the add-in' { `$excel.RegisterXLL('$xll') })) { throw 'Excel refused to load $xll' }
     $open
     `$excel.Visible = `$true
     `$excel.UserControl = `$true
 }
 catch {
+    try { [void]`$excel.Run('GoosedovePrepareToQuit') } catch { }
     `$excel.Quit()
     throw
 }
