@@ -34,7 +34,13 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.observations import Observations
 from goosedove.trades.reserves import Reserves, reserves
 from goosedove.trades.schedule_methods import METHODS, requires_booked_reference
-from goosedove.trades.terms import LegTerms, ResolvedTrades, Route, payments_after_observations
+from goosedove.trades.terms import (
+    LegTerms,
+    ResolvedTrades,
+    Route,
+    named_trade,
+    payments_after_observations,
+)
 
 ENCODED_COMPONENTS = "encoded_components"  # components turned into quantities and offsets
 ENCODED_GROUPS = "encoded_groups"  # payment groups formed, summed into and checked
@@ -43,6 +49,10 @@ ENCODED_SLOTS = "encoded_slots"  # dated slots named and summed over
 ENCODED_PAYMENT_DAYS = (
     "encoded_payment_days"  # a bilateral batch's distinct payment days, since #178
 )
+# The allowance two legs' sizes per entered unit may differ by and be one quantity, relative,
+# since two-index-fixed-float.md: the unit tables' products of a few factors agree to a few
+# ulps, 1e-16 of the size, and two quantities that are not one differ by a ratio of units.
+UNIT_ROUNDOFF = 1e-12
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,7 +121,9 @@ class EncodedLeg:
 
     Per payment group, aligned with the trade's groups: group_contract[g], the schedule row of
     the g-th group's contract on this leg's schedule, the contract its components were booked on,
-    which owns the fixed leg and, with its payment day, names the group.
+    which owns the fixed leg and, with its payment day, names the group; and offset_of_group[g],
+    the leg's components' offsets summed by group, the leg's fixed leg of the group, the trade's
+    being the legs' summed.
 
     Per slot, the dated inputs: slot_group[s], the group the slot belongs to; slot_date[s], the
     observation day; slot_reference[s], the schedule row of the contract pricing that day, the
@@ -150,6 +162,7 @@ class EncodedLeg:
     coefficient: NDArray[np.float64]
     offset: NDArray[np.float64]
     group_contract: NDArray[np.intp]
+    offset_of_group: NDArray[np.float64]
     slot_group: NDArray[np.intp]
     slot_date: NDArray[np.datetime64]
     slot_reference: NDArray[np.intp]
@@ -245,6 +258,14 @@ def encoded(
     currency, USD or CENT to USD or CENT, so that a price in cents times it is an amount in
     dollars; every price the batch meets, a quote, a settle or the fixed price, multiplies the
     coefficient and never the quantity. The offset: minus the coefficient times the fixed price.
+    For a pair, since two-index-fixed-float.md, each occurrence's quantity unit is one quantity
+    per entered unit on both indexes: the specification it names on each index restates one
+    entered unit in the shared quote quantity unit, and the two sizes agree to within
+    UNIT_ROUNDOFF, whatever the row's quantity, zero included, a `LOT` of 10,000 MMBTU on one
+    index and 2,500 on the other refused as an ambiguous common quantity and not a conversion
+    to invent, a THERM on one and 100,000 BTU on the other one quantity; the first occurrence
+    that differs is refused by its unit, its trade and the two sizes. Each leg's own arrays are
+    made over its leg, the groups shared.
     The groups: under a financial settlement the distinct pairs of contract and payment day among
     the components, and since named-curves-slice-3.md the distinct triples with the row's
     discount_curve_key where the batch has keys, the components sorted by contract, then by day,
@@ -318,8 +339,141 @@ def encoded(
             f"observations are {len(observations)} legs' worth, expected {len(terms.legs)}, one "
             "per leg of the terms"
         )
-    leg = terms.legs[0]
-    observed = observations[0]
+    heads, payment_date, group_of_component, keys, key_of_group = _the_groups(terms)
+    groups = heads.size
+    legs: list[EncodedLeg] = []
+    sizes: list[NDArray[np.float64]] = []  # each leg's specifications in the quote unit
+    payment_axes: PaymentAxes | None = None
+    for leg, observed in zip(terms.legs, observations, strict=True):
+        quote_quantity, coefficient, offset, to_quote_unit = _the_amounts(terms, leg, units)
+        if legs:
+            _the_same_quantity(terms, legs[0].leg, sizes[0], leg, to_quote_unit)
+        sizes.append(to_quote_unit)
+        group_contract = leg.contract[heads]
+        offset_of_group = _the_group_offsets(
+            leg, group_of_component, offset, group_contract, payment_date, keys, key_of_group
+        )
+        reference = _the_references(terms, leg, observed)
+        slot_of_observation, slot_group, slot_date, slot_reference = _the_slots(
+            group_of_component[observed.component], observed.date, reference
+        )
+        slot_exposure = _the_exposures(
+            terms,
+            leg,
+            observed,
+            coefficient,
+            slot_of_observation,
+            slot_group.size,
+            slot_date,
+            slot_reference,
+        )
+        references, reference_of_slot = np.unique(slot_reference, return_inverse=True)
+        days = _the_day_axis(slot_date, slot_reference)
+        periods = _the_contract_periods(leg.schedule_month[references])
+        # A cleared batch's DV01 has no dated axis; nothing more is made for it and its ledger
+        # stands. The payment-time axes are the trade's, made once with the first leg's days.
+        if (
+            payment_axes is None
+            and terms.route is Route.BILATERAL
+            and payment_date is not None
+            and not legs
+        ):
+            payment_axes = _the_payment_axes(payment_date, days[0], counter)
+        # Since named-curves-slice-3.md the places every curve's risk is summed into at once, made
+        # here for a bilateral batch, each leg's over its own slots and references; a batch on
+        # one key holds the places above by reference.
+        curve_axes = (
+            _the_curve_axes(
+                len(keys),
+                key_of_group,
+                slot_group,
+                reference_of_slot,
+                days[1],
+                references.size,
+                days[0].size,
+                payment_axes,
+                periods[1],
+                periods[3],
+                periods[0].size,
+                periods[2].size,
+            )
+            if payment_axes is not None and key_of_group is not None
+            else None
+        )
+        if payment_date is not None:
+            _payments_after_observations(leg, group_contract, payment_date, slot_group, slot_date)
+        counter.hit(ENCODED_COMPONENTS, int(leg.contract.size))
+        counter.hit(ENCODED_OBSERVATIONS, int(observed.component.size))
+        counter.hit(ENCODED_SLOTS, int(slot_group.size))
+        arrays = (
+            quote_quantity,
+            coefficient,
+            offset,
+            group_contract,
+            offset_of_group,
+            slot_group,
+            slot_date,
+            slot_reference,
+            slot_exposure,
+            slot_of_observation,
+            references,
+            reference_of_slot,
+            *days,
+            *periods,
+        )
+        for array in arrays:
+            array.setflags(write=False)
+        legs.append(EncodedLeg(terms, leg, observed, *arrays, curve_axes))
+    counter.hit(ENCODED_GROUPS, int(groups))
+    # The trade's fixed leg of each group: the one leg's own array, by reference, or the legs'
+    # summed, finite or refused by the group since the legs' sums, each finite, can outrun.
+    offset_of_group = legs[0].offset_of_group
+    if len(legs) > 1:
+        with np.errstate(over="ignore", invalid="ignore"):
+            offset_of_group = legs[0].offset_of_group + legs[1].offset_of_group
+        outrun = ~np.isfinite(offset_of_group)
+        if outrun.any():
+            g = int(outrun.argmax())
+            group = group_words(
+                terms.legs[0].schedule.codes,
+                legs[0].group_contract,
+                payment_date,
+                g,
+                keys,
+                key_of_group,
+            )
+            raise ValueError(
+                f"the fixed leg of {group} is {float(offset_of_group[g])!r}, expected a finite "
+                f"amount of {terms.legs[0].index.conventions.currency_unit}; the legs' fixed legs, "
+                "each finite, sum past the largest number"
+            )
+        offset_of_group.setflags(write=False)
+    if payment_date is not None:
+        payment_date.setflags(write=False)
+    if key_of_group is not None:
+        key_of_group.setflags(write=False)
+    group_of_component.setflags(write=False)
+    reserved = reserves(terms, counter)
+    return Encoded(
+        terms,
+        tuple(legs),
+        group_of_component,
+        offset_of_group,
+        payment_date,
+        reserved,
+        payment_axes,
+        keys,
+        key_of_group,
+    )
+
+
+def _the_amounts(
+    terms: ResolvedTrades, leg: LegTerms, units: UnitConversions
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+    """A leg's three amounts per component, the quote quantity, the coefficient and the offset,
+    each finite or refused by its trade and its operation, and the quote-unit size of each of
+    the leg's specifications, the conversion formed once per distinct specification the batch
+    selects; the arithmetic runs with numpy's flags down and the rules judge."""
     index = leg.index
     conventions = index.conventions
     specifications = index.specifications
@@ -328,9 +482,6 @@ def encoded(
     quote_unit = conventions.quote_quantity_unit
     per_price = f"{currency} per {conventions.quote_currency_unit}/{quote_unit}"
     to_quote_unit = np.zeros(len(specifications.names))
-    # The arithmetic runs with numpy's flags down and the rules judge, since #190: each number
-    # made here is finite before it enters the record or feeds the next stage, else the first
-    # that is not is refused by its operation and its trade, group or slot.
     with np.errstate(over="ignore", invalid="ignore"):
         for row in np.unique(
             selection
@@ -381,7 +532,50 @@ def encoded(
                 f"{terms.named(k)} has {float(values[k])!r} of {what}, expected a finite {unit}; "
                 f"{why}"
             )
-    group_contract, payment_date, group_of_component, keys, key_of_group = _the_groups(terms, leg)
+    return quote_quantity, coefficient, offset, to_quote_unit
+
+
+def _the_same_quantity(
+    terms: ResolvedTrades,
+    first: LegTerms,
+    first_sizes: NDArray[np.float64],
+    leg: LegTerms,
+    sizes: NDArray[np.float64],
+) -> None:
+    """The pair's rule, since two-index-fixed-float.md: each occurrence's quantity unit is one
+    quantity per entered unit on both indexes, the size of the specification it names on each,
+    one entered unit restated in the shared quote quantity unit, agreeing to within
+    UNIT_ROUNDOFF, relative, whatever the row's quantity, zero included; else the first
+    occurrence that differs is refused by its unit, its trade and the two sizes, a `LOT` of
+    10,000 MMBTU on one index and 2,500 on the other being an ambiguous common quantity and not a
+    conversion to invent, while a THERM on one and 100,000 BTU on the other are one quantity to
+    the roundoff of their conversions."""
+    theirs = first_sizes[first.specification]
+    mine = sizes[leg.specification]
+    differs = ~np.isclose(mine, theirs, rtol=UNIT_ROUNDOFF, atol=0.0)
+    if not differs.any():
+        return
+    i = int(differs.argmax())
+    unit = leg.index.conventions.quote_quantity_unit
+    name = first.index.specifications.names[int(first.specification[i])]
+    raise ValueError(
+        f"quantity_unit {name!r} of {named_trade(terms.trade_ids, i)} is {float(theirs[i])!r} "
+        f"{unit} on index {first.index.name!r} and {float(mine[i])!r} {unit} on index "
+        f"{leg.index.name!r}, expected one quantity per entered unit on both legs"
+    )
+
+
+def _the_group_offsets(
+    leg: LegTerms,
+    group_of_component: NDArray[np.intp],
+    offset: NDArray[np.float64],
+    group_contract: NDArray[np.intp],
+    payment_date: NDArray[np.datetime64] | None,
+    keys: tuple[str, ...],
+    key_of_group: NDArray[np.intp] | None,
+) -> NDArray[np.float64]:
+    """A leg's offsets summed by group, one bincount, each finite or the first that is not
+    refused by its group, a sum blamed on the group and never on one of its trades."""
     with np.errstate(over="ignore", invalid="ignore"):
         offset_of_group = np.bincount(
             group_of_component, weights=offset, minlength=group_contract.size
@@ -392,98 +586,46 @@ def encoded(
         group = group_words(leg.schedule.codes, group_contract, payment_date, g, keys, key_of_group)
         raise ValueError(
             f"the fixed leg of {group} is {float(offset_of_group[g])!r}, expected a finite amount "
-            f"of {currency}; its components' fixed legs, each finite, sum past the largest number"
+            f"of {leg.index.conventions.currency_unit}; its components' fixed legs, each finite, "
+            "sum past the largest number"
         )
-    reference = _the_references(terms, leg, observed)
-    slot_of_observation, slot_group, slot_date, slot_reference = _the_slots(
-        group_of_component[observed.component], observed.date, reference
-    )
+    return offset_of_group
+
+
+def _the_exposures(
+    terms: ResolvedTrades,
+    leg: LegTerms,
+    observed: Observations,
+    coefficient: NDArray[np.float64],
+    slot_of_observation: NDArray[np.intp],
+    slots: int,
+    slot_date: NDArray[np.datetime64],
+    slot_reference: NDArray[np.intp],
+) -> NDArray[np.float64]:
+    """Each slot's exposure, the leg's coefficients times the observations' weights summed onto
+    the slots, one bincount; a weight is at most one, so a finite coefficient's weighted exposure
+    is finite and only the slot's sum can outrun, the first that does refused by its first trade,
+    its day and the contract pricing it."""
     with np.errstate(over="ignore", invalid="ignore"):
-        # A weight is at most one, so a finite coefficient's weighted exposure is finite; the
-        # slot's sum of them is what can outrun, and is what the record keeps.
         slot_exposure = np.bincount(
             slot_of_observation,
             weights=coefficient[observed.component] * observed.weight,
-            minlength=slot_group.size,
+            minlength=slots,
         )
     outrun = ~np.isfinite(slot_exposure)
     if outrun.any():
         s = int(outrun.argmax())
         j = int((slot_of_observation == s).argmax())  # its first observation
         code = leg.schedule.codes[int(slot_reference[s])]
+        conventions = leg.index.conventions
         raise ValueError(
             f"{terms.named(int(observed.component[j]))} on {slot_date[s]}, a day {code} "
             f"prices, has {float(slot_exposure[s])!r} of exposure, expected a finite amount of "
-            f"{per_price}; its observations' coefficients times their weights sum past the "
-            "largest number"
+            f"{conventions.currency_unit} per {conventions.quote_currency_unit}/"
+            f"{conventions.quote_quantity_unit}; its observations' coefficients times their "
+            "weights sum past the largest number"
         )
-    references, reference_of_slot = np.unique(slot_reference, return_inverse=True)
-    days = _the_day_axis(slot_date, slot_reference)
-    periods = _the_contract_periods(leg.schedule_month[references])
-    # A cleared batch's DV01 has no dated axis; nothing more is made for it and its ledger stands.
-    payment_axes = (
-        _the_payment_axes(payment_date, days[0], counter)
-        if terms.route is Route.BILATERAL and payment_date is not None
-        else None
-    )
-    # Since named-curves-slice-3.md the places every curve's risk is summed into at once, made
-    # here for a bilateral batch; a batch on one key holds the places above by reference.
-    curve_axes = (
-        _the_curve_axes(
-            len(keys),
-            key_of_group,
-            slot_group,
-            reference_of_slot,
-            days[1],
-            references.size,
-            days[0].size,
-            payment_axes,
-            periods[1],
-            periods[3],
-            periods[0].size,
-            periods[2].size,
-        )
-        if payment_axes is not None and key_of_group is not None
-        else None
-    )
-    if payment_date is not None:
-        _payments_after_observations(leg, group_contract, payment_date, slot_group, slot_date)
-        payment_date.setflags(write=False)
-    if key_of_group is not None:
-        key_of_group.setflags(write=False)
-    counter.hit(ENCODED_COMPONENTS, int(leg.contract.size))
-    counter.hit(ENCODED_GROUPS, int(group_contract.size))
-    counter.hit(ENCODED_OBSERVATIONS, int(observed.component.size))
-    counter.hit(ENCODED_SLOTS, int(slot_group.size))
-    reserved = reserves(terms, counter)
-    arrays = (
-        quote_quantity,
-        coefficient,
-        offset,
-        group_contract,
-        slot_group,
-        slot_date,
-        slot_reference,
-        slot_exposure,
-        slot_of_observation,
-        references,
-        reference_of_slot,
-        *days,
-        *periods,
-    )
-    for array in (*arrays, group_of_component, offset_of_group):
-        array.setflags(write=False)
-    return Encoded(
-        terms,
-        (EncodedLeg(terms, leg, observed, *arrays, curve_axes),),
-        group_of_component,
-        offset_of_group,
-        payment_date,
-        reserved,
-        payment_axes,
-        keys,
-        key_of_group,
-    )
+    return slot_exposure
 
 
 def group_words(
@@ -508,7 +650,6 @@ def group_words(
 
 def _the_groups(
     terms: ResolvedTrades,
-    leg: LegTerms,
 ) -> tuple[
     NDArray[np.intp],
     NDArray[np.datetime64] | None,
@@ -520,30 +661,25 @@ def _the_groups(
     day among the components, in the schedule's order and by day within a contract, and since
     named-curves-slice-3.md the distinct triples with the row's key where the batch has keys, by
     key within a day, the keys in the order the rows first name them; under a physical settlement,
-    which pays on no day, the distinct contracts. Each group's contract, its payment day or None,
+    which pays on no day, the distinct contracts. Each group's first component, its head, whose
+    contract row on each leg's schedule is the group's contract there, its payment day or None,
     each component's group, the batch's distinct keys and each group's key, the keys empty and
-    the key of each group None where the batch has none. The contracts are the leg's rows of
-    its schedule, the first leg's naming the groups."""
-    contract = leg.contract
+    the key of each group None where the batch has none. The first leg's contract rows name the
+    groups; a second leg's components stand in the same months, so its groups are the same."""
+    contract = terms.legs[0].contract
     if terms.payment is None:
-        group_contract, group_of_component = np.unique(contract, return_inverse=True)
-        return group_contract, None, group_of_component, (), None
+        _, heads, group_of_component = np.unique(contract, return_index=True, return_inverse=True)
+        return heads, None, group_of_component, (), None
     day = terms.payment.date.astype(np.int64)
     if terms.discount_curve_key is None:
         group_of_component, heads = _distinct(contract, day)
-        return contract[heads], terms.payment.date[heads], group_of_component, (), None
+        return heads, terms.payment.date[heads], group_of_component, (), None
     keys = tuple(dict.fromkeys(terms.discount_curve_key))  # distinct, by first appearance
     place = {key: i for i, key in enumerate(keys)}
     key_of_occurrence = np.array([place[key] for key in terms.discount_curve_key], dtype=np.intp)
     key_of_component = key_of_occurrence[terms.occurrence]
     group_of_component, heads = _distinct(contract, day, key_of_component)
-    return (
-        contract[heads],
-        terms.payment.date[heads],
-        group_of_component,
-        keys,
-        key_of_component[heads],
-    )
+    return heads, terms.payment.date[heads], group_of_component, keys, key_of_component[heads]
 
 
 def _distinct(*keys: NDArray[Any]) -> tuple[NDArray[np.intp], NDArray[np.intp]]:

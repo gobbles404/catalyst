@@ -252,8 +252,10 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
+        "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
-        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
+        "_the_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 4,
@@ -329,6 +331,12 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
     curves = set_on(as_of)  # made before the ledger looks, as a collection is on a sheet
     assert call_profile(lambda: tick(prep, quoted, curves)) == {
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_summed": 3,  # the legs' amounts, NPVs and DV01s by group, one leg's by reference
+        "_the_lots_arrays": 1,  # the leg's discounted lots and their sums
+        "_the_lots_checked": 1,
+        "_discounted_leg": 1,  # the leg's results over them
         "_the_curves": 1,  # the rules and the keys bound, before any quote is read
         "curve_starts_on": 1,  # the start rule, shared with the cashflows since #200
         "DiscountCurve.start_date": 2,  # the rule's look and the factors' positions
@@ -619,6 +627,12 @@ def test_a_bilateral_tick_on_several_curves_does_no_work_per_curve_over_the_slot
     }
     assert call_profile(lambda: tick(prep, quoted, collection)) == {
         "trade_results": 1,
+        "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
+        "_the_contributions": 1,  # the leg's live contributions off its market
+        "_summed": 3,  # the legs' amounts, NPVs and DV01s by group, one leg's by reference
+        "_the_lots_arrays": 1,  # the leg's discounted lots and their sums
+        "_the_lots_checked": 1,
+        "_discounted_leg": 1,  # the leg's results over them
         "_the_curves": 1,
         "curve_starts_on": curves,  # the per-curve rules, once per curve selected
         "DiscountCurve.start_date": 2 * curves,

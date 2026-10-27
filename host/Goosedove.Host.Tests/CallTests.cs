@@ -262,7 +262,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "CountFieldRows", new object[] { "fixed_float", Row("quantity", "fixed_price"), new object[,] { { 1.0, 3.1 }, { 2.0, 3.2 }, { 3.0, 3.3 } } }, 3.0 };
             yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values" };
-            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_day, payment_holiday_calendar, marketing_reserve" };
+            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields cell (1, 2) is text 'quantity', already given at cell (1, 1)" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "fixed_price"), Row("ten", "eleven") }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("trade_date"), 46164.5 }, "#ERROR EchoFieldRow: values cell (1, 1) is number 46164.5, expected date" };
@@ -638,7 +638,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("Firm A", booked[2, 5]);
             Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk", Seam.Call("_ReportRisk", results, "delta", "day"));
             var fixedFloat = Seam.Call("_CreateTradeTemplate", "fixed_float", Row("route"), Row("cleared"));
-            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_day, payment_holiday_calendar, marketing_reserve", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
+            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
             Assert.Equal("#ERROR _CreateCashflows: ValueError: template is of instrument 'fixed_float', expected cashflow, the one instrument whose cashflows are built", Seam.Call("_CreateCashflows", Row("trade_date"), Row(46391.0), fixedFloat));
         }
 
@@ -679,15 +679,17 @@ namespace Goosedove.Host.Tests
             Assert.Equal(8, ((object[,])Seam.Call("_ShowInstrument", "cashflow")).GetLength(1));
             var shown = (object[,])Seam.Call("_ShowInstrument", "fixed_float");
             Assert.Equal(10, shown.GetLength(0));
-            Assert.Equal(20, shown.GetLength(1));
+            Assert.Equal(22, shown.GetLength(1));  // twenty-one fields since two-index-fixed-float.md
             Assert.Equal("field", shown[0, 0]);
             Assert.Equal("trade_id", shown[0, 1]);
             Assert.Equal("start_date", shown[0, 4]);
             Assert.Equal("counterparty", shown[0, 10]);
             Assert.Equal("discount_curve_key", shown[0, 11]);  // after the counterparty, since named-curves-slice-3.md
             Assert.Equal("route = bilateral", shown[3, 11]);
-            Assert.Equal("payment_holiday_calendar", shown[0, 18]);
-            Assert.Equal("marketing_reserve", shown[0, 19]);
+            Assert.Equal("second_fixed_price", shown[0, 17]);
+            Assert.Equal("two indexes", shown[3, 17]);
+            Assert.Equal("payment_holiday_calendar", shown[0, 20]);
+            Assert.Equal("marketing_reserve", shown[0, 21]);
             Assert.Equal("required", shown[2, 0]);
             Assert.Equal(false, shown[2, 1]);
             Assert.Equal(true, shown[2, 2]);
@@ -696,8 +698,8 @@ namespace Goosedove.Host.Tests
             Assert.Equal("no contract_code on the row, or with start_date", shown[3, 5]);
             Assert.Equal("route = cleared", shown[3, 9]);
             Assert.Equal("route = bilateral", shown[3, 10]);
-            Assert.Equal("a finite amount of zero or more", shown[5, 19]);
-            Assert.Equal("holiday calendar handle", shown[4, 18]);
+            Assert.Equal("a finite amount of zero or more", shown[5, 21]);
+            Assert.Equal("holiday calendar handle", shown[4, 20]);
             Assert.Equal("the index's specification names", shown[5, 14]);
             Assert.Equal("month, calday", shown[5, 15]);
             Assert.Equal("quote_allowed", shown[7, 0]);
@@ -706,9 +708,9 @@ namespace Goosedove.Host.Tests
             Assert.Equal(false, shown[7, 1]);  // trade_id: a booking fact no quote template holds
             Assert.Equal(true, shown[7, 6]);  // schedule_method: held and always required
             Assert.Equal(true, shown[8, 6]);
-            Assert.Equal(true, shown[7, 17]);  // payment_day: held, required with a financial settlement
-            Assert.Equal(false, shown[8, 17]);
-            Assert.Equal("settlement_method = financial", shown[9, 17]);
+            Assert.Equal(true, shown[7, 19]);  // payment_day: held, required with a financial settlement
+            Assert.Equal(false, shown[8, 19]);
+            Assert.Equal("settlement_method = financial", shown[9, 19]);
             Assert.Equal("route = bilateral", shown[9, 11]);
             Assert.Equal("none", shown[9, 1]);
         }

@@ -97,7 +97,7 @@ def _CreateTrades(
     """Creates a batch of trades on one index from a template's shared fields and a ticket's rows,
     each contract code resolved against the index's schedule, and shows its handle, the text other
     formulas take as the trades."""
-    return trades(index, trade_rows, template, UNITS, WorkCounter())
+    return trades((index,), trade_rows, template, UNITS, WorkCounter())
 
 
 @excel_function

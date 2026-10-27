@@ -168,7 +168,7 @@ def created(
     template: Mapping[str, object] = NG_TEMPLATE,
 ) -> tuple[Trades, WorkCounter]:
     counter = WorkCounter()
-    return trades(ix, a_ticket(ticket), a_template(template), UNITS, counter), counter
+    return trades((ix,), a_ticket(ticket), a_template(template), UNITS, counter), counter
 
 
 def refused(
@@ -1406,10 +1406,10 @@ def test_the_quantity_unit_names_a_specification_row_and_the_quantity_counts_it(
 def test_a_template_holds_the_name_and_the_index_asked_at_creation_owns_it() -> None:
     template = a_template({**NG_TEMPLATE, "quantity_unit": "ICE PHH"})
     assert template.defaults["quantity_unit"] == "ICE PHH"
-    with_both = trades(TWO_LOTS, a_ticket(one_row()), template, UNITS, WorkCounter())
+    with_both = trades((TWO_LOTS,), a_ticket(one_row()), template, UNITS, WorkCounter())
     assert with_both.resolved.legs[0].specification.tolist() == [1]
     with pytest.raises(ValueError) as refused:
-        trades(NG, a_ticket(one_row()), template, UNITS, WorkCounter())
+        trades((NG,), a_ticket(one_row()), template, UNITS, WorkCounter())
     assert str(refused.value) == (
         "quantity_unit is 'ICE PHH', expected one of the index's specifications: 'NYMEX NG'"
     )
@@ -1922,21 +1922,23 @@ def test_the_conditions_are_the_definitions_own() -> None:
         "start_date": "no contract_code on the row, or with end_date",
         "end_date": "no contract_code on the row, or with start_date",
     }
+    # Since two-index-fixed-float.md the second leg's two fields are conditional on the index
+    # count, which the creator alone knows: their rule is the resolution's, not CONDITIONS'.
     assert conditional == {
         name: f"{fact} = {value.value}" for name, (fact, value) in CONDITIONS.items()
-    }
+    } | {"second_fixed_price": "two indexes", "second_schedule_method": "two indexes"}
 
 
 def test_the_ticket_and_the_template_are_of_one_instrument_the_future() -> None:
     other = Instrument("swap", "Another instrument.", FIXED_FLOAT.fields)
     with pytest.raises(ValueError) as refusal:
-        trades(NG, a_ticket(NG_TICKET, other), a_template(NG_TEMPLATE), UNITS, WorkCounter())
+        trades((NG,), a_ticket(NG_TICKET, other), a_template(NG_TEMPLATE), UNITS, WorkCounter())
     assert (
         str(refusal.value)
         == "ticket is of instrument 'swap', expected the template's, 'fixed_float'"
     )
     with pytest.raises(ValueError) as refusal:
-        resolved(NG, a_ticket(NG_TICKET), a_template({"route": "cleared"}, other), WorkCounter())
+        resolved((NG,), a_ticket(NG_TICKET), a_template({"route": "cleared"}, other), WorkCounter())
     assert str(refusal.value) == (
         "template is of instrument 'swap', expected fixed_float, the one instrument whose trades "
         "are built"

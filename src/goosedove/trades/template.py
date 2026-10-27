@@ -226,6 +226,7 @@ def months_of(where: str, text: str) -> tuple[int, int]:
 READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
     {
         "schedule_method": schedule_method_of,
+        "second_schedule_method": schedule_method_of,  # two-index-fixed-float.md
         "route": route_of,
         "settlement_method": settlement_of,
         "quantity_per": quantity_per_of,
@@ -239,6 +240,7 @@ NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float | int]]] = Mappi
         "trade_id": trade_id_of,
         "quantity": quantity_of,
         "fixed_price": price_of,
+        "second_fixed_price": price_of,  # two-index-fixed-float.md
         "marketing_reserve": marketing_reserve_of,
         "amount": amount_of,  # the cashflow instrument's, since #200
     }

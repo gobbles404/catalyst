@@ -1,5 +1,6 @@
 """The two children of _CreateTrades and the batch they make. Resolution completes a template's
-shared values and a ticket's rows into the resolved terms of one batch on one index: every field
+shared values and a ticket's rows into the resolved terms of one batch on one index or, since
+two-index-fixed-float.md, on two, the second leg's two fields beside the first's: every field
 from exactly one of the two, the required fields present and the conditional ones present when
 their condition holds, one route and one settlement for the batch and a quantity unit, a method
 and a basis per row, in that order, each distinct text of the three read once, the quantity unit
@@ -15,7 +16,7 @@ resolved_trades checks the first profile's rules and encoded turns the terms and
 into arrays, and the batch holds both. Nothing here reads a history, a price or a valuation date.
 docs/library/trades/create-trades.md is the page."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import partial
 from typing import Any, Final, assert_never, cast
@@ -49,6 +50,7 @@ from goosedove.trades.template import (
 )
 from goosedove.trades.terms import (
     BASES,
+    LegInputs,
     PaymentTerms,
     ResolvedTrades,
     Route,
@@ -73,6 +75,8 @@ SCHEDULE_CODES_READ = "schedule_codes_read"  # codes of the index's schedule rea
 # books by its dates has its code, if any, read for nothing and counted here for nothing.
 TICKET_CODES_READ = "ticket_codes_read"
 PERIOD_FIELDS: Final = ("contract_code", "start_date", "end_date")
+# The second leg's two fields, since two-index-fixed-float.md, present exactly with two indexes.
+SECOND_LEG_FIELDS: Final = ("second_fixed_price", "second_schedule_method")
 
 # The conditions of the fixed_float's required_when fields, as library rules: the field, the batch
 # fact it depends on and the value that fact must have, rendered as the definition shows them,
@@ -106,27 +110,28 @@ class Trades:
 
 
 def trades(
-    index: Index,
+    indexes: Sequence[Index],
     ticket: FieldValues,
     template: TradeTemplate,
     units: UnitConversions,
     counter: WorkCounter,
 ) -> Trades:
-    """The one way to make Trades: resolution, which makes the schedule method's observations on
-    the way to the payment days, then encoding over the terms and those observations, the unit
-    tables and the counter passed in and never looked up; a failure in any publishes nothing."""
-    terms, observations, entered = resolved(index, ticket, template, counter)
-    return Trades(terms, encoded(terms, (observations,), units, counter), *entered)
+    """The one way to make Trades: resolution, which makes each leg's schedule methods'
+    observations on the way to the payment days, one index or since two-index-fixed-float.md
+    two, then encoding over the terms and those observations, the unit tables and the counter
+    passed in and never looked up; a failure in any publishes nothing."""
+    terms, observations, entered = resolved(indexes, ticket, template, counter)
+    return Trades(terms, encoded(terms, observations, units, counter), *entered)
 
 
 def resolved(
-    index: Index, ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
-) -> tuple[ResolvedTrades, Observations, tuple[NDArray[np.bool_], tuple[str, ...]]]:
+    indexes: Sequence[Index], ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
+) -> tuple[ResolvedTrades, tuple[Observations, ...], tuple[NDArray[np.bool_], tuple[str, ...]]]:
     """The resolution child: the terms of a batch from a template and a ticket, checked in this
     order, the first failure being the message, and then the kernel's own rules; with them the
-    observations the schedule method gave the components, made once here and handed on to the
-    encoding, since the payment days count from them, and what the rows entered for their codes,
-    the rows that entered one and their texts.
+    observations the schedule method gave the components, one Observations per leg, made once
+    here and handed on to the encoding, since the payment days count from them, and what the
+    rows entered for their codes, the rows that entered one and their texts.
 
     The ticket is bound against the template's instrument, the fixed_float, the one whose trades are
     built. No field is supplied by both, even to the same value. Every required field is present
@@ -191,19 +196,40 @@ def resolved(
     index, counted on its occurrence's payment calendar with Monday to Friday eligible, that day
     itself rolled back first so that a day the payment calendar closes is not counted; the rule
     of the four methods.
+    Two indexes, since two-index-fixed-float.md, make two legs of the same rows. The indexes are
+    one or two, else refused by their number, before anything else. second_fixed_price and
+    second_schedule_method are present exactly with two, checked here where the index count is
+    known and by no template, each refused by its name, missing with two and present with one.
+    The second leg follows the first's rules on its own index, the first leg's steps as they
+    were: the quantity unit names one of its specifications, exactly; its methods are read
+    from the list; every code of its schedule is read for its month; each row's months are
+    resolved against its schedule, a month a schedule lacks refused by the index and the month,
+    each leg's refusals naming its index; its observations are its own methods' over the same
+    days; and the payment anchor is the later of the two legs' last observation days, so one
+    rule finds one day both legs pay on, a date standing after both. The pair's rules, two
+    distinct indexes of distinct names, one quote currency, quote quantity and settlement
+    currency unit, and a financial settlement, are the kernel's.
+
     Then the kernel's rules, through resolved_trades: whole quantities, zero included, and finite
     prices, each named by its trade, a financial settlement with penultimate, last3day and asian,
     the first row of them named under a physical one, and each component's quantity formed once
     by the basis, the entered quantity times its covered days under calday.
 
     Work: one occurrence per ticket row, one component per contract month, one schedule code
-    per row of the schedule and since #172 one ticket code per distinct code of the rows that book
-    by code, none for a row that books by its dates, reported to the counter.
+    per row of each leg's schedule and since #172 one ticket code per distinct code of the rows
+    that book by code, none for a row that books by its dates, reported to the counter.
     """
+    if not 1 <= len(indexes) <= 2:
+        raise ValueError(
+            f"indexes are {len(indexes)}, expected one or two; a batch is on one index or, since "
+            "two-index-fixed-float.md, on a pair"
+        )
+    index = indexes[0]
+    paired = len(indexes) == 2
     fields = _fields(template, ticket)
     _the_required(fields)
     specifications, by_unit = _each_distinct(
-        fields, "quantity_unit", partial(_the_specification, index)
+        fields, "quantity_unit", partial(_the_specification, index, owner=_owner(index, paired))
     )
     methods, by_method = _each_distinct(fields, "schedule_method", schedule_method_of)
     route = route_of(fields.where("route", 0), fields.one_text("route"))
@@ -212,6 +238,7 @@ def resolved(
     )
     bases, by_basis = _each_distinct(fields, "quantity_per", quantity_per_of)
     _the_conditions(fields, route, settlement)
+    _the_leg_fields(fields, paired)
     specification = np.array(specifications, dtype=np.intp)[by_unit]
     schedule_method = np.array([METHODS.index(m) for m in methods], dtype=np.intp)[by_method]
     quantity_per = np.array([BASES.index(b) for b in bases], dtype=np.intp)[by_basis]
@@ -219,10 +246,16 @@ def resolved(
     reporting_lot_of(index)
     months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
-    periods = _the_periods(fields, months)
+    schedules = [(months, _schedule_of(index, paired))]
+    second = None
+    if paired:
+        second = _the_second_schedule(indexes[1], counter)
+        schedules.append((second[1], _schedule_of(indexes[1], True)))
+    periods = _the_periods(fields, tuple(schedules))
     counter.hit(TICKET_CODES_READ, periods.codes_read)
-    occurrence, contract = periods.occurrence, periods.contract
+    occurrence = periods.occurrence
     start, end = periods.start, periods.end
+    contract = periods.contracts[0]
     trade_ids = fields.ids("trade_id")
     observations = observed(
         schedule_method[occurrence],
@@ -234,15 +267,16 @@ def resolved(
     )
     # One anchor for every index since iferc-publication-payment-anchor.md, each component's
     # last observation day, the expiry under lastday on a futures index and the publication day
-    # on an IFERC one, handed over as a temporary, not held across the kernel's copies below.
-    payment = _the_payment_terms(
-        settlement,
-        fields,
-        last_days(observations, occurrence.size),
-        occurrence,
-        trade_ids,
-        counter,
-    )
+    # on an IFERC one, handed over as a temporary, not held across the kernel's copies below;
+    # with two legs the later of the two, the one day both pay from.
+    legs: tuple[Observations, ...] = (observations,)
+    second_leg = None
+    if second is not None:
+        second_leg, second_observations = _the_second_leg(
+            second[0], fields, periods.contracts[1], occurrence, start, end, trade_ids, second[1]
+        )
+        legs = (observations, second_observations)
+    payment = _the_payments(settlement, fields, legs, occurrence, trade_ids, counter)
     counter.hit(RESOLVED_OCCURRENCES, fields.rows)
     counter.hit(RESOLVED_COMPONENTS, int(occurrence.size))
     terms = resolved_trades(
@@ -268,8 +302,9 @@ def resolved(
         marketing_reserve=fields.amounts("marketing_reserve"),
         discount_curve_key=fields.keys("discount_curve_key"),
         schedule_month=months,
+        second_leg=second_leg,
     )
-    return terms, observations, periods.entered
+    return terms, legs, periods.entered
 
 
 # --- the fields of the batch, each from the template or the ticket --------------------------
@@ -485,17 +520,18 @@ def _the_conditions(fields: _Fields, route: Route, settlement: Settlement) -> No
             raise ValueError(f"{name} is {fields.shown(name)}, expected none unless {condition}")
 
 
-def _the_specification(index: Index, where: str, name: str) -> int:
+def _the_specification(
+    index: Index, where: str, name: str, owner: str = "the index's specifications"
+) -> int:
     """The row of the index's specifications the quantity unit names, exactly: no trimming, no
     case folding, no alias and no first row taken for want of a match, the index's names being
     the choices, so a unit the tables know but the index does not define is refused like any
-    other text."""
+    other text; the specifications named as the owner words them, by the index's name with
+    two indexes."""
     names = index.specifications.names
     if name not in names:
         choices = ", ".join(repr(each) for each in names)
-        raise ValueError(
-            f"{where} is {name!r}, expected one of the index's specifications: {choices}"
-        )
+        raise ValueError(f"{where} is {name!r}, expected one of {owner}: {choices}")
     return names.index(name)
 
 
@@ -534,20 +570,20 @@ def _each_distinct[T](
 
 @dataclass(frozen=True, slots=True)
 class _Periods:
-    """What the rows' periods resolved to: per component its occurrence, its schedule row and the
-    first and the last day it covers, aligned; which rows entered a code, a read-only mask the
-    batch owns, with the texts they entered in row order; and how many distinct codes were read
-    for their months."""
+    """What the rows' periods resolved to: per component its occurrence, its schedule row on each
+    leg's schedule, one array per leg in leg order, and the first and the last day it covers,
+    aligned; which rows entered a code, a read-only mask the batch owns, with the texts they
+    entered in row order; and how many distinct codes were read for their months."""
 
     occurrence: NDArray[np.intp]
-    contract: NDArray[np.intp]
+    contracts: tuple[NDArray[np.intp], ...]
     start: NDArray[np.datetime64]
     end: NDArray[np.datetime64]
     entered: tuple[NDArray[np.bool_], tuple[str, ...]]
     codes_read: int
 
 
-def _the_periods(fields: _Fields, months: NDArray[np.int64]) -> _Periods:
+def _the_periods(fields: _Fields, schedules: tuple[tuple[NDArray[np.int64], str], ...]) -> _Periods:
     """Each occurrence's period chosen row by row and resolved to its components, one per
     calendar month it covers, in one pass over the components, since #172. A row with both dates
     books the days between them, a code beside them kept as entered text and never read; a row
@@ -558,8 +594,10 @@ def _the_periods(fields: _Fields, months: NDArray[np.int64]) -> _Periods:
     first rows come, so the first row from the top that breaks the grammar is the one named;
     then each row's first month and the month after its last, from the code's span or the
     dates' months, the components in row order whichever form each row took, each month looked
-    up in the schedule's months, a month without a contract refused by the row and the month,
-    and each component's days its month's, a dated row's first and last clipped to its dates.
+    up in each leg's schedule, the schedules' months given with the words a refusal names each
+    schedule by, a month without a contract refused by the row and the month, the first leg's
+    schedule first, and each component's days its month's, a dated row's first and last clipped
+    to its dates.
     The month bounds are one conversion each over the components, the clipping one maximum and
     one minimum over the dated components, and the days are the kernel's to count."""
     rows = fields.rows
@@ -627,7 +665,9 @@ def _the_periods(fields: _Fields, months: NDArray[np.int64]) -> _Periods:
             )
         return f"{fields.where('contract_code', i)} is {codes[int(rank_code[i])]!r}"
 
-    contract = schedule_rows(months, month, occurrence, period_of)
+    contracts = tuple(
+        [schedule_rows(months, month, occurrence, period_of, words) for months, words in schedules]
+    )
     start, end = month_bounds(month)
     on = dated[occurrence]  # the dated rows' components, clipped to their rows' dates
     if on.any():
@@ -636,7 +676,100 @@ def _the_periods(fields: _Fields, months: NDArray[np.int64]) -> _Periods:
         end[on] = np.minimum(end[on], dated_ends[k])
     entered = np.array(code_on, dtype=bool)  # the batch's own copy of which rows entered a code
     entered.setflags(write=False)
-    return _Periods(occurrence, contract, start, end, (entered, codes), len(spans))
+    return _Periods(occurrence, contracts, start, end, (entered, codes), len(spans))
+
+
+def _owner(index: Index, paired: bool) -> str:
+    """The words a refusal names an index's specifications by: the index's, or with two indexes
+    the index's by name, since a batch on a pair must say whose."""
+    return f"the specifications of index {index.name!r}" if paired else "the index's specifications"
+
+
+def _schedule_of(index: Index, paired: bool) -> str:
+    """The words a refusal names an index's schedule by, as _owner names its specifications."""
+    return f"the schedule of index {index.name!r}" if paired else "the index's schedule"
+
+
+def _the_leg_fields(fields: _Fields, paired: bool) -> None:
+    """The second leg's two fields present exactly with two indexes, since
+    two-index-fixed-float.md, the count the creator alone knows: each refused by its name,
+    missing with two and present with one."""
+    for name in SECOND_LEG_FIELDS:
+        if paired and not fields.has(name):
+            raise ValueError(f"{name} is missing, expected it with two indexes")
+        if not paired and fields.has(name):
+            raise ValueError(f"{name} is {fields.shown(name)}, expected none unless two indexes")
+
+
+def _the_second_schedule(index: Index, counter: WorkCounter) -> tuple[Index, NDArray[np.int64]]:
+    """The second index and its schedule's months, since two-index-fixed-float.md, read before
+    the rows' periods are resolved against it: a futures or an IFERC index made with a reporting
+    lot, every code of its schedule read for its month, reported to the counter."""
+    schedule = trade_schedule_of(index)
+    reporting_lot_of(index)
+    months = schedule_months(schedule)
+    counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
+    return index, months
+
+
+def _the_second_leg(
+    index: Index,
+    fields: _Fields,
+    contract: NDArray[np.intp],
+    occurrence: NDArray[np.intp],
+    start: NDArray[np.datetime64],
+    end: NDArray[np.datetime64],
+    trade_ids: NDArray[np.int64] | None,
+    months: NDArray[np.int64],
+) -> tuple[LegInputs, Observations]:
+    """The second leg's inputs and observations, since two-index-fixed-float.md, over the rows
+    the first leg resolved and the contract rows the periods resolved on this index's schedule:
+    the quantity unit resolved on this index, each distinct text once; second_schedule_method
+    read from the list, each distinct text once; the fixed prices second_fixed_price's per
+    occurrence, on every component of the row; and the observations this leg's methods give the
+    components over the same days, named as the first leg's are."""
+    specifications, by_unit = _each_distinct(
+        fields, "quantity_unit", partial(_the_specification, index, owner=_owner(index, True))
+    )
+    methods, by_method = _each_distinct(fields, "second_schedule_method", schedule_method_of)
+    schedule_method = np.array([METHODS.index(m) for m in methods], dtype=np.intp)[by_method]
+    observations = observed(
+        schedule_method[occurrence],
+        index,
+        contract,
+        start,
+        end,
+        lambda k: named_trade(trade_ids, int(occurrence[k])),
+        "second_schedule_method",
+    )
+    leg = LegInputs(
+        index,
+        np.array(specifications, dtype=np.intp)[by_unit],
+        schedule_method,
+        contract,
+        fields.numbers("second_fixed_price")[occurrence],
+        months,
+    )
+    return leg, observations
+
+
+def _the_payments(
+    settlement: Settlement,
+    fields: _Fields,
+    legs: tuple[Observations, ...],
+    occurrence: NDArray[np.intp],
+    trade_ids: NDArray[np.int64] | None,
+    counter: WorkCounter,
+) -> PaymentTerms | None:
+    """The payment terms over the legs' anchors: one anchor for every index since
+    iferc-publication-payment-anchor.md, each component's last observation day, the expiry under
+    lastday on a futures index and the publication day on an IFERC one, and with two legs the
+    later of the two since two-index-fixed-float.md, the one day both legs pay from; handed over
+    as a temporary, not held across the kernel's copies."""
+    anchors = last_days(legs[0], occurrence.size)
+    for observations in legs[1:]:
+        anchors = np.maximum(anchors, last_days(observations, occurrence.size))
+    return _the_payment_terms(settlement, fields, anchors, occurrence, trade_ids, counter)
 
 
 def schedule_rows(
@@ -644,10 +777,12 @@ def schedule_rows(
     month: NDArray[np.int64],
     occurrence: NDArray[np.intp],
     period_of: Callable[[int], str],
+    schedule: str = "the index's schedule",
 ) -> NDArray[np.intp]:
     """Each component's month resolved to its schedule row, one lookup over the components; a
     month the schedule lacks is refused by the row that covers it and the month, in the words of
-    the period form the row booked by."""
+    the period form the row booked by, the schedule named as given, by its index's name with two
+    indexes since two-index-fixed-float.md."""
     low, high = int(months.min()), int(months.max())
     row_of = np.full(high - low + 1, -1, dtype=np.intp)
     row_of[months - low] = np.arange(months.size, dtype=np.intp)
@@ -657,8 +792,8 @@ def schedule_rows(
     if missing.any():
         k = int(missing.argmax())
         raise ValueError(
-            f"{period_of(int(occurrence[k]))}, expected months the index's schedule has a "
-            f"contract for; it has none for {month_label(month[k])}"
+            f"{period_of(int(occurrence[k]))}, expected months {schedule} has a contract for; "
+            f"it has none for {month_label(month[k])}"
         )
     return contract.astype(np.intp)
 

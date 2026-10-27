@@ -22,7 +22,7 @@ from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market_history import MarketHistory
 from goosedove.trades.display_axes import EarlyRisk, PeriodAxis, early_risk, period_axis
-from goosedove.trades.encoding import Encoded, EncodedLeg, group_words
+from goosedove.trades.encoding import Encoded, EncodedLeg, PaymentAxes, group_words
 from goosedove.trades.terms import Route
 
 PREPARED_SLOTS = "prepared_slots"  # slots placed on the calendar and told live from fixed
@@ -295,15 +295,26 @@ def _the_sensitivity(
     return price_sensitivity
 
 
-def _the_unsettled_totals(
-    encoded: Encoded, set_amount: NDArray[np.float64], unsettled: NDArray[np.bool_], currency: str
-) -> tuple[float, float]:
-    """The two totals a tick adds to the live amount for the mark, kept for both routes: the
-    unsettled groups' fixed legs and their set amounts, each sum finite since #190, the arithmetic
-    running with numpy's flags down, else refused for the batch by its total."""
+def _the_totals(
+    encoded: Encoded,
+    set_amount: NDArray[np.float64],
+    is_settled: NDArray[np.bool_],
+    unsettled: NDArray[np.bool_],
+    currency: str,
+) -> tuple[float, float, float]:
+    """The cash, the settled groups' fixed legs and set amounts, and the two totals a tick adds
+    to the live amount for the mark, kept for both routes: the unsettled groups' fixed legs and
+    their set amounts, each sum finite since #190, the arithmetic running with numpy's flags
+    down, else refused for the batch by its total, the cash first."""
     with np.errstate(over="ignore", invalid="ignore"):
+        cash = float((encoded.offset_of_group + set_amount)[is_settled].sum())
         offset_unsettled = float(encoded.offset_of_group[unsettled].sum())
         set_unsettled = float(set_amount[unsettled].sum())
+    if not np.isfinite(cash):
+        raise ValueError(
+            f"the batch has {cash!r} of cash in all, expected a finite amount of {currency}; the "
+            "settled groups' offsets and set amounts sum past the largest number"
+        )
     for label, total, parts in (
         ("unsettled fixed leg", offset_unsettled, "fixed legs"),
         ("unsettled set amount", set_unsettled, "set amounts"),
@@ -314,7 +325,7 @@ def _the_unsettled_totals(
                 f"{currency}; the unsettled groups' {parts}, each finite, sum past the largest "
                 "number"
             )
-    return offset_unsettled, set_unsettled
+    return cash, offset_unsettled, set_unsettled
 
 
 def prepared_trades(
@@ -323,9 +334,15 @@ def prepared_trades(
     """The one way to make a PreparedTrades: four rules, checked once, in this order, the first
     failure being the message; then the arrays, one pass over the slots and one read per fixed slot.
 
-    The histories are one per leg of the trades, in leg order, since two-index-fixed-float.md,
-    else refused; each is over its leg's index, the one object the leg holds, as the history
-    itself requires of its fixings; another index of the same name is another index. On a
+    The histories are one per leg of the trades, since two-index-fixed-float.md, matched to the
+    legs by the exact index object whatever their order, else refused: one history more or
+    fewer by the count, a history over none of the legs' indexes or a second over one of them
+    by its position, and the two valued on one day, the second's valuation day held to the
+    first's; each is over its leg's index, the one object the leg holds, as the history
+    itself requires of its fixings; another index of the same name is another index. A group
+    is settled when every slot of every leg has fixed and its payment day has come, so a
+    common payment is never cash while one leg's observation is live; the trade's set amount
+    of a group is the legs' summed, each finite and the sum finite. On a
     futures index each slot's day is a day of the calendar, which runs from the day after the
     schedule's first expiry to its last: the first contract only bounds the calendar, so a slot
     on or before its expiry is refused by name, nothing ever pricing it. On an IFERC index,
@@ -368,27 +385,28 @@ def prepared_trades(
     nothing per observation, nothing per day of the calendar.
     """
     terms = encoded.terms
-    if len(histories) != len(terms.legs):
+    legs = encoded.legs
+    if len(histories) != len(legs):
         raise ValueError(
-            f"histories are {len(histories)}, expected {len(terms.legs)}, one per leg of the trades"
+            f"histories are {len(histories)}, expected {len(legs)}, one per leg of the trades"
         )
-    leg = encoded.legs[0]
-    index = leg.leg.index
-    history = histories[0]
-    calendar = history.calendar
-    if calendar.index is not index:
-        raise ValueError(
-            f"history is over another index, {calendar.index.name!r}, "
-            f"expected the trades', {index.name!r}"
-        )
-    codes = leg.leg.schedule.codes
-    slot_rows = _the_slot_rows(leg, calendar)
-    is_fixed = calendar.is_fixed[slot_rows]
-    as_of = calendar.valuation_date.as_of
+    matched = _the_histories(legs, histories)
+    first_calendar = matched[0].calendar
+    as_of = first_calendar.valuation_date.as_of
+    groups = encoded.offset_of_group.size
+    # Each leg's slots on its own calendar, told live from fixed, before the groups are settled,
+    # since a group is settled when every slot of every leg has fixed.
+    placed = [
+        _the_slot_rows(leg, history.calendar) for leg, history in zip(legs, matched, strict=True)
+    ]
+    fixed = [history.calendar.is_fixed[rows] for rows, history in zip(placed, matched, strict=True)]
     if encoded.payment_date is None:
-        # A physical batch is a futures batch: the kernel refuses a physical IFERC one.
+        # A physical batch is a futures batch on one leg: the kernel refuses a physical IFERC one
+        # and a physical pair.
+        leg = legs[0]
+        codes = leg.leg.schedule.codes
         expiries = cast(FuturesSchedule, leg.leg.schedule).future_expiry[leg.group_contract]
-        expired = calendar.is_fixed[(expiries - calendar.dates[0]).astype(np.intp)]
+        expired = first_calendar.is_fixed[(expiries - first_calendar.dates[0]).astype(np.intp)]
         if expired.any():
             g = int(expired.argmax())
             k = int((encoded.group_of_component == g).argmax())  # its first component
@@ -398,10 +416,110 @@ def prepared_trades(
                 f"before valuation date {as_of}; "
                 "a physical fixed_float after its expiry is not supported"
             )
-        is_settled = np.zeros(leg.group_contract.size, dtype=np.bool_)
+        is_settled = np.zeros(groups, dtype=np.bool_)
     else:
-        unfixed = np.bincount(leg.slot_group, weights=~is_fixed, minlength=leg.group_contract.size)
+        unfixed = np.bincount(legs[0].slot_group, weights=~fixed[0], minlength=groups)
+        for leg, is_fixed in zip(legs[1:], fixed[1:], strict=True):
+            unfixed = unfixed + np.bincount(leg.slot_group, weights=~is_fixed, minlength=groups)
         is_settled = (unfixed == 0) & (encoded.payment_date <= as_of)
+    paid = encoded.payment_axes
+    prepared = tuple(
+        [
+            _the_prepared_leg(encoded, leg, history, rows, is_fixed, as_of, paid, counter)
+            for leg, history, rows, is_fixed in zip(legs, matched, placed, fixed, strict=True)
+        ]
+    )
+    currency = legs[0].leg.index.conventions.currency_unit
+    # The trade's set amounts: the one leg's own array, by reference, or the legs' summed.
+    set_amount = prepared[0].set_amount
+    if len(prepared) > 1:
+        set_amount = _the_summed_set_amounts(encoded, prepared, currency)
+    unsettled = ~is_settled
+    cash, offset_unsettled, set_unsettled = _the_totals(
+        encoded, set_amount, is_settled, unsettled, currency
+    )
+    # A cleared batch discounts nothing and runs nothing more here; its ledgers stand.
+    unpaid_payments = (
+        _unpaid_payments(encoded, unsettled, as_of, counter)
+        if terms.route is Route.BILATERAL
+        else None
+    )
+    is_settled.setflags(write=False)
+    return PreparedTrades(
+        encoded,
+        prepared,
+        set_amount,
+        is_settled,
+        offset_unsettled,
+        set_unsettled,
+        cash,
+        unpaid_payments,
+    )
+
+
+def _the_histories(
+    legs: tuple[EncodedLeg, ...], histories: Sequence[MarketHistory]
+) -> tuple[MarketHistory, ...]:
+    """Each leg's history among those given, in leg order: with one leg the one history, over the
+    leg's index, the one object, else refused; with two, since two-index-fixed-float.md, each
+    history matched to the leg whose index it is over whatever the order given, a history over
+    none of the legs' indexes or a second over one of them refused by its position, and the
+    two valued on one day, the second's valuation day held to the first's, since the trades are
+    prepared on one day."""
+    if len(legs) == 1:
+        (history,) = histories
+        index = legs[0].leg.index
+        if history.calendar.index is not index:
+            raise ValueError(
+                f"history is over another index, {history.calendar.index.name!r}, "
+                f"expected the trades', {index.name!r}"
+            )
+        return (history,)
+    names = " and ".join(repr(leg.leg.index.name) for leg in legs)
+    by_index: dict[int, tuple[int, MarketHistory]] = {}
+    for k, history in enumerate(histories):
+        index = history.calendar.index
+        if not any(index is leg.leg.index for leg in legs):
+            raise ValueError(
+                f"history {k + 1} is over another index, {index.name!r}, expected the trades', "
+                f"{names}"
+            )
+        seen = by_index.get(id(index))
+        if seen is not None:
+            raise ValueError(
+                f"history {k + 1} is over index {index.name!r} as history {seen[0] + 1} is, "
+                "expected one history per index of the trades"
+            )
+        by_index[id(index)] = (k, history)
+    matched = tuple([by_index[id(leg.leg.index)][1] for leg in legs])
+    as_of = matched[0].calendar.valuation_date.as_of
+    for leg, history in zip(legs[1:], matched[1:], strict=True):
+        day = history.calendar.valuation_date.as_of
+        if day != as_of:
+            raise ValueError(
+                f"the history of index {leg.leg.index.name!r} is valued on {day}, expected "
+                f"{as_of}, the valuation day of the history of index {legs[0].leg.index.name!r}; "
+                "the trades are prepared on one day"
+            )
+    return matched
+
+
+def _the_prepared_leg(
+    encoded: Encoded,
+    leg: EncodedLeg,
+    history: MarketHistory,
+    slot_rows: NDArray[np.intp],
+    is_fixed: NDArray[np.bool_],
+    as_of: np.datetime64,
+    paid: PaymentAxes | None,
+    counter: WorkCounter,
+) -> PreparedLeg:
+    """One leg prepared against its history over its placed slots: the fixed slots' settles read,
+    the set amounts, the live side and the risk the leg owns, every number finite or refused as
+    the builder's rules say, and the leg's display axes and early facts; the leg's slots and
+    fixings reported to the counter."""
+    index = leg.leg.index
+    codes = leg.leg.schedule.codes
     fixed_rows = slot_rows[is_fixed]
     settles = history.fixing_prices[np.searchsorted(history.fixed_rows, fixed_rows)]
     conventions = index.conventions
@@ -424,7 +542,6 @@ def prepared_trades(
         dated_live_lots = dated_live_exposure / lot.coefficient
         nominal_delta = price_sensitivity / lot.coefficient
         nominal_delta_total = float(nominal_delta.sum())
-        cash = float((encoded.offset_of_group + set_amount)[is_settled].sum())
     words = lot.words
     outrun = ~np.isfinite(dated_live_lots)
     if outrun.any():
@@ -468,18 +585,8 @@ def prepared_trades(
                 f"{label} {starts[b]} has {float(lots[b])!r} of nominal delta in all, expected a "
                 f"finite number of {words}; its exposures in lots sum past the largest number"
             )
-    if not np.isfinite(cash):
-        raise ValueError(
-            f"the batch has {cash!r} of cash in all, expected a finite amount of {currency}; the "
-            "settled groups' offsets and set amounts sum past the largest number"
-        )
-    unsettled = ~is_settled
-    offset_unsettled, set_unsettled = _the_unsettled_totals(
-        encoded, set_amount, unsettled, currency
-    )
     # Since #186 the month and year displays start at the valuation day's period: the axes made
     # once here, two searches a bucket, and the nominal lots before the start checked zero.
-    paid = encoded.payment_axes
     by_month = period_axis(as_of, leg.contract_months, None if paid is None else paid.months, "M")
     by_year = period_axis(as_of, leg.contract_years, None if paid is None else paid.years, "Y")
     early_nominal = early_risk(
@@ -497,12 +604,6 @@ def prepared_trades(
     counter.hit(DISPLAY_PERIODS, int(by_month.periods.size + by_year.periods.size))
     counter.hit(PREPARED_SLOTS, int(is_fixed.size))
     counter.hit(FIXINGS_READ, int(fixed_rows.size))
-    # A cleared batch discounts nothing and runs nothing more here; its ledgers stand.
-    unpaid_payments = (
-        _unpaid_payments(encoded, unsettled, as_of, counter)
-        if terms.route is Route.BILATERAL
-        else None
-    )
     arrays = (
         is_fixed,
         dated_live_exposure,
@@ -514,9 +615,9 @@ def prepared_trades(
         price_sensitivity,
         nominal_delta,
     )
-    for array in (*arrays, is_settled, daily_lots, monthly_lots, yearly_lots):
+    for array in (*arrays, daily_lots, monthly_lots, yearly_lots):
         array.setflags(write=False)
-    prepared_leg = PreparedLeg(
+    return PreparedLeg(
         leg,
         history,
         *arrays,
@@ -528,14 +629,31 @@ def prepared_trades(
         by_year,
         early_nominal,
     )
-    # The trade's set amounts are the legs' summed, the one leg's own array today.
-    return PreparedTrades(
-        encoded,
-        (prepared_leg,),
-        set_amount,
-        is_settled,
-        offset_unsettled,
-        set_unsettled,
-        cash,
-        unpaid_payments,
-    )
+
+
+def _the_summed_set_amounts(
+    encoded: Encoded, prepared: tuple[PreparedLeg, ...], currency: str
+) -> NDArray[np.float64]:
+    """The two legs' set amounts summed by group, since two-index-fixed-float.md, each finite
+    already and the sum finite, else the first group that is not is refused by its contract and
+    payment day, a sum blamed on the group; frozen."""
+    with np.errstate(over="ignore", invalid="ignore"):
+        set_amount = prepared[0].set_amount + prepared[1].set_amount
+    outrun = ~np.isfinite(set_amount)
+    if outrun.any():
+        g = int(outrun.argmax())
+        first = encoded.legs[0]
+        group = group_words(
+            first.leg.schedule.codes,
+            first.group_contract,
+            encoded.payment_date,
+            g,
+            encoded.keys,
+            encoded.key_of_group,
+        )
+        raise ValueError(
+            f"the set amount of {group} is {float(set_amount[g])!r}, expected a finite amount of "
+            f"{currency}; the legs' set amounts, each finite, sum past the largest number"
+        )
+    set_amount.setflags(write=False)
+    return set_amount
