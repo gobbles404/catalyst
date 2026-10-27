@@ -284,6 +284,36 @@ namespace Goosedove.Host.Tests
             Assert.Equal("boolean FALSE", Importer.Shown(false));
             Assert.Equal("an Excel error", Importer.Shown(-2146826281));
         }
+
+        // Excel's status bar takes 255 characters and refuses a longer text, which the callback
+        // on Excel's thread could tell no one: the review's finding, a protected sheet during the
+        // run leaving "fetching ..." in the cell and nothing on the bar.
+        [Fact]
+        public void the_status_bar_takes_255_characters_and_a_longer_text_is_cut_there()
+        {
+            var whole = new string('x', Importer.StatusBarLimit);
+            Assert.Same(whole, Importer.Bounded(whole));
+            var cut = Importer.Bounded(whole + "y");
+            Assert.Equal(255, cut.Length);
+            Assert.Equal(new string('x', 252) + "...", cut);
+        }
+
+        // The line for a cell that would not take a write puts Excel's cause last, so the cut
+        // takes its tail and the run's line, before it, stands whole.
+        [Fact]
+        public void a_cell_refusing_a_write_reports_the_outcome_before_the_cause_within_the_bar()
+        {
+            const string excel = "The cell or chart you're trying to change is on a protected sheet. To make a change, unprotect the sheet. You might be requested to enter a password.";
+            const string line = "3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX";
+            var before = Importer.Unwritten("nothing was fetched", excel);
+            Assert.Equal("#ERROR GoosedoveImportTrades: import_status could not be written; nothing was fetched; the cause: " + excel, before);
+            Assert.Same(before, Importer.Bounded(before));
+            var whole = Importer.Unwritten("the run's line: " + line, excel);
+            var during = Importer.Bounded(whole);
+            Assert.Equal(255, during.Length);
+            Assert.Equal(whole.Substring(0, 252) + "...", during);
+            Assert.StartsWith("#ERROR GoosedoveImportTrades: import_status could not be written; the run's line: " + line + "; the cause: The cell or chart you're trying to change is on a protected sheet.", during);
+        }
     }
 
     /// <summary>

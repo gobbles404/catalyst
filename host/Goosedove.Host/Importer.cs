@@ -18,9 +18,9 @@ namespace Goosedove.Host
     /// Excel's thread. Its own refusals, a name missing or a cell it will not hand over, are
     /// written in the form a cell shows a failure, "#ERROR GoosedoveImportTrades: ..."; with the
     /// status cell itself missing, or refusing a write, a protected sheet say, the one line goes
-    /// to Excel's status bar, with the cause in the second case, so no run ends in silence. The
-    /// host checks no meaning: it tells one kind of cell from another, as its scan does, and the
-    /// seam and the library judge the rest.
+    /// to Excel's status bar, the cause after it in the second case and cut to the 255 characters
+    /// the bar takes, so no run ends in silence. The host checks no meaning: it tells one kind of
+    /// cell from another, as its scan does, and the seam and the library judge the rest.
     /// </summary>
     public static class Importer
     {
@@ -142,13 +142,13 @@ namespace Goosedove.Host
 
         // The text into the status cell, true when the cell took it. Onto Excel's status bar when
         // there is no cell to take it, the name missing, or when the cell will not, a protected
-        // sheet say, then with the cause and the words given for what the text was, so that no run
+        // sheet say, then with the words given for what the text was and the cause, so that no run
         // ends in silence and no progress text stands for a result unexplained.
         private static bool Write(dynamic application, dynamic status, string text, string otherwise)
         {
             if (status == null)
             {
-                application.StatusBar = text;
+                StatusBar(application, text);
                 return true;
             }
             try
@@ -158,9 +158,35 @@ namespace Goosedove.Host
             }
             catch (Exception failure)
             {
-                application.StatusBar = "#ERROR " + Command + ": " + StatusName + " could not be written: " + failure.Message + "; " + otherwise;
+                StatusBar(application, Unwritten(otherwise, failure.Message));
                 return false;
             }
+        }
+
+        /// <summary>Excel's status bar takes 255 characters and refuses a longer text.</summary>
+        internal const int StatusBarLimit = 255;
+
+        // Onto Excel's status bar, within what it takes: a longer text is cut there and the cut
+        // marked, since the bar refusing it would leave a run's last word unsaid, and from the
+        // callback on Excel's thread unsaid to anyone.
+        private static void StatusBar(dynamic application, string text)
+        {
+            application.StatusBar = Bounded(text);
+        }
+
+        internal static string Bounded(string text)
+        {
+            return text.Length <= StatusBarLimit ? text : text.Substring(0, StatusBarLimit - 3) + "...";
+        }
+
+        /// <summary>
+        /// The status bar's line for a cell that would not take a write: the failure, then what the
+        /// text was, the run's line say, then Excel's cause, so that the cut the bar's limit makes
+        /// takes the cause's tail before anything a person needs.
+        /// </summary>
+        internal static string Unwritten(string otherwise, string cause)
+        {
+            return "#ERROR " + Command + ": " + StatusName + " could not be written; " + otherwise + "; the cause: " + cause;
         }
 
         // The configuration off the active workbook's Tables, each read once, in the order the
@@ -435,9 +461,9 @@ namespace Goosedove.Host
                 {
                     ExcelAsyncUtil.QueueAsMacro(() =>
                     {
-                        // On Excel's thread, later: the cell, or the status bar with the cause when
-                        // the cell will not take the line now; nothing thrown here reaches anyone,
-                        // and the run is over either way.
+                        // On Excel's thread, later: the cell, or the status bar with the line and
+                        // the cause when the cell will not take the line now, within what the bar
+                        // takes; nothing thrown here reaches anyone, and the run is over either way.
                         try
                         {
                             Write(application, status, line, "the run's line: " + line);

@@ -112,9 +112,12 @@ Decided while building the first slice, 27 October 2026:
 13. **The line names twenty IDs and counts the rest**, so a first run against an empty workbook
     never writes a cell's worth of IDs; and with the name `import_status` missing the one line goes
     to Excel's status bar, the one place left that is no pop-up. A cell that will not take a write,
-    a protected sheet say, sends the line there too with the cause, the review's fourth finding:
-    before the request the run stops, `...; nothing was fetched`, and during it the line follows
-    the cause, the cell keeping its progress text.
+    a protected sheet say, sends the line there too, the cause after it, the review's fourth
+    finding: before the request the run stops, `...; nothing was fetched; the cause: ...`, and
+    during it the line goes with the cause, the cell keeping its progress text. The bar takes 255
+    characters and refuses more, the review's last finding, so the host cuts a longer text there
+    and marks the cut; the cause stands last so that the cut takes its tail and the line stays
+    whole.
 14. **The worker lets the host's buffers go.** Each run's request goes on a thread of its own, and
     the host keeps a set of pinned buffers per thread; the worker releases its set when its call is
     done, since a thread that ends keeps its pinned arrays alive otherwise, the review's first

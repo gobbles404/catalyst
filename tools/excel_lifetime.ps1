@@ -1962,20 +1962,22 @@ $import = {
 
         # The status cell unwritable, the review's finding: a protected sheet before the run
         # refuses it on Excel's status bar with the cause, nothing fetched; protected during the
-        # run, the line goes there with the cause while the cell keeps its progress text, the most
-        # a protected sheet allows.
+        # run, the line goes there before the cause while the cell keeps its progress text, the
+        # most a protected sheet allows. The bar takes 255 characters and refuses more, the
+        # review's last finding: Excel's words after the run's line pass the limit, and the text
+        # is cut there with the line whole.
         $requests = @(Get-Content $log).Count
         Invoke-ExcelCall "protect the sheet" { [void]$sheet.Protect() }
         Run-Import $state
         $bar = [string](Read-ExcelProperty $state.Excel "StatusBar")
-        Check "a protected status cell before the run: refused on the status bar, nothing fetched" ($bar.StartsWith("#ERROR GoosedoveImportTrades: import_status could not be written: ") -and $bar.EndsWith("; nothing was fetched") -and @(Get-Content $log).Count -eq $requests) $bar
+        Check "a protected status cell before the run: refused on the status bar with the cause, nothing fetched" ($bar.StartsWith("#ERROR GoosedoveImportTrades: import_status could not be written; nothing was fetched; the cause: ") -and @(Get-Content $log).Count -eq $requests) $bar
         Invoke-ExcelCall "unprotect the sheet" { [void]$sheet.Unprotect() }
         Invoke-ExcelCall "give Excel its status bar back" { $state.Excel.StatusBar = $false }
         Put $state $sheet "B2" "http://127.0.0.1:$port/slow/3"
         Run-Import $state
         Invoke-ExcelCall "protect the sheet" { [void]$sheet.Protect() }
-        $bar = Wait-StatusBar $state { param($text) $text.StartsWith("#ERROR GoosedoveImportTrades: import_status could not be written: ") }
-        Check "protected during the run: the line on the status bar with the cause, the cell keeping its progress text" ($bar.EndsWith("; the run's line: 3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX") -and (Text $state $sheet "A6").StartsWith("fetching trade IDs from ")) ("$bar | " + (Text $state $sheet "A6"))
+        $bar = Wait-StatusBar $state { param($text) $text.StartsWith("#ERROR GoosedoveImportTrades: import_status could not be written; the run's line: ") }
+        Check "protected during the run: the line on the status bar before the cause, cut to the bar's 255 characters, the cell keeping its progress text" ($bar.StartsWith("#ERROR GoosedoveImportTrades: import_status could not be written; the run's line: 3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX; the cause: ") -and $bar.Length -eq 255 -and $bar.EndsWith("...") -and (Text $state $sheet "A6").StartsWith("fetching trade IDs from ")) ("$bar | " + (Text $state $sheet "A6"))
         Invoke-ExcelCall "unprotect the sheet" { [void]$sheet.Unprotect() }
         Invoke-ExcelCall "give Excel its status bar back" { $state.Excel.StatusBar = $false }
         Put $state $sheet "B2" $three
