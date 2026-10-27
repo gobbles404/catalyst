@@ -8,7 +8,7 @@ $steps = @(
   "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_busy_selftest.ps1",
   "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_session_selftest.ps1",
   "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_smoke.ps1",
-  "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_lifetime.ps1 -Groups core,processes,trades,valuation,calendars,bumps,curves,cashflows,quotes,pairs,rfq"
+  "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_lifetime.ps1 -Groups core,processes,trades,valuation,calendars,bumps,curves,cashflows,quotes,pairs,rfq,import"
 )
 foreach ($s in $steps) {
   Write-Host ">> $s"

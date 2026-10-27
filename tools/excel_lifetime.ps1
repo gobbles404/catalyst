@@ -50,6 +50,12 @@
 #          a changed quantity remaking it, a code naming nothing and a payment day on the
 #          expiry failing it and typed back rebuilding it. check.ps1 runs this group beside
 #          core.
+#   import the import command, GoosedoveImportTrades, run by name as Ctrl+Shift+F runs it,
+#          against a stand-in for the desk's API in a process of its own: the issue's table
+#          through the workbook's Tables and the status cell, the request as the stand-in saw
+#          it, the walk's three ends, and each refusal in its words, the reader's, the
+#          request's, the library's, the seam's and the host's own, last with the status cell
+#          gone and the one line on Excel's status bar. check.ps1 runs this group beside core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
@@ -58,7 +64,7 @@
 # hidden_excel.ps1, which makes the refused call again until it is taken or its time runs out;
 # inside a bounded wait that time is the wait's own deadline, never more. A property is read
 # through Read-ExcelProperty, since a refused read made with a dot comes back as nothing.
-param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "bumps", "curves", "cashflows", "quotes", "pairs", "rfq", "quit"), [int]$Patience = 20)
+param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "bumps", "curves", "cashflows", "quotes", "pairs", "rfq", "import", "quit"), [int]$Patience = 20)
 $ErrorActionPreference = "Stop"
 $Groups = @($Groups | ForEach-Object { $_ -split "," })
 $root = Split-Path $PSScriptRoot -Parent
@@ -153,6 +159,84 @@ function Insert-Row($State, $Sheet, [string]$Address) {
 # The hidden Excel's process ID, read from its window when the session started: it leads every
 # handle that Excel publishes.
 function Id($State) { return [string]$State.Session.Process.Id }
+
+# --- the import command's workbook: Tables, a name, the command and its line ------------------
+
+# A Table over a range whose first row is its headers, named; a range of headers alone makes a
+# Table with one empty row, as Excel does.
+function New-Table($State, $Sheet, [string]$Address, [string]$Name) {
+    $range = Cell $State $Sheet $Address
+    $tables = Own $State (Read-ExcelProperty $Sheet "ListObjects")
+    $table = Own $State (Invoke-ExcelCall "make a Table" { , $tables.Add(1, $range, [Type]::Missing, 1) } $Address)
+    Invoke-ExcelCall "name the Table" { $table.Name = $Name } $Address
+}
+function Rename-Table($State, $Sheet, [string]$Name, [string]$NewName) {
+    $tables = Own $State (Read-ExcelProperty $Sheet "ListObjects")
+    $table = Own $State (Invoke-ExcelCall "find the Table" { , $tables.Item($Name) } $Name)
+    Invoke-ExcelCall "rename the Table" { $table.Name = $NewName } $Name
+}
+# A workbook-level name on one cell of the sheet, the cell given as an absolute address.
+function Add-Name($State, $Book, $Sheet, [string]$Name, [string]$Absolute) {
+    $names = Own $State (Read-ExcelProperty $Book "Names")
+    $sheetName = [string](Read-ExcelProperty $Sheet "Name")
+    $refersTo = "='" + $sheetName + "'!" + $Absolute
+    Invoke-ExcelCall "add the name" { [void]$names.Add($Name, $refersTo) } $Name
+}
+function Remove-Name($State, $Book, [string]$Name) {
+    $names = Own $State (Read-ExcelProperty $Book "Names")
+    $named = Own $State (Invoke-ExcelCall "find the name" { , $names.Item($Name) } $Name)
+    Invoke-ExcelCall "delete the name" { $named.Delete() } $Name | Out-Null
+}
+# The command run by name, as Application.Run runs any macro and as Ctrl+Shift+F runs this one.
+function Run-Import($State) {
+    Invoke-ExcelCall "run the import command" { [void]$State.Excel.Run("GoosedoveImportTrades") }
+}
+# The line one run wrote into the status cell: the command writes "fetching ..." before its
+# request leaves and the line once the answer is back, on Excel's thread, so the cell is read
+# until it shows something else, within the patience; a refusal before any request is there at
+# once. The last text read comes back either way.
+function Wait-Line($State, $Sheet, [string]$Address) {
+    $deadline = [datetime]::UtcNow.AddSeconds($Patience)
+    do {
+        $cell = Cell $State $Sheet $Address $deadline
+        $text = [string](Read-ExcelProperty $cell "Text" $Address $deadline)
+        if (-not $text.StartsWith("fetching")) { return $text }
+        Start-Sleep -Milliseconds 250
+    } while ([datetime]::UtcNow -lt $deadline)
+    return $text
+}
+function Import-Line($State, $Sheet, [string]$Address = "A6") {
+    Run-Import $State
+    return Wait-Line $State $Sheet $Address
+}
+
+# --- a stand-in for the desk's API, in a process of its own ------------------------------------
+
+# tools/import_standin.py under the project's Python, which prints its port on its first line,
+# appends each request it receives to the log as one JSON line, and exits when its standard
+# input closes; started for the import group and ended with it, leaving nothing running.
+function Start-StandIn([string]$Root, [string]$Log) {
+    $python = & uv run --no-sync python -c "import sys; print(sys.executable)"
+    if ($LASTEXITCODE) { throw "uv run python failed; run uv sync --locked first" }
+    $info = New-Object Diagnostics.ProcessStartInfo
+    $info.FileName = [string]$python
+    $info.Arguments = "`"$(Join-Path $Root 'tools\import_standin.py')`" --log `"$Log`""
+    $info.WorkingDirectory = $Root
+    $info.UseShellExecute = $false
+    $info.RedirectStandardInput = $true
+    $info.RedirectStandardOutput = $true
+    $info.CreateNoWindow = $true
+    $process = [Diagnostics.Process]::Start($info)
+    $port = $process.StandardOutput.ReadLine()
+    if (-not $port) { throw "the stand-in for the API did not start" }
+    return [pscustomobject]@{ Process = $process; Port = [int]$port; Log = $Log }
+}
+function Stop-StandIn($StandIn) {
+    try { $StandIn.Process.StandardInput.Close() } catch { }
+    if (-not $StandIn.Process.WaitForExit(10000)) { $StandIn.Process.Kill() }
+    $StandIn.Process.Dispose()
+    Remove-Item $StandIn.Log -ErrorAction SilentlyContinue
+}
 
 # --- the store's counts, read through GoosedoveHandles in a scratch cell ----------------------
 
@@ -1765,7 +1849,118 @@ $rfq = {
     Close-Book $state $book
 }
 
-$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; bumps = $bumps; curves = $curves; cashflows = $cashflows; quotes = $quotes; pairs = $pairs; rfq = $rfq; quit = $quit }
+# --- import ---------------------------------------------------------------------------------------
+# The import command, import-cleared-futures.md, against a stand-in for the desk's API in a
+# process of its own. The workbook holds what the command reads: import_settings in A1:B3, the
+# endpoint and the filter; import_destinations in D1:F3, two pairs naming the Tables Trades_NYMEX
+# in H1:I3, holding 104 and 90, and Trades_NG in K1:L1, with no trade yet, the one empty row Excel
+# gives a Table made of headers alone; and the name import_status on A6, which every run writes.
+# The issue's table first: 105 to fetch, 104 the stop held by Trades_NYMEX, 103 unseen, the
+# request a POST carrying the filter's text; then none held, the newest held in the empty Table's
+# row, an empty answer; then each refusal in its words, the walk's, the reader's, the request's
+# twice, the library's and the host's own, the seam's words for a blank endpoint, the settings
+# Table renamed; last the status name removed, and the one line on Excel's status bar.
+$import = {
+    param($state)
+    $log = Join-Path ([IO.Path]::GetTempPath()) ("goosedove_import_{0}.log" -f [Guid]::NewGuid())
+    $standIn = Start-StandIn $root $log
+    try {
+        $port = $standIn.Port
+        $three = "http://127.0.0.1:$port/ids/three"
+        $filter = '{"product": "cleared futures", "traded": "today"}'
+        $book = New-Book $state
+        $sheet = Sheet $state $book
+        Put $state $sheet "A1" "setting"; Put $state $sheet "B1" "value"
+        Put $state $sheet "A2" "endpoint"; Put $state $sheet "B2" $three
+        Put $state $sheet "A3" "filter"; Put $state $sheet "B3" $filter
+        New-Table $state $sheet "A1:B3" "import_settings"
+        Put $state $sheet "D1" "index"; Put $state $sheet "E1" "clearing_house"; Put $state $sheet "F1" "table"
+        Put $state $sheet "D2" "WTI NYMEX"; Put $state $sheet "E2" "NYMEX"; Put $state $sheet "F2" "Trades_NYMEX"
+        Put $state $sheet "D3" "NG NYMEX"; Put $state $sheet "E3" "NYMEX"; Put $state $sheet "F3" "Trades_NG"
+        New-Table $state $sheet "D1:F3" "import_destinations"
+        Put $state $sheet "H1" "trade_id"; Put $state $sheet "I1" "quantity"
+        Put $state $sheet "H2" "104"; Put $state $sheet "I2" "10"
+        Put $state $sheet "H3" "90"; Put $state $sheet "I3" "5"
+        New-Table $state $sheet "H1:I3" "Trades_NYMEX"
+        Put $state $sheet "K1" "trade_id"; Put $state $sheet "L1" "quantity"
+        New-Table $state $sheet "K1:L1" "Trades_NG"
+        Add-Name $state $book $sheet "import_status" '$A$6'
+
+        $line = Import-Line $state $sheet
+        Check "the issue's table: 105 to fetch, 104 the stop held by Trades_NYMEX, 103 unseen" ($line -eq "3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX") $line
+        $seen = Get-Content $log -TotalCount 1 | ConvertFrom-Json
+        Check "the request is a POST carrying the filter's text as its body, as JSON" ($seen.method -eq "POST" -and $seen.path -eq "/ids/three" -and $seen.body -eq $filter -and $seen.content_type -eq "application/json; charset=utf-8") "$($seen.method) $($seen.path) $($seen.content_type) $($seen.body)"
+
+        Put $state $sheet "H2" "50"
+        $line = Import-Line $state $sheet
+        Check "none held: every ID to fetch, newest first" ($line -eq "3 IDs returned, 3 to fetch: 105, 104, 103; none held") $line
+        Put $state $sheet "K2" "105"
+        $line = Import-Line $state $sheet
+        Check "the newest held in the second Table's row: nothing to fetch, the stop named there" ($line -eq "3 IDs returned, none new; stopped at 105, held by Trades_NG") $line
+        Clear-Cell $state $sheet "K2"
+        Put $state $sheet "H2" "104"
+        Put $state $sheet "B2" "http://127.0.0.1:$port/ids/none"
+        $line = Import-Line $state $sheet
+        Check "an empty answer: nothing returned, nothing held" ($line -eq "0 IDs returned, none new; none held") $line
+
+        # The walk's, the reader's and the request's refusals, each with its type, as a cell shows
+        # the library's failure.
+        Put $state $sheet "B2" "http://127.0.0.1:$port/ids/repeat"
+        $line = Import-Line $state $sheet
+        Check "a repeated ID is refused by name" ($line -eq "#ERROR _ImportTradeIds: ValueError: the filter returned 104 more than once, expected each trade ID once") $line
+        Put $state $sheet "B2" "http://127.0.0.1:$port/ids/object"
+        $line = Import-Line $state $sheet
+        Check "an answer that is no list is refused in the reader's words" ($line -eq "#ERROR _ImportTradeIds: ValueError: the filter's answer is an object, expected a list of trade IDs") $line
+        Put $state $sheet "B2" "http://127.0.0.1:$port/status/500"
+        $line = Import-Line $state $sheet
+        Check "the API failing is refused with the address and the status" ($line -eq "#ERROR _ImportTradeIds: ValueError: the filter request to http://127.0.0.1:$port/status/500 answered 500 Internal Server Error, expected 200") $line
+        Put $state $sheet "B2" "http://127.0.0.1:1/ids"
+        $line = Import-Line $state $sheet
+        Check "nobody listening is refused with the address and the cause" ($line.StartsWith("#ERROR _ImportTradeIds: ValueError: the filter request to http://127.0.0.1:1/ids failed: ")) $line
+        Put $state $sheet "B2" $three
+
+        # A Table's cell that is no ID: a text refused by the host by its Table and row, a
+        # fraction by the library by its place among the Table's IDs.
+        Put $state $sheet "H3" "abc"
+        $line = Import-Line $state $sheet
+        Check "a text in a trade_id column is refused by its Table and row" ($line -eq "#ERROR GoosedoveImportTrades: Trades_NYMEX row 2 trade_id is text 'abc', expected number") $line
+        Put $state $sheet "H3" "90.5"
+        $line = Import-Line $state $sheet
+        Check "a fraction is refused by the library by its Table and place" ($line -eq "#ERROR _ImportTradeIds: ValueError: Trades_NYMEX trade_id 2 is 90.5, expected a whole number of at most 15 digits") $line
+        Put $state $sheet "H3" "90"
+
+        # The host's own refusals, and the seam's words for a blank setting.
+        Put $state $sheet "F3" "Trades_X"
+        $line = Import-Line $state $sheet
+        Check "a destination naming no Table is refused by its row" ($line -eq "#ERROR GoosedoveImportTrades: import_destinations row 2 names Trades_X, which is not a Table in this workbook") $line
+        Put $state $sheet "F3" "Trades_NG"
+        Put $state $sheet "A3" "filtre"
+        $line = Import-Line $state $sheet
+        Check "a setting misspelt is refused by its row" ($line -eq "#ERROR GoosedoveImportTrades: import_settings row 2 has setting text 'filtre', expected endpoint or filter") $line
+        Put $state $sheet "A3" "filter"
+        Clear-Cell $state $sheet "B2"
+        $line = Import-Line $state $sheet
+        Check "a blank endpoint is refused in the seam's words" ($line -eq "#ERROR _ImportTradeIds: endpoint is blank, expected text") $line
+        Put $state $sheet "B2" $three
+        Rename-Table $state $sheet "import_settings" "settings"
+        $line = Import-Line $state $sheet
+        Check "the settings Table missing is refused by name" ($line -eq "#ERROR GoosedoveImportTrades: the workbook has no Table import_settings") $line
+        Rename-Table $state $sheet "settings" "import_settings"
+        $line = Import-Line $state $sheet
+        Check "and renamed back, the run again" ($line -eq "3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX") $line
+
+        # The status name gone: the one line with nowhere else to go, on Excel's status bar.
+        Remove-Name $state $book "import_status"
+        Run-Import $state
+        $bar = [string](Read-ExcelProperty $state.Excel "StatusBar")
+        Check "with no status cell the refusal is on Excel's status bar" ($bar -eq "#ERROR GoosedoveImportTrades: the workbook has no name import_status") $bar
+        Invoke-ExcelCall "give Excel its status bar back" { $state.Excel.StatusBar = $false }
+        Close-Book $state $book
+    }
+    finally { Stop-StandIn $standIn }
+}
+
+$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; bumps = $bumps; curves = $curves; cashflows = $cashflows; quotes = $quotes; pairs = $pairs; rfq = $rfq; import = $import; quit = $quit }
 foreach ($name in $Groups) {
     if (-not $bodies.Contains($name)) { throw "no group named $name; the groups are $($bodies.Keys -join ', ')" }
     Run-Group $name $bodies[$name]

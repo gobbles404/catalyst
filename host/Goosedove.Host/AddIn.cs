@@ -25,6 +25,9 @@ namespace Goosedove.Host
                 var config = Config.Load(Path.Combine(Path.GetDirectoryName(ExcelDnaUtil.XllPath), "goosedove.cfg"));
                 Bridge.Start(config["pythondll"], config["pythonpath"].Split(';'));
                 Registration.RegisterAll();
+                // The import command's entry, the one the seam keeps for the host alone and
+                // never tells Excel; fetched once here as every function's path is.
+                Importer.Path = Bridge.Prepare(Importer.Entry);
                 // The help beside the formula as a person types it, from what was just registered. Excel's
                 // own fx dialog reads the same registration and needs nothing more.
                 IntelliSenseServer.Install();
