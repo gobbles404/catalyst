@@ -164,6 +164,9 @@ namespace Goosedove.Host.Tests
 
         // --- the seam's line ---------------------------------------------------------------
 
+        // The issue's table as the API answers it, under tradeIds.
+        private const string Issue = "{\"tradeIds\": [103, 105, 104]}";
+
         private static Importer.Request Request(string endpoint, params (double id, string table)[] held)
         {
             var request = new Importer.Request { Endpoint = endpoint, Filter = "today" };
@@ -178,14 +181,16 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void the_line_for_the_issues_table_through_the_hosts_path()
         {
-            using (var standIn = new StandIn("[103, 105, 104]"))
+            using (var standIn = new StandIn(Issue))
             {
                 var line = Importer.Line(Request(standIn.Address, (104.0, "Trades_NYMEX"), (90.0, "Trades_NYMEX")));
                 Assert.Equal("3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX", line);
-                Assert.StartsWith("POST /ids HTTP/1.1\r\n", standIn.Request);
-                Assert.EndsWith("\r\n\r\ntoday", standIn.Request);
+                // A GET with the filter's name the last part of its path and no body.
+                Assert.StartsWith("GET /gettradeids/today HTTP/1.1\r\n", standIn.Request);
+                Assert.EndsWith("\r\n\r\n", standIn.Request);
+                Assert.DoesNotContain("Content-Type", standIn.Request);
             }
-            using (var standIn = new StandIn("[103, 105, 104]"))
+            using (var standIn = new StandIn(Issue))
             {
                 Assert.Equal("3 IDs returned, 3 to fetch: 105, 104, 103; none held", Importer.Line(Request(standIn.Address)));
             }
@@ -194,14 +199,14 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void the_seams_and_the_librarys_refusals_come_back_as_the_line()
         {
-            using (var standIn = new StandIn("[105, 104, 104]"))
+            using (var standIn = new StandIn("{\"tradeIds\": [105, 104, 104]}"))
             {
                 Assert.Equal("#ERROR _ImportTradeIds: ValueError: the filter returned 104 more than once, expected each trade ID once",
                     Importer.Line(Request(standIn.Address)));
             }
             Assert.Equal("#ERROR _ImportTradeIds: endpoint is number 5.0, expected text", Importer.Line(new Importer.Request { Endpoint = 5.0, Filter = "today" }));
-            Assert.Equal("#ERROR _ImportTradeIds: filter is blank, expected text", Importer.Line(new Importer.Request { Endpoint = "http://127.0.0.1:1/ids", Filter = null }));
-            using (var standIn = new StandIn("[103, 105, 104]"))
+            Assert.Equal("#ERROR _ImportTradeIds: filter is blank, expected text", Importer.Line(new Importer.Request { Endpoint = "http://127.0.0.1:1/gettradeids", Filter = null }));
+            using (var standIn = new StandIn(Issue))
             {
                 Assert.Equal("#ERROR _ImportTradeIds: ValueError: Trades_NYMEX trade_id 2 is 90.5, expected a whole number of at most 15 digits",
                     Importer.Line(Request(standIn.Address, (104.0, "Trades_NYMEX"), (90.5, "Trades_NYMEX"))));
@@ -216,8 +221,8 @@ namespace Goosedove.Host.Tests
             probe.Start();
             var port = ((IPEndPoint)probe.LocalEndpoint).Port;
             probe.Stop();
-            var endpoint = "http://127.0.0.1:" + port + "/ids";
-            Assert.StartsWith("#ERROR _ImportTradeIds: ValueError: the filter request to " + endpoint + " failed: ", Importer.Line(Request(endpoint)));
+            var endpoint = "http://127.0.0.1:" + port + "/gettradeids";
+            Assert.StartsWith("#ERROR _ImportTradeIds: ValueError: the filter request to " + endpoint + "/today failed: ", Importer.Line(Request(endpoint)));
         }
 
         // Each run's request goes on a thread of its own, and the host keeps a set of pinned
@@ -235,7 +240,7 @@ namespace Goosedove.Host.Tests
                 request.Ids.Add(1_000_000 + id);
                 request.Tables.Add("Trades_NYMEX");
             }
-            using (var standIn = new StandIn("[103, 105, 104]", connections: 5))
+            using (var standIn = new StandIn(Issue, connections: 5))
             {
                 request.Endpoint = standIn.Address;
                 var sets = Marshal.BufferSets;
@@ -335,7 +340,7 @@ namespace Goosedove.Host.Tests
             this.connections = connections;
             listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
-            Address = "http://127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port + "/ids";
+            Address = "http://127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port + "/gettradeids";
             new Thread(Serve) { IsBackground = true }.Start();
         }
 

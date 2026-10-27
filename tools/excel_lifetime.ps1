@@ -1867,23 +1867,23 @@ $rfq = {
 # in H1:I3, holding 104 and 90, and Trades_NG in K1:L1, with no trade yet, the one empty row Excel
 # gives a Table made of headers alone; and the name import_status on A6, which every run writes.
 # The issue's table first: 105 to fetch, 104 the stop held by Trades_NYMEX, 103 unseen, the
-# request a POST carrying the filter's text; then none held, the newest held in the empty Table's
-# row, an empty answer; then each refusal in its words, the walk's, the reader's, the request's
-# twice, the library's and the host's own, the seam's words for a blank endpoint, the settings
-# Table renamed; last the status name removed, and the one line on Excel's status bar.
+# request a GET with the filter's name the last part of its path and no body; then none held, the
+# newest held in the empty Table's row, an empty answer; then each refusal in its words, the
+# walk's, the reader's, the request's twice, the library's and the host's own, the seam's words
+# for a blank endpoint, the settings Table renamed; last the status name removed, and the one
+# line on Excel's status bar.
 $import = {
     param($state)
     $log = Join-Path ([IO.Path]::GetTempPath()) ("goosedove_import_{0}.log" -f [Guid]::NewGuid())
     $standIn = Start-StandIn $root $log
     try {
         $port = $standIn.Port
-        $three = "http://127.0.0.1:$port/ids/three"
-        $filter = '{"product": "cleared futures", "traded": "today"}'
+        $endpoint = "http://127.0.0.1:$port/gettradeids"
         $book = New-Book $state
         $sheet = Sheet $state $book
         Put $state $sheet "A1" "setting"; Put $state $sheet "B1" "value"
-        Put $state $sheet "A2" "endpoint"; Put $state $sheet "B2" $three
-        Put $state $sheet "A3" "filter"; Put $state $sheet "B3" $filter
+        Put $state $sheet "A2" "endpoint"; Put $state $sheet "B2" $endpoint
+        Put $state $sheet "A3" "filter"; Put $state $sheet "B3" "three"
         New-Table $state $sheet "A1:B3" "import_settings"
         Put $state $sheet "D1" "index"; Put $state $sheet "E1" "clearing_house"; Put $state $sheet "F1" "table"
         Put $state $sheet "D2" "WTI NYMEX"; Put $state $sheet "E2" "NYMEX"; Put $state $sheet "F2" "Trades_NYMEX"
@@ -1900,7 +1900,7 @@ $import = {
         $line = Import-Line $state $sheet
         Check "the issue's table: 105 to fetch, 104 the stop held by Trades_NYMEX, 103 unseen" ($line -eq "3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX") $line
         $seen = Get-Content $log -TotalCount 1 | ConvertFrom-Json
-        Check "the request is a POST carrying the filter's text as its body, as JSON" ($seen.method -eq "POST" -and $seen.path -eq "/ids/three" -and $seen.body -eq $filter -and $seen.content_type -eq "application/json; charset=utf-8") "$($seen.method) $($seen.path) $($seen.content_type) $($seen.body)"
+        Check "the request is a GET with the filter's name the last part of its path and no body" ($seen.method -eq "GET" -and $seen.path -eq "/gettradeids/three" -and $seen.body -eq "" -and $null -eq $seen.content_type -and $seen.accept -eq "application/json") "$($seen.method) $($seen.path) $($seen.accept) $($seen.content_type) '$($seen.body)'"
 
         Put $state $sheet "H2" "50"
         $line = Import-Line $state $sheet
@@ -1910,25 +1910,26 @@ $import = {
         Check "the newest held in the second Table's row: nothing to fetch, the stop named there" ($line -eq "3 IDs returned, none new; stopped at 105, held by Trades_NG") $line
         Clear-Cell $state $sheet "K2"
         Put $state $sheet "H2" "104"
-        Put $state $sheet "B2" "http://127.0.0.1:$port/ids/none"
+        Put $state $sheet "B3" "none"
         $line = Import-Line $state $sheet
         Check "an empty answer: nothing returned, nothing held" ($line -eq "0 IDs returned, none new; none held") $line
 
         # The walk's, the reader's and the request's refusals, each with its type, as a cell shows
         # the library's failure.
-        Put $state $sheet "B2" "http://127.0.0.1:$port/ids/repeat"
+        Put $state $sheet "B3" "repeat"
         $line = Import-Line $state $sheet
         Check "a repeated ID is refused by name" ($line -eq "#ERROR _ImportTradeIds: ValueError: the filter returned 104 more than once, expected each trade ID once") $line
-        Put $state $sheet "B2" "http://127.0.0.1:$port/ids/object"
+        Put $state $sheet "B3" "list"
         $line = Import-Line $state $sheet
-        Check "an answer that is no list is refused in the reader's words" ($line -eq "#ERROR _ImportTradeIds: ValueError: the filter's answer is an object, expected a list of trade IDs") $line
+        Check "an answer that is no object is refused in the reader's words" ($line -eq "#ERROR _ImportTradeIds: ValueError: the filter's answer is a list, expected an object holding tradeIds") $line
+        Put $state $sheet "B3" "three"
         Put $state $sheet "B2" "http://127.0.0.1:$port/status/500"
         $line = Import-Line $state $sheet
-        Check "the API failing is refused with the address and the status" ($line -eq "#ERROR _ImportTradeIds: ValueError: the filter request to http://127.0.0.1:$port/status/500 answered 500 Internal Server Error, expected 200") $line
-        Put $state $sheet "B2" "http://127.0.0.1:1/ids"
+        Check "the API failing is refused with the whole address and the status" ($line -eq "#ERROR _ImportTradeIds: ValueError: the filter request to http://127.0.0.1:$port/status/500/three answered 500 Internal Server Error, expected 200") $line
+        Put $state $sheet "B2" "http://127.0.0.1:1/gettradeids"
         $line = Import-Line $state $sheet
-        Check "nobody listening is refused with the address and the cause" ($line.StartsWith("#ERROR _ImportTradeIds: ValueError: the filter request to http://127.0.0.1:1/ids failed: ")) $line
-        Put $state $sheet "B2" $three
+        Check "nobody listening is refused with the whole address and the cause" ($line.StartsWith("#ERROR _ImportTradeIds: ValueError: the filter request to http://127.0.0.1:1/gettradeids/three failed: ")) $line
+        Put $state $sheet "B2" $endpoint
 
         # A Table's cell that is no ID: a text refused by the host by its Table and row, a
         # fraction by the library by its place among the Table's IDs.
@@ -1952,7 +1953,7 @@ $import = {
         Clear-Cell $state $sheet "B2"
         $line = Import-Line $state $sheet
         Check "a blank endpoint is refused in the seam's words" ($line -eq "#ERROR _ImportTradeIds: endpoint is blank, expected text") $line
-        Put $state $sheet "B2" $three
+        Put $state $sheet "B2" $endpoint
         Rename-Table $state $sheet "import_settings" "settings"
         $line = Import-Line $state $sheet
         Check "the settings Table missing is refused by name" ($line -eq "#ERROR GoosedoveImportTrades: the workbook has no Table import_settings") $line
@@ -1980,7 +1981,7 @@ $import = {
         Check "protected during the run: the line on the status bar before the cause, cut to the bar's 255 characters, the cell keeping its progress text" ($bar.StartsWith("#ERROR GoosedoveImportTrades: import_status could not be written; the run's line: 3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX; the cause: ") -and $bar.Length -eq 255 -and $bar.EndsWith("...") -and (Text $state $sheet "A6").StartsWith("fetching trade IDs from ")) ("$bar | " + (Text $state $sheet "A6"))
         Invoke-ExcelCall "unprotect the sheet" { [void]$sheet.Unprotect() }
         Invoke-ExcelCall "give Excel its status bar back" { $state.Excel.StatusBar = $false }
-        Put $state $sheet "B2" $three
+        Put $state $sheet "B2" $endpoint
         $line = Import-Line $state $sheet
         Check "and unprotected, the run again" ($line -eq "3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX") $line
 

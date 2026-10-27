@@ -26,16 +26,16 @@ def standin() -> Iterator[StandIn]:
     server.server_close()
 
 
-def address(standin: StandIn, path: str = "/ids/three") -> str:
-    return f"http://127.0.0.1:{standin.server_address[1]}{path}"
+def address(standin: StandIn) -> str:
+    return f"http://127.0.0.1:{standin.server_address[1]}/gettradeids"
 
 
 def ran(
-    standin: StandIn, ids: list[float] | None, tables: list[str] | None, path: str = "/ids/three"
+    standin: StandIn, ids: list[float] | None, tables: list[str] | None, filter: str = "three"
 ) -> str:
     held = None if ids is None else np.asarray(ids, dtype=np.float64)
     names = None if tables is None else tuple(tables)
-    return import_ids(address(standin, path), "today", held, names, WorkCounter())
+    return import_ids(address(standin), filter, held, names, WorkCounter())
 
 
 def test_the_lines_words() -> None:
@@ -80,8 +80,8 @@ def test_the_issues_table_through_the_run(standin: StandIn) -> None:
     assert ran(standin, [104, 104], ["Trades_NG", "Trades_NYMEX"]) == (
         "3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NG"
     )
-    assert ran(standin, None, None, "/ids/none") == "0 IDs returned, none new; none held"
-    assert ran(standin, None, None, "/ids/many").startswith(
+    assert ran(standin, None, None, "none") == "0 IDs returned, none new; none held"
+    assert ran(standin, None, None, "many").startswith(
         "30 IDs returned, 30 to fetch: 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, "
         "16, 15, 14, 13, 12, 11 and 10 more; none held"
     )
@@ -89,10 +89,10 @@ def test_the_issues_table_through_the_run(standin: StandIn) -> None:
 
 def test_the_run_reports_its_work(standin: StandIn) -> None:
     counter = WorkCounter()
-    import_ids(address(standin), "today", np.asarray([104.0, 90.0]), ("A", "A"), counter)
+    import_ids(address(standin), "three", np.asarray([104.0, 90.0]), ("A", "A"), counter)
     assert counter.freeze().as_dict() == {
         "requests_made": 1,
-        "bytes_received": 15,
+        "bytes_received": 29,
         "ids_returned": 3,
         "ids_to_fetch": 1,
     }
@@ -160,46 +160,44 @@ def test_the_entry_runs_the_line_and_refuses_in_the_cells_form(standin: StandIn)
     assert (
         bridge.call(
             "_ImportTradeIds",
-            [endpoint, "today", column(104.0, 90.0), column("Trades_NYMEX", "Trades_NYMEX")],
+            [endpoint, "three", column(104.0, 90.0), column("Trades_NYMEX", "Trades_NYMEX")],
         )
         == "3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX"
     )
-    assert bridge.call("_ImportTradeIds", [endpoint, "today", MISSING, MISSING]) == (
+    assert bridge.call("_ImportTradeIds", [endpoint, "three", MISSING, MISSING]) == (
         "3 IDs returned, 3 to fetch: 105, 104, 103; none held"
     )
     # The seam's own refusals, each argument alone, before anything is asked of the API.
     before = len(standin.requests)
-    assert bridge.call("_ImportTradeIds", [None, "today", MISSING, MISSING]) == (
+    assert bridge.call("_ImportTradeIds", [None, "three", MISSING, MISSING]) == (
         "#ERROR _ImportTradeIds: endpoint is blank, expected text"
     )
-    assert bridge.call("_ImportTradeIds", [5.0, "today", MISSING, MISSING]) == (
+    assert bridge.call("_ImportTradeIds", [5.0, "three", MISSING, MISSING]) == (
         "#ERROR _ImportTradeIds: endpoint is number 5.0, expected text"
     )
     assert bridge.call("_ImportTradeIds", [endpoint, "", MISSING, MISSING]) == (
         "#ERROR _ImportTradeIds: filter is empty text, expected text"
     )
     assert bridge.call(
-        "_ImportTradeIds", [endpoint, "today", column(104.0, None), column("A", "A")]
+        "_ImportTradeIds", [endpoint, "three", column(104.0, None), column("A", "A")]
     ) == ("#ERROR _ImportTradeIds: trade_ids cell (2, 1) is blank, expected number")
     assert (
         bridge.call(
             "_ImportTradeIds",
-            [endpoint, "today", Cells.from_rows([[104.0, 90.0]]), column("A", "A")],
+            [endpoint, "three", Cells.from_rows([[104.0, 90.0]]), column("A", "A")],
         )
         == "#ERROR _ImportTradeIds: trade_ids is 1x2 array, expected column of numbers"
     )
-    assert bridge.call("_ImportTradeIds", [endpoint, "today", column(104.0), column(7.0)]) == (
+    assert bridge.call("_ImportTradeIds", [endpoint, "three", column(104.0), column(7.0)]) == (
         "#ERROR _ImportTradeIds: tables cell (1, 1) is number 7.0, expected text"
     )
     assert len(standin.requests) == before
     # The library's and the reader's refusals carry their type, as a cell shows them.
-    assert bridge.call(
-        "_ImportTradeIds", [address(standin, "/ids/repeat"), "today", MISSING, MISSING]
-    ) == (
+    assert bridge.call("_ImportTradeIds", [address(standin), "repeat", MISSING, MISSING]) == (
         "#ERROR _ImportTradeIds: ValueError: the filter returned 104 more than once, expected each "
         "trade ID once"
     )
-    assert bridge.call("_ImportTradeIds", [endpoint, "today", column(90.5), column("A")]) == (
+    assert bridge.call("_ImportTradeIds", [endpoint, "three", column(90.5), column("A")]) == (
         "#ERROR _ImportTradeIds: ValueError: A trade_id 1 is 90.5, expected a whole number of at "
         "most 15 digits"
     )

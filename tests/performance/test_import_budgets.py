@@ -46,7 +46,7 @@ def test_the_walk_and_the_reader_run_one_function_each_whatever_the_count(
     once = {"walk": 1, "WorkCounter.__init__": 1, "WorkCounter.hit": 2}
     assert call_profile(lambda: walk(one, [], WorkCounter())) == once
     assert call_profile(lambda: walk(many, [5_000], WorkCounter())) == once
-    text = "[" + ", ".join(str(x) for x in many) + "]"
+    text = '{"tradeIds": [' + ", ".join(str(x) for x in many) + "]}"
     assert call_profile(lambda: ids_from_json(text)) == {"ids_from_json": 1}
     # The numpy calls the walk makes: the IDs as an array, sorted, reversed as a view and copied
     # for the repeat check, the imported IDs as an array for the membership test, the stop
@@ -88,7 +88,7 @@ def test_the_walk_and_the_reader_allocate_within_a_few_dozen_bytes_an_id(n: int)
     ids = returned(n)
     held = [n // 2] if n > 1 else []
     assert least_peak(lambda: walk(ids, held, WorkCounter())) <= 1_500 + 40 * n + SLACK
-    text = "[" + ", ".join(str(x) for x in ids) + "]"
+    text = '{"tradeIds": [' + ", ".join(str(x) for x in ids) + "]}"
     assert least_peak(lambda: ids_from_json(text)) <= 2_000 + 60 * n + SLACK
 
 
@@ -106,7 +106,7 @@ def standin() -> Iterator[str]:
     )
     assert process.stdin is not None and process.stdout is not None
     port = int(process.stdout.readline())
-    yield f"http://127.0.0.1:{port}/ids/three"
+    yield f"http://127.0.0.1:{port}/gettradeids"
     process.stdin.close()  # the stand-in exits when its standard input closes
     process.wait(timeout=10)
     process.stdout.close()
@@ -116,11 +116,11 @@ def test_the_run_counts_the_request_the_bytes_and_the_walk(standin: str) -> None
     endpoint = standin
     counter = WorkCounter()
     import_ids(
-        endpoint, "today", np.asarray([104.0, 90.0]), ("Trades_NYMEX", "Trades_NYMEX"), counter
+        endpoint, "three", np.asarray([104.0, 90.0]), ("Trades_NYMEX", "Trades_NYMEX"), counter
     )
     assert counter.freeze().as_dict() == {
         "requests_made": 1,
-        "bytes_received": 15,
+        "bytes_received": 29,
         "ids_returned": 3,
         "ids_to_fetch": 1,
     }
@@ -134,10 +134,11 @@ def test_the_run_is_one_request_one_whole_and_one_walk(
     endpoint = standin
     held = np.asarray([104.0, 90.0])
     names = ("Trades_NYMEX", "Trades_NYMEX")
-    assert call_profile(lambda: import_ids(endpoint, "today", held, names, WorkCounter())) == {
+    assert call_profile(lambda: import_ids(endpoint, "three", held, names, WorkCounter())) == {
         "import_ids": 1,
         "whole_trade_ids": 1,
         "fetch_ids": 1,
+        "address": 1,
         "ids_from_json": 1,
         "walk": 1,
         "status_line": 1,
@@ -150,7 +151,7 @@ def test_the_run_is_one_request_one_whole_and_one_walk(
     column = Cells.from_rows([[104.0], [90.0]])
     tables = Cells.from_rows([["Trades_NYMEX"], ["Trades_NYMEX"]])
     assert call_profile(
-        lambda: bridge.call("_ImportTradeIds", [endpoint, "today", column, tables])
+        lambda: bridge.call("_ImportTradeIds", [endpoint, "three", column, tables])
     ) == {
         "call": 1,
         "Registered.run": 1,
@@ -167,6 +168,7 @@ def test_the_run_is_one_request_one_whole_and_one_walk(
         "import_ids": 1,
         "whole_trade_ids": 1,
         "fetch_ids": 1,
+        "address": 1,
         "ids_from_json": 1,
         "walk": 1,
         "status_line": 1,
@@ -178,7 +180,7 @@ def test_the_run_is_one_request_one_whole_and_one_walk(
     }
     # With no Table holding an ID the host leaves both columns out: nothing made whole.
     assert call_profile(
-        lambda: bridge.call("_ImportTradeIds", [endpoint, "today", MISSING, MISSING])
+        lambda: bridge.call("_ImportTradeIds", [endpoint, "three", MISSING, MISSING])
     ) == {
         "call": 1,
         "Registered.run": 1,
@@ -188,6 +190,7 @@ def test_the_run_is_one_request_one_whole_and_one_walk(
         "_ImportTradeIds": 1,
         "import_ids": 1,
         "fetch_ids": 1,
+        "address": 1,
         "ids_from_json": 1,
         "walk": 1,
         "status_line": 1,

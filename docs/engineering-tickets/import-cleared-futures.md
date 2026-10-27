@@ -89,14 +89,22 @@ carrying the source ID. The ID found anywhere in any participating table counts 
 
 Decided while building the first slice, 27 October 2026:
 
-10. **The filter request is a POST carrying the filter's text as its body**, sent as it stands in
-    the cell with `Content-Type: application/json; charset=utf-8`, the form a search request on an
-    internal API usually takes; the issue left the form to the real API, and the first run against
-    it settles the question. If the API takes the filter in the address instead, `fetch_ids` in
-    `src/goosedove/importer/fetch.py` changes in one line and the settings keep their names. The
-    request is sent once: a redirect is refused with its status and never followed, since following
-    one would turn the POST into a GET without the filter's text, and only 200 is an answer, a 201,
-    202 or 206 refused with IDs in it; the review's second and third findings.
+10. **The filter request is a GET to the endpoint with the filter's name as the last part of its
+    path, and the answer holds the IDs under `tradeIds`.** Built first, in #226, as a POST carrying
+    the filter's text as its body, the form a search request on an internal API usually takes,
+    since the issue left the form to the real API and the first run against it was to settle the
+    question. It did, the same day: the owner's run against the desk's API showed a named filter
+    queried by `GET .../gettradeids/<filter name>`, no body and no credentials needed on that
+    machine and network, answering an object `{"tradeIds": [...]}`, seven IDs on the day. The
+    request changed to that form in the pull request after #226, the POST form gone with it, no
+    second form kept: we use what we ship. The settings keep their names and the `filter` cell
+    holds the filter's name, which the command sends encoded once and never reads; an endpoint or
+    a filter that cannot make such an address is refused before any request. The request is sent
+    once: a redirect is refused with its status and never followed, and only 200 is an answer, a
+    201, 202, 204 or 206 refused with IDs in it and a 401 or 403 refused with no second request;
+    the review's second and third findings. The reader checks the sheet's own bound on an ID, 15
+    digits, before the IDs become an array, so an ID past it is refused in the reader's words
+    and not in numpy's.
 11. **The seam keeps one entry for the host alone.** `_ImportTradeIds` is registered through
     `host_function`, so `entry` finds it and `function_specs` leaves it out: Excel is never told its
     name, no formula reaches it and nothing fetches on a recalculation, while its arguments are
@@ -152,19 +160,25 @@ Built, on `feat/import-ids`; [import-trades.md](../library/importer/import-trade
 
 ## Pull request 2: the details, the rows and the insertion
 
-Waits on the redacted detail payload. What it builds: the detail request per ID, one at a time
-in the walk's order; the mapping from a payload to ticket rows, a monthly strip expanded into one
-row per month with the source ID in `trade_id`, each row's destination from its index and clearing
-house, every row prepared and checked for shape before any insertion; the host inserting rows into
-each Table and writing the prepared values, formula columns untouched; the status line with the
-counts; a failed request, an unmapped destination or an invalid payload stopping the run before
-insertion with no row written.
+Waits on the redacted detail payload. What the owner's run established on 27 October 2026: the
+detail route is `GET .../calypso/trade/<trade ID>`, no body and no credentials needed there
+either, answering an object `calypsoTrade` that carries `tradeId`, `productType`, `Future` for a
+cleared future, and the product under `product.future`; two trades answered 200 at 17,632 and
+5,566 bytes. The payloads are confidential and stay on the desk's machine; one, redacted with its
+field names kept and its values replaced, is what the mapping is designed against. What it builds:
+the detail request per ID, one at a time in the walk's order; the mapping from a payload to ticket
+rows, a monthly strip expanded into one row per month with the source ID in `trade_id`, each row's
+destination from its index and clearing house, every row prepared and checked for shape before any
+insertion; the host inserting rows into each Table and writing the prepared values, formula
+columns untouched; the status line with the counts; a failed request, an unmapped destination or
+an invalid payload stopping the run before insertion with no row written.
 
 ## Open, to settle against the payload
 
-- The detail payload's fields and which carries the ID; its dates, units, quantities and prices,
-  and how a strip is represented.
-- What "today" means to the API and its date and time conventions.
+- The detail payload's fields beyond `tradeId`, `productType` and `product.future`; its dates,
+  units, quantities and prices, and how a strip is represented.
+- What "today" means to the API's filter and its date and time conventions; the filter is the
+  API's own, named in the workbook, and the command reads nothing into its name.
 - Whether the IDs are whole numbers that grow with time, which the early stop assumes.
 - The insertion position within a Table, and whether any destination holds a formula column the
   rows must not touch.

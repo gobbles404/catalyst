@@ -1,5 +1,6 @@
 """The walk over the IDs a filter returned, import-cleared-futures.md: the filter's answer read at
-the edge into trade IDs, a JSON list of whole numbers and nothing else; then the IDs sorted
+the edge into trade IDs, a JSON object holding a list of whole numbers under `tradeIds`, the
+desk's API's form, and nothing else read from it; then the IDs sorted
 descending and read newest first, an ID the workbook already holds stopping the walk there, every
 ID before it to be fetched in that order and every ID after it left unseen, the issue's deliberate
 early stop. Array code over the IDs: one sort, one uniqueness check, one membership test, and no
@@ -15,9 +16,12 @@ import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.instrumentation.work_counts import WorkCounter
+from goosedove.trades.terms import TRADE_ID_DIGITS, TRADE_ID_LIMIT
 
 IDS_RETURNED: Final = "ids_returned"  # the filter's IDs, each looked at once
 IDS_TO_FETCH: Final = "ids_to_fetch"  # the IDs the walk hands on, newest first
+
+TRADE_IDS: Final = "tradeIds"  # the key the answer holds its list of IDs under, the API's own
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,27 +35,44 @@ class Walk:
 
 
 def ids_from_json(text: str) -> tuple[int, ...]:
-    """The filter's answer as trade IDs: a JSON list of whole numbers, in the order the API gave
-    them, each read for its type at this edge and nothing coerced: a fraction, text, a flag, a
-    nested value or an answer that is no list is refused naming the item and what arrived, as a
-    cell is refused at the seam. Which IDs are new is the walk's question, not this reader's."""
+    """The filter's answer as trade IDs: a JSON object holding under `tradeIds` a list of whole
+    numbers of at most 15 digits, the sheet's own bound on an ID, in the order the API gave them,
+    each read for its type at this edge and nothing coerced: a fraction, text, a flag, a nested
+    value or a number past the bound is refused naming the item and what arrived, as a cell is
+    refused at the seam, and so is an answer that is no object, one without `tradeIds` or one
+    holding something else under it; any other key is passed over. Which IDs are new is the
+    walk's question, not this reader's."""
     try:
         loaded: object = json.loads(text)
     except json.JSONDecodeError as refusal:
         raise ValueError(f"the filter's answer is not JSON: {refusal}") from None
-    if not isinstance(loaded, list):
+    if not isinstance(loaded, dict):
         raise ValueError(
-            f"the filter's answer is {_described(loaded)}, expected a list of trade IDs"
+            f"the filter's answer is {_described(loaded)}, expected an object holding {TRADE_IDS}"
         )
-    items = cast(list[object], loaded)
+    answer = cast(dict[str, object], loaded)
+    if TRADE_IDS not in answer:
+        raise ValueError(
+            f"the filter's answer has no {TRADE_IDS}, expected an object holding {TRADE_IDS}"
+        )
+    held = answer[TRADE_IDS]
+    if not isinstance(held, list):
+        raise ValueError(
+            f"the filter's {TRADE_IDS} is {_described(held)}, expected a list of trade IDs"
+        )
     ids: list[int] = []
-    for k, item in enumerate(items):
+    for k, item in enumerate(cast(list[object], held)):
         # A JSON number without a fraction is an int, and a flag is a bool, which Python counts as
         # an int: the type is read exactly, the one place the API's answer is checked.
         if type(item) is not int:
             raise ValueError(
                 f"the filter's item {k + 1} is {_described(item)}, expected a whole number, a "
                 "trade ID"
+            )
+        if abs(item) > TRADE_ID_LIMIT:
+            raise ValueError(
+                f"the filter's item {k + 1} is {item}, expected a whole number of at most "
+                f"{TRADE_ID_DIGITS} digits"
             )
         ids.append(item)
     return tuple(ids)

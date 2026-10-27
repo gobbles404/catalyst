@@ -56,20 +56,58 @@ def test_the_walk_reports_its_work() -> None:
     assert counter.freeze().as_dict() == {"ids_returned": 0, "ids_to_fetch": 0}
 
 
-def test_the_filters_answer_is_read_as_whole_numbers_and_nothing_else() -> None:
-    assert ids_from_json("[105, 103, 104]") == (105, 103, 104)
-    assert ids_from_json("[]") == ()
-    assert ids_from_json(" [ 7 ] ") == (7,)
+def test_the_filters_answer_is_read_as_whole_numbers_under_tradeids_and_nothing_else() -> None:
+    assert ids_from_json('{"tradeIds": [105, 103, 104]}') == (105, 103, 104)
+    assert ids_from_json('{"tradeIds": []}') == ()
+    # Any other key is passed over, and the whitespace JSON allows.
+    assert ids_from_json(
+        ' {"count": 1, "tradeIds": [ 7 ], "filter": "Cleared_Futures_Today"} '
+    ) == (7,)
+    # The sheet's own bound on an ID, 15 digits, zero and signed values within it; a repeat is
+    # read as it came, the walk's to refuse.
+    assert ids_from_json('{"tradeIds": [999999999999999, 0, -999999999999999]}') == (
+        999999999999999,
+        0,
+        -999999999999999,
+    )
+    assert ids_from_json('{"tradeIds": [105, 104, 104]}') == (105, 104, 104)
+    item = "expected a whole number, a trade ID"
+    bound = "expected a whole number of at most 15 digits"
+    no_key = "expected an object holding tradeIds"
     for text, message in (
-        ("[105.0]", "the filter's item 1 is 105.0, expected a whole number, a trade ID"),
-        ('[105, "104"]', "the filter's item 2 is text '104', expected a whole number, a trade ID"),
-        ("[true]", "the filter's item 1 is a flag, expected a whole number, a trade ID"),
-        ("[null]", "the filter's item 1 is nothing, expected a whole number, a trade ID"),
-        ("[[105]]", "the filter's item 1 is a list, expected a whole number, a trade ID"),
-        ('[{"id": 105}]', "the filter's item 1 is an object, expected a whole number, a trade ID"),
-        ('{"ids": [105]}', "the filter's answer is an object, expected a list of trade IDs"),
-        ("105", "the filter's answer is 105, expected a list of trade IDs"),
-        ('"105"', "the filter's answer is text '105', expected a list of trade IDs"),
+        ('{"tradeIds": [105.0]}', f"the filter's item 1 is 105.0, {item}"),
+        ('{"tradeIds": [105, "104"]}', f"the filter's item 2 is text '104', {item}"),
+        ('{"tradeIds": [true]}', f"the filter's item 1 is a flag, {item}"),
+        ('{"tradeIds": [null]}', f"the filter's item 1 is nothing, {item}"),
+        ('{"tradeIds": [[105]]}', f"the filter's item 1 is a list, {item}"),
+        ('{"tradeIds": [{"id": 105}]}', f"the filter's item 1 is an object, {item}"),
+        ('{"tradeIds": [1000000000000000]}', f"the filter's item 1 is 1000000000000000, {bound}"),
+        (
+            '{"tradeIds": [5, -1000000000000000]}',
+            f"the filter's item 2 is -1000000000000000, {bound}",
+        ),
+        (
+            '{"tradeIds": [99999999999999999999]}',
+            f"the filter's item 1 is 99999999999999999999, {bound}",
+        ),
+        ('{"tradeIds": null}', "the filter's tradeIds is nothing, expected a list of trade IDs"),
+        ('{"tradeIds": 105}', "the filter's tradeIds is 105, expected a list of trade IDs"),
+        (
+            '{"tradeIds": {"105": 1}}',
+            "the filter's tradeIds is an object, expected a list of trade IDs",
+        ),
+        (
+            '{"tradeIds": "105"}',
+            "the filter's tradeIds is text '105', expected a list of trade IDs",
+        ),
+        ('{"ids": [105]}', f"the filter's answer has no tradeIds, {no_key}"),
+        ('{"tradeids": [105]}', f"the filter's answer has no tradeIds, {no_key}"),
+        ('{"trade_ids": [105]}', f"the filter's answer has no tradeIds, {no_key}"),
+        ("{}", f"the filter's answer has no tradeIds, {no_key}"),
+        ("[105, 103, 104]", f"the filter's answer is a list, {no_key}"),
+        ("105", f"the filter's answer is 105, {no_key}"),
+        ('"105"', f"the filter's answer is text '105', {no_key}"),
+        ("null", f"the filter's answer is nothing, {no_key}"),
     ):
         with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
             ids_from_json(text)
