@@ -88,16 +88,20 @@ Then the kernel: `resolved_trades` checks the first profile's rules and freezes 
 
 ```text
 Trades
-    resolved   ResolvedTrades: the instrument, the index, its schedule and its reporting lot;
-               route and settlement for the batch; per row its specification row, the one the quantity unit named,
-               its method and its basis, its trade date and, where given, trade_id, a whole number since #168, clearing_house,
-               counterparty since #175, discount_curve_key on a bilateral batch since the named-curve arc's slice 3 and broker, and the marketing reserve it booked; per component its row, its schedule row, its quantity as entered, the
-               first and the last day it covers, the days between them, the quantity the basis
-               gives it and its fixed price; for a financial settlement the payment terms, per
-               row the day it entered, a date or a rule, and
-               the calendar it is counted on, per component the day they give
-    encoded    Encoded: the terms by reference; per component its quote quantity, coefficient and
-               offset; the payment groups, a contract and the day it pays, and the dated slots
+    resolved   ResolvedTrades: the instrument, route and settlement for the batch, and its legs, one
+               today since two-index-fixed-float.md, each the index, its schedule and its reporting
+               lot, per row its specification row, the one the quantity unit named, and its method,
+               and per component its schedule row and its fixed price; then per row its basis, its
+               trade date and, where given, trade_id, a whole number since #168, clearing_house,
+               counterparty since #175, discount_curve_key on a bilateral batch since the named-curve
+               arc's slice 3 and broker, and the marketing reserve it booked; per component its row,
+               its quantity as entered, the first and the last day it covers, the days between them
+               and the quantity the basis gives it; for a financial settlement the payment terms,
+               per row the day it entered, a date or a rule, and the calendar it is counted on, per
+               component the day they give
+    encoded    Encoded: the terms by reference; per leg, one today, its quote quantity, coefficient
+               and offset per component, its group contracts and its dated slots; the payment
+               groups' offsets and the day each pays
     code_entered   per row, since #172, whether it entered a contract_code, a read-only mask
     entered_codes  the texts of the rows that did, in row order, as typed, apart from the contracts
 ```

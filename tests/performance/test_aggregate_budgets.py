@@ -39,11 +39,11 @@ def valued_sources(
     """That many results of one bilateral batch, valued twice over one market and curve and the
     two repeated, every one on the same history and price-vector objects."""
     terms = bilateral_terms(components, contracts, method)
-    history = a_history(as_of=as_of, ix=terms.index)
+    history = a_history(as_of=as_of, ix=terms.legs[0].index)
     market = a_market(history)
     curves = set_on(as_of)
     prep = prepared_trades(
-        encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
+        encoded(terms, (observed_of(terms),), UNITS, WorkCounter()), (history,), WorkCounter()
     )
     pair = [tick(prep, market, curves), tick(prep, market, curves)]
     return (pair * (count // 2 + 1))[:count]
@@ -135,7 +135,10 @@ def test_a_collection_counts_its_sources_groups_entries_and_reductions(
     # and the cross-gamma onto each observation axis, fifteen reductions; and the three buckets'
     # axes saved, the observed, the paid and their union each.
     delta_axes = (
-        enc.references.size + enc.days.size + enc.contract_months.size + enc.contract_years.size
+        enc.legs[0].references.size
+        + enc.legs[0].days.size
+        + enc.legs[0].contract_months.size
+        + enc.legs[0].contract_years.size
     )
     per_source = 2 * delta_axes + paid.days.size + paid.months.size + paid.years.size
     coordinates = sum(
@@ -154,16 +157,16 @@ def test_a_collection_counts_its_sources_groups_entries_and_reductions(
     }
     # The axes are one source's, every source sharing them, and the sums are the source's times
     # the count, nothing of the batch's trades or days expanded again.
-    np.testing.assert_array_equal(agg.index_groups[0].days, enc.days)
+    np.testing.assert_array_equal(agg.index_groups[0].days, enc.legs[0].days)
     np.testing.assert_array_equal(agg.rate_groups[0].days, paid.days)
     np.testing.assert_allclose(
         agg.index_groups[0].daily_lots,
-        count * sources[0].prepared.daily_lots,
+        count * sources[0].prepared.legs[0].daily_lots,
         rtol=1e-12,
         atol=1e-12,
     )
     assert agg.index_groups[0].nominal_delta_total == pytest.approx(
-        count * sources[0].nominal_delta_total
+        count * sources[0].legs[0].nominal_delta_total
     )
     assert agg.rate_groups[0].dv01 == pytest.approx(count * sources[0].dv01, rel=1e-12, abs=1e-15)
 
@@ -270,7 +273,7 @@ def test_a_collection_allocates_by_the_entries_stacked_and_retains_its_vectors(
     sources = valued_sources(method, components, contracts, as_of, count)
     agg = aggregate_results(sources, WorkCounter())
     retained = retained_bytes(agg)
-    stacked = sum(s.prepared.encoded.days.size for s in sources)
+    stacked = sum(s.prepared.encoded.legs[0].days.size for s in sources)
     assert (
         least_peak(lambda: aggregate_results(sources, WorkCounter()))
         <= 40 * stacked + retained + 16 * SLACK
@@ -297,8 +300,8 @@ def test_a_collection_allocates_by_the_entries_stacked_and_retains_its_vectors(
         + 8 * axes
     )
     for source in sources:
-        assert not source.prepared.daily_lots.flags.writeable
-        assert agg.index_groups[0].daily_lots is not source.prepared.daily_lots
+        assert not source.prepared.legs[0].daily_lots.flags.writeable
+        assert agg.index_groups[0].daily_lots is not source.prepared.legs[0].daily_lots
 
 
 @pytest.mark.parametrize(
@@ -400,19 +403,19 @@ def test_a_cleared_source_beside_a_bilateral_one_adds_its_entries_and_no_rate_gr
     # zero, nothing aligned; the cleared source's observation entries aligned and no payment
     # entry of its own; the same functions and numpy calls.
     terms = bilateral_terms(components, contracts, method)
-    assert terms.index is GAS
+    assert terms.legs[0].index is GAS
     history = a_history(as_of=as_of, ix=GAS)
     market = a_market(history)
     discounted = tick(
         prepared_trades(
-            encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
+            encoded(terms, (observed_of(terms),), UNITS, WorkCounter()), (history,), WorkCounter()
         ),
         market,
         set_on(as_of),
     )
     cleared = trade_results(
-        prepared_trades(a_batch(components, contracts), history, WorkCounter()),
-        market,
+        prepared_trades(a_batch(components, contracts), (history,), WorkCounter()),
+        (market,),
         WorkCounter(),
     )
     counter = WorkCounter()
@@ -421,17 +424,17 @@ def test_a_cleared_source_beside_a_bilateral_one_adds_its_entries_and_no_rate_gr
     np.testing.assert_array_equal(agg.rate_groups[0].occurrences, [0])
     paid = payment_axes(discounted)
     observed = sum(
-        s.prepared.encoded.references.size
-        + s.prepared.encoded.days.size
-        + s.prepared.encoded.contract_months.size
-        + s.prepared.encoded.contract_years.size
+        s.prepared.encoded.legs[0].references.size
+        + s.prepared.encoded.legs[0].days.size
+        + s.prepared.encoded.legs[0].contract_months.size
+        + s.prepared.encoded.legs[0].contract_years.size
         for s in (discounted, cleared)
     )
     bilateral_delta_axes = (
-        discounted.prepared.encoded.references.size
-        + discounted.prepared.encoded.days.size
-        + discounted.prepared.encoded.contract_months.size
-        + discounted.prepared.encoded.contract_years.size
+        discounted.prepared.encoded.legs[0].references.size
+        + discounted.prepared.encoded.legs[0].days.size
+        + discounted.prepared.encoded.legs[0].contract_months.size
+        + discounted.prepared.encoded.legs[0].contract_years.size
     )
     assert (
         counter.freeze().as_dict()["entries_aligned"]
@@ -467,7 +470,7 @@ def test_a_cashflow_source_adds_its_payment_entries_to_its_curves_group_and_noth
     curve = a_cashflow_curve(2_000)  # from the cashflows' day, past every payment of either
     discounted = tick(
         prepared_trades(
-            encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
+            encoded(terms, (observed_of(terms),), UNITS, WorkCounter()), (history,), WorkCounter()
         ),
         market,
         curve_set(curve),
@@ -482,10 +485,10 @@ def test_a_cashflow_source_adds_its_payment_entries_to_its_curves_group_and_noth
     np.testing.assert_array_equal(agg.cross_groups[0].occurrences, [0])
     paid = payment_axes(discounted)
     trade_axes = (
-        discounted.prepared.encoded.references.size
-        + discounted.prepared.encoded.days.size
-        + discounted.prepared.encoded.contract_months.size
-        + discounted.prepared.encoded.contract_years.size
+        discounted.prepared.encoded.legs[0].references.size
+        + discounted.prepared.encoded.legs[0].days.size
+        + discounted.prepared.encoded.legs[0].contract_months.size
+        + discounted.prepared.encoded.legs[0].contract_years.size
     )
     batch = cashflows.cashflows
     counts = counter.freeze().as_dict()

@@ -138,22 +138,22 @@ def test_a_bilateral_result_keeps_one_contribution_of_each_kind_by_reference() -
     assert contribution.years is axes.years
     assert contribution.dv01_by_day.sum() == contribution.dv01
     assert not contribution.dv01_by_day.flags.writeable
-    (cross_contribution,) = result.cross_contributions
+    (cross_contribution,) = result.legs[0].cross_contributions
     assert isinstance(cross_contribution, CrossContribution)
     assert cross_contribution.curve is SOFR
-    assert cross_contribution.cross_gamma_total == result.cross_gamma_total
-    assert cross_contribution.references is prep.encoded.references
-    assert cross_contribution.days is prep.encoded.days
-    assert cross_contribution.months is prep.encoded.contract_months
-    assert cross_contribution.years is prep.encoded.contract_years
+    assert cross_contribution.cross_gamma_total == result.legs[0].cross_gamma_total
+    assert cross_contribution.references is prep.encoded.legs[0].references
+    assert cross_contribution.days is prep.encoded.legs[0].days
+    assert cross_contribution.months is prep.encoded.legs[0].contract_months
+    assert cross_contribution.years is prep.encoded.legs[0].contract_years
     assert not cross_contribution.cross_gamma.flags.writeable
     assert rate(result) is contribution and cross(result) is cross_contribution
 
 
 def test_a_cleared_result_keeps_no_contribution_and_the_known_zeros() -> None:
     result = trades_valued(prepared_on(bilateral_terms(route=Route.CLEARED)), (80.0, 50.0), None)
-    assert result.rate_contributions == () and result.cross_contributions == ()
-    assert result.dv01 == 0.0 and result.cross_gamma_total == 0.0
+    assert result.rate_contributions == () and result.legs[0].cross_contributions == ()
+    assert result.dv01 == 0.0 and result.legs[0].cross_gamma_total == 0.0
 
 
 def test_a_batch_of_cashflows_keeps_one_rate_contribution_on_its_curve() -> None:

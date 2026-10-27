@@ -764,3 +764,20 @@ agreed once, booked as the date and marked against the desk's own number; a stri
 convention booked as a row per month; a dated row's cash on the day itself; whether typing the
 whole column into a ticket, where one row has a date, is the friction expected; and whether the
 readback's column, text on some rows and a date on others, reads well on the sheet.
+
+## 27. Two index legs on fixed_float
+
+Agreed 21 October 2026, not yet built: [two-index-fixed-float.md](two-index-fixed-float.md),
+issue #212. Book a pair through direct ranges in the existing creators, with two
+leg fixed prices and shared quantity, payment and route terms. Keep index risk
+separate, rate risk primarily grouped by curve/currency, and leg value/DV01
+attribution visible in readback. First-leg specifications supply fees once.
+
+UAT should follow one leg fixing before the other, both fixed but unpaid, then
+cash; compare the combined values with the two leg contributions; collect the
+result with standalone trades on its original indexes; verify no third index or
+double-counted DV01 appears. Check the ticket's fixed-price reallocation example,
+different reporting lot sizes, a deferred strip, first-leg fee selection and
+unchanged single-index entry. One common net payment per monthly component is
+this version's rule, agreed and not checked against a confirmation; a deal whose
+legs pay apart is outside the version and is noted, not booked as one payment.

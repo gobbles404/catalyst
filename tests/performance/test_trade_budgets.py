@@ -64,9 +64,9 @@ def observed_of(terms: ResolvedTrades) -> Observations:
     """The observations the terms' schedule method gives them over the days each component
     covers, as resolution makes them."""
     return observed(
-        terms.schedule_method[terms.occurrence],
-        terms.index,
-        terms.contract,
+        terms.legs[0].schedule_method[terms.occurrence],
+        terms.legs[0].index,
+        terms.legs[0].contract,
         terms.start_date,
         terms.end_date,
         terms.named,
@@ -114,7 +114,7 @@ def a_batch(components: int, contracts: int) -> Encoded:
     """That many single-month trades spread over the first contracts after the boundary, lots
     and prices varying, encoded on a counter of its own."""
     terms = some_terms(components, contracts)
-    return encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    return encoded(terms, (observed_of(terms),), UNITS, WorkCounter())
 
 
 def some_terms(
@@ -174,7 +174,7 @@ def a_daily_batch(components: int, contracts: int, days: int) -> Encoded:
         np.full(components * days, 1 / days),
         components,
     )
-    return encoded(terms, obs, UNITS, WorkCounter())
+    return encoded(terms, (obs,), UNITS, WorkCounter())
 
 
 def daily_fixed_slots(components: int, contracts: int, days: int, as_of: str = AS_OF) -> int:
@@ -206,7 +206,7 @@ def test_the_encoding_reports_its_components_its_observations_and_its_slots(
 ) -> None:
     counter = WorkCounter()
     terms = a_batch(components, contracts).terms
-    encoded(terms, observed_of(terms), UNITS, counter)
+    encoded(terms, (observed_of(terms),), UNITS, counter)
     assert counter.freeze().as_dict() == {
         "encoded_components": components,
         "encoded_groups": contracts,  # one payment day per contract: one group each
@@ -235,9 +235,9 @@ def test_each_fee_charged_is_one_pass_over_its_components_and_an_uncharged_one_i
         (bilateral, 0, 0),
     ):
         counter = WorkCounter()
-        encoded(batch, observed_of(batch), UNITS, counter)
+        encoded(batch, (observed_of(batch),), UNITS, counter)
         assert counter.freeze()["reserved_fee_components"] == charged
-        profile = call_profile(lambda b=batch: encoded(b, observed_of(b), UNITS, WorkCounter()))
+        profile = call_profile(lambda b=batch: encoded(b, (observed_of(b),), UNITS, WorkCounter()))
         assert profile.get("_charged", 0) == passes and profile["reserves"] == 1
 
 
@@ -246,7 +246,7 @@ def test_the_preparation_reports_its_slots_and_one_settle_read_per_fixed_slot(
     components: int, contracts: int, fixed: int
 ) -> None:
     counter = WorkCounter()
-    prep = prepared_trades(a_batch(components, contracts), a_history(), counter)
+    prep = prepared_trades(a_batch(components, contracts), (a_history(),), counter)
     assert counter.freeze().as_dict() == {
         "display_periods": display_periods(prep),
         "fixings_read": fixed,
@@ -259,9 +259,9 @@ def test_a_tick_reports_one_kernel_call_and_one_quote_per_live_reference(
     components: int, contracts: int, live: int
 ) -> None:
     history = a_history()
-    prep = prepared_trades(a_batch(components, contracts), history, WorkCounter())
+    prep = prepared_trades(a_batch(components, contracts), (history,), WorkCounter())
     counter = WorkCounter()
-    trade_results(prep, a_market(history), counter)
+    trade_results(prep, (a_market(history),), counter)
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": live}
 
 
@@ -277,7 +277,7 @@ def display_periods(prep: PreparedTrades) -> int:
     """The periods of the two display axes the preparation made, since #186: the valuation day's
     month and year through the last contract's, two for the five-trade fixtures and twenty-two
     for two thousand trades over two years."""
-    return prep.by_month.periods.size + prep.by_year.periods.size
+    return prep.legs[0].by_month.periods.size + prep.legs[0].by_year.periods.size
 
 
 PREPARATION_NUMPY = {
@@ -312,9 +312,9 @@ def test_a_tick_runs_evaluation_alone_and_nothing_of_the_steps_before(
     call_profile: CallProfile, numpy_calls: CallProfile, components: int, contracts: int
 ) -> None:
     history = a_history()
-    prep = prepared_trades(a_batch(components, contracts), history, WorkCounter())
+    prep = prepared_trades(a_batch(components, contracts), (history,), WorkCounter())
     quoted = a_market(history)
-    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+    assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -324,7 +324,7 @@ def test_a_tick_runs_evaluation_alone_and_nothing_of_the_steps_before(
     # the preparation's, shared and not made again. What is seen is the market's one look at the
     # references asked for, with its reduction, the sum of the dated contributions, and the
     # contributions frozen.
-    assert numpy_calls(lambda: trade_results(prep, quoted, WorkCounter())) == {
+    assert numpy_calls(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "ndarray.any": 2,  # the market's coverage, and since #190 the live contributions finite
         "ndarray.setflags": 1,
         "ndarray.sum": 1,
@@ -339,7 +339,7 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
 ) -> None:
     terms = a_batch(components, contracts).terms
     obs = observed_of(terms)
-    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
+    assert call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter())) == ENCODING_LEDGER
     assert call_profile(lambda: observed_of(terms)) == {
         "observed": 1,
         "trade_schedule_of": 1,
@@ -367,7 +367,7 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
     }
     assert call_profile(lambda: observed_of(pen)) == with_expiries
     pen_obs = observed_of(pen)
-    assert call_profile(lambda: encoded(pen, pen_obs, UNITS, WorkCounter())) == ENCODING_LEDGER
+    assert call_profile(lambda: encoded(pen, (pen_obs,), UNITS, WorkCounter())) == ENCODING_LEDGER
     # last3day makes three observations per component with the same functions as the pen, one
     # offset over the components and the three offsets at once; the encoding over them runs the
     # same functions again, three times the observations and slots through the same calls.
@@ -375,7 +375,9 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
     assert call_profile(lambda: observed_of(three)) == with_expiries
     three_obs = observed_of(three)
     assert three_obs.component.size == 3 * components
-    assert call_profile(lambda: encoded(three, three_obs, UNITS, WorkCounter())) == ENCODING_LEDGER
+    assert (
+        call_profile(lambda: encoded(three, (three_obs,), UNITS, WorkCounter())) == ENCODING_LEDGER
+    )
 
 
 # The encoding's functions, each once: the groups found in one sort over the components and
@@ -413,7 +415,7 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
 ) -> None:
     enc = a_batch(components, contracts)
     history = a_history()
-    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+    assert call_profile(lambda: prepared_trades(enc, (history,), WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
         "calendar_rows": 1,
@@ -430,7 +432,7 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 3,
     }
-    numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
+    numpy = numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter()))
     assert numpy == PREPARATION_NUMPY, numpy
 
 
@@ -509,11 +511,11 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
         "observations": 1,
     }
     counter = WorkCounter()
-    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    enc = encoded(terms, (observed_of(terms),), UNITS, counter)
     history = a_history(ix=ASIAN_GAS)
-    prep = prepared_trades(enc, history, counter)
+    prep = prepared_trades(enc, (history,), counter)
     quoted = a_market(history)
-    trade_results(prep, quoted, counter)
+    trade_results(prep, (quoted,), counter)
     counts = counter.freeze().as_dict()
     rows = 1 + np.arange(components) % contracts
     assert counts["encoded_components"] == components
@@ -523,10 +525,10 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
         == counts["prepared_slots"]
         == int(MONTH_DAYS[1 : contracts + 1].sum())
     )
-    assert counts["live_prices_read"] == prep.live_references.size
+    assert counts["live_prices_read"] == prep.legs[0].live_references.size
     obs = observed_of(terms)
-    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
-    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+    assert call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter())) == ENCODING_LEDGER
+    assert call_profile(lambda: prepared_trades(enc, (history,), WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
         "calendar_rows": 1,
@@ -543,9 +545,9 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 3,
     }
-    numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
+    numpy = numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter()))
     assert numpy == PREPARATION_NUMPY, numpy
-    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+    assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -562,19 +564,19 @@ def test_a_last3day_batch_prepares_and_ticks_with_the_same_functions_as_a_lastda
     # of the steps before, no schedule generated, no fixed leg made, no fixing folded again.
     terms = some_terms(components, contracts, ScheduleMethod.LAST3DAY)
     counter = WorkCounter()
-    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    enc = encoded(terms, (observed_of(terms),), UNITS, counter)
     history = a_history()
-    prep = prepared_trades(enc, history, counter)
+    prep = prepared_trades(enc, (history,), counter)
     quoted = a_market(history)
-    trade_results(prep, quoted, counter)
+    trade_results(prep, (quoted,), counter)
     counts = counter.freeze().as_dict()
     assert (counts["encoded_components"], counts["encoded_observations"]) == (
         components,
         3 * components,
     )
     assert counts["encoded_slots"] == counts["prepared_slots"] == 3 * contracts
-    assert counts["live_prices_read"] == prep.live_references.size  # one a live reference
-    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+    assert counts["live_prices_read"] == prep.legs[0].live_references.size  # one a live reference
+    assert call_profile(lambda: prepared_trades(enc, (history,), WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
         "calendar_rows": 1,
@@ -591,9 +593,9 @@ def test_a_last3day_batch_prepares_and_ticks_with_the_same_functions_as_a_lastda
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 3,
     }
-    numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
+    numpy = numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter()))
     assert numpy == PREPARATION_NUMPY, numpy
-    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+    assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -619,7 +621,7 @@ def test_a_daily_batch_is_summed_into_one_slot_per_contract_and_day(
         np.full(components * days, 1 / days),
         components,
     )
-    enc = encoded(terms, obs, UNITS, counter)
+    enc = encoded(terms, (obs,), UNITS, counter)
     slots = contracts * days
     assert counter.freeze().as_dict() == {
         "encoded_components": components,
@@ -628,15 +630,17 @@ def test_a_daily_batch_is_summed_into_one_slot_per_contract_and_day(
         "encoded_slots": slots,
         "reserved_fee_components": components,  # clearing alone: cleared, no broker, since #188
     }
-    assert enc.slot_group.size == slots and enc.references.size == contracts
-    np.testing.assert_array_equal(enc.slot_reference, enc.group_contract[enc.slot_group])
+    assert enc.legs[0].slot_group.size == slots and enc.legs[0].references.size == contracts
+    np.testing.assert_array_equal(
+        enc.legs[0].slot_reference, enc.legs[0].group_contract[enc.legs[0].slot_group]
+    )
     # Every component's exposure is shared out over its days and nothing is lost in the sum.
-    assert enc.slot_exposure.sum() == pytest.approx(enc.coefficient.sum(), abs=1e-6)
+    assert enc.legs[0].slot_exposure.sum() == pytest.approx(enc.legs[0].coefficient.sum(), abs=1e-6)
     # What is retained per slot and per observation, in bytes: eight a slot for each of the
     # four slot columns, eight an observation for each of the observations' three and its slot.
-    assert enc.slot_exposure.nbytes == 8 * slots and enc.slot_of_observation.nbytes == (
-        8 * components * days
-    )
+    assert enc.legs[0].slot_exposure.nbytes == 8 * slots and enc.legs[
+        0
+    ].slot_of_observation.nbytes == (8 * components * days)
 
 
 @pytest.mark.parametrize(("components", "contracts", "days"), DAILY, ids=DAILY_IDS)
@@ -646,31 +650,35 @@ def test_a_daily_batch_prepares_per_slot_and_ticks_per_live_reference(
     enc = a_daily_batch(components, contracts, days)
     history = a_history()
     counter = WorkCounter()
-    prep = prepared_trades(enc, history, counter)
+    prep = prepared_trades(enc, (history,), counter)
     slots, fixed = contracts * days, daily_fixed_slots(components, contracts, days)
     assert counter.freeze().as_dict() == {
         "display_periods": display_periods(prep),
         "fixings_read": fixed,
         "prepared_slots": slots,
     }
-    assert prep.live_slot.size == slots - fixed
+    assert prep.legs[0].live_slot.size == slots - fixed
     assert (
-        prep.dated_live_exposure.nbytes == 8 * slots
-        and prep.dated_live_lots.nbytes == 8 * slots  # the lot view per slot
-        and prep.price_sensitivity.nbytes == 8 * contracts
-        and prep.nominal_delta.nbytes == 8 * contracts
+        prep.legs[0].dated_live_exposure.nbytes == 8 * slots
+        and prep.legs[0].dated_live_lots.nbytes == 8 * slots  # the lot view per slot
+        and prep.legs[0].price_sensitivity.nbytes == 8 * contracts
+        and prep.legs[0].nominal_delta.nbytes == 8 * contracts
     )
     counter = WorkCounter()
-    result = trade_results(prep, a_market(history), counter)
-    live_references = int(np.unique(enc.slot_reference[prep.live_slot]).size)
+    result = trade_results(prep, (a_market(history),), counter)
+    live_references = int(np.unique(enc.legs[0].slot_reference[prep.legs[0].live_slot]).size)
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": live_references}
-    assert result.dated_live_contribution.nbytes == 8 * (slots - fixed)  # one per live slot
-    assert result.dated_live_contribution.sum() == pytest.approx(
+    assert result.legs[0].dated_live_contribution.nbytes == 8 * (slots - fixed)  # one per live slot
+    assert result.legs[0].dated_live_contribution.sum() == pytest.approx(
         result.mark - prep.offset_unsettled - prep.set_unsettled
     )
     np.testing.assert_allclose(
-        np.bincount(enc.reference_of_slot, weights=prep.dated_live_exposure, minlength=contracts),
-        prep.price_sensitivity,
+        np.bincount(
+            enc.legs[0].reference_of_slot,
+            weights=prep.legs[0].dated_live_exposure,
+            minlength=contracts,
+        ),
+        prep.legs[0].price_sensitivity,
     )
 
 
@@ -685,10 +693,10 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
         np.full(components * days, 1 / days),
         components,
     )
-    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
-    enc = encoded(terms, obs, UNITS, WorkCounter())
+    assert call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter())) == ENCODING_LEDGER
+    enc = encoded(terms, (obs,), UNITS, WorkCounter())
     history = a_history()
-    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+    assert call_profile(lambda: prepared_trades(enc, (history,), WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
         "calendar_rows": 1,
@@ -705,10 +713,10 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 3,
     }
-    assert numpy_calls(lambda: prepared_trades(enc, history, WorkCounter())) == PREPARATION_NUMPY
-    prep = prepared_trades(enc, history, WorkCounter())
+    assert numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter())) == PREPARATION_NUMPY
+    prep = prepared_trades(enc, (history,), WorkCounter())
     quoted = a_market(history)
-    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+    assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -729,13 +737,13 @@ def test_a_daily_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> 
     enc = a_daily_batch(components, contracts, days)
     history = a_history()
     slots = contracts * days
-    assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= 98 * slots + SLACK
-    prep = prepared_trades(enc, history, WorkCounter())
+    assert least_peak(lambda: prepared_trades(enc, (history,), WorkCounter())) <= 98 * slots + SLACK
+    prep = prepared_trades(enc, (history,), WorkCounter())
     quoted = a_market(history)
-    assert least_peak(lambda: trade_results(prep, quoted, WorkCounter())) <= 24 * slots + SLACK
+    assert least_peak(lambda: trade_results(prep, (quoted,), WorkCounter())) <= 24 * slots + SLACK
     small = a_daily_batch(*DAILY[0])
-    small_prep = prepared_trades(small, history, WorkCounter())
-    assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= (
+    small_prep = prepared_trades(small, (history,), WorkCounter())
+    assert least_peak(lambda: trade_results(small_prep, (quoted,), WorkCounter())) <= (
         KEYWORD_CALL + 2 * SLACK
     )
 
@@ -750,13 +758,14 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
     # batch; the quote quantities are the month batch's times the days each month covers.
     terms = some_terms(components, contracts, basis=QuantityPer.CALDAY)
     obs = observed_of(terms)
-    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
-    enc = encoded(terms, obs, UNITS, WorkCounter())
+    assert call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter())) == ENCODING_LEDGER
+    enc = encoded(terms, (obs,), UNITS, WorkCounter())
     np.testing.assert_array_equal(
-        enc.quote_quantity, a_batch(components, contracts).quote_quantity * terms.covered_days
+        enc.legs[0].quote_quantity,
+        a_batch(components, contracts).legs[0].quote_quantity * terms.covered_days,
     )
     history = a_history()
-    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+    assert call_profile(lambda: prepared_trades(enc, (history,), WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
         "calendar_rows": 1,
@@ -773,16 +782,16 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 3,
     }
-    assert numpy_calls(lambda: prepared_trades(enc, history, WorkCounter())) == PREPARATION_NUMPY
-    prep = prepared_trades(enc, history, WorkCounter())
+    assert numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter())) == PREPARATION_NUMPY
+    prep = prepared_trades(enc, (history,), WorkCounter())
     quoted = a_market(history)
-    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+    assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
     }
-    assert numpy_calls(lambda: trade_results(prep, quoted, WorkCounter())) == {
+    assert numpy_calls(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "ndarray.any": 2,  # the market's coverage, and since #190 the live contributions finite
         "ndarray.setflags": 1,
         "ndarray.sum": 1,
@@ -841,13 +850,13 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
 ) -> None:
     terms = two_day_terms(components, contracts)
     obs = observed_of(terms)
-    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
+    assert call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter())) == ENCODING_LEDGER
     counter = WorkCounter()
-    enc = encoded(terms, obs, UNITS, counter)
+    enc = encoded(terms, (obs,), UNITS, counter)
     history = a_history()
-    prep = prepared_trades(enc, history, counter)
+    prep = prepared_trades(enc, (history,), counter)
     quoted = a_market(history)
-    trade_results(prep, quoted, counter)
+    trade_results(prep, (quoted,), counter)
     assert counter.freeze().as_dict() == {
         "display_periods": display_periods(prep),
         "encoded_components": components,
@@ -860,10 +869,10 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
         "kernel": 1,
         "live_prices_read": live,  # one quote per live contract, not per live group
     }
-    assert enc.references.size == contracts and prep.live_references.size == live
-    assert prep.live_slot.size == 2 * live
-    np.testing.assert_array_equal(enc.group_contract, np.repeat(enc.references, 2))
-    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+    assert enc.legs[0].references.size == contracts and prep.legs[0].live_references.size == live
+    assert prep.legs[0].live_slot.size == 2 * live
+    np.testing.assert_array_equal(enc.legs[0].group_contract, np.repeat(enc.legs[0].references, 2))
+    assert call_profile(lambda: prepared_trades(enc, (history,), WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
         "calendar_rows": 1,
@@ -880,16 +889,16 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 3,
     }
-    assert numpy_calls(lambda: prepared_trades(enc, history, WorkCounter())) == PREPARATION_NUMPY
-    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+    assert numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter())) == PREPARATION_NUMPY
+    assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
     }
     # The same trades, the same exposure per contract: the delta is the one-group batch's.
-    one_group = prepared_trades(a_batch(components, contracts), history, WorkCounter())
-    np.testing.assert_allclose(prep.price_sensitivity, one_group.price_sensitivity)
+    one_group = prepared_trades(a_batch(components, contracts), (history,), WorkCounter())
+    np.testing.assert_allclose(prep.legs[0].price_sensitivity, one_group.legs[0].price_sensitivity)
 
 
 def test_a_two_day_daily_batch_prepares_and_ticks_by_its_doubled_slots() -> None:
@@ -904,18 +913,18 @@ def test_a_two_day_daily_batch_prepares_and_ticks_by_its_doubled_slots() -> None
         np.full(components * days, 1 / days),
         components,
     )
-    enc = encoded(terms, obs, UNITS, WorkCounter())
+    enc = encoded(terms, (obs,), UNITS, WorkCounter())
     slots = 2 * contracts * days
-    assert enc.slot_group.size == slots and enc.references.size == contracts
-    assert enc.slot_of_observation.size == components * days
+    assert enc.legs[0].slot_group.size == slots and enc.legs[0].references.size == contracts
+    assert enc.legs[0].slot_of_observation.size == components * days
     history = a_history()
-    assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= 98 * slots + SLACK
-    prep = prepared_trades(enc, history, WorkCounter())
+    assert least_peak(lambda: prepared_trades(enc, (history,), WorkCounter())) <= 98 * slots + SLACK
+    prep = prepared_trades(enc, (history,), WorkCounter())
     quoted = a_market(history)
-    assert least_peak(lambda: trade_results(prep, quoted, WorkCounter())) <= 24 * slots + SLACK
+    assert least_peak(lambda: trade_results(prep, (quoted,), WorkCounter())) <= 24 * slots + SLACK
     counter = WorkCounter()
-    trade_results(prep, quoted, counter)
-    live_references = int(np.unique(enc.slot_reference[prep.live_slot]).size)
+    trade_results(prep, (quoted,), counter)
+    live_references = int(np.unique(enc.legs[0].slot_reference[prep.legs[0].live_slot]).size)
     assert counter.freeze()["live_prices_read"] == live_references
 
 
@@ -1032,17 +1041,17 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
         "observations": 1,
     }
     obs = observed_of(terms)
-    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == {
+    assert call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter())) == {
         **ENCODING_LEDGER,
         "UnitConversions.factor": 3,
         "UnitConversions.category": 3,
     }
     counter = WorkCounter()
-    enc = encoded(terms, obs, UNITS, counter)
+    enc = encoded(terms, (obs,), UNITS, counter)
     history = a_history(ix=MIXED_GAS)
-    prep = prepared_trades(enc, history, counter)
+    prep = prepared_trades(enc, (history,), counter)
     quoted = a_market(history)
-    trade_results(prep, quoted, counter)
+    trade_results(prep, (quoted,), counter)
     rows = 1 + np.arange(components) % contracts
     lap = (np.arange(components) // contracts) % 4
     observations_by_method = np.array([1, 1, 3, 0])[lap] + np.where(lap == 3, MONTH_DAYS[rows], 0)
@@ -1058,8 +1067,8 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
         "kernel": 1,
         "live_prices_read": live,
     }
-    assert enc.references.size == contracts and prep.live_references.size == live
-    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+    assert enc.legs[0].references.size == contracts and prep.legs[0].live_references.size == live
+    assert call_profile(lambda: prepared_trades(enc, (history,), WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
         "calendar_rows": 1,
@@ -1076,8 +1085,8 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 3,
     }
-    assert numpy_calls(lambda: prepared_trades(enc, history, WorkCounter())) == PREPARATION_NUMPY
-    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+    assert numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter())) == PREPARATION_NUMPY
+    assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -1091,18 +1100,18 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
 def test_a_mixed_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> None:
     components, contracts = MIXED_SIZES[1]
     terms = mixed_terms(components, contracts)
-    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    enc = encoded(terms, (observed_of(terms),), UNITS, WorkCounter())
     history = a_history(ix=MIXED_GAS)
     slots = mixed_slots(contracts)
-    assert enc.slot_group.size == slots
-    assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= 98 * slots + SLACK
-    prep = prepared_trades(enc, history, WorkCounter())
+    assert enc.legs[0].slot_group.size == slots
+    assert least_peak(lambda: prepared_trades(enc, (history,), WorkCounter())) <= 98 * slots + SLACK
+    prep = prepared_trades(enc, (history,), WorkCounter())
     quoted = a_market(history)
-    assert least_peak(lambda: trade_results(prep, quoted, WorkCounter())) <= 24 * slots + SLACK
+    assert least_peak(lambda: trade_results(prep, (quoted,), WorkCounter())) <= 24 * slots + SLACK
     small = mixed_terms(*MIXED_SIZES[0])
-    small_enc = encoded(small, observed_of(small), UNITS, WorkCounter())
-    small_prep = prepared_trades(small_enc, history, WorkCounter())
-    assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= (
+    small_enc = encoded(small, (observed_of(small),), UNITS, WorkCounter())
+    small_prep = prepared_trades(small_enc, (history,), WorkCounter())
+    assert least_peak(lambda: trade_results(small_prep, (quoted,), WorkCounter())) <= (
         KEYWORD_CALL + 2 * SLACK
     )
 
@@ -1177,11 +1186,11 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
     terms = rolling_terms(components, contracts)
     counter = WorkCounter()
     obs = observed_of(terms)
-    enc = encoded(terms, obs, UNITS, counter)
+    enc = encoded(terms, (obs,), UNITS, counter)
     history = a_history(ix=ROLLING_GAS)
-    prep = prepared_trades(enc, history, counter)
+    prep = prepared_trades(enc, (history,), counter)
     quoted = rolling_market(history)
-    trade_results(prep, quoted, counter)
+    trade_results(prep, (quoted,), counter)
     counts = counter.freeze().as_dict()
     rows = 1 + np.arange(components) % contracts
     assert counts["encoded_components"] == components
@@ -1195,12 +1204,16 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
     # Each booked month's days are two contracts', the one expiring in it and the next: the groups
     # are rows 1 to `contracts`, the references rows 2 to `contracts` + 2, every slot's a row or
     # two after its group's.
-    np.testing.assert_array_equal(np.unique(enc.group_contract), np.arange(1, contracts + 1))
-    np.testing.assert_array_equal(enc.references, np.arange(2, contracts + 3))
-    assert (enc.slot_reference >= enc.group_contract[enc.slot_group] + 1).all()
-    assert counts["live_prices_read"] == prep.live_references.size
-    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
-    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+    np.testing.assert_array_equal(
+        np.unique(enc.legs[0].group_contract), np.arange(1, contracts + 1)
+    )
+    np.testing.assert_array_equal(enc.legs[0].references, np.arange(2, contracts + 3))
+    assert (
+        enc.legs[0].slot_reference >= enc.legs[0].group_contract[enc.legs[0].slot_group] + 1
+    ).all()
+    assert counts["live_prices_read"] == prep.legs[0].live_references.size
+    assert call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter())) == ENCODING_LEDGER
+    assert call_profile(lambda: prepared_trades(enc, (history,), WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
         "calendar_rows": 1,
@@ -1217,9 +1230,9 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 3,
     }
-    numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
+    numpy = numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter()))
     assert numpy == PREPARATION_NUMPY, numpy
-    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+    assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -1339,11 +1352,11 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
     }
     counter = WorkCounter()
     obs = observed_of(terms)
-    enc = encoded(terms, obs, UNITS, counter)
+    enc = encoded(terms, (obs,), UNITS, counter)
     history = iferc_history()
-    prep = prepared_trades(enc, history, counter)
+    prep = prepared_trades(enc, (history,), counter)
     quoted = iferc_market(history)
-    trade_results(prep, quoted, counter)
+    trade_results(prep, (quoted,), counter)
     assert counter.freeze().as_dict() == {
         "display_periods": display_periods(prep),
         "encoded_components": components,
@@ -1356,11 +1369,13 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
         "kernel": 1,
         "live_prices_read": contracts - fixed,
     }
-    np.testing.assert_array_equal(enc.slot_date, IFERC_PUBLICATION[:contracts])
-    np.testing.assert_array_equal(enc.slot_reference, np.arange(contracts))
+    np.testing.assert_array_equal(enc.legs[0].slot_date, IFERC_PUBLICATION[:contracts])
+    np.testing.assert_array_equal(enc.legs[0].slot_reference, np.arange(contracts))
     np.testing.assert_array_equal(enc.payment_date, IFERC_PAYS[:contracts])
-    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == IFERC_ENCODING_LEDGER
-    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+    assert (
+        call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter())) == IFERC_ENCODING_LEDGER
+    )
+    assert call_profile(lambda: prepared_trades(enc, (history,), WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
         "calendar_rows": 1,
@@ -1377,15 +1392,15 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 3,
     }
-    numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
+    numpy = numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter()))
     assert numpy == IFERC_PREPARATION_NUMPY, numpy
-    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+    assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
     }
-    assert numpy_calls(lambda: trade_results(prep, quoted, WorkCounter())) == {
+    assert numpy_calls(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "ndarray.any": 2,  # the market's coverage, and since #190 the live contributions finite
         "ndarray.setflags": 1,
         "ndarray.sum": 1,
@@ -1400,20 +1415,22 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
 # times the trades; the tick 1,210 and 1,080, the quotes and their gather.
 def test_an_iferc_batchs_preparation_and_tick_allocate_by_month_not_by_trade() -> None:
     history = iferc_history()
-    small = encoded(iferc_terms(5, 2), observed_of(iferc_terms(5, 2)), UNITS, WorkCounter())
-    big = encoded(iferc_terms(2_000, 24), observed_of(iferc_terms(2_000, 24)), UNITS, WorkCounter())
-    small_peak = least_peak(lambda: prepared_trades(small, history, WorkCounter()))
-    big_peak = least_peak(lambda: prepared_trades(big, history, WorkCounter()))
+    small = encoded(iferc_terms(5, 2), (observed_of(iferc_terms(5, 2)),), UNITS, WorkCounter())
+    big = encoded(
+        iferc_terms(2_000, 24), (observed_of(iferc_terms(2_000, 24)),), UNITS, WorkCounter()
+    )
+    small_peak = least_peak(lambda: prepared_trades(small, (history,), WorkCounter()))
+    big_peak = least_peak(lambda: prepared_trades(big, (history,), WorkCounter()))
     assert big_peak <= small_peak + 230 * 22 + SLACK
     quoted = iferc_market(history)
-    big_prep = prepared_trades(big, history, WorkCounter())
+    big_prep = prepared_trades(big, (history,), WorkCounter())
     # Since #190 the finite check keeps two boolean temporaries over the live slots for a moment;
     # since #197 the record holds the cross-gamma's six fields, 48 bytes, None and 0.0 here.
     assert (
-        least_peak(lambda: trade_results(big_prep, quoted, WorkCounter()))
+        least_peak(lambda: trade_results(big_prep, (quoted,), WorkCounter()))
         <= 24 * 24 + KEYWORD_CALL + SLACK + 304
     )
-    small_prep = prepared_trades(small, history, WorkCounter())
-    assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= (
+    small_prep = prepared_trades(small, (history,), WorkCounter())
+    assert least_peak(lambda: trade_results(small_prep, (quoted,), WorkCounter())) <= (
         KEYWORD_CALL + 2 * SLACK
     )

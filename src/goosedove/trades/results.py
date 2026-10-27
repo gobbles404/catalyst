@@ -1,12 +1,12 @@
 """What an evaluation saves, and how a report selects from it, in the words of risk_report.py.
-TradeResults is the snapshot `trade_results` in evaluation.py makes once for a batch against one
-market: the preparation and
-the market by reference, the values, the risk by contract and by date, the bilateral payment facts
-and the booked reserves, read-only. risk_view and the helpers beside it are what _ReportRisk reads
-from a saved result: a selection by reference, a copy through saved places where the axis is
-shared, nothing summed, sorted, priced or discounted here. This module defines and selects; it
-never calculates, so it imports the records that precede a result and nothing of evaluation,
-aggregation or Excel. docs/library/trades/kernel.md is the page."""
+TradeResults is the snapshot `trade_results` in evaluation.py makes once for a batch against its
+markets, one per leg: the preparation by reference, the values, the bilateral payment facts and
+the booked reserves, and per leg, LegResults since two-index-fixed-float.md, the leg's market by
+reference and its risk by contract and by date, read-only. risk_view and the helpers beside it
+are what _ReportRisk reads from a saved result: a selection by reference, a copy through saved
+places where the axis is shared, nothing summed, sorted, priced or discounted here. This module
+defines and selects; it never calculates, so it imports the records that precede a result and
+nothing of evaluation, aggregation or Excel. docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
 from typing import assert_never
@@ -23,7 +23,7 @@ from goosedove.trades.contributions import (
     curve_words,
 )
 from goosedove.trades.display_axes import EarlyRisk, PeriodAxis, Unit
-from goosedove.trades.preparation import PreparedTrades
+from goosedove.trades.preparation import PreparedLeg, PreparedTrades
 from goosedove.trades.reserves import Reserves
 from goosedove.trades.risk_report import (
     NO_DAYS,
@@ -41,76 +41,41 @@ from goosedove.trades.terms import Route
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class TradeResults:
-    """The preparation and the market, by reference, and the snapshot they make, read-only. The
-    route and the currency name what the numbers are: for a cleared batch, mark is the
-    undiscounted entry-to-current-price P&L of the groups not yet settled, live slots at their
-    references' quotes and fixed slots at their settles, and cash the cumulative
-    entry-to-final-price P&L of the groups settled by the valuation date, both in the settlement
-    currency. dated_live_contribution[i] is live slot i's exposure times its reference's quote,
-    paired with the preparation's live_slot; their sum is the live amount, and they allocate
-    neither the offsets nor the mark among dates. contracts is the batch's axis, the schedule
-    rows of its references in the schedule's order, the same whatever has fixed;
-    price_sensitivity[r] is the change in mark for a move of one quote unit in contract r, the
-    live exposure referencing it and zero where every slot of it has fixed, in
-    price_sensitivity_unit, currency per quote currency per quote quantity unit; nominal_delta[r] is
-    the exposure still to price in contract r counted in lots of the index's reporting
-    specification, the sensitivity over the lot's coefficient, in lot_unit, `lots of LOT (1000
-    BBL)`, and nominal_delta_total their sum, the number the risk report shows as the delta; the
-    three arrays are the preparation's own, shared and never written. dv01 is zero: the cleared
-    model is undiscounted, so a rate move changes nothing, a result of the model and not a
-    placeholder. as_of is the history's valuation day. reserves, since #170, is the batch's
-    booked brokerage, clearing and since #175 marketing and their currency, the encoding's
-    record by reference, which no tick changes, _ReportReserves spills and the results
-    readback shows once.
+class LegResults:
+    """One leg's side of a result, since two-index-fixed-float.md: the leg's preparation and the
+    market it was valued against, by reference, and the snapshot they make, read-only.
+    dated_live_contribution[i] is live slot i's exposure times its reference's quote, paired with
+    the preparation's live_slot; their sum is the leg's live amount, and they allocate neither
+    the offsets nor the mark among dates. contracts is the leg's axis, the schedule rows of its
+    references in the schedule's order, the same whatever has fixed; price_sensitivity[r] is the
+    change in mark for a move of one quote unit in contract r, the live exposure referencing it
+    and zero where every slot of it has fixed, in price_sensitivity_unit, currency per quote
+    currency per quote quantity unit; nominal_delta[r] is the exposure still to price in contract
+    r counted in lots of the index's reporting specification, the sensitivity over the lot's
+    coefficient, in lot_unit, `lots of LOT (1000 BBL)`, and nominal_delta_total their sum, the
+    number the risk report shows as the delta; the three arrays are the preparation's own,
+    shared and never written. delta[r], delta_total, discounted_price_sensitivity[r] and the
+    discounted daily, monthly and yearly lots are, since #176, the nominal vectors weighted by
+    each live slot's payment factor before the sums, the lots the desk hedges to; for a cleared
+    batch they are the nominal arrays themselves, by reference, since nothing discounts. Since
+    #186 early_delta, the facts refusing a month or a year report whose discounted lots stand in
+    a period before the valuation day's, or none, a cleared result's the preparation's nominal
+    facts, its lots being the same; a reader words them with the measure asked for and scans
+    nothing. Since #197 single-curve-cross-gamma.md cross_contributions, one CrossContribution
+    per curve the batch was valued on, in key order: the sensitivity of each contract's delta to
+    a rise of one basis point in that curve's continuously compounded zero rates, each live
+    slot's discounted lots times -0.0001 times its payment's time fraction, summed by reference,
+    by observation day and, by reference, onto the contract months and years, the discounted
+    lots' own axes, since the payment supplies the time and not the axis, in lot_unit per basis
+    point, negative for lots bought and paid for later, with its total and its early facts, each
+    the share of the groups on that curve, the vectors rows of arrays summed by curve at once;
+    none for a cleared batch, whose lots nothing discounts, the known zero and no buffer. And
+    cross_gamma_total the contributions' totals summed: the leg's cross-gamma with every used
+    curve shifted by one basis point together, explicitly not the sensitivity to one curve
+    alone, zero for a cleared batch."""
 
-    Since #176, the bilateral fields. curves, since named-curves-slice-3.md, are the exact curve
-    objects the batch's keys selected from the collection it was evaluated with, in key order,
-    the curves the contributions below are owned by, and none for a cleared batch; the
-    collection itself is not kept. delta[r], delta_total,
-    discounted_price_sensitivity[r] and the discounted daily, monthly and yearly lots are the
-    nominal vectors weighted by each live slot's payment factor before the sums, the lots the desk
-    hedges to; for a cleared batch they are
-    the nominal arrays themselves, by reference, since nothing discounts. payment_amount[g] is the
-    group's offset, set amount and live amount together, npv_by_group[g] that amount times its
-    payment factor, zero for a paid group, dv01_by_group[g] -0.0001 times the group's day count over
-    365 times its NPV, and payment_factor[g] the factor of the group's own curve, the one its key
-    named, on the group's payment day, 1.0 for a paid group, the policy and no read; the four
-    None for a cleared batch, which values no group.
-    mark for a bilateral batch is the NPV of the unpaid groups and dv01 their sensitivity summed,
-    negative for an amount receivable.
-
-    Since #186 early_delta, the facts refusing a month or a year report whose discounted lots
-    stand in a period before the valuation day's, or none, a cleared result's the preparation's
-    nominal facts, its lots being the same; a reader words them with the measure asked for and
-    scans nothing.
-
-    Since named-curves-slice-2.md the rate risk and the cross-gamma are kept per curve, as
-    contributions, contributions.py: rate_contributions, one RateContribution per curve the
-    batch was valued on, the DV01 by payment day, month and year, the groups' DV01s summed
-    since #178 onto the payment-time axes the encoding made once, a paid group's nothing on
-    its day, with its total and the facts refusing an early month or year; and
-    cross_contributions, one CrossContribution per curve, since #197 single-curve-cross-gamma.md:
-    the sensitivity of each contract's delta to a rise of one basis point in
-    that curve's continuously compounded zero rates, each live slot's discounted lots times
-    -0.0001 times its payment's time fraction, summed by reference, by observation day and,
-    by reference, onto the contract months and years, the discounted lots' own axes, since
-    the payment supplies the time and not the axis, in lot_unit per basis point, negative for
-    lots bought and paid for later, with its total and its early facts. One of each per curve
-    the batch's keys selected, since named-curves-slice-3.md, in key order, each the share of
-    the groups on that curve, the vectors rows of arrays summed by curve at once; none for a
-    cleared batch, whose lots nothing discounts, the known zero and no buffer. The batch's
-    dv01 and cross_gamma_total are the contributions' totals summed: the batch's risk with
-    every used curve shifted by one basis point together, explicitly not the sensitivity to
-    one curve alone."""
-
-    prepared: PreparedTrades
+    prepared: PreparedLeg
     market: Market
-    route: Route
-    currency: str
-    as_of: np.datetime64
-    mark: float
-    cash: float
     dated_live_contribution: NDArray[np.float64]
     contracts: NDArray[np.intp]
     price_sensitivity: NDArray[np.float64]
@@ -118,23 +83,70 @@ class TradeResults:
     nominal_delta: NDArray[np.float64]
     nominal_delta_total: float
     lot_unit: str
-    dv01: float
-    reserves: Reserves
-    curves: tuple[DiscountCurve, ...]
     delta: NDArray[np.float64]
     delta_total: float
     discounted_price_sensitivity: NDArray[np.float64]
     discounted_daily_lots: NDArray[np.float64]
     discounted_monthly_lots: NDArray[np.float64]
     discounted_yearly_lots: NDArray[np.float64]
+    early_delta: EarlyRisk
+    cross_gamma_total: float
+    cross_contributions: tuple[CrossContribution, ...]
+
+    def codes(self) -> tuple[str, ...]:
+        """The axis spelled as the schedule spells its codes, one per contract of the leg."""
+        schedule = self.prepared.encoded.leg.schedule
+        return tuple([schedule.codes[int(row)] for row in self.contracts])
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class TradeResults:
+    """The preparation by reference, the legs, one LegResults per leg of the preparation in leg
+    order, one today, each valued against its own market, and the snapshot the trade makes of
+    them together, read-only, since two-index-fixed-float.md. The route and the currency name
+    what the numbers are: for a cleared batch, mark is the undiscounted entry-to-current-price
+    P&L of the groups not yet settled, live slots at their references' quotes and fixed slots at
+    their settles, and cash the cumulative entry-to-final-price P&L of the groups settled by the
+    valuation date, both in the settlement currency; dv01 is zero: the cleared model is
+    undiscounted, so a rate move changes nothing, a result of the model and not a placeholder.
+    as_of is the history's valuation day. reserves, since #170, is the batch's booked brokerage,
+    clearing and since #175 marketing and their currency, the encoding's record by reference,
+    which no tick changes, _ReportReserves spills and the results readback shows once.
+
+    Since #176, the bilateral fields. curves, since named-curves-slice-3.md, are the exact curve
+    objects the batch's keys selected from the collection it was evaluated with, in key order,
+    the curves the contributions are owned by, and none for a cleared batch; the collection
+    itself is not kept. payment_amount[g] is the group's offset, set amount and live amount
+    together over every leg, npv_by_group[g] that amount times its payment factor, zero for a
+    paid group, dv01_by_group[g] -0.0001 times the group's day count over 365 times its NPV, and
+    payment_factor[g] the factor of the group's own curve, the one its key named, on the group's
+    payment day, 1.0 for a paid group, the policy and no read; the four None for a cleared
+    batch, which values no group. mark for a bilateral batch is the NPV of the unpaid groups and
+    dv01 their sensitivity summed, negative for an amount receivable. Since
+    named-curves-slice-2.md the rate risk is kept per curve, as contributions, contributions.py:
+    rate_contributions, one RateContribution per curve the batch was valued on, the DV01 by
+    payment day, month and year, the groups' DV01s summed since #178 onto the payment-time axes
+    the encoding made once, a paid group's nothing on its day, with its total and the facts
+    refusing an early month or year, in key order, each the share of the groups on that curve;
+    none for a cleared batch. The batch's dv01 is the contributions' totals summed: the batch's
+    risk with every used curve shifted by one basis point together, explicitly not the
+    sensitivity to one curve alone. The commodity risk and the cross-gamma are each leg's own."""
+
+    prepared: PreparedTrades
+    legs: tuple[LegResults, ...]
+    route: Route
+    currency: str
+    as_of: np.datetime64
+    mark: float
+    cash: float
+    dv01: float
+    reserves: Reserves
+    curves: tuple[DiscountCurve, ...]
     payment_amount: NDArray[np.float64] | None
     npv_by_group: NDArray[np.float64] | None
     dv01_by_group: NDArray[np.float64] | None
     payment_factor: NDArray[np.float64] | None
-    early_delta: EarlyRisk
-    cross_gamma_total: float
     rate_contributions: tuple[RateContribution, ...]
-    cross_contributions: tuple[CrossContribution, ...]
 
     def report(self, risk: Risk, bucket: Bucket) -> RiskView:
         """The content of the risk report asked for, since #180: risk_view's selection of this
@@ -142,11 +154,6 @@ class TradeResults:
         a collection, whose record answers the same question over its own saved views. Selects, and
         nothing else."""
         return risk_view(self, risk, bucket)
-
-    def codes(self) -> tuple[str, ...]:
-        """The axis spelled as the schedule spells its codes, one per contract of the batch."""
-        schedule = self.prepared.encoded.terms.schedule
-        return tuple([schedule.codes[int(row)] for row in self.contracts])
 
 
 Labels = tuple[str, str, tuple[str, ...], tuple[str, ...]]
@@ -179,23 +186,24 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
     risk's own, a column of zeros for a cleared result's cross-gamma; nothing summed, nothing
     sorted, nothing discovered, the Total the scalar the evaluation stored.
     """
-    terms = results.prepared.encoded.terms
-    nominal_label, delta_label = delta_labels(terms.index, terms.reporting_lot)
+    leg = results.legs[0]  # one leg today: its index names the deltas and the cross-gamma
+    leg_terms = leg.prepared.encoded.leg
+    nominal_label, delta_label = delta_labels(leg_terms.index, leg_terms.reporting_lot)
     rates = results.rate_contributions
-    crosses = results.cross_contributions
+    crosses = leg.cross_contributions
     if rates or crosses:
         words = curve_words([c.curve for c in (*rates, *crosses)])
         dv01_labels = tuple([dv01_label(words[id(c.curve)], c.currency) for c in rates])
         cross_labels = tuple(
             [
-                cross_gamma_label(terms.index, words[id(c.curve)], terms.reporting_lot)
+                cross_gamma_label(leg_terms.index, words[id(c.curve)], leg_terms.reporting_lot)
                 for c in crosses
             ]
         )
     else:
         # Cleared: no curve values, the one DV01 column and the one cross-gamma column of nothing.
         dv01_labels = (dv01_label(CLEARED, results.currency),)
-        cross_labels = (cross_gamma_label(terms.index, CLEARED, terms.reporting_lot),)
+        cross_labels = (cross_gamma_label(leg_terms.index, CLEARED, leg_terms.reporting_lot),)
     labels: Labels = (nominal_label, delta_label, dv01_labels, cross_labels)
     match bucket:
         case Bucket.DAY:
@@ -207,27 +215,29 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
 
 
 def _day_view(results: TradeResults, risk: Risk, labels: Labels) -> RiskView:
-    """The day report's content, by reference where the axis is the risk's own."""
-    prepared = results.prepared
+    """The day report's content, by reference where the axis is the risk's own: the deltas
+    and the cross-gamma the one leg's today, the DV01 the trade's."""
+    leg = results.legs[0]
+    prepared = leg.prepared
     encoded = prepared.encoded
     nominal_label, delta_label, dv01_labels, cross_labels = labels
     rates = results.rate_contributions
-    crosses = results.cross_contributions
-    axes = encoded.payment_axes
+    crosses = leg.cross_contributions
+    axes = results.prepared.encoded.payment_axes
     match risk:
         case Risk.NOMINAL_DELTA:
             return RiskView(
                 encoded.days,
                 (nominal_label,),
-                (results.nominal_delta_total,),
+                (leg.nominal_delta_total,),
                 (prepared.daily_lots,),
             )
         case Risk.DELTA:
             return RiskView(
                 encoded.days,
                 (delta_label,),
-                (results.delta_total,),
-                (results.discounted_daily_lots,),
+                (leg.delta_total,),
+                (leg.discounted_daily_lots,),
             )
         case Risk.DV01:
             if not rates:
@@ -243,7 +253,7 @@ def _day_view(results: TradeResults, risk: Risk, labels: Labels) -> RiskView:
             if not crosses:
                 # Cleared: the known zero on the observation days, the column made for the report.
                 zeros = np.zeros(encoded.days.size)
-                return RiskView(encoded.days, cross_labels, (results.cross_gamma_total,), (zeros,))
+                return RiskView(encoded.days, cross_labels, (leg.cross_gamma_total,), (zeros,))
             return RiskView(
                 encoded.days,
                 cross_labels,
@@ -256,11 +266,11 @@ def _day_view(results: TradeResults, risk: Risk, labels: Labels) -> RiskView:
             cross_totals = (
                 tuple([c.cross_gamma_total for c in crosses])
                 if crosses
-                else (results.cross_gamma_total,)
+                else (leg.cross_gamma_total,)
             )
             totals = (
-                results.nominal_delta_total,
-                results.delta_total,
+                leg.nominal_delta_total,
+                leg.delta_total,
                 *dv01_totals,
                 *cross_totals,
             )
@@ -268,7 +278,7 @@ def _day_view(results: TradeResults, risk: Risk, labels: Labels) -> RiskView:
                 # Cleared: the observation days, the DV01 and the cross-gamma nothing on every row.
                 columns = (
                     prepared.daily_lots,
-                    results.discounted_daily_lots,
+                    leg.discounted_daily_lots,
                     *[np.zeros(encoded.days.size) for _ in dv01_totals],
                     *[np.zeros(encoded.days.size) for _ in cross_totals],
                 )
@@ -280,7 +290,7 @@ def _day_view(results: TradeResults, risk: Risk, labels: Labels) -> RiskView:
                 totals,
                 (
                     placed(union.size, axes.observed_in_days, prepared.daily_lots),
-                    placed(union.size, axes.observed_in_days, results.discounted_daily_lots),
+                    placed(union.size, axes.observed_in_days, leg.discounted_daily_lots),
                     *[placed(union.size, axes.paid_in_days, c.dv01_by_day) for c in rates],
                     *[
                         placed(union.size, axes.observed_in_days, c.cross_gamma_by_day)
@@ -298,11 +308,12 @@ def _period_view(results: TradeResults, risk: Risk, bucket: Period, labels: Labe
     period on or after the start, a saved value before it refused from the saved facts, worded
     with the measure asked for; since #197 the cross-gamma on the delta's rows and places, a
     cleared result's the known zero as a column of zeros; one column per contribution."""
-    prepared = results.prepared
+    leg = results.legs[0]  # one leg today: its lots, on its display axes
+    prepared = leg.prepared
     nominal_label, delta_label, dv01_labels, cross_labels = labels
     rates = results.rate_contributions
-    crosses = results.cross_contributions
-    unit, axis, nominal, discounted = _saved(results, bucket)
+    crosses = leg.cross_contributions
+    unit, axis, nominal, discounted = _saved(leg, bucket)
     match risk:
         case Risk.NOMINAL_DELTA:
             prepared.early_nominal.refuse("nominal delta", unit)
@@ -310,16 +321,16 @@ def _period_view(results: TradeResults, risk: Risk, bucket: Period, labels: Labe
             return RiskView(
                 axis.periods[: axis.delta_rows],
                 (nominal_label,),
-                (results.nominal_delta_total,),
+                (leg.nominal_delta_total,),
                 (column,),
             )
         case Risk.DELTA:
-            results.early_delta.refuse("delta", unit)
+            leg.early_delta.refuse("delta", unit)
             column = placed(axis.delta_rows, axis.contract_in, discounted[axis.contract_from :])
             return RiskView(
                 axis.periods[: axis.delta_rows],
                 (delta_label,),
-                (results.delta_total,),
+                (leg.delta_total,),
                 (column,),
             )
         case Risk.DV01:
@@ -342,7 +353,7 @@ def _period_view(results: TradeResults, risk: Risk, bucket: Period, labels: Labe
                 return RiskView(
                     axis.periods[: axis.delta_rows],
                     cross_labels,
-                    (results.cross_gamma_total,),
+                    (leg.cross_gamma_total,),
                     (zeros,),
                 )
             for c in crosses:
@@ -381,12 +392,13 @@ def _period_all(
     """All four by month or by year: the two deltas, then a DV01 column per rate contribution and
     a cross-gamma column per cross contribution, a cleared result's one of each at zero, on the
     display axis through the later of the delta rows and the DV01 rows."""
-    prepared = results.prepared
+    leg = results.legs[0]
+    prepared = leg.prepared
     nominal_label, delta_label, dv01_labels, cross_labels = labels
     rates = results.rate_contributions
-    crosses = results.cross_contributions
+    crosses = leg.cross_contributions
     prepared.early_nominal.refuse("nominal delta", unit)
-    results.early_delta.refuse("delta", unit)
+    leg.early_delta.refuse("delta", unit)
     rows = max(axis.delta_rows, axis.dv01_rows)
     if rates:
         for c in rates:
@@ -404,13 +416,13 @@ def _period_all(
         ]
         cross_totals = [c.cross_gamma_total for c in crosses]
     else:
-        cross_on, cross_totals = [np.zeros(rows)], [results.cross_gamma_total]
+        cross_on, cross_totals = [np.zeros(rows)], [leg.cross_gamma_total]
     return RiskView(
         axis.periods[:rows],
         (nominal_label, delta_label, *dv01_labels, *cross_labels),
         (
-            results.nominal_delta_total,
-            results.delta_total,
+            leg.nominal_delta_total,
+            leg.delta_total,
             *dv01_totals,
             *cross_totals,
         ),
@@ -424,10 +436,11 @@ def _period_all(
 
 
 def _saved(
-    results: TradeResults, bucket: Period
+    results: LegResults, bucket: Period
 ) -> tuple[Unit, PeriodAxis, NDArray[np.float64], NDArray[np.float64]]:
-    """A month or a year bucket's unit, its display axis and the saved lot vectors it places, the
-    nominal lots and the discounted lots; the DV01 and the cross-gamma are each contribution's."""
+    """A month or a year bucket's unit, the leg's display axis and the saved lot vectors it
+    places, the nominal lots and the discounted lots; the DV01 and the cross-gamma are each
+    contribution's."""
     prepared = results.prepared
     match bucket:
         case Bucket.MONTH:

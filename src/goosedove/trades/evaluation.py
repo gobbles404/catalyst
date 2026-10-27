@@ -1,6 +1,7 @@
-"""The prepared batch evaluated against one market: the quotes of its live references read off
-the market once each, gathered onto the live slots and multiplied by their exposure, one
-multiplication and one sum for the live amount, which the unsettled offsets and set amounts
+"""The prepared batch evaluated against its markets, one per leg, one today since
+two-index-fixed-float.md: the quotes of the leg's live references read off its market once
+each, gathered onto the live slots and multiplied by their exposure, one multiplication and
+one sum for the live amount, which the unsettled offsets and set amounts
 complete into the mark; the cash as the preparation settled it; the risk by reference on the
 batch's own axis, the price sensitivity in the settlement currency and the delta in lots of the
 index's reporting lot with its total, shared with the preparation that settled them, since no
@@ -20,6 +21,7 @@ is as it was. The record this makes, TradeResults, and the
 selection of its saved views are results.py's; this module calculates and nothing else.
 docs/library/trades/kernel.md is the page."""
 
+from collections.abc import Sequence
 from typing import assert_never, cast
 
 import numpy as np
@@ -33,8 +35,8 @@ from goosedove.market.market import Market
 from goosedove.trades.contributions import CrossContribution, RateContribution
 from goosedove.trades.display_axes import EarlyRisk, early_risk
 from goosedove.trades.encoding import CurveAxes, PaymentAxes
-from goosedove.trades.preparation import PreparedTrades, UnpaidPayments
-from goosedove.trades.results import TradeResults
+from goosedove.trades.preparation import PreparedLeg, PreparedTrades, UnpaidPayments
+from goosedove.trades.results import LegResults, TradeResults
 from goosedove.trades.terms import Route, Settlement, named_trade
 
 LIVE_PRICES_READ = "live_prices_read"  # quotes read off the market, one per live reference
@@ -57,17 +59,19 @@ SLOTS_WEIGHTED = "slots_weighted"
 
 def trade_results(
     prepared: PreparedTrades,
-    market: Market,
+    markets: Sequence[Market],
     counter: WorkCounter,
     curve_set: DiscountCurveSet | None = None,
 ) -> TradeResults:
     """The one way to make TradeResults: the rules, checked once, in this order, the first failure
     being the message; then the quotes read, one kernel call, and the snapshot.
 
-    The market is over the history the batch was prepared against, the one object: a market over
-    another history, a later valuation date or a corrected fixing, is refused, and the batch is
-    prepared again outside, never silently here. Then the route, since #176. A cleared batch is
-    undiscounted and takes no collection of curves: one supplied is refused by name, since its
+    The markets are one per leg of the trades, in leg order, since two-index-fixed-float.md,
+    else refused; each is over the history its leg was prepared against, the one object: a
+    market over another history, a later valuation date or a corrected fixing, is refused, and
+    the batch is prepared again outside, never silently here. Then the route, since #176. A
+    cleared batch is undiscounted and takes no collection of curves: one supplied is refused
+    by name, since its
     payments are margined as they come and discounting them would be a wrong number. A bilateral
     batch meets _the_curves' rules, since named-curves-slice-3.md: financial, since a physical
     delivery has no payment to discount; a collection supplied; each of its keys bound to the
@@ -76,8 +80,9 @@ def trade_results(
     own groups, a fixed-but-unpaid group and a group whose amount nets to nothing included, the
     first uncovered named by its contract, its day, its key and the curve's range.
 
-    The market answers the quotes of the live references in the batch's order, one per distinct
-    contract, and refuses a contract past its coverage by name, as it does for every reader; the
+    Each leg's market answers the quotes of the leg's live references in the leg's order, one
+    per distinct contract, and refuses a contract past its coverage by name, as it does for
+    every reader; the
     quotes are gathered onto the live slots, and each slot's exposure times its reference's quote
     is its contribution, finite or refused by its slot and its quote since #190,
     reject-nonfinite-trade-arithmetic.md, before either route sums it. For a cleared batch the
@@ -95,7 +100,13 @@ def trade_results(
     again, and nothing per slot but the gather and the multiplication over the live ones.
     """
     terms = prepared.encoded.terms
-    if market.market_history is not prepared.history:
+    if len(markets) != len(prepared.legs):
+        raise ValueError(
+            f"markets are {len(markets)}, expected {len(prepared.legs)}, one per leg of the trades"
+        )
+    leg = prepared.legs[0]  # one leg today, two-index-fixed-float.md
+    market = markets[0]
+    if market.market_history is not leg.history:
         name = market.market_history.calendar.index.name
         raise ValueError(
             f"market is over another history of index {name!r}, "
@@ -113,23 +124,22 @@ def trade_results(
             curves = _the_curves(prepared, curve_set)
         case _:
             assert_never(terms.route)
-    quotes = market.live_prices(prepared.live_references)
-    conventions = terms.index.conventions
+    quotes = market.live_prices(leg.live_references)
+    conventions = leg.encoded.leg.index.conventions
     currency = conventions.currency_unit
     # The arithmetic runs with numpy's flags down and the rules judge, since #190: each live
     # slot's contribution is finite before either route sums it, else the first that is not is
     # refused by its slot and its quote.
     with np.errstate(over="ignore", invalid="ignore"):
         dated_live_contribution = (
-            prepared.dated_live_exposure[prepared.live_slot]
-            * quotes[prepared.reference_of_live_slot]
+            leg.dated_live_exposure[leg.live_slot] * quotes[leg.reference_of_live_slot]
         )
         outrun = ~np.isfinite(dated_live_contribution)
         if outrun.any():
             i = int(outrun.argmax())
-            quote = float(quotes[int(prepared.reference_of_live_slot[i])])
+            quote = float(quotes[int(leg.reference_of_live_slot[i])])
             raise ValueError(
-                f"{prepared.encoded.named_slot(int(prepared.live_slot[i]))}, quoted at {quote!r}, "
+                f"{leg.encoded.named_slot(int(leg.live_slot[i]))}, quoted at {quote!r}, "
                 f"has {float(dated_live_contribution[i])!r} of live contribution, expected a "
                 f"finite amount of {currency}; its exposure times the quote outruns the largest "
                 "number"
@@ -138,10 +148,10 @@ def trade_results(
         # flags; the bilateral route sums them by payment group in _discounted instead.
         live = float(dated_live_contribution.sum()) if not curves else 0.0
     counter.hit(KERNEL)
-    counter.hit(LIVE_PRICES_READ, int(prepared.live_references.size))
+    counter.hit(LIVE_PRICES_READ, int(leg.live_references.size))
     dated_live_contribution.setflags(write=False)
     if curves:
-        return _discounted(prepared, market, curves, dated_live_contribution, counter)
+        return _discounted(prepared, leg, market, curves, dated_live_contribution, counter)
     # The cleared mark: the live amount, then the unsettled fixed legs and set amounts added,
     # each finite or refused for the batch; Python adds two finite floats past the largest
     # number without a word, so the rule looks.
@@ -159,44 +169,49 @@ def trade_results(
         )
     return TradeResults(
         prepared=prepared,
-        market=market,
+        legs=(
+            LegResults(
+                prepared=leg,
+                market=market,
+                dated_live_contribution=dated_live_contribution,
+                contracts=leg.encoded.references,
+                price_sensitivity=leg.price_sensitivity,
+                price_sensitivity_unit=(
+                    f"{conventions.currency_unit} per {conventions.quote_currency_unit}/"
+                    f"{conventions.quote_quantity_unit}"
+                ),
+                nominal_delta=leg.nominal_delta,
+                nominal_delta_total=leg.nominal_delta_total,
+                lot_unit=leg.encoded.leg.reporting_lot.words,
+                # Cleared: nothing discounts, so the valuation-adjusted risk is the nominal risk
+                # itself, the preparation's arrays by reference.
+                delta=leg.nominal_delta,
+                delta_total=leg.nominal_delta_total,
+                discounted_price_sensitivity=leg.price_sensitivity,
+                discounted_daily_lots=leg.daily_lots,
+                discounted_monthly_lots=leg.monthly_lots,
+                discounted_yearly_lots=leg.yearly_lots,
+                early_delta=leg.early_nominal,  # the same lots: worded as the delta when asked
+                # Nothing discounts, so no rate moves the lots: the known zero, no contribution
+                # and no buffer, as the DV01's axes are.
+                cross_gamma_total=0.0,
+                cross_contributions=(),
+            ),
+        ),
         route=terms.route,
         currency=currency,
-        as_of=prepared.history.calendar.valuation_date.as_of,
+        as_of=leg.history.calendar.valuation_date.as_of,
         mark=mark,
         cash=prepared.cash,
-        dated_live_contribution=dated_live_contribution,
-        contracts=prepared.encoded.references,
-        price_sensitivity=prepared.price_sensitivity,
-        price_sensitivity_unit=(
-            f"{conventions.currency_unit} per {conventions.quote_currency_unit}/"
-            f"{conventions.quote_quantity_unit}"
-        ),
-        nominal_delta=prepared.nominal_delta,
-        nominal_delta_total=prepared.nominal_delta_total,
-        lot_unit=terms.reporting_lot.words,
         dv01=0.0,  # the undiscounted model moves for no rate
         reserves=prepared.encoded.reserves,
         curves=(),
-        # Cleared: nothing discounts, so the valuation-adjusted risk is the nominal risk itself,
-        # the preparation's arrays by reference.
-        delta=prepared.nominal_delta,
-        delta_total=prepared.nominal_delta_total,
-        discounted_price_sensitivity=prepared.price_sensitivity,
-        discounted_daily_lots=prepared.daily_lots,
-        discounted_monthly_lots=prepared.monthly_lots,
-        discounted_yearly_lots=prepared.yearly_lots,
         # No payment group is valued and the DV01 has no dated axis.
         payment_amount=None,
         npv_by_group=None,
         dv01_by_group=None,
         payment_factor=None,
-        early_delta=prepared.early_nominal,  # the same lots: worded as the delta when asked for
-        # Nothing discounts, so no rate moves the mark or the lots: the known zero, no
-        # contribution and no buffer, as the DV01's axes are.
-        cross_gamma_total=0.0,
         rate_contributions=(),
-        cross_contributions=(),
     )
 
 
@@ -222,6 +237,7 @@ def _the_curves(
     checks each selected curve's start. The curves selected, in key order."""
     encoded = prepared.encoded
     terms = encoded.terms
+    leg = prepared.legs[0]  # one leg today: its schedule names a group's contract
     if terms.settlement is Settlement.PHYSICAL:
         raise ValueError(
             "settlement_method is 'physical', expected 'financial' with a bilateral batch; a "
@@ -245,10 +261,10 @@ def _the_curves(
                 "that name"
             )
         curves.append(curve)
-    as_of = prepared.history.calendar.valuation_date.as_of
+    as_of = leg.history.calendar.valuation_date.as_of
     pays = cast(UnpaidPayments, prepared.unpaid_payments)  # bilateral and financial: made with it
     payment_date = cast(NDArray[np.datetime64], encoded.payment_date)  # financial: the rule above
-    codes = terms.schedule.codes
+    codes = leg.encoded.leg.schedule.codes
     for key, curve, keyed_pays in zip(encoded.keys, curves, pays.by_key, strict=True):
         curve_starts_on(curve, as_of)
         uncovered = keyed_pays.days > curve.max_date
@@ -256,7 +272,8 @@ def _the_curves(
             d = int(uncovered.argmax())
             g = int(keyed_pays.groups[int((keyed_pays.day_of_group == d).argmax())])
             raise ValueError(
-                f"the payment of {codes[int(encoded.group_contract[g])]} on {payment_date[g]} on "
+                f"the payment of {codes[int(leg.encoded.group_contract[g])]} on "
+                f"{payment_date[g]} on "
                 f"{key} is past the discount curve {curve.name!r}, which runs from "
                 f"{curve.start_date} to {curve.max_date}; expected every unpaid payment day covered"
             )
@@ -265,12 +282,14 @@ def _the_curves(
 
 def _discounted(
     prepared: PreparedTrades,
+    leg: PreparedLeg,
     market: Market,
     curves: tuple[DiscountCurve, ...],
     dated_live_contribution: NDArray[np.float64],
     counter: WorkCounter,
 ) -> TradeResults:
-    """The bilateral snapshot, since #176, over the rules _the_curves checked. The live
+    """The bilateral snapshot, since #176, over the rules _the_curves checked, the one leg
+    today and its market beside the trade's preparation, two-index-fixed-float.md. The live
     contributions are summed onto the payment groups, one bincount, and each group's amount is
     its entry-price offset, its set amount and its live amount together; a paid group's amount
     is cash already and is read for nothing. The unpaid groups, their time fractions and, per
@@ -309,20 +328,22 @@ def _discounted(
     """
     encoded = prepared.encoded
     terms = encoded.terms
-    conventions = terms.index.conventions
+    encoded_leg = leg.encoded
+    leg_terms = encoded_leg.leg
+    conventions = leg_terms.index.conventions
     currency = conventions.currency_unit
-    codes = terms.schedule.codes
-    as_of = prepared.history.calendar.valuation_date.as_of
-    groups = encoded.group_contract.size
+    codes = leg_terms.schedule.codes
+    as_of = leg.history.calendar.valuation_date.as_of
+    groups = encoded.offset_of_group.size
     payment_date = cast(
         NDArray[np.datetime64], encoded.payment_date
     )  # financial: _the_curves' rule
     pays = cast(UnpaidPayments, prepared.unpaid_payments)  # bilateral and financial: the same rule
     axes = cast(PaymentAxes, encoded.payment_axes)  # bilateral and financial: made with it
-    places = cast(CurveAxes, encoded.curve_axes)  # the same
+    places = cast(CurveAxes, encoded_leg.curve_axes)  # the same
     key_of_group = cast(NDArray[np.intp], encoded.key_of_group)  # bilateral: keyed
-    live_group = encoded.slot_group[prepared.live_slot]
-    lot = terms.reporting_lot
+    live_group = encoded_leg.slot_group[leg.live_slot]
+    lot = leg_terms.reporting_lot
     curve_count = len(curves)
     days, months, years = axes.days.size, axes.months.size, axes.years.size
     factors_read = 0
@@ -344,21 +365,25 @@ def _discounted(
         mark = float(npv.sum())
         dv01_by_curve = np.bincount(key_of_group, weights=dv01_by_group, minlength=curve_count)
         dv01 = float(dv01_by_curve.sum())
-        discounted_lots = prepared.dated_live_lots * payment_factor[encoded.slot_group]
+        discounted_lots = leg.dated_live_lots * payment_factor[encoded_leg.slot_group]
         delta = np.bincount(
-            encoded.reference_of_slot, weights=discounted_lots, minlength=encoded.references.size
+            encoded_leg.reference_of_slot,
+            weights=discounted_lots,
+            minlength=encoded_leg.references.size,
         )
         discounted_price_sensitivity = delta * lot.coefficient
         daily = np.bincount(
-            encoded.day_of_slot, weights=discounted_lots, minlength=encoded.days.size
+            encoded_leg.day_of_slot, weights=discounted_lots, minlength=encoded_leg.days.size
         )
         monthly = np.bincount(
-            encoded.contract_month_of_reference,
+            encoded_leg.contract_month_of_reference,
             weights=delta,
-            minlength=encoded.contract_months.size,
+            minlength=encoded_leg.contract_months.size,
         )
         yearly = np.bincount(
-            encoded.contract_year_of_month, weights=monthly, minlength=encoded.contract_years.size
+            encoded_leg.contract_year_of_month,
+            weights=monthly,
+            minlength=encoded_leg.contract_years.size,
         )
         discounted_total = float(delta.sum())
         # Since #178, the DV01 by payment day, month and year, the groups' DV01s summed onto the
@@ -377,7 +402,7 @@ def _discounted(
     if unfinished.any():
         g = int(unfinished.argmax())
         raise ValueError(
-            f"the payment of {codes[int(encoded.group_contract[g])]} on {payment_date[g]} on "
+            f"the payment of {codes[int(encoded_leg.group_contract[g])]} on {payment_date[g]} on "
             f"{encoded.keys[int(key_of_group[g])]} is {float(amount[g])!r}, expected a finite "
             f"amount of {currency}; its fixed, set and live legs sum past the largest number"
         )
@@ -392,7 +417,7 @@ def _discounted(
     if outrun.any():
         r = int(outrun.argmax())
         raise ValueError(
-            f"{codes[int(encoded.references[r])]} has {float(delta[r])!r} of "
+            f"{codes[int(encoded_leg.references[r])]} has {float(delta[r])!r} of "
             f"delta, expected a finite number of {words}; its discounted lots sum "
             "past the largest number"
         )
@@ -400,15 +425,16 @@ def _discounted(
     if outrun.any():
         r = int(outrun.argmax())
         raise ValueError(
-            f"{codes[int(encoded.references[r])]} has {float(discounted_price_sensitivity[r])!r} "
+            f"{codes[int(encoded_leg.references[r])]} has "
+            f"{float(discounted_price_sensitivity[r])!r} "
             f"of discounted price sensitivity, expected a finite amount of {currency} per "
             f"{conventions.quote_currency_unit}/{conventions.quote_quantity_unit}; its discounted "
             "lots times the lot's coefficient outrun the largest number"
         )
     for label, starts, lots in (
-        ("the day", encoded.days, daily),
-        ("the contract month from", encoded.contract_months, monthly),
-        ("the contract year from", encoded.contract_years, yearly),
+        ("the day", encoded_leg.days, daily),
+        ("the contract month from", encoded_leg.contract_months, monthly),
+        ("the contract year from", encoded_leg.contract_years, yearly),
     ):
         outrun = ~np.isfinite(lots)
         if outrun.any():
@@ -437,22 +463,22 @@ def _discounted(
     )
     # Since #197 the cross-gamma, after every rule above and under its own.
     cross_gamma, cross_by_day, cross_by_month, cross_by_year, cross_by_curve, cross_total, early = (
-        _cross_gamma(prepared, pays, discounted_lots, words, as_of, curves, places)
+        _cross_gamma(leg, pays, discounted_lots, words, as_of, curves, places)
     )
     # Since #186 the facts refusing a month or a year report of the discounted lots or the DV01
     # standing before the valuation day's period, found once here against the preparation's
     # display axes, the DV01's per curve.
     early_delta = early_risk(
-        f"index {terms.index.name!r}",
+        f"index {leg_terms.index.name!r}",
         "contract",
         as_of,
         words,
-        encoded.contract_months,
+        encoded_leg.contract_months,
         monthly,
-        prepared.by_month.contract_from,
-        encoded.contract_years,
+        leg.by_month.contract_from,
+        encoded_leg.contract_years,
         yearly,
-        prepared.by_year.contract_from,
+        leg.by_year.contract_from,
     )
     early_dv01 = tuple(
         [
@@ -463,10 +489,10 @@ def _discounted(
                 f"{currency} per basis point",
                 axes.months,
                 dv01_by_month[c * months : (c + 1) * months],
-                prepared.by_month.paid_from,
+                leg.by_month.paid_from,
                 axes.years,
                 dv01_by_year[c * years : (c + 1) * years],
-                prepared.by_year.paid_from,
+                leg.by_year.paid_from,
             )
             for c, curve in enumerate(curves)
         ]
@@ -474,8 +500,8 @@ def _discounted(
     counter.hit(CURVES_SELECTED, curve_count)
     counter.hit(PAYMENT_FACTORS_READ, factors_read)
     counter.hit(GROUPS_VALUED, int(pays.groups.size))
-    counter.hit(SLOTS_DISCOUNTED, int(encoded.slot_group.size))
-    counter.hit(SLOTS_WEIGHTED, int(encoded.slot_group.size))
+    counter.hit(SLOTS_DISCOUNTED, int(encoded_leg.slot_group.size))
+    counter.hit(SLOTS_WEIGHTED, int(encoded_leg.slot_group.size))
     counter.hit(RISK_REDUCTIONS, 12)
     for array in (
         amount,
@@ -493,45 +519,72 @@ def _discounted(
         dv01_by_year,
     ):
         array.setflags(write=False)
-    references = encoded.references.size
-    observed = encoded.days.size
-    contract_months = encoded.contract_months.size
-    contract_years = encoded.contract_years.size
+    references = encoded_leg.references.size
+    observed = encoded_leg.days.size
+    contract_months = encoded_leg.contract_months.size
+    contract_years = encoded_leg.contract_years.size
     return TradeResults(
         prepared=prepared,
-        market=market,
+        legs=(
+            LegResults(
+                prepared=leg,
+                market=market,
+                dated_live_contribution=dated_live_contribution,
+                contracts=encoded_leg.references,
+                price_sensitivity=leg.price_sensitivity,
+                price_sensitivity_unit=(
+                    f"{currency} per {conventions.quote_currency_unit}/"
+                    f"{conventions.quote_quantity_unit}"
+                ),
+                nominal_delta=leg.nominal_delta,
+                nominal_delta_total=leg.nominal_delta_total,
+                lot_unit=words,
+                # Bilateral: the nominal risk weighted by each live slot's payment factor, made
+                # above.
+                delta=delta,
+                delta_total=discounted_total,
+                discounted_price_sensitivity=discounted_price_sensitivity,
+                discounted_daily_lots=daily,
+                discounted_monthly_lots=monthly,
+                discounted_yearly_lots=yearly,
+                early_delta=early_delta,
+                cross_gamma_total=cross_total,
+                # Each curve's share of the cross-gamma, its row of the arrays above by
+                # reference, on the axes they were summed onto.
+                cross_contributions=tuple(
+                    [
+                        CrossContribution(
+                            curve,
+                            encoded_leg.references,
+                            cross_gamma[c * references : (c + 1) * references],
+                            encoded_leg.days,
+                            cross_by_day[c * observed : (c + 1) * observed],
+                            encoded_leg.contract_months,
+                            cross_by_month[c * contract_months : (c + 1) * contract_months],
+                            encoded_leg.contract_years,
+                            cross_by_year[c * contract_years : (c + 1) * contract_years],
+                            float(cross_by_curve[c]),
+                            early[c],
+                        )
+                        for c, curve in enumerate(curves)
+                    ]
+                ),
+            ),
+        ),
         route=terms.route,
         currency=currency,
         as_of=as_of,
         mark=mark,
         cash=prepared.cash,
-        dated_live_contribution=dated_live_contribution,
-        contracts=encoded.references,
-        price_sensitivity=prepared.price_sensitivity,
-        price_sensitivity_unit=(
-            f"{currency} per {conventions.quote_currency_unit}/{conventions.quote_quantity_unit}"
-        ),
-        nominal_delta=prepared.nominal_delta,
-        nominal_delta_total=prepared.nominal_delta_total,
-        lot_unit=words,
         dv01=dv01,
         reserves=encoded.reserves,
         curves=curves,
-        # Bilateral: the nominal risk weighted by each live slot's payment factor, made above.
-        delta=delta,
-        delta_total=discounted_total,
-        discounted_price_sensitivity=discounted_price_sensitivity,
-        discounted_daily_lots=daily,
-        discounted_monthly_lots=monthly,
-        discounted_yearly_lots=yearly,
         payment_amount=amount,
         npv_by_group=npv,
         dv01_by_group=dv01_by_group,
         payment_factor=payment_factor,
-        early_delta=early_delta,
-        cross_gamma_total=cross_total,
-        # Each curve's share of the DV01 and of the cross-gamma, its row of the arrays above by
-        # reference, on the axes they were summed onto.
+        # Each curve's share of the DV01, its row of the arrays above by reference, on the axes
+        # they were summed onto.
         rate_contributions=tuple(
             [
                 RateContribution(
@@ -545,24 +598,6 @@ def _discounted(
                     axes.years,
                     dv01_by_year[c * years : (c + 1) * years],
                     early_dv01[c],
-                )
-                for c, curve in enumerate(curves)
-            ]
-        ),
-        cross_contributions=tuple(
-            [
-                CrossContribution(
-                    curve,
-                    encoded.references,
-                    cross_gamma[c * references : (c + 1) * references],
-                    encoded.days,
-                    cross_by_day[c * observed : (c + 1) * observed],
-                    encoded.contract_months,
-                    cross_by_month[c * contract_months : (c + 1) * contract_months],
-                    encoded.contract_years,
-                    cross_by_year[c * contract_years : (c + 1) * contract_years],
-                    float(cross_by_curve[c]),
-                    early[c],
                 )
                 for c, curve in enumerate(curves)
             ]
@@ -591,7 +626,7 @@ def _each_period_finite(
 
 
 def _cross_gamma(
-    prepared: PreparedTrades,
+    leg: PreparedLeg,
     pays: UnpaidPayments,
     discounted_lots: NDArray[np.float64],
     words: str,
@@ -609,7 +644,7 @@ def _cross_gamma(
 ]:
     """The cross-gamma, since #197, single-curve-cross-gamma.md, and since named-curves-slice-3.md
     every curve's at once: by reference, by day, by contract month, by contract year, a row per
-    curve in one array per axis, the totals by curve and their sum, the batch's cross-gamma with
+    curve in one array per axis, the totals by curve and their sum, the leg's cross-gamma with
     every used curve shifted together, and the facts refusing a month or a year
     report of each curve's standing before the valuation day's period. Each unpaid group's
     weight is -0.0001 times its time fraction, its factor's derivative over the factor for a rise
@@ -631,9 +666,9 @@ def _cross_gamma(
     Work: one weight per group, one product per slot and four reductions, counted by the caller;
     nothing sorted, no factor and no day read again, no pass per curve.
     """
-    encoded = prepared.encoded
-    terms = encoded.terms
-    codes = terms.schedule.codes
+    encoded = leg.encoded
+    leg_terms = encoded.leg
+    codes = leg_terms.schedule.codes
     curve_count = len(curves)
     references = encoded.references.size
     days = encoded.days.size
@@ -693,16 +728,16 @@ def _cross_gamma(
     early = tuple(
         [
             early_risk(
-                f"index {terms.index.name!r} on {curve.name}",
+                f"index {leg_terms.index.name!r} on {curve.name}",
                 "contract",
                 as_of,
                 per_bp,
                 encoded.contract_months,
                 by_month[c * months : (c + 1) * months],
-                prepared.by_month.contract_from,
+                leg.by_month.contract_from,
                 encoded.contract_years,
                 by_year[c * years : (c + 1) * years],
-                prepared.by_year.contract_from,
+                leg.by_year.contract_from,
             )
             for c, curve in enumerate(curves)
         ]

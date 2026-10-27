@@ -94,21 +94,42 @@ class PaymentTerms:
 
 
 @dataclass(frozen=True, slots=True)
+class LegTerms:
+    """One leg's side of a batch's terms, since two-index-fixed-float.md: the facts that belong to
+    the index the leg prices on, kept apart from the trade's own so that a second leg is another
+    of these and nothing else. The index, by reference, its schedule, the same object the index
+    holds, typed as the kind rule found it, and its reporting lot, the specification the leg's
+    delta is counted in lots of. Per occurrence, aligned with the trade's rows: specification[i]
+    the row of the index's specifications the row's quantity counts, the desk's word for a
+    quantity of the index that its quantity_unit named, and schedule_method[i] the method, the
+    position of the member among METHODS. Per component, aligned with the trade's components:
+    contract[k] the row of the schedule the component's month is, and fixed_price[k] the price
+    agreed for the leg, in the index's quote units. Then schedule_month[i], since #186, the
+    calendar month of every row of the schedule as numpy counts months from 1970, read once by
+    the resolution against the ticket's codes and kept for the encoding's contract-month axes.
+    Every array read-only."""
+
+    index: Index
+    schedule: FuturesSchedule | IfercSchedule
+    reporting_lot: ReportingLot
+    specification: NDArray[np.intp]
+    schedule_method: NDArray[np.intp]
+    contract: NDArray[np.intp]
+    fixed_price: NDArray[np.float64]
+    schedule_month: NDArray[np.int64]
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedTrades:
-    """The instrument, the definition the terms were resolved under; the index, by reference, its
-    futures schedule, the same object the index holds, typed as the kind rule found it, and its
-    reporting lot, the specification the batch's delta is counted in lots of, the one the index
-    was made with; the route and the settlement, one each for the batch. Then two sets of columns
+    """The trade's own facts, and its legs. The instrument, the definition the terms were resolved
+    under; the route and the settlement, one each for the batch. Then two sets of columns
     aligned by position, all read-only. Per occurrence, the ticket's rows in order:
-    specification[i] the row of the index's specifications its quantity counts, the desk's word
-    for a quantity of the index that the row's quantity_unit named; schedule_method[i] its method
-    and quantity_per[i] the basis its quantity is stated per, each the position of the member
-    among METHODS and BASES, so that one batch mixes units, methods and bases row by row;
-    trade_dates[i] the day the deal was struck, trade_ids[i] its trade_id, the source system's
-    whole number of at most 15 digits held as an int64 since #168, clearing_house[i] its clearing
-    organization, counterparty[i] since #175 the counterparty it faces and broker[i] its broker,
-    the IDs an array and the three labels tuples, each None as a whole when the field was not
-    given, each kept as given and read for nothing but a message's words and, since #188, the
+    quantity_per[i] the basis its quantity is stated per, the position of the member among
+    BASES; trade_dates[i] the day the deal was struck, trade_ids[i] its trade_id, the source
+    system's whole number of at most 15 digits held as an int64 since #168, clearing_house[i] its
+    clearing organization, counterparty[i] since #175 the counterparty it faces and broker[i] its
+    broker, the IDs an array and the three labels tuples, each None as a whole when the field was
+    not given, each kept as given and read for nothing but a message's words and, since #188, the
     broker's text for brokered[i], whether the row names a broker and so charges brokerage:
     False for every row when the field was not given and where the row's text is none in any
     case, the desk's word for a screen trade, reserve-fee-applicability.md; marketing_reserve[i]
@@ -117,30 +138,27 @@ class ResolvedTrades:
     read by the reserves alone; discount_curve_key[i], since named-curves-slice-3.md, the
     exact name of the curve the row's payments discount on, one per occurrence for a bilateral
     batch and None as a whole for a cleared one, read by the encoding for the groups and by the
-    evaluation to select the curve, never a curve itself. Per
-    component, the contract months the occurrences hold: occurrence[k] the row of the occurrence
-    it belongs to, contract[k] the row of the schedule its month is, quantity[k] the signed whole
-    count of the specification as entered, per the basis, start_date[k] and end_date[k] the first
-    and the last day the component covers, within its contract's calendar month, the whole month
-    from a contract code and a booked period's share of it from explicit dates, covered_days[k]
-    the calendar days between them inclusive, weekends and holidays included, derived here,
-    component_quantity[k] the count the component holds, the entered quantity under month and
-    the entered quantity times the covered days under calday, formed once here, the one quantity
-    the encoding converts and nothing later scales again, and fixed_price[k] the price agreed, in
-    the index's quote units. Then payment, the terms a financial settlement pays by and the days
-    they give, and None for a physical one, which pays on no day. Then schedule_month[i], since
-    #186, the calendar month of every row of the schedule as numpy counts months from 1970, read
-    once by the resolution against the ticket's codes and kept for the encoding, which gathers it
-    by the pricing references for the delta's month and year buckets."""
+    evaluation to select the curve, never a curve itself. Per component, the contract months the
+    occurrences hold: occurrence[k] the row of the occurrence it belongs to, quantity[k] the
+    signed whole count of the specification as entered, per the basis, start_date[k] and
+    end_date[k] the first and the last day the component covers, within its contract's calendar
+    month, the whole month from a contract code and a booked period's share of it from explicit
+    dates, covered_days[k] the calendar days between them inclusive, weekends and holidays
+    included, derived here, and component_quantity[k] the count the component holds, the entered
+    quantity under month and the entered quantity times the covered days under calday, formed
+    once here, the one quantity the encoding converts and nothing later scales again. Then
+    payment, the terms a financial settlement pays by and the days they give, one day per
+    component shared by every leg, and None for a physical one, which pays on no day.
+
+    Then legs, since two-index-fixed-float.md: the LegTerms of each leg in leg order, one today,
+    each the index a leg prices on with its schedule, reporting lot, specification rows, methods,
+    contract rows and fixed prices, so that what an index owns is held once per leg and what
+    the trade owns is held once. The first leg is the batch's for what a batch has one of: the
+    fee source of its reserves and the name its handle carries."""
 
     instrument: Instrument
-    index: Index
-    schedule: FuturesSchedule | IfercSchedule
-    reporting_lot: ReportingLot
-    specification: NDArray[np.intp]
     route: Route
     settlement: Settlement
-    schedule_method: NDArray[np.intp]
     quantity_per: NDArray[np.intp]
     trade_ids: NDArray[np.int64] | None
     clearing_house: tuple[str, ...] | None
@@ -150,21 +168,26 @@ class ResolvedTrades:
     brokered: NDArray[np.bool_]
     trade_dates: NDArray[np.datetime64]
     occurrence: NDArray[np.intp]
-    contract: NDArray[np.intp]
     quantity: NDArray[np.float64]
     start_date: NDArray[np.datetime64]
     end_date: NDArray[np.datetime64]
     covered_days: NDArray[np.int64]
     component_quantity: NDArray[np.float64]
-    fixed_price: NDArray[np.float64]
     marketing_reserve: NDArray[np.float64] | None
     payment: PaymentTerms | None
-    schedule_month: NDArray[np.int64]
+    legs: tuple[LegTerms, ...]
 
     def named(self, component: int) -> str:
         """A component's trade named in a message, by its ID when the ticket gave one and by its
         row as the sheet counts rows either way: `trade 1001 at row 1`, `trade at row 3`."""
         return named_trade(self.trade_ids, int(self.occurrence[component]))
+
+    @property
+    def descriptor(self) -> str:
+        """The words a handle of the batch carries where a single index's name stands: the legs'
+        index names joined by `+` in leg order, one index's name alone today, a readable
+        descriptor and nothing more, read by nothing that decides."""
+        return "+".join([leg.index.name for leg in self.legs])
 
 
 def named_trade(trade_ids: NDArray[np.int64] | None, row: int) -> str:
@@ -203,7 +226,9 @@ def resolved_trades(
     discount_curve_key: tuple[str, ...] | None = None,
 ) -> ResolvedTrades:
     """The one way to make ResolvedTrades: the rules of the first fixed_float profile, checked once,
-    in this order, the first failure being the message; then the columns copied and frozen.
+    in this order, the first failure being the message; then the columns copied and frozen, the
+    index's own into the batch's one leg, since two-index-fixed-float.md, and the trade's own
+    into the record.
 
     The index is a futures or, since #167, an IFERC index, since a fixed_float's contract is a row
     of a futures schedule, its final price the settlement on that row's expiry day, or a row of an
@@ -284,15 +309,20 @@ def resolved_trades(
     )
     months.setflags(write=False)
     brokered = _the_brokered(broker, occurrences)
-    return ResolvedTrades(
-        instrument,
+    leg = LegTerms(
         index,
         schedule,
         lot,
         _frozen_rows(specification),
+        _frozen_rows(schedule_method),
+        _frozen_rows(contract),
+        _frozen_numbers(fixed_price),
+        months,
+    )
+    return ResolvedTrades(
+        instrument,
         route,
         settlement,
-        _frozen_rows(schedule_method),
         _frozen_rows(quantity_per),
         None if trade_ids is None else _frozen_ids(trade_ids),
         clearing_house,
@@ -302,16 +332,14 @@ def resolved_trades(
         brokered,
         _frozen_days(trade_dates),
         _frozen_rows(occurrence),
-        _frozen_rows(contract),
         quantities,
         starts,
         ends,
         days,
         _the_component_quantity(quantity_per, quantities, days, trade_ids, occurrence),
-        _frozen_numbers(fixed_price),
         None if marketing_reserve is None else _frozen_numbers(marketing_reserve),
         pays,
-        months,
+        (leg,),
     )
 
 

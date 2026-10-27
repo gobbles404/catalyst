@@ -116,7 +116,7 @@ def _PrepareTrades(
     """Prepares a batch of trades against one market history, each observation whose day has
     passed fixed at that day's settle and each payment that has fallen due settled, and shows
     its handle, the text _EvaluateTrades takes as the prepared trades."""
-    return prepared_trades(trades.encoded, history, WorkCounter())
+    return prepared_trades(trades.encoded, (history,), WorkCounter())
 
 
 @excel_function
@@ -141,7 +141,7 @@ def _EvaluateTrades(
     """Evaluates prepared trades against one market, live observations at their quotes and fixed
     at their settles, each bilateral payment discounted on its row's curve, into mark, cash, delta
     and DV01, and shows the results' handle, which the reports take."""
-    return trade_results(prepared, market, WorkCounter(), discount_curve_set)
+    return trade_results(prepared, (market,), WorkCounter(), discount_curve_set)
 
 
 @excel_function

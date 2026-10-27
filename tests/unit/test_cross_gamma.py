@@ -160,22 +160,22 @@ def test_the_worked_example_prices_by_hand() -> None:
     prep = ticket_batch()
     counter = WorkCounter()
     result = valued(prep, QUOTES, CURVE, counter)
-    assert result.nominal_delta_total == 5.0
-    assert result.delta_total == pytest.approx(5.0, **CLOSE)
+    assert result.legs[0].nominal_delta_total == 5.0
+    assert result.legs[0].delta_total == pytest.approx(5.0, **CLOSE)
     np.testing.assert_allclose(given(result.payment_amount), [20.0, 10.0], **TIGHT)
     np.testing.assert_allclose(given(result.npv_by_group), [19.0, 9.0], **TIGHT)
     assert result.mark == pytest.approx(28.0, **CLOSE)
     np.testing.assert_allclose(given(result.dv01_by_group), [-0.0019, -0.0018], **TIGHT)
     assert result.dv01 == pytest.approx(-0.0037, **CLOSE)
     by_reference, by_day, by_month, by_year = cross_of(result)
-    assert result.codes() == ("G27",)
+    assert result.legs[0].codes() == ("G27",)
     np.testing.assert_allclose(by_reference, [-0.00005], **TIGHT)
-    assert result.cross_gamma_total == pytest.approx(-0.00005, **CLOSE)
-    np.testing.assert_array_equal(prep.encoded.days, dates("2027-02-01"))
+    assert result.legs[0].cross_gamma_total == pytest.approx(-0.00005, **CLOSE)
+    np.testing.assert_array_equal(prep.encoded.legs[0].days, dates("2027-02-01"))
     np.testing.assert_allclose(by_day, [-0.00005], **TIGHT)
-    np.testing.assert_array_equal(prep.encoded.contract_months, dates("2027-02-01"))
+    np.testing.assert_array_equal(prep.encoded.legs[0].contract_months, dates("2027-02-01"))
     np.testing.assert_allclose(by_month, [-0.00005], **TIGHT)
-    np.testing.assert_array_equal(prep.encoded.contract_years, dates("2027-01-01"))
+    np.testing.assert_array_equal(prep.encoded.legs[0].contract_years, dates("2027-01-01"))
     np.testing.assert_allclose(by_year, [-0.00005], **TIGHT)
     assert all(
         not array.flags.writeable and array.dtype == np.float64 for array in cross_of(result)
@@ -197,12 +197,12 @@ def test_the_worked_example_prices_by_hand() -> None:
     b = valued(prepared_on(trades_on(HNG, (-5.0,), (74.0,), PAYS[1:], LAGS[1:])), QUOTES, CURVE)
     assert (a.mark, a.dv01) == (pytest.approx(19.0, **CLOSE), pytest.approx(-0.0019, **CLOSE))
     assert (b.mark, b.dv01) == (pytest.approx(9.0, **CLOSE), pytest.approx(-0.0018, **CLOSE))
-    assert a.delta_total == pytest.approx(9.5, **CLOSE)
-    assert b.delta_total == pytest.approx(-4.5, **CLOSE)
-    assert a.cross_gamma_total == pytest.approx(-0.00095, **CLOSE)
-    assert b.cross_gamma_total == pytest.approx(0.0009, **CLOSE)
-    assert a.cross_gamma_total + b.cross_gamma_total == pytest.approx(
-        result.cross_gamma_total, **CLOSE
+    assert a.legs[0].delta_total == pytest.approx(9.5, **CLOSE)
+    assert b.legs[0].delta_total == pytest.approx(-4.5, **CLOSE)
+    assert a.legs[0].cross_gamma_total == pytest.approx(-0.00095, **CLOSE)
+    assert b.legs[0].cross_gamma_total == pytest.approx(0.0009, **CLOSE)
+    assert a.legs[0].cross_gamma_total + b.legs[0].cross_gamma_total == pytest.approx(
+        result.legs[0].cross_gamma_total, **CLOSE
     )
 
 
@@ -217,16 +217,20 @@ def test_a_quote_tick_moves_the_mark_and_the_dv01_and_a_curve_move_moves_the_cro
     ticked = valued(prep, (73.0, 50.0), CURVE)
     assert ticked.mark == pytest.approx(33.0, **CLOSE)
     assert ticked.dv01 == pytest.approx(-0.00375, **CLOSE)
-    assert ticked.nominal_delta_total == 5.0
-    assert ticked.delta_total == pytest.approx(5.0, **CLOSE)
-    assert ticked.cross_gamma_total == base.cross_gamma_total == pytest.approx(-0.00005, **CLOSE)
+    assert ticked.legs[0].nominal_delta_total == 5.0
+    assert ticked.legs[0].delta_total == pytest.approx(5.0, **CLOSE)
+    assert (
+        ticked.legs[0].cross_gamma_total
+        == base.legs[0].cross_gamma_total
+        == pytest.approx(-0.00005, **CLOSE)
+    )
     for before, after in zip(cross_of(base), cross_of(ticked), strict=True):
         np.testing.assert_array_equal(before, after)
     moved = valued(prep, QUOTES, curve_of((AS_OF, 1.0), (PAYS[0], 0.96), (PAYS[1], 0.92)))
-    assert moved.delta_total == pytest.approx(5.0, **CLOSE)
+    assert moved.legs[0].delta_total == pytest.approx(5.0, **CLOSE)
     assert moved.mark == pytest.approx(28.4, **CLOSE)
     assert moved.dv01 == pytest.approx(-0.00376, **CLOSE)
-    assert moved.cross_gamma_total == pytest.approx(-0.00004, **CLOSE)
+    assert moved.legs[0].cross_gamma_total == pytest.approx(-0.00004, **CLOSE)
 
 
 def test_the_cross_gamma_stands_where_the_npv_or_the_discounted_delta_is_nothing() -> None:
@@ -238,17 +242,17 @@ def test_the_cross_gamma_stands_where_the_npv_or_the_discounted_delta_is_nothing
     # payment's time weights its own lots before they net.
     at_the_money = valued(ticket_batch((10.0, -5.0), (72.0, 72.0)), QUOTES, CURVE)
     assert at_the_money.mark == 0.0 and at_the_money.dv01 == 0.0
-    assert at_the_money.nominal_delta_total == 5.0
-    assert at_the_money.delta_total == pytest.approx(5.0, **CLOSE)
-    assert at_the_money.cross_gamma_total == pytest.approx(-0.00005, **CLOSE)
+    assert at_the_money.legs[0].nominal_delta_total == 5.0
+    assert at_the_money.legs[0].delta_total == pytest.approx(5.0, **CLOSE)
+    assert at_the_money.legs[0].cross_gamma_total == pytest.approx(-0.00005, **CLOSE)
     netted = valued(ticket_batch((18.0, -19.0), (70.0, 70.0)), (80.0, 50.0), CURVE)
     np.testing.assert_allclose(given(netted.npv_by_group), [171.0, -171.0], **TIGHT)
     assert netted.mark == pytest.approx(0.0, **CLOSE)
     assert netted.dv01 == pytest.approx(0.0171, **CLOSE)
-    assert netted.nominal_delta_total == -1.0
-    assert netted.delta_total == pytest.approx(0.0, **CLOSE)
+    assert netted.legs[0].nominal_delta_total == -1.0
+    assert netted.legs[0].delta_total == pytest.approx(0.0, **CLOSE)
     np.testing.assert_allclose(cross(netted).cross_gamma, [0.00171], **TIGHT)
-    assert netted.cross_gamma_total == pytest.approx(0.00171, **CLOSE)
+    assert netted.legs[0].cross_gamma_total == pytest.approx(0.00171, **CLOSE)
 
 
 # --- the numerical derivative ---------------------------------------------------------------------
@@ -280,17 +284,19 @@ def test_the_analytic_cross_gamma_agrees_with_a_centered_difference_of_the_disco
         up = valued(prep, QUOTES, bumped(CURVE, h))
         down = valued(prep, QUOTES, bumped(CURVE, -h))
         pairs = (
-            (up.delta, down.delta),
-            (up.discounted_daily_lots, down.discounted_daily_lots),
-            (up.discounted_monthly_lots, down.discounted_monthly_lots),
-            (up.discounted_yearly_lots, down.discounted_yearly_lots),
+            (up.legs[0].delta, down.legs[0].delta),
+            (up.legs[0].discounted_daily_lots, down.legs[0].discounted_daily_lots),
+            (up.legs[0].discounted_monthly_lots, down.legs[0].discounted_monthly_lots),
+            (up.legs[0].discounted_yearly_lots, down.legs[0].discounted_yearly_lots),
         )
         for (plus, minus), exact in zip(pairs, cross_of(analytic), strict=True):
             np.testing.assert_allclose(
                 0.0001 * (plus - minus) / (2 * h), exact, rtol=0, atol=tolerance
             )
-        centered_total = 0.0001 * (up.delta_total - down.delta_total) / (2 * h)
-        assert centered_total == pytest.approx(analytic.cross_gamma_total, rel=0, abs=tolerance)
+        centered_total = 0.0001 * (up.legs[0].delta_total - down.legs[0].delta_total) / (2 * h)
+        assert centered_total == pytest.approx(
+            analytic.legs[0].cross_gamma_total, rel=0, abs=tolerance
+        )
         if h == 1e-5:
             # The ticket's own figure for the primary example at this bump, to its roundoff.
             assert centered_total == pytest.approx(-0.0000499999999581, rel=0, abs=2e-14)
@@ -308,13 +314,13 @@ def test_fixed_lots_carry_no_cross_gamma_and_a_paid_group_none_at_all() -> None:
     terms = terms_of((10.0,), (A_YEAR,), (261,))
     ones = curve_of((AS_OF, 1.0), (A_YEAR, 1.0))
     on_the_day = valued(prepared_on(terms), (80.0, 50.0), ones)
-    assert on_the_day.delta_total == pytest.approx(10.0, **CLOSE)
-    assert on_the_day.cross_gamma_total == pytest.approx(-0.001, **CLOSE)
+    assert on_the_day.legs[0].delta_total == pytest.approx(10.0, **CLOSE)
+    assert on_the_day.legs[0].cross_gamma_total == pytest.approx(-0.001, **CLOSE)
     fixed = prepared_on(terms, "2027-01-05", {"F27": 82.0})
     unpaid = valued(fixed, (50.0,), curve_of(("2027-01-05", 1.0), (A_YEAR, 1.0)))
     assert unpaid.mark == pytest.approx(120.0, **CLOSE)
     assert unpaid.dv01 == pytest.approx(-0.0001 * 364 / 365 * 120.0, **CLOSE)
-    assert unpaid.delta_total == 0.0 and unpaid.cross_gamma_total == 0.0
+    assert unpaid.legs[0].delta_total == 0.0 and unpaid.legs[0].cross_gamma_total == 0.0
     for array in cross_of(unpaid):
         assert array.dtype == np.float64 and not array.flags.writeable
         np.testing.assert_array_equal(array, [0.0])
@@ -322,7 +328,7 @@ def test_fixed_lots_carry_no_cross_gamma_and_a_paid_group_none_at_all() -> None:
     counter = WorkCounter()
     settled = valued(paid, (50.0,), curve_of((A_YEAR, 1.0)), counter)
     assert settled.cash == pytest.approx(120.0, **CLOSE) and settled.mark == 0.0
-    assert settled.cross_gamma_total == 0.0
+    assert settled.legs[0].cross_gamma_total == 0.0
     for array in cross_of(settled):
         np.testing.assert_array_equal(array, [0.0])
     assert counter.freeze().as_dict()["payment_factors_read"] == 0
@@ -350,25 +356,25 @@ def test_a_partly_fixed_asian_keeps_the_cross_gamma_of_its_live_days_alone() -> 
         ),
         as_of,
     )
-    assert prep.encoded.days.size == 22 and int(prep.is_fixed.sum()) == 10
+    assert prep.encoded.legs[0].days.size == 22 and int(prep.legs[0].is_fixed.sum()) == 10
     result = valued(prep, (3.1, 3.2), curve_of((as_of, 1.0), ("2027-10-15", 0.95)))
-    assert result.nominal_delta_total == pytest.approx(12.0, **CLOSE)
-    assert result.delta_total == pytest.approx(11.4, **CLOSE)
+    assert result.legs[0].nominal_delta_total == pytest.approx(12.0, **CLOSE)
+    assert result.legs[0].delta_total == pytest.approx(11.4, **CLOSE)
     by_reference, by_day, by_month, by_year = cross_of(result)
     np.testing.assert_allclose(by_reference, [-0.00114], **TIGHT)
     np.testing.assert_allclose(by_day, [0.0] * 10 + [-0.000095] * 12, **TIGHT)
-    np.testing.assert_array_equal(prep.encoded.contract_months, dates("2026-10-01"))
+    np.testing.assert_array_equal(prep.encoded.legs[0].contract_months, dates("2026-10-01"))
     np.testing.assert_allclose(by_month, [-0.00114], **TIGHT)
     np.testing.assert_allclose(by_year, [-0.00114], **TIGHT)
-    assert result.cross_gamma_total == pytest.approx(-0.00114, **CLOSE)
+    assert result.legs[0].cross_gamma_total == pytest.approx(-0.00114, **CLOSE)
 
 
 def test_a_cleared_batch_holds_the_known_zero_and_asks_for_no_curve() -> None:
     for settlement in (Settlement.FINANCIAL, Settlement.PHYSICAL):
         prep = prepared_on(terms_of(route=Route.CLEARED, settlement=settlement))
         result = valued(prep, (80.0, 50.0), None)
-        assert result.curves == () and result.cross_gamma_total == 0.0
-        assert result.rate_contributions == () and result.cross_contributions == ()
+        assert result.curves == () and result.legs[0].cross_gamma_total == 0.0
+        assert result.rate_contributions == () and result.legs[0].cross_contributions == ()
 
 
 # --- the axes -------------------------------------------------------------------------------------
@@ -407,17 +413,21 @@ def test_the_month_and_the_year_follow_the_pricing_contract_and_the_day_the_obse
     )
     result = valued(prep, (3.2, 3.3, 3.4), NG_CURVE)
     by_reference, by_day, by_month, by_year = cross_of(result)
-    assert result.codes() == ("Z26", "F27")
+    assert result.legs[0].codes() == ("Z26", "F27")
     np.testing.assert_allclose(by_reference, [-0.00095, -0.00072], **TIGHT)
-    np.testing.assert_array_equal(prep.encoded.days, dates("2026-11-25", "2026-12-29"))
+    np.testing.assert_array_equal(prep.encoded.legs[0].days, dates("2026-11-25", "2026-12-29"))
     np.testing.assert_allclose(by_day, [-0.00095, -0.00072], **TIGHT)
-    np.testing.assert_array_equal(prep.encoded.contract_months, dates("2026-12-01", "2027-01-01"))
+    np.testing.assert_array_equal(
+        prep.encoded.legs[0].contract_months, dates("2026-12-01", "2027-01-01")
+    )
     np.testing.assert_allclose(by_month, [-0.00095, -0.00072], **TIGHT)
-    np.testing.assert_array_equal(prep.encoded.contract_years, dates("2026-01-01", "2027-01-01"))
+    np.testing.assert_array_equal(
+        prep.encoded.legs[0].contract_years, dates("2026-01-01", "2027-01-01")
+    )
     np.testing.assert_allclose(by_year, [-0.00095, -0.00072], **TIGHT)
     for vector in cross_of(result):
-        assert float(vector.sum()) == pytest.approx(result.cross_gamma_total, **CLOSE)
-    assert result.cross_gamma_total == pytest.approx(-0.00167, **CLOSE)
+        assert float(vector.sum()) == pytest.approx(result.legs[0].cross_gamma_total, **CLOSE)
+    assert result.legs[0].cross_gamma_total == pytest.approx(-0.00167, **CLOSE)
 
 
 def test_a_rolling_asian_splits_its_cross_gamma_by_the_contract_pricing_each_day() -> None:
@@ -441,14 +451,16 @@ def test_a_rolling_asian_splits_its_cross_gamma_by_the_contract_pricing_each_day
     )
     result = valued(prep, (3.2, 3.3, 3.4), NG_CURVE)
     by_reference, by_day, by_month, by_year = cross_of(result)
-    assert result.codes() == ("Z26", "F27")
+    assert result.legs[0].codes() == ("Z26", "F27")
     np.testing.assert_allclose(by_reference, [-0.00171, -0.000285], **TIGHT)
-    assert prep.encoded.days.size == 21
+    assert prep.encoded.legs[0].days.size == 21
     np.testing.assert_allclose(by_day, [-0.000095] * 21, **TIGHT)
-    np.testing.assert_array_equal(prep.encoded.contract_months, dates("2026-12-01", "2027-01-01"))
+    np.testing.assert_array_equal(
+        prep.encoded.legs[0].contract_months, dates("2026-12-01", "2027-01-01")
+    )
     np.testing.assert_allclose(by_month, [-0.00171, -0.000285], **TIGHT)
     np.testing.assert_allclose(by_year, [-0.00171, -0.000285], **TIGHT)
-    assert result.cross_gamma_total == pytest.approx(-0.001995, **CLOSE)
+    assert result.legs[0].cross_gamma_total == pytest.approx(-0.001995, **CLOSE)
 
 
 def test_a_contract_month_before_the_valuation_month_is_a_saved_fact() -> None:
@@ -488,7 +500,9 @@ def test_the_batch_is_its_rows_in_any_order_a_repeat_counts_and_a_zero_row_adds_
         QUOTES,
         CURVE,
     )
-    assert reversed_rows.cross_gamma_total == pytest.approx(result.cross_gamma_total, **CLOSE)
+    assert reversed_rows.legs[0].cross_gamma_total == pytest.approx(
+        result.legs[0].cross_gamma_total, **CLOSE
+    )
     for mine, theirs in zip(cross_of(result), cross_of(reversed_rows), strict=True):
         np.testing.assert_allclose(mine, theirs, **TIGHT)
     twice = valued(
@@ -497,7 +511,7 @@ def test_the_batch_is_its_rows_in_any_order_a_repeat_counts_and_a_zero_row_adds_
         CURVE,
     )
     assert given(twice.payment_amount).size == 1  # one group, both trades
-    assert twice.cross_gamma_total == pytest.approx(-0.0019, **CLOSE)
+    assert twice.legs[0].cross_gamma_total == pytest.approx(-0.0019, **CLOSE)
     with_zero = valued(
         prepared_on(
             trades_on(
@@ -511,7 +525,7 @@ def test_the_batch_is_its_rows_in_any_order_a_repeat_counts_and_a_zero_row_adds_
         QUOTES,
         CURVE,
     )
-    assert with_zero.cross_gamma_total == pytest.approx(-0.00005, **CLOSE)
+    assert with_zero.legs[0].cross_gamma_total == pytest.approx(-0.00005, **CLOSE)
     # A third payment day for the one contract and observation, 2 lots three years out at 0.85:
     # -0.0001 times 3 times 1.7, -0.00051, beside the pair's -0.00005, each slot its own time.
     three = valued(
@@ -529,7 +543,7 @@ def test_the_batch_is_its_rows_in_any_order_a_repeat_counts_and_a_zero_row_adds_
     )
     assert given(three.payment_amount).size == 3
     np.testing.assert_allclose(cross(three).cross_gamma, [-0.00056], **TIGHT)
-    assert three.cross_gamma_total == pytest.approx(-0.00056, **CLOSE)
+    assert three.legs[0].cross_gamma_total == pytest.approx(-0.00056, **CLOSE)
 
 
 # --- the rules ------------------------------------------------------------------------------------
@@ -602,7 +616,8 @@ def test_the_views_select_the_cross_gamma_by_reference_and_all_four_place_it_wit
     result = valued(prep, QUOTES, CURVE)
     by_day = risk_view(result, Risk.CROSS_GAMMA, Bucket.DAY)
     assert (
-        by_day.dates is prep.encoded.days and by_day.columns[0] is cross(result).cross_gamma_by_day
+        by_day.dates is prep.encoded.legs[0].days
+        and by_day.columns[0] is cross(result).cross_gamma_by_day
     )
     assert by_day.labels == (HNG_CROSS,)
     assert by_day.totals == (pytest.approx(-0.00005, **CLOSE),)
@@ -637,7 +652,7 @@ def test_a_cleared_result_reports_the_known_zero_under_its_cleared_label() -> No
     result = valued(prep, (80.0, 50.0), None)
     label = "UNIT cleared cross_gamma [UNIT per basis point]"
     by_day = risk_view(result, Risk.CROSS_GAMMA, Bucket.DAY)
-    assert by_day.dates is prep.encoded.days and by_day.labels == (label,)
+    assert by_day.dates is prep.encoded.legs[0].days and by_day.labels == (label,)
     assert by_day.totals == (0.0,)
     np.testing.assert_array_equal(by_day.columns[0], [0.0])
     by_month = risk_view(result, Risk.CROSS_GAMMA, Bucket.MONTH)
@@ -707,9 +722,11 @@ def valued_on(
     """The terms prepared against that history and valued on that market, the objects shared by
     every source that is to collect."""
     prep = prepared_trades(
-        encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
+        encoded(terms, (observed_of(terms),), UNITS, WorkCounter()), (history,), WorkCounter()
     )
-    return trade_results(prep, market, WorkCounter(), None if curve is None else curve_set(curve))
+    return trade_results(
+        prep, (market,), WorkCounter(), None if curve is None else curve_set(curve)
+    )
 
 
 def hng_source(
@@ -815,7 +832,7 @@ def test_another_curve_another_index_or_no_curve_is_another_cross_group() -> Non
     wti = valued_on(
         trades_on(WTI, (1.0,), (50.0,), (PAYS[0],), ("+336cd",)), WTI_HISTORY, WTI_MARKET, CURVE
     )
-    assert wti.cross_gamma_total == pytest.approx(-0.000095, **CLOSE)
+    assert wti.legs[0].cross_gamma_total == pytest.approx(-0.000095, **CLOSE)
     both = collected(a, wti)
     assert [(c.index, c.word) for c in both.cross_groups] == [(HNG, "SOFR"), (WTI, "SOFR")]
     view = aggregate_view(both, Risk.CROSS_GAMMA, Bucket.DAY)

@@ -220,7 +220,7 @@ def test_creation_reports_its_rows_its_components_and_every_schedule_code(
 ) -> None:
     counter = WorkCounter()
     batch = trades(GAS, a_ticket(rows, contracts), a_template(), UNITS, counter)
-    assert batch.encoded.group_contract.size == contracts
+    assert batch.encoded.legs[0].group_contract.size == contracts
     assert counter.freeze().as_dict() == {
         "encoded_components": rows,
         "encoded_groups": contracts,  # one payment day per contract: one group each
@@ -438,7 +438,7 @@ def test_the_penultimate_method_adds_one_look_at_the_expiries_and_nothing_per_ro
     terms, observations, _ = resolved(GAS, ticket, template, counter)
     assert terms.payment is not None
     np.testing.assert_array_equal(
-        observations.date, np.busday_offset(EXPIRIES[terms.contract], -1, holidays=HOLIDAYS)
+        observations.date, np.busday_offset(EXPIRIES[terms.legs[0].contract], -1, holidays=HOLIDAYS)
     )
     np.testing.assert_array_equal(
         terms.payment.date, np.busday_offset(observations.date, 2, holidays=HOLIDAYS)
@@ -479,7 +479,7 @@ def test_the_last3day_method_gives_three_days_per_component_and_one_payment_afte
     counter = WorkCounter()
     terms, observations, _ = resolved(GAS, ticket, template, counter)
     assert terms.payment is not None
-    expiries = EXPIRIES[terms.contract]
+    expiries = EXPIRIES[terms.legs[0].contract]
     np.testing.assert_array_equal(
         observations.date,
         np.busday_offset(expiries[:, None], [[-2, -1, 0]], holidays=HOLIDAYS).ravel(),
@@ -529,7 +529,7 @@ def test_the_asian_method_gives_a_month_of_days_per_component_and_one_payment_af
     counter = WorkCounter()
     terms, observations, _ = resolved(ASIAN_GAS, ticket, template, counter)
     assert terms.payment is not None
-    months: NDArray[np.datetime64] = MONTHS[terms.contract]
+    months: NDArray[np.datetime64] = MONTHS[terms.legs[0].contract]
     firsts: NDArray[np.datetime64] = months.astype("datetime64[D]")
     afters: NDArray[np.datetime64] = (months + np.timedelta64(1, "M")).astype("datetime64[D]")
     days: NDArray[np.int64] = np.busday_count(firsts, afters, holidays=HOLIDAYS)
@@ -543,7 +543,8 @@ def test_the_asian_method_gives_a_month_of_days_per_component_and_one_payment_af
     ]
     np.testing.assert_array_equal(observations.date, np.concatenate(by_component))
     np.testing.assert_array_equal(
-        terms.payment.date, np.busday_offset(MONTH_ENDS[terms.contract], 2, holidays=HOLIDAYS)
+        terms.payment.date,
+        np.busday_offset(MONTH_ENDS[terms.legs[0].contract], 2, holidays=HOLIDAYS),
     )
     assert counter.freeze().as_dict() == {
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
@@ -675,6 +676,8 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         # payment-day-date-or-rule.md
         "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
         "_charged": 1,  # clearing, the one fee a cleared, unbrokered template charges, since #188
+        "ResolvedTrades.descriptor": 1,  # the handle's name, the legs' index names joined,
+        # since two-index-fixed-float.md
         "_publish": 1,
     }
     expected = {**resolution_ledger(contracts), **WHOLE_MONTHS, **seam, "WorkCounter.hit": 11}
@@ -752,7 +755,7 @@ def test_the_calday_basis_counts_the_days_once_over_the_schedule_and_multiplies_
     # row.
     ticket, template = a_ticket(rows, contracts), a_template(basis="calday")
     terms, _, _ = resolved(GAS, ticket, template, WorkCounter())
-    days = MONTH_DAYS_BY_HAND[terms.contract]
+    days = MONTH_DAYS_BY_HAND[terms.legs[0].contract]
     np.testing.assert_array_equal(terms.covered_days, days)
     np.testing.assert_array_equal(terms.component_quantity, terms.quantity * days)
     assert (terms.quantity_per == BASES.index(QuantityPer.CALDAY)).all()
@@ -847,7 +850,7 @@ def test_a_ticket_of_dates_resolves_as_its_codes_would_through_the_same_function
         GAS, a_ticket(rows, contracts), template, WorkCounter()
     )
     for mine, theirs in (
-        (terms.contract, by_code.contract),
+        (terms.legs[0].contract, by_code.legs[0].contract),
         (terms.start_date, by_code.start_date),
         (terms.end_date, by_code.end_date),
         (terms.covered_days, by_code.covered_days),
@@ -875,7 +878,9 @@ def test_a_part_of_each_month_under_asian_observes_its_own_days_and_nothing_per_
     # with the holiday calendar read once and no whole-month look.
     ticket, template = a_dated_ticket(rows, contracts, 10), a_template("asian")
     terms, observations, _ = resolved(ASIAN_GAS, ticket, template, WorkCounter())
-    np.testing.assert_array_equal(terms.covered_days, MONTH_DAYS_BY_HAND[terms.contract] - 10)
+    np.testing.assert_array_equal(
+        terms.covered_days, MONTH_DAYS_BY_HAND[terms.legs[0].contract] - 10
+    )
     days: NDArray[np.int64] = np.busday_count(
         terms.start_date, terms.end_date + np.timedelta64(1, "D"), holidays=HOLIDAYS
     )
@@ -989,15 +994,18 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "schedule_codes_read": 25,
         "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #172
     }
-    np.testing.assert_array_equal(np.bincount(terms.specification), [rows // 2, rows // 2])
+    np.testing.assert_array_equal(np.bincount(terms.legs[0].specification), [rows // 2, rows // 2])
     np.testing.assert_array_equal(np.bincount(terms.quantity_per), [rows // 2, rows // 2])
     lap = (np.arange(rows) // contracts) % 4
     np.testing.assert_array_equal(
-        terms.schedule_method,
+        terms.legs[0].schedule_method,
         [METHODS.index(ScheduleMethod(METHOD_NAMES_BY_LAP[int(i)])) for i in lap],
     )
     assert observations.component.size == int(
-        (np.array([1, 1, 3, 0])[lap] + np.where(lap == 3, PRICING_DAYS[terms.contract], 0)).sum()
+        (
+            np.array([1, 1, 3, 0])[lap]
+            + np.where(lap == 3, PRICING_DAYS[terms.legs[0].contract], 0)
+        ).sum()
     )
     assert call_profile(lambda: resolved(MIXED_GAS, ticket, template, WorkCounter())) == {
         **resolution_ledger(contracts),
@@ -1093,12 +1101,12 @@ def test_an_iferc_ticket_resolves_like_a_futures_one_without_the_days(
     ticket, template = a_ticket(rows, contracts), a_template()
     counter = WorkCounter()
     terms, observations, _ = resolved(BASIS, ticket, template, counter)
-    np.testing.assert_array_equal(observations.date, IFERC_PUBLICATION[terms.contract])
+    np.testing.assert_array_equal(observations.date, IFERC_PUBLICATION[terms.legs[0].contract])
     np.testing.assert_array_equal(observations.weight, np.ones(rows))
     assert terms.payment is not None
     np.testing.assert_array_equal(
         terms.payment.date,
-        np.busday_offset(IFERC_PUBLICATION[terms.contract], 2, holidays=HOLIDAYS),
+        np.busday_offset(IFERC_PUBLICATION[terms.legs[0].contract], 2, holidays=HOLIDAYS),
     )
     assert counter.freeze().as_dict() == {
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
@@ -1191,4 +1199,4 @@ def test_a_half_year_does_the_work_of_its_six_month_strip(
         lambda: resolved(GAS, strip, template, WorkCounter())
     )
     terms, _, _ = resolved(GAS, half, template, WorkCounter())
-    assert terms.contract.size == 6
+    assert terms.legs[0].contract.size == 6

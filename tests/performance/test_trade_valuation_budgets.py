@@ -190,6 +190,8 @@ def test_preparing_resolves_two_handles_and_runs_the_kernels_preparation_alone(
         "early_fact": 2,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 3,
+        "ResolvedTrades.descriptor": 1,  # the handle's name, the legs' index names joined,
+        # since two-index-fixed-float.md
         "_publish": 1,
     }
 
@@ -215,6 +217,8 @@ def test_a_tick_resolves_two_handles_and_runs_the_evaluation_alone(
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
+        "ResolvedTrades.descriptor": 1,  # the handle's name, the legs' index names joined,
+        # since two-index-fixed-float.md
         "_publish": 1,
     }
 
@@ -320,6 +324,8 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
         "early_fact": 6,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 8,
+        "ResolvedTrades.descriptor": 1,  # the handle's name, the legs' index names joined,
+        # since two-index-fixed-float.md
         "_publish": 1,
     }
 

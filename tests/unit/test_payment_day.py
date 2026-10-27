@@ -136,7 +136,7 @@ def test_a_date_pays_the_row_on_that_day_and_a_rule_as_before() -> None:
     counts = counter.freeze().as_dict()
     assert (counts["payment_rules_read"], counts["payment_shifts"]) == (1, 1)
     # The two payments are two groups of one contract, on their own days.
-    np.testing.assert_array_equal(batch.encoded.group_contract, [2, 2])  # F27, row 2
+    np.testing.assert_array_equal(batch.encoded.legs[0].group_contract, [2, 2])  # F27, row 2
     assert batch.encoded.payment_date is not None
     np.testing.assert_array_equal(batch.encoded.payment_date, days("2027-02-02", "2027-02-25"))
 
@@ -172,9 +172,11 @@ def test_a_dated_strip_pays_every_component_together_and_a_ruled_one_month_by_mo
     assert ruled.size == 12 and (np.diff(ruled) > np.timedelta64(0, "D")).all()
     assert ruled[0] == np.datetime64("2027-02-02", "D")  # F27's expiry, Friday the 29th, +2bd
     np.testing.assert_array_equal(
-        batch.encoded.group_contract, np.repeat(np.arange(2, 14, dtype=np.intp), 2)
+        batch.encoded.legs[0].group_contract, np.repeat(np.arange(2, 14, dtype=np.intp), 2)
     )
-    np.testing.assert_array_equal(batch.resolved.contract[:12], batch.resolved.contract[12:])
+    np.testing.assert_array_equal(
+        batch.resolved.legs[0].contract[:12], batch.resolved.legs[0].contract[12:]
+    )
 
 
 def test_a_date_on_or_before_the_rows_last_observation_is_refused_by_the_row() -> None:
@@ -227,14 +229,14 @@ def test_a_rule_and_a_date_on_one_day_share_a_group_under_one_key_and_not_under_
     # row's group on one curve key, and stays apart on another.
     feb_2 = np.datetime64("2027-02-02", "D")
     together, _ = created(SYN, two_rows("+2bd", feb_2), BILATERAL)
-    assert together.encoded.group_contract.size == 1
+    assert together.encoded.legs[0].group_contract.size == 1
     keyed: dict[str, list[object]] = {
         **two_rows("+2bd", feb_2),
         "discount_curve_key": ["SOFR", "FFOIS"],
     }
     template = {k: v for k, v in BILATERAL.items() if k != "discount_curve_key"}
     apart, _ = created(SYN, keyed, template)
-    assert apart.encoded.group_contract.size == 2
+    assert apart.encoded.legs[0].group_contract.size == 2
     assert apart.encoded.payment_date is not None
     np.testing.assert_array_equal(apart.encoded.payment_date, [feb_2, feb_2])
 
@@ -513,11 +515,11 @@ def test_a_dated_quote_template_prices_the_strip_on_one_factor_that_cancels() ->
             discount_curve_key=("SOFR",) * 2,
         )
         prep = prepared_trades(
-            encoded(terms, observed_of(terms), UNITS, WorkCounter()),
-            m.market_history,
+            encoded(terms, (observed_of(terms),), UNITS, WorkCounter()),
+            (m.market_history,),
             WorkCounter(),
         )
-        result = trade_results(prep, m, WorkCounter(), RATES_MAR)
+        result = trade_results(prep, (m,), WorkCounter(), RATES_MAR)
         assert result.mark == pytest.approx(mark, abs=1e-6)
     # A dated template serves any request whose last observation falls before its date, and
     # refuses one on or after it by the month.

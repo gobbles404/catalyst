@@ -98,10 +98,10 @@ def valued_on(
     """The terms prepared against that history and valued against that market, the same objects
     for every source that is to combine."""
     prep = prepared_trades(
-        encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
+        encoded(terms, (observed_of(terms),), UNITS, WorkCounter()), (history,), WorkCounter()
     )
     return trade_results(
-        prep, quoted_on, WorkCounter(), None if curve is None else curve_set(curve)
+        prep, (quoted_on,), WorkCounter(), None if curve is None else curve_set(curve)
     )
 
 
@@ -570,19 +570,19 @@ def test_the_collection_owns_its_membership_and_writes_nothing(
     # numbers as they were.
     a, b = sources["a"], sources["b"]
     kept = {
-        "nominal_delta": a.nominal_delta.copy(),
-        "daily": b.discounted_daily_lots.copy(),
+        "nominal_delta": a.legs[0].nominal_delta.copy(),
+        "daily": b.legs[0].discounted_daily_lots.copy(),
         "dv01": rate(b).dv01_by_day.copy(),
-        "days": b.prepared.encoded.days.copy(),
+        "days": b.prepared.encoded.legs[0].days.copy(),
     }
     inputs = [a, b]
     agg = aggregate_results(inputs, WorkCounter())
     inputs.append(sources["c"])
     assert agg.sources == (a, b)
-    np.testing.assert_array_equal(a.nominal_delta, kept["nominal_delta"])
-    np.testing.assert_array_equal(b.discounted_daily_lots, kept["daily"])
+    np.testing.assert_array_equal(a.legs[0].nominal_delta, kept["nominal_delta"])
+    np.testing.assert_array_equal(b.legs[0].discounted_daily_lots, kept["daily"])
     np.testing.assert_array_equal(rate(b).dv01_by_day, kept["dv01"])
-    np.testing.assert_array_equal(b.prepared.encoded.days, kept["days"])
+    np.testing.assert_array_equal(b.prepared.encoded.legs[0].days, kept["days"])
     scalars = {
         "index", "reporting_lot", "history", "price_vector", "nominal_delta_total",
         "delta_total", "curve", "word", "currency", "dv01",
@@ -630,7 +630,11 @@ def test_sums_past_the_largest_number_are_refused_by_their_coordinate() -> None:
         at_one,
         None,
     )
-    assert up.nominal_delta_total == big and up.mark == 0.0 and down.nominal_delta_total == -big
+    assert (
+        up.legs[0].nominal_delta_total == big
+        and up.mark == 0.0
+        and down.legs[0].nominal_delta_total == -big
+    )
     with pytest.raises(ValueError) as refused:
         collected(up, down, up, down)
     assert str(refused.value) == (
@@ -658,7 +662,7 @@ def test_cancelling_sources_keep_the_lot_in_every_vector_whatever_their_order() 
         )
 
     bought, one, sold = hng_at_eighty(1e16), hng_at_eighty(1.0), hng_at_eighty(-1e16)
-    assert bought.mark == 0.0 and bought.nominal_delta_total == 1e16
+    assert bought.mark == 0.0 and bought.legs[0].nominal_delta_total == 1e16
     for order in (
         (bought, one, sold),
         (bought, sold, one),
@@ -684,7 +688,7 @@ def test_cancelling_sources_keep_the_lot_in_every_vector_whatever_their_order() 
         return valued_on(terms, trio_history, trio_market, None)
 
     million, barrel, sold_million = trio_at_eighty(1e6), trio_at_eighty(1.0), trio_at_eighty(-1e6)
-    assert barrel.nominal_delta_total == pytest.approx(1 / 3, **CLOSE)
+    assert barrel.legs[0].nominal_delta_total == pytest.approx(1 / 3, **CLOSE)
     for order in ((million, barrel, sold_million), (million, sold_million, barrel)):
         (group,) = collected(*order).index_groups
         assert group.nominal_delta_total == pytest.approx(1 / 3, **CLOSE)
@@ -710,7 +714,10 @@ def test_the_headings_are_spelled_once_for_both_paths(sources: dict[str, TradeRe
     result's view and the collection's carry what they return and nothing else."""
     results = tuple(sources.values())
     terms = results[0].prepared.encoded.terms
-    assert delta_labels(terms.index, terms.reporting_lot) == (HNG_NOMINAL, HNG_DELTA)
+    assert delta_labels(terms.legs[0].index, terms.legs[0].reporting_lot) == (
+        HNG_NOMINAL,
+        HNG_DELTA,
+    )
     assert dv01_label("SOFR", "USD") == CURVE_1
     assert dv01_label("cleared", "USD") == CLEARED_USD
     for result in results:
@@ -719,9 +726,9 @@ def test_the_headings_are_spelled_once_for_both_paths(sources: dict[str, TradeRe
         for bucket in Bucket:
             view = risk_view(result, Risk.ALL, bucket)
             assert view.labels == (
-                *delta_labels(terms.index, terms.reporting_lot),
+                *delta_labels(terms.legs[0].index, terms.legs[0].reporting_lot),
                 dv01_label(group, result.currency),
-                cross_gamma_label(terms.index, group, terms.reporting_lot),
+                cross_gamma_label(terms.legs[0].index, group, terms.legs[0].reporting_lot),
             )
     agg = collected(*results)
     view = aggregate_view(agg, Risk.ALL, Bucket.DAY)
@@ -777,23 +784,26 @@ def on_two_curves(
             c.early_dv01,
         )
 
+    a, b = first.legs[0], second_row.legs[0]
+    leg = replace(
+        sources["b"].legs[0],
+        delta=a.delta + b.delta,
+        delta_total=a.delta_total + b.delta_total,
+        discounted_price_sensitivity=(
+            a.discounted_price_sensitivity + b.discounted_price_sensitivity
+        ),
+        discounted_daily_lots=a.discounted_daily_lots + b.discounted_daily_lots,
+        discounted_monthly_lots=a.discounted_monthly_lots + b.discounted_monthly_lots,
+        discounted_yearly_lots=a.discounted_yearly_lots + b.discounted_yearly_lots,
+        cross_gamma_total=a.cross_gamma_total + b.cross_gamma_total,
+        cross_contributions=(cross(first), cross(second_row)),
+    )
     mixed = replace(
         sources["b"],
+        legs=(leg,),
         mark=first.mark + second_row.mark,
-        delta=first.delta + second_row.delta,
-        delta_total=(first.delta_total + second_row.delta_total),
-        discounted_price_sensitivity=(
-            first.discounted_price_sensitivity + second_row.discounted_price_sensitivity
-        ),
-        discounted_daily_lots=first.discounted_daily_lots + second_row.discounted_daily_lots,
-        discounted_monthly_lots=(
-            first.discounted_monthly_lots + second_row.discounted_monthly_lots
-        ),
-        discounted_yearly_lots=first.discounted_yearly_lots + second_row.discounted_yearly_lots,
         dv01=first.dv01 + second_row.dv01,
-        cross_gamma_total=first.cross_gamma_total + second_row.cross_gamma_total,
         rate_contributions=(on_the_batch_axes(rate(first)), on_the_batch_axes(rate(second_row))),
-        cross_contributions=(cross(first), cross(second_row)),
     )
     return first, second_row, mixed
 

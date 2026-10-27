@@ -120,7 +120,7 @@ def rate(result: TradeResults) -> RateContribution:
 
 def cross(result: TradeResults) -> CrossContribution:
     """A bilateral result's one cross contribution, its curve's share of the cross-gamma."""
-    (contribution,) = result.cross_contributions
+    (contribution,) = result.legs[0].cross_contributions
     return contribution
 
 
@@ -176,8 +176,8 @@ def prepared_on(
     terms: ResolvedTrades, as_of: str = AS_OF, finals: dict[str, float] | None = None
 ) -> PreparedTrades:
     return prepared_trades(
-        encoded(terms, observed_of(terms), UNITS, WorkCounter()),
-        history_on(terms.index, as_of, finals or {}),
+        encoded(terms, (observed_of(terms),), UNITS, WorkCounter()),
+        (history_on(terms.legs[0].index, as_of, finals or {}),),
         WorkCounter(),
     )
 
@@ -190,7 +190,7 @@ def valued(
 ) -> TradeResults:
     return trade_results(
         prep,
-        quoted(prep.history, *quotes),
+        (quoted(prep.legs[0].history, *quotes),),
         counter or WorkCounter(),
         None if curve is None else curve_set(curve),
     )
@@ -218,15 +218,18 @@ def test_two_groups_paying_a_year_apart_discount_before_they_net() -> None:
     np.testing.assert_allclose(given(result.dv01_by_group), [-0.0095, 0.018], **TIGHT)
     np.testing.assert_array_equal(given(result.payment_factor), [0.95, 0.90])
     # The nominal risk is the preparation's, shared and nought; the discounted lots are 9.5 less 9.
-    assert result.nominal_delta is prep.nominal_delta and result.nominal_delta_total == 0.0
-    assert result.price_sensitivity is prep.price_sensitivity
-    np.testing.assert_allclose(result.delta, [0.5], **TIGHT)
-    assert result.delta_total == pytest.approx(0.5, **CLOSE)
-    np.testing.assert_allclose(result.discounted_price_sensitivity, [0.5], **TIGHT)
-    np.testing.assert_array_equal(prep.encoded.days, dates(AS_OF))
-    np.testing.assert_allclose(result.discounted_daily_lots, [0.5], **TIGHT)
-    np.testing.assert_allclose(result.discounted_monthly_lots, [0.5], **TIGHT)
-    np.testing.assert_allclose(result.discounted_yearly_lots, [0.5], **TIGHT)
+    assert (
+        result.legs[0].nominal_delta is prep.legs[0].nominal_delta
+        and result.legs[0].nominal_delta_total == 0.0
+    )
+    assert result.legs[0].price_sensitivity is prep.legs[0].price_sensitivity
+    np.testing.assert_allclose(result.legs[0].delta, [0.5], **TIGHT)
+    assert result.legs[0].delta_total == pytest.approx(0.5, **CLOSE)
+    np.testing.assert_allclose(result.legs[0].discounted_price_sensitivity, [0.5], **TIGHT)
+    np.testing.assert_array_equal(prep.encoded.legs[0].days, dates(AS_OF))
+    np.testing.assert_allclose(result.legs[0].discounted_daily_lots, [0.5], **TIGHT)
+    np.testing.assert_allclose(result.legs[0].discounted_monthly_lots, [0.5], **TIGHT)
+    np.testing.assert_allclose(result.legs[0].discounted_yearly_lots, [0.5], **TIGHT)
     assert counter.freeze().as_dict() == {
         "curves_selected": 1,
         "groups_valued": 2,
@@ -242,14 +245,14 @@ def test_two_groups_paying_a_year_apart_discount_before_they_net() -> None:
     ticked = valued(prep, (81.0, 50.0), FLAT)
     assert ticked.mark == pytest.approx(5.5, **CLOSE)
     assert ticked.dv01 == pytest.approx(0.00935, **CLOSE)
-    assert ticked.delta_total == pytest.approx(0.5, **CLOSE)
-    assert ticked.nominal_delta_total == 0.0
+    assert ticked.legs[0].delta_total == pytest.approx(0.5, **CLOSE)
+    assert ticked.legs[0].nominal_delta_total == 0.0
     other = valued(prep, (80.0, 50.0), curve_of((AS_OF, 1.0), (A_YEAR, 0.96), (TWO_YEARS, 0.92)))
     assert other.mark == pytest.approx(4.0, **CLOSE)
-    assert other.delta_total == pytest.approx(0.4, **CLOSE)
+    assert other.legs[0].delta_total == pytest.approx(0.4, **CLOSE)
     assert other.dv01 == pytest.approx(0.0088, **CLOSE)
-    assert other.nominal_delta_total == 0.0
-    for array in (result.payment_amount, result.npv_by_group, result.discounted_daily_lots):
+    assert other.legs[0].nominal_delta_total == 0.0
+    for array in (result.payment_amount, result.npv_by_group, result.legs[0].discounted_daily_lots):
         assert array is not None and not array.flags.writeable
 
 
@@ -260,8 +263,8 @@ def test_a_mark_of_nothing_still_carries_lots_and_dv01() -> None:
     prep = prepared_on(terms_of((10.0,), (A_YEAR,), (261,)))
     flat = valued(prep, (70.0, 50.0), FLAT)
     assert flat.mark == 0.0 and flat.dv01 == 0.0
-    assert flat.nominal_delta_total == 10.0
-    assert flat.delta_total == pytest.approx(9.5, **CLOSE)
+    assert flat.legs[0].nominal_delta_total == 10.0
+    assert flat.legs[0].delta_total == pytest.approx(9.5, **CLOSE)
     moved = valued(prep, (71.0, 50.0), FLAT)
     assert moved.mark == pytest.approx(9.5, **CLOSE)
     assert moved.dv01 == pytest.approx(-0.00095, **CLOSE)
@@ -281,7 +284,9 @@ def test_batch_equals_its_singletons_and_order_and_duplicates_count() -> None:
     b = valued(prepared_on(terms_of((-10.0,), (TWO_YEARS,), (522,))), (80.0, 50.0), FLAT)
     assert a.mark + b.mark == pytest.approx(batch.mark, **CLOSE)
     assert a.dv01 + b.dv01 == pytest.approx(batch.dv01, **CLOSE)
-    assert a.delta_total + b.delta_total == pytest.approx(batch.delta_total, **CLOSE)
+    assert a.legs[0].delta_total + b.legs[0].delta_total == pytest.approx(
+        batch.legs[0].delta_total, **CLOSE
+    )
     reversed_rows = valued(
         prepared_on(terms_of((-10.0, 10.0), (TWO_YEARS, A_YEAR), (522, 261))), (80.0, 50.0), FLAT
     )
@@ -294,7 +299,7 @@ def test_batch_equals_its_singletons_and_order_and_duplicates_count() -> None:
         given(twice.npv_by_group), [190.0], **TIGHT
     )  # one group, both trades
     assert twice.dv01 == pytest.approx(-0.019, **CLOSE)
-    assert twice.delta_total == pytest.approx(19.0, **CLOSE)
+    assert twice.legs[0].delta_total == pytest.approx(19.0, **CLOSE)
 
 
 # --- fixed is not paid ----------------------------------------------------------------------------
@@ -306,15 +311,15 @@ def test_a_fixed_payment_is_discounted_until_it_is_paid_and_then_is_cash() -> No
     on_the_day = valued(prepared_on(terms), (80.0, 50.0), curve_of((AS_OF, 1.0), (A_YEAR, 1.0)))
     assert on_the_day.mark == pytest.approx(100.0, **CLOSE)
     assert on_the_day.dv01 == pytest.approx(-0.01, **CLOSE)
-    assert on_the_day.nominal_delta_total == 10.0
-    assert on_the_day.delta_total == pytest.approx(10.0, **CLOSE)
+    assert on_the_day.legs[0].nominal_delta_total == 10.0
+    assert on_the_day.legs[0].delta_total == pytest.approx(10.0, **CLOSE)
     # The next day, fixed at 82: 120 of NPV, 364 days out, no lots, and -0.0119671232876712 of DV01.
     fixed = prepared_on(terms, "2027-01-05", {"F27": 82.0})
     unpaid = valued(fixed, (50.0,), curve_of(("2027-01-05", 1.0), (A_YEAR, 1.0)))
     assert unpaid.mark == pytest.approx(120.0, **CLOSE)
     assert unpaid.cash == 0.0
     assert unpaid.dv01 == pytest.approx(-0.0001 * 364 / 365 * 120.0, **CLOSE)
-    assert unpaid.nominal_delta_total == 0.0 and unpaid.delta_total == 0.0
+    assert unpaid.legs[0].nominal_delta_total == 0.0 and unpaid.legs[0].delta_total == 0.0
     np.testing.assert_array_equal(given(unpaid.payment_factor), [1.0])
     # At 0.99 the same payment is worth 118.8.
     at_99 = valued(fixed, (50.0,), curve_of(("2027-01-05", 1.0), (A_YEAR, 0.99)))
@@ -326,7 +331,7 @@ def test_a_fixed_payment_is_discounted_until_it_is_paid_and_then_is_cash() -> No
         counter = WorkCounter()
         settled = valued(paid, (50.0,), curve_of((as_of, 1.0)), counter)
         assert settled.mark == 0.0 and settled.cash == pytest.approx(120.0, **CLOSE)
-        assert settled.dv01 == 0.0 and settled.delta_total == 0.0
+        assert settled.dv01 == 0.0 and settled.legs[0].delta_total == 0.0
         np.testing.assert_array_equal(
             given(settled.payment_factor), [1.0]
         )  # the policy, read for nothing
@@ -335,11 +340,11 @@ def test_a_fixed_payment_is_discounted_until_it_is_paid_and_then_is_cash() -> No
         # vectors are floats of nothing, a sum over every slot and never numpy's integer zeros
         # for a sum over none.
         for array in (
-            settled.delta,
-            settled.discounted_price_sensitivity,
-            settled.discounted_daily_lots,
-            settled.discounted_monthly_lots,
-            settled.discounted_yearly_lots,
+            settled.legs[0].delta,
+            settled.legs[0].discounted_price_sensitivity,
+            settled.legs[0].discounted_daily_lots,
+            settled.legs[0].discounted_monthly_lots,
+            settled.legs[0].discounted_yearly_lots,
         ):
             assert array.dtype == np.float64
             np.testing.assert_array_equal(array, [0.0])
@@ -434,22 +439,26 @@ def test_discounted_lots_are_weighted_by_slot_before_the_reference_and_time_sums
     )
     assert result.mark == pytest.approx(100 * d365 - 100 * d730 - 100 * d735, **CLOSE)
     # By reference, F27 then F29; by day, the two observation days; by month and year likewise.
-    np.testing.assert_array_equal(prep.encoded.references, [1, 2])
-    np.testing.assert_allclose(result.delta, [10 * d365 - 10 * d730, 5 * d735], **TIGHT)
-    np.testing.assert_allclose(result.nominal_delta, [0.0, 5.0])
-    np.testing.assert_array_equal(prep.encoded.days, dates(AS_OF, "2029-01-05"))
+    np.testing.assert_array_equal(prep.encoded.legs[0].references, [1, 2])
+    np.testing.assert_allclose(result.legs[0].delta, [10 * d365 - 10 * d730, 5 * d735], **TIGHT)
+    np.testing.assert_allclose(result.legs[0].nominal_delta, [0.0, 5.0])
+    np.testing.assert_array_equal(prep.encoded.legs[0].days, dates(AS_OF, "2029-01-05"))
     np.testing.assert_allclose(
-        result.discounted_daily_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
+        result.legs[0].discounted_daily_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
     )
-    np.testing.assert_array_equal(prep.encoded.contract_months, dates("2027-01-01", "2029-01-01"))
+    np.testing.assert_array_equal(
+        prep.encoded.legs[0].contract_months, dates("2027-01-01", "2029-01-01")
+    )
     np.testing.assert_allclose(
-        result.discounted_monthly_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
+        result.legs[0].discounted_monthly_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
     )
-    np.testing.assert_array_equal(prep.encoded.contract_years, dates("2027-01-01", "2029-01-01"))
+    np.testing.assert_array_equal(
+        prep.encoded.legs[0].contract_years, dates("2027-01-01", "2029-01-01")
+    )
     np.testing.assert_allclose(
-        result.discounted_yearly_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
+        result.legs[0].discounted_yearly_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
     )
-    assert result.delta_total == pytest.approx(10 * d365 - 10 * d730 + 5 * d735, **CLOSE)
+    assert result.legs[0].delta_total == pytest.approx(10 * d365 - 10 * d730 + 5 * d735, **CLOSE)
     assert counter.freeze().as_dict() == {
         "curves_selected": 1,
         "groups_valued": 3,
@@ -471,12 +480,12 @@ def test_a_cleared_batch_shares_its_nominal_arrays_and_keeps_no_group_vector() -
     result = valued(prep, (80.0, 50.0), None, counter)
     assert result.curves == () and result.dv01 == 0.0
     assert result.mark == pytest.approx(0.0, **CLOSE)  # +100 and -100, undiscounted, net
-    assert result.delta is prep.nominal_delta
-    assert result.discounted_price_sensitivity is prep.price_sensitivity
-    assert result.discounted_daily_lots is prep.daily_lots
-    assert result.discounted_monthly_lots is prep.monthly_lots
-    assert result.discounted_yearly_lots is prep.yearly_lots
-    assert result.delta_total == prep.nominal_delta_total
+    assert result.legs[0].delta is prep.legs[0].nominal_delta
+    assert result.legs[0].discounted_price_sensitivity is prep.legs[0].price_sensitivity
+    assert result.legs[0].discounted_daily_lots is prep.legs[0].daily_lots
+    assert result.legs[0].discounted_monthly_lots is prep.legs[0].monthly_lots
+    assert result.legs[0].discounted_yearly_lots is prep.legs[0].yearly_lots
+    assert result.legs[0].delta_total == prep.legs[0].nominal_delta_total
     assert result.payment_amount is None and result.npv_by_group is None
     assert result.dv01_by_group is None and result.payment_factor is None
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": 1}
@@ -516,12 +525,12 @@ def test_the_two_trades_made_through_the_creators_value_the_same() -> None:
     assert batch.resolved.counterparty == ("ACME Trading", "ACME Trading")
     assert batch.resolved.discount_curve_key == ("SOFR", "SOFR")
     assert batch.encoded.keys == ("SOFR",)
-    prep = prepared_trades(batch.encoded, history_on(UNIT, AS_OF, {}), WorkCounter())
+    prep = prepared_trades(batch.encoded, (history_on(UNIT, AS_OF, {}),), WorkCounter())
     result = valued(prep, (80.0, 50.0), FLAT)
     assert result.mark == pytest.approx(5.0, **CLOSE)
     assert result.dv01 == pytest.approx(0.0085, **CLOSE)
-    assert result.delta_total == pytest.approx(0.5, **CLOSE)
-    assert result.nominal_delta_total == 0.0
+    assert result.legs[0].delta_total == pytest.approx(0.5, **CLOSE)
+    assert result.legs[0].nominal_delta_total == 0.0
 
 
 # --- the review of #176: the mapping once, every stored vector finite -----------------------------
@@ -535,8 +544,8 @@ def test_the_preparation_maps_the_unpaid_payment_days_once_for_the_ticks() -> No
     terms = terms_of()
     counter = WorkCounter()
     prep = prepared_trades(
-        encoded(terms, observed_of(terms), UNITS, WorkCounter()),
-        history_on(UNIT, AS_OF, {}),
+        encoded(terms, (observed_of(terms),), UNITS, WorkCounter()),
+        (history_on(UNIT, AS_OF, {}),),
         counter,
     )
     assert counter.freeze().as_dict() == {
@@ -622,10 +631,10 @@ def test_a_discounted_sensitivity_past_the_largest_number_is_refused_by_its_cont
         prepared_on(terms_of(halves, route=Route.CLEARED, fixed=0.0, ix=TRIO)), (0.0, 50.0), None
     )
     assert cleared.mark == 0.0 and cleared.dv01 == 0.0
-    np.testing.assert_array_equal(cleared.price_sensitivity, [LARGEST])
-    assert cleared.nominal_delta_total == LARGEST / 3
+    np.testing.assert_array_equal(cleared.legs[0].price_sensitivity, [LARGEST])
+    assert cleared.legs[0].nominal_delta_total == LARGEST / 3
     prep = prepared_on(terms_of(halves, fixed=0.0, ix=TRIO))
-    assert prep.nominal_delta_total == LARGEST / 3
+    assert prep.legs[0].nominal_delta_total == LARGEST / 3
     with pytest.raises(ValueError) as refused:
         valued(prep, (0.0, 50.0), curve_of((AS_OF, 1.0), (TWO_YEARS, 1.0)))
     assert str(refused.value) == (
@@ -680,7 +689,7 @@ def test_the_encoding_makes_the_payment_axes_once_for_a_bilateral_batch() -> Non
     # payment period, every saved period placed from the start.
     counter = WorkCounter()
     terms = terms_of()
-    axes = encoded(terms, observed_of(terms), UNITS, counter).payment_axes
+    axes = encoded(terms, (observed_of(terms),), UNITS, counter).payment_axes
     assert axes is not None
     assert counter.freeze().as_dict()["encoded_payment_days"] == 2
     np.testing.assert_array_equal(axes.days, dates(A_YEAR, TWO_YEARS))
@@ -694,18 +703,21 @@ def test_the_encoding_makes_the_payment_axes_once_for_a_bilateral_batch() -> Non
     np.testing.assert_array_equal(axes.paid_in_days, [1, 2])
     assert all(not getattr(axes, field.name).flags.writeable for field in fields(axes))
     prep = prepared_on(terms)
-    assert (prep.by_month.delta_rows, prep.by_month.dv01_rows) == (1, 25)
-    np.testing.assert_array_equal(prep.by_month.contract_in, [0])
-    np.testing.assert_array_equal(prep.by_month.paid_in, [12, 24])
-    assert (prep.by_year.delta_rows, prep.by_year.dv01_rows) == (1, 3)
+    assert (prep.legs[0].by_month.delta_rows, prep.legs[0].by_month.dv01_rows) == (1, 25)
+    np.testing.assert_array_equal(prep.legs[0].by_month.contract_in, [0])
+    np.testing.assert_array_equal(prep.legs[0].by_month.paid_in, [12, 24])
+    assert (prep.legs[0].by_year.delta_rows, prep.legs[0].by_year.dv01_rows) == (1, 3)
     np.testing.assert_array_equal(
-        prep.by_year.periods, dates("2027-01-01", "2028-01-01", "2029-01-01")
+        prep.legs[0].by_year.periods, dates("2027-01-01", "2028-01-01", "2029-01-01")
     )
-    assert (prep.by_month.contract_from, prep.by_month.paid_from) == (0, 0)
-    assert not prep.by_month.periods.flags.writeable and not prep.by_year.periods.flags.writeable
+    assert (prep.legs[0].by_month.contract_from, prep.legs[0].by_month.paid_from) == (0, 0)
+    assert (
+        not prep.legs[0].by_month.periods.flags.writeable
+        and not prep.legs[0].by_year.periods.flags.writeable
+    )
     for other in (terms_of(route=Route.CLEARED), terms_of(settlement=Settlement.PHYSICAL)):
         counter = WorkCounter()
-        assert encoded(other, observed_of(other), UNITS, counter).payment_axes is None
+        assert encoded(other, (observed_of(other),), UNITS, counter).payment_axes is None
         assert "encoded_payment_days" not in counter.freeze().as_dict()
 
 
@@ -765,10 +777,10 @@ def test_groups_paying_on_one_day_share_it_and_days_in_one_month_share_the_month
     np.testing.assert_array_equal(axes.year_of_month, [0, 1])
     # The displays, since #186: by year 2027 and 2028, both payment years placed; by month
     # January 2027 through January 2028, the two payment months the 12th and 13th rows.
-    assert (straddle.by_year.delta_rows, straddle.by_year.dv01_rows) == (1, 2)
-    np.testing.assert_array_equal(straddle.by_year.paid_in, [0, 1])
-    assert (straddle.by_month.delta_rows, straddle.by_month.dv01_rows) == (1, 13)
-    np.testing.assert_array_equal(straddle.by_month.paid_in, [11, 12])
+    assert (straddle.legs[0].by_year.delta_rows, straddle.legs[0].by_year.dv01_rows) == (1, 2)
+    np.testing.assert_array_equal(straddle.legs[0].by_year.paid_in, [0, 1])
+    assert (straddle.legs[0].by_month.delta_rows, straddle.legs[0].by_month.dv01_rows) == (1, 13)
+    np.testing.assert_array_equal(straddle.legs[0].by_month.paid_in, [11, 12])
 
 
 def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -> None:
@@ -784,7 +796,7 @@ def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -
         terms_of((10.0, 5.0), ("2029-01-05", "2029-01-10"), (522, 525), contracts=(1, 2))
     )
     axes = axes_of(prep)
-    np.testing.assert_array_equal(prep.encoded.days, dates(AS_OF, "2029-01-05"))
+    np.testing.assert_array_equal(prep.encoded.legs[0].days, dates(AS_OF, "2029-01-05"))
     np.testing.assert_array_equal(axes.days, dates("2029-01-05", "2029-01-10"))
     np.testing.assert_array_equal(axes.union_days, dates(AS_OF, "2029-01-05", "2029-01-10"))
     np.testing.assert_array_equal(axes.observed_in_days, [0, 1])
@@ -796,7 +808,9 @@ def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -
     np.testing.assert_allclose(rate(result).dv01_by_month, [first + second], **TIGHT)
     np.testing.assert_allclose(rate(result).dv01_by_year, [first + second], **TIGHT)
     nominal = risk_view(result, Risk.NOMINAL_DELTA, Bucket.DAY)
-    assert nominal.dates is prep.encoded.days and nominal.columns[0] is prep.daily_lots
+    assert (
+        nominal.dates is prep.encoded.legs[0].days and nominal.columns[0] is prep.legs[0].daily_lots
+    )
     assert nominal.labels == ALL_LABELS[:1] and nominal.totals == (15.0,)
     delta = risk_view(result, Risk.DELTA, Bucket.MONTH)
     # Since #186 the month view is dense from the valuation month: January 2027 through
@@ -836,19 +850,24 @@ def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -
 def test_a_cleared_result_has_no_rate_axis_and_its_views_share_the_nominal_arrays() -> None:
     prep = prepared_on(terms_of(route=Route.CLEARED))
     result = valued(prep, (80.0, 50.0), None)
-    assert result.rate_contributions == () and result.cross_contributions == ()
+    assert result.rate_contributions == () and result.legs[0].cross_contributions == ()
     nominal = risk_view(result, Risk.NOMINAL_DELTA, Bucket.DAY)
-    assert nominal.dates is prep.encoded.days and nominal.columns[0] is prep.daily_lots
+    assert (
+        nominal.dates is prep.encoded.legs[0].days and nominal.columns[0] is prep.legs[0].daily_lots
+    )
     assert nominal.labels == ALL_LABELS[:1] and nominal.totals == (0.0,)
     delta = risk_view(result, Risk.DELTA, Bucket.MONTH)
-    np.testing.assert_array_equal(delta.dates, prep.encoded.contract_months)
-    np.testing.assert_array_equal(delta.columns[0], prep.monthly_lots)
+    np.testing.assert_array_equal(delta.dates, prep.encoded.legs[0].contract_months)
+    np.testing.assert_array_equal(delta.columns[0], prep.legs[0].monthly_lots)
     dv01 = risk_view(result, Risk.DV01, Bucket.YEAR)
     assert dv01.dates.size == 0 and dv01.columns[0].size == 0 and dv01.totals == (0.0,)
     assert dv01.labels == ("cleared USD dv01 [USD per basis point]",)
     everything = risk_view(result, Risk.ALL, Bucket.DAY)
-    assert everything.dates is prep.encoded.days
-    assert everything.columns[0] is prep.daily_lots and everything.columns[1] is prep.daily_lots
+    assert everything.dates is prep.encoded.legs[0].days
+    assert (
+        everything.columns[0] is prep.legs[0].daily_lots
+        and everything.columns[1] is prep.legs[0].daily_lots
+    )
     np.testing.assert_array_equal(everything.columns[2], [0.0])
     np.testing.assert_array_equal(everything.columns[3], [0.0])
     assert everything.labels == (

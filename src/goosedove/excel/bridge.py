@@ -1521,9 +1521,9 @@ _NAMED: Final[dict[type[object], str]] = {
     MarketHistory: "calendar.index.name",
     PriceVector: "index_name",
     Market: "market_history.calendar.index.name",
-    Trades: "resolved.index.name",
-    PreparedTrades: "encoded.terms.index.name",
-    TradeResults: "prepared.encoded.terms.index.name",
+    Trades: "resolved.descriptor",
+    PreparedTrades: "encoded.terms.descriptor",
+    TradeResults: "prepared.encoded.terms.descriptor",
     DiscountCurve: "name",  # the curve's name, SOFR, since #201
     Cashflows: "currency",  # the batch's one currency where an index's name would be, since #200
     CashflowResults: "currency",

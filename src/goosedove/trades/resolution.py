@@ -116,7 +116,7 @@ def trades(
     the way to the payment days, then encoding over the terms and those observations, the unit
     tables and the counter passed in and never looked up; a failure in any publishes nothing."""
     terms, observations, entered = resolved(index, ticket, template, counter)
-    return Trades(terms, encoded(terms, observations, units, counter), *entered)
+    return Trades(terms, encoded(terms, (observations,), units, counter), *entered)
 
 
 def resolved(
