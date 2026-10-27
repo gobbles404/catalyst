@@ -66,6 +66,7 @@ pid:kind:count
 | prepared trades, trade results | `30512:prepared_trades:WTI:43`, `30512:trade_results:WTI:45` | the batch's descriptor through the records, `encoded.terms.descriptor` and `prepared.encoded.terms.descriptor`, since #141 |
 | cashflows, cashflow results | `30512:cashflows:USD:12`, `30512:cashflow_results:USD:13` | the batch's one currency, `currency`, where an index's name would be, since #200 |
 | discount curve | `30512:discount_curve:SOFR:2` | its own `name`, `_CreateDiscountCurve`'s first argument, kept by `util_BumpDiscountCurve` on the curve it makes, [discount-curve.md](../library/globals/discount-curve.md) |
+| request for quote | `30512:rfq:WTI:46` | the request's index's name, `request.index.name`, since [rfq-quoting.md](../engineering-tickets/trade-valuation-pipeline/rfq-quoting.md) |
 | valuation date, trade template, quote template, discount curve set | `30512:valuation_date:1`, `30512:trade_template:40`, `30512:quote_template:41`, `30512:discount_curve_set:4` | none: a template serves any compatible index and carries none, and a collection's members are its readback's to show |
 | the three schedules, the holiday calendar, the conventions, the contract specifications | `30512:futures_schedule:12`, `30512:holiday_calendar:13`, `30512:index_conventions:14`, `30512:contract_specifications:15` | none: an index uses them, which names them nothing, and their creators gain no argument |
 

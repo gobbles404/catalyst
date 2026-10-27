@@ -783,3 +783,18 @@ different reporting lot sizes, a deferred strip, first-leg fee selection and
 unchanged single-index entry. One common net payment per monthly component is
 this version's rule, agreed and not checked against a confirmation; a deal whose
 legs pay apart is outside the version and is noted, not booked as one payment.
+
+## 28. RFQ quantity and payment schedules
+
+Built in #218: [rfq-quoting.md](rfq-quoting.md), [rfq.md](../../library/quoting/rfq.md) the page. `_CreateRFQ` takes aligned
+contract-month and quantity columns, a quote template and an optional complete payment-date
+column, retaining a resolved request. Explicit dates take precedence over the quote template's
+default `payment_day`; omitted dates use it. Booking's no-overlap rule is unchanged.
+`_QuoteRFQ` prices the saved request through the same calculation as `_Quote`, with market
+prices, fixings and named discount curves supplied at quote time.
+
+UAT: inspect request readback; compare a supplied monthly volume profile with independent
+weighted-price arithmetic; distinguish monthly totals from `calday` quantities; use a `+5bd`
+template with and without exact dates; check that payment sources and effective dates are
+visible and that a price tick reuses the request. Compare cleared and bilateral quotes,
+repeated months paying differently, partial fixings, a curve bump and an as-of roll.

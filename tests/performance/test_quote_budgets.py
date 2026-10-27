@@ -5,7 +5,7 @@ The pins are the ticket's work rules, template-based-quoting.md: the template's 
 every month resolved once, each distinct live contract read once, the fixings one per fixed
 observation, the payment rule read once and applied once over the months, the key bound once
 and each distinct payment day after the valuation day read once off the curve, a paid month
-reading nothing, and three reductions whatever the strip."""
+reading nothing, and four reductions whatever the strip."""
 
 from collections.abc import Callable
 from types import MappingProxyType
@@ -192,7 +192,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
         "payment_factors_read": 1,
         "payment_rules_read": 1,
         "payment_shifts": 1,
-        "price_reductions": 3,
+        "price_reductions": 4,
         "schedule_codes_read": 13,
         "template_fields_read": 7,
     }
@@ -209,7 +209,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
         "payment_factors_read": 7,
         "payment_rules_read": 1,
         "payment_shifts": 1,
-        "price_reductions": 3,
+        "price_reductions": 4,
         "schedule_codes_read": 13,
         "template_fields_read": 7,
     }
@@ -228,7 +228,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
         "payment_factors_read": 7,
         "payment_rules_read": 1,
         "payment_shifts": 1,
-        "price_reductions": 3,
+        "price_reductions": 4,
         "schedule_codes_read": 13,
         "template_fields_read": 7,
     }
@@ -244,7 +244,8 @@ def test_a_month_and_a_strip_report_their_work() -> None:
 # and rows, the prices, quantities, payments and factors, the shares and their sum.
 LEDGER = {
     "quote": 1,
-    "_the_terms": 1,
+    "the_terms": 1,
+    "_the_conditions": 1,  # the conditional fields, since rfq-quoting.md
     "_text": 5,  # the five texts the bilateral template holds beside its payment day
     "route_of": 1,
     "settlement_of": 1,
@@ -253,13 +254,13 @@ LEDGER = {
     "choice": 4,
     "payment_rule_of": 1,
     "read_offset": 1,
-    "_the_curve": 1,
-    "_the_curve.<locals>.<genexpr>": 2,  # the collection searched to SOFR, its first curve
+    "the_curve": 1,
+    "the_curve.<locals>.<genexpr>": 2,  # the collection searched to SOFR, its first curve
     "DiscountCurve.start_date": 2,
     "curve_starts_on": 1,
     "DiscountCurve.max_date": 1,
     "trade_schedule_of": 2,  # the quote's own read and the observations'
-    "_the_method": 1,
+    "the_method": 1,
     "_the_period": 1,
     "_the_span": 1,
     "start_date": 1,  # the two readers the date utilities use, balance-of-period-quotes.md
@@ -287,11 +288,12 @@ LEDGER = {
     "_the_prices": 1,
     "Market.live_prices": 1,
     "_the_quantities": 1,
-    "_the_payments": 1,
+    "the_payments": 1,
     "last_days": 1,
     "shift_days": 1,
     "payments_after_observations": 1,  # the kernel's rule, one owner since
     # payment-day-date-or-rule.md
+    "priced": 1,  # the request priced, since rfq-quoting.md, request.py
     "_the_factors": 1,
     "factors_on": 1,
     "WorkCounter.__init__": 1,

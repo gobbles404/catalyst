@@ -39,6 +39,7 @@ from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
+from goosedove.quoting.rfq import Rfq
 
 PID = os.getpid()  # leads every handle this Python publishes
 
@@ -1244,6 +1245,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         MarketHistory,
         PriceVector,
         Market,
+        Rfq,
     } <= set(shown.registry)
 
 
