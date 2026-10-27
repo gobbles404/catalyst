@@ -209,6 +209,17 @@ function Import-Line($State, $Sheet, [string]$Address = "A6") {
     Run-Import $State
     return Wait-Line $State $Sheet $Address
 }
+# Excel's status bar, read until it satisfies the condition or the patience runs out; the last
+# text read comes back either way, "False" while Excel holds its own status bar.
+function Wait-StatusBar($State, [scriptblock]$Until) {
+    $deadline = [datetime]::UtcNow.AddSeconds($Patience)
+    do {
+        $text = [string](Read-ExcelProperty $State.Excel "StatusBar" "" $deadline)
+        if (& $Until $text) { return $text }
+        Start-Sleep -Milliseconds 250
+    } while ([datetime]::UtcNow -lt $deadline)
+    return $text
+}
 
 # --- a stand-in for the desk's API, in a process of its own ------------------------------------
 
@@ -1948,6 +1959,28 @@ $import = {
         Rename-Table $state $sheet "settings" "import_settings"
         $line = Import-Line $state $sheet
         Check "and renamed back, the run again" ($line -eq "3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX") $line
+
+        # The status cell unwritable, the review's finding: a protected sheet before the run
+        # refuses it on Excel's status bar with the cause, nothing fetched; protected during the
+        # run, the line goes there with the cause while the cell keeps its progress text, the most
+        # a protected sheet allows.
+        $requests = @(Get-Content $log).Count
+        Invoke-ExcelCall "protect the sheet" { [void]$sheet.Protect() }
+        Run-Import $state
+        $bar = [string](Read-ExcelProperty $state.Excel "StatusBar")
+        Check "a protected status cell before the run: refused on the status bar, nothing fetched" ($bar.StartsWith("#ERROR GoosedoveImportTrades: import_status could not be written: ") -and $bar.EndsWith("; nothing was fetched") -and @(Get-Content $log).Count -eq $requests) $bar
+        Invoke-ExcelCall "unprotect the sheet" { [void]$sheet.Unprotect() }
+        Invoke-ExcelCall "give Excel its status bar back" { $state.Excel.StatusBar = $false }
+        Put $state $sheet "B2" "http://127.0.0.1:$port/slow/3"
+        Run-Import $state
+        Invoke-ExcelCall "protect the sheet" { [void]$sheet.Protect() }
+        $bar = Wait-StatusBar $state { param($text) $text.StartsWith("#ERROR GoosedoveImportTrades: import_status could not be written: ") }
+        Check "protected during the run: the line on the status bar with the cause, the cell keeping its progress text" ($bar.EndsWith("; the run's line: 3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX") -and (Text $state $sheet "A6").StartsWith("fetching trade IDs from ")) ("$bar | " + (Text $state $sheet "A6"))
+        Invoke-ExcelCall "unprotect the sheet" { [void]$sheet.Unprotect() }
+        Invoke-ExcelCall "give Excel its status bar back" { $state.Excel.StatusBar = $false }
+        Put $state $sheet "B2" $three
+        $line = Import-Line $state $sheet
+        Check "and unprotected, the run again" ($line -eq "3 IDs returned, 1 to fetch: 105; stopped at 104, held by Trades_NYMEX") $line
 
         # The status name gone: the one line with nowhere else to go, on Excel's status bar.
         Remove-Name $state $book "import_status"

@@ -6,6 +6,7 @@ using ExcelDna.IntelliSense;
 using Python.Runtime;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 [assembly: InternalsVisibleTo("Goosedove.Host.Tests")]
 [assembly: InternalsVisibleTo("Goosedove.Host.Measure")]
@@ -362,6 +363,13 @@ namespace Goosedove.Host
         [ThreadStatic] private static PyObject numbersAddress;
         [ThreadStatic] private static List<string> textCells;
 
+        // The threads holding a set of buffers now: Excel's calculation thread once it has
+        // marshaled a range, a test's or a runner's, and an import's worker until it lets its
+        // set go. A pinned handle keeps its array alive after the thread ends, so a thread that
+        // ends without letting go leaks its set; the count is what the host's tests pin.
+        private static int bufferSets;
+        internal static int BufferSets => bufferSets;
+
         // Room for a range of this many cells: the buffers already there, or larger ones. The new
         // set is whole before the old one goes, so a failure to grow leaves the old buffers pinned
         // and the next range as safe as before.
@@ -395,6 +403,10 @@ namespace Goosedove.Host
                 kindsAddress.Dispose();
                 numbersAddress.Dispose();
             }
+            else
+            {
+                Interlocked.Increment(ref bufferSets);
+            }
             kindsBuffer = newKinds;
             numbersBuffer = newNumbers;
             kindsHandle = newKindsHandle;
@@ -404,6 +416,39 @@ namespace Goosedove.Host
             work?.Hit("buffers_allocated", 2);
             work?.Hit("buffer_bytes", 9L * cells);
             work?.Hit("objects_built", 2);
+        }
+
+        /// <summary>
+        /// Lets this thread's set of buffers go: the arrays unpinned, so the collector may take
+        /// them, and the two Python integers carrying their addresses disposed under the lock,
+        /// unless Python is gone. The import command's worker calls it when its one call is done,
+        /// since a thread that ends takes its thread-static fields with it and not the pinned
+        /// arrays behind them, which the review of #226 measured as 4.5 MB kept after five runs
+        /// over a hundred thousand IDs. Excel's calculation thread never calls it: its set lives
+        /// as long as the add-in and grows only when a larger range comes.
+        /// </summary>
+        internal static void ReleaseBuffers()
+        {
+            if (kindsBuffer == null)
+            {
+                return;
+            }
+            kindsHandle.Free();
+            numbersHandle.Free();
+            if (PythonEngine.IsInitialized && !Lifetime.Closing)
+            {
+                using (Py.GIL())
+                {
+                    kindsAddress.Dispose();
+                    numbersAddress.Dispose();
+                }
+            }
+            kindsBuffer = null;
+            numbersBuffer = null;
+            kindsAddress = null;
+            numbersAddress = null;
+            textCells = null;
+            Interlocked.Decrement(ref bufferSets);
         }
 
         // One pass over the cells, in sheet order, into the kept buffers. An Excel error

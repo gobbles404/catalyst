@@ -220,6 +220,40 @@ namespace Goosedove.Host.Tests
             Assert.StartsWith("#ERROR _ImportTradeIds: ValueError: the filter request to " + endpoint + " failed: ", Importer.Line(Request(endpoint)));
         }
 
+        // Each run's request goes on a thread of its own, and the host keeps a set of pinned
+        // buffers per thread for the ranges it marshals: the worker lets its set go when its call
+        // is done, so repeated runs leave nothing behind. The review of #226 measured 4.5 MB kept
+        // after five runs over a hundred thousand held IDs each; here the count of sets is as it
+        // was after five such runs, and the memory kept after collection has grown by less than
+        // one set of that size, 900,000 bytes, would hold.
+        [Fact]
+        public void repeated_runs_on_fresh_threads_leave_no_buffers_behind()
+        {
+            var request = new Importer.Request { Filter = "today" };
+            for (var id = 1; id <= 100_000; id++)
+            {
+                request.Ids.Add(1_000_000 + id);
+                request.Tables.Add("Trades_NYMEX");
+            }
+            using (var standIn = new StandIn("[103, 105, 104]", connections: 5))
+            {
+                request.Endpoint = standIn.Address;
+                var sets = Marshal.BufferSets;
+                var kept = GC.GetTotalMemory(true);
+                for (var run = 0; run < 5; run++)
+                {
+                    string line = null;
+                    var worker = new Thread(() => line = Importer.Run(request));
+                    worker.Start();
+                    worker.Join();
+                    Assert.Equal("3 IDs returned, 3 to fetch: 105, 104, 103; none held", line);
+                }
+                Assert.Equal(sets, Marshal.BufferSets);
+                var grown = GC.GetTotalMemory(true) - kept;
+                Assert.True(grown < 900_000, "the memory kept grew by " + grown + " bytes over five runs");
+            }
+        }
+
         // Excel's object model hands a range's values as a rectangle counted from 1, and one
         // cell's value as the value itself; the readers take a rectangle counted from 0.
         [Fact]
@@ -253,19 +287,22 @@ namespace Goosedove.Host.Tests
     }
 
     /// <summary>
-    /// A stand-in for the desk's API on the loopback interface: one connection, the request kept
-    /// whole for the test to read, and one answer with the status and the JSON given.
+    /// A stand-in for the desk's API on the loopback interface: as many connections as asked, one
+    /// request each, the last kept whole for the test to read, and the one answer with the JSON
+    /// given to every one of them.
     /// </summary>
     internal sealed class StandIn : IDisposable
     {
         private static readonly Regex Length = new Regex(@"Content-Length:\s*(\d+)", RegexOptions.IgnoreCase);
         private readonly TcpListener listener;
         private readonly string answer;
+        private readonly int connections;
         public volatile string Request;
 
-        public StandIn(string answer)
+        public StandIn(string answer, int connections = 1)
         {
             this.answer = answer;
+            this.connections = connections;
             listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
             Address = "http://127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port + "/ids";
@@ -278,42 +315,54 @@ namespace Goosedove.Host.Tests
         {
             try
             {
-                using (var client = listener.AcceptTcpClient())
-                using (var stream = client.GetStream())
+                for (var served = 0; served < connections; served++)
                 {
-                    var received = new MemoryStream();
-                    var buffer = new byte[65536];
-                    while (true)
+                    using (var client = listener.AcceptTcpClient())
+                    using (var stream = client.GetStream())
                     {
-                        var count = stream.Read(buffer, 0, buffer.Length);
-                        if (count <= 0)
+                        if (Received(stream))
                         {
-                            return;
-                        }
-                        received.Write(buffer, 0, count);
-                        var text = Encoding.UTF8.GetString(received.ToArray());
-                        var headersEnd = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
-                        if (headersEnd < 0)
-                        {
-                            continue;
-                        }
-                        var length = Length.Match(text.Substring(0, headersEnd));
-                        var body = length.Success ? int.Parse(length.Groups[1].Value) : 0;
-                        if (received.Length >= headersEnd + 4 + body)
-                        {
-                            Request = text;
-                            break;
+                            var bytes = Encoding.UTF8.GetBytes(answer);
+                            var head = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + bytes.Length + "\r\nConnection: close\r\n\r\n");
+                            stream.Write(head, 0, head.Length);
+                            stream.Write(bytes, 0, bytes.Length);
                         }
                     }
-                    var bytes = Encoding.UTF8.GetBytes(answer);
-                    var head = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + bytes.Length + "\r\nConnection: close\r\n\r\n");
-                    stream.Write(head, 0, head.Length);
-                    stream.Write(bytes, 0, bytes.Length);
                 }
             }
             catch (Exception)
             {
                 // The listener stopped, or the client went: nothing more to serve.
+            }
+        }
+
+        // One request read whole, headers and the body its Content-Length promises; false when
+        // the client went before it was whole.
+        private bool Received(NetworkStream stream)
+        {
+            var received = new MemoryStream();
+            var buffer = new byte[65536];
+            while (true)
+            {
+                var count = stream.Read(buffer, 0, buffer.Length);
+                if (count <= 0)
+                {
+                    return false;
+                }
+                received.Write(buffer, 0, count);
+                var text = Encoding.UTF8.GetString(received.ToArray());
+                var headersEnd = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+                if (headersEnd < 0)
+                {
+                    continue;
+                }
+                var length = Length.Match(text.Substring(0, headersEnd));
+                var body = length.Success ? int.Parse(length.Groups[1].Value) : 0;
+                if (received.Length >= headersEnd + 4 + body)
+                {
+                    Request = text;
+                    return true;
+                }
             }
         }
 

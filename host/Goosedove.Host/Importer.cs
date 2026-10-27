@@ -17,9 +17,10 @@ namespace Goosedove.Host
     /// writes what comes back into the status cell through QueueAsMacro, the one way back onto
     /// Excel's thread. Its own refusals, a name missing or a cell it will not hand over, are
     /// written in the form a cell shows a failure, "#ERROR GoosedoveImportTrades: ..."; with the
-    /// status cell itself missing, the one line goes to Excel's status bar. The host checks no
-    /// meaning: it tells one kind of cell from another, as its scan does, and the seam and the
-    /// library judge the rest.
+    /// status cell itself missing, or refusing a write, a protected sheet say, the one line goes
+    /// to Excel's status bar, with the cause in the second case, so no run ends in silence. The
+    /// host checks no meaning: it tells one kind of cell from another, as its scan does, and the
+    /// seam and the library judge the rest.
     /// </summary>
     public static class Importer
     {
@@ -54,7 +55,7 @@ namespace Goosedove.Host
                 status = StatusCell(book);
                 if (Path == null)
                 {
-                    Write(application, status, "#ERROR python did not start: " + Bridge.StartupError);
+                    Write(application, status, "#ERROR python did not start: " + Bridge.StartupError, "nothing was fetched");
                     return;
                 }
                 var request = Read(book);
@@ -64,7 +65,13 @@ namespace Goosedove.Host
                 }
                 try
                 {
-                    Write(application, status, "fetching trade IDs from " + request.Endpoint + " ...");
+                    // The progress text first: a cell that will not take it, a protected sheet
+                    // say, stops the run here, before any request, the cause on the status bar.
+                    if (!Write(application, status, "fetching trade IDs from " + request.Endpoint + " ...", "nothing was fetched"))
+                    {
+                        Volatile.Write(ref running, 0);
+                        return;
+                    }
                     Start(request, application, status);
                 }
                 catch
@@ -75,13 +82,15 @@ namespace Goosedove.Host
             }
             catch (Refusal refusal)
             {
-                Write(application, status, "#ERROR " + Command + ": " + refusal.Message);
+                var text = "#ERROR " + Command + ": " + refusal.Message;
+                Write(application, status, text, "the refusal: " + text);
             }
             catch (Exception failure)
             {
                 // Excel's object model refusing something on the way: reported where every run
                 // reports, never swallowed, since a command has no cell of its own to fail into.
-                Write(application, status, "#ERROR host: " + failure.Message);
+                var text = "#ERROR host: " + failure.Message;
+                Write(application, status, text, "the failure: " + text);
             }
         }
 
@@ -131,16 +140,26 @@ namespace Goosedove.Host
             return range;
         }
 
-        // The line, into the status cell, or onto Excel's status bar when there is no cell to take it.
-        private static void Write(dynamic application, dynamic status, string text)
+        // The text into the status cell, true when the cell took it. Onto Excel's status bar when
+        // there is no cell to take it, the name missing, or when the cell will not, a protected
+        // sheet say, then with the cause and the words given for what the text was, so that no run
+        // ends in silence and no progress text stands for a result unexplained.
+        private static bool Write(dynamic application, dynamic status, string text, string otherwise)
         {
-            if (status != null)
-            {
-                status.Value2 = text;
-            }
-            else
+            if (status == null)
             {
                 application.StatusBar = text;
+                return true;
+            }
+            try
+            {
+                status.Value2 = text;
+                return true;
+            }
+            catch (Exception failure)
+            {
+                application.StatusBar = "#ERROR " + Command + ": " + StatusName + " could not be written: " + failure.Message + "; " + otherwise;
+                return false;
             }
         }
 
@@ -406,7 +425,7 @@ namespace Goosedove.Host
                 string line;
                 try
                 {
-                    line = Line(request);
+                    line = Run(request);
                 }
                 catch (Exception failure)
                 {
@@ -416,9 +435,15 @@ namespace Goosedove.Host
                 {
                     ExcelAsyncUtil.QueueAsMacro(() =>
                     {
+                        // On Excel's thread, later: the cell, or the status bar with the cause when
+                        // the cell will not take the line now; nothing thrown here reaches anyone,
+                        // and the run is over either way.
                         try
                         {
-                            Write(application, status, line);
+                            Write(application, status, line, "the run's line: " + line);
+                        }
+                        catch (Exception)
+                        {
                         }
                         finally
                         {
@@ -437,6 +462,23 @@ namespace Goosedove.Host
                 Name = Command,
             };
             thread.Start();
+        }
+
+        /// <summary>
+        /// The worker's work: the seam's line for the request, and this thread's set of the host's
+        /// kept buffers let go once it is done, so a run leaves nothing pinned behind, however many
+        /// run; a thread that ended without letting go would keep its set alive.
+        /// </summary>
+        internal static string Run(Request request)
+        {
+            try
+            {
+                return Line(request);
+            }
+            finally
+            {
+                Marshal.ReleaseBuffers();
+            }
         }
 
         /// <summary>
