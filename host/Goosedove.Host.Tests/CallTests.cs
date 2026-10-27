@@ -33,6 +33,19 @@ namespace Goosedove.Host.Tests
             return handle;
         }
 
+        // The column of a readback under a heading, or -1 when no column carries it.
+        private static int Heading(object[,] grid, string name)
+        {
+            for (var j = 0; j < grid.GetLength(1); j++)
+            {
+                if (Equals(grid[0, j], name))
+                {
+                    return j;
+                }
+            }
+            return -1;
+        }
+
         private static object[,] Row(params object[] cells)
         {
             var grid = new object[1, cells.Length];
@@ -284,8 +297,8 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("route"), "Cleared" }, "#ERROR _CreateQuoteTemplate: ValueError: route is 'Cleared', expected cleared or bilateral" };
             yield return new object[] { "_Quote", new object[] { ExcelMissing.Value, "F27", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _Quote: market is missing, expected market handle" };
             yield return new object[] { "_Quote", new object[] { "x:market:gas:9", "F27", "y:quote_template:9", ExcelMissing.Value }, "#ERROR _Quote: market is text 'x:market:gas:9' naming no live object, expected market handle" };
-            yield return new object[] { "_CreateTrades", new object[] { ExcelMissing.Value, Row("quantity"), 1.0, ExcelMissing.Value }, "#ERROR _CreateTrades: index is missing, expected index handle" };
-            yield return new object[] { "_CreateTrades", new object[] { "x:index:gas:9", Row("quantity"), 1.0, "y:trade_template:9" }, "#ERROR _CreateTrades: index is text 'x:index:gas:9' naming no live object, expected index handle" };
+            yield return new object[] { "_CreateTrades", new object[] { ExcelMissing.Value, Row("quantity"), 1.0, ExcelMissing.Value }, "#ERROR _CreateTrades: indexes is missing, expected index handles in a cell, a row or a column" };
+            yield return new object[] { "_CreateTrades", new object[] { "x:index:gas:9", Row("quantity"), 1.0, "y:trade_template:9" }, "#ERROR _CreateTrades: indexes is text 'x:index:gas:9' naming no live object, expected index handle" };
             // The valuation path: the handles left out, naming nothing or of another kind, in the seam's words; the batch itself is in the fact below.
             yield return new object[] { "_PrepareTrades", new object[] { ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _PrepareTrades: trades is missing, expected trades handle" };
             yield return new object[] { "_PrepareTrades", new object[] { "x:trades:gas:9", "y:market_history:gas:9" }, "#ERROR _PrepareTrades: trades is text 'x:trades:gas:9' naming no live object, expected trades handle" };
@@ -660,6 +673,66 @@ namespace Goosedove.Host.Tests
             Assert.Equal(10.0, spill[1, 3]);
             var date = (string)Seam.Call("_CreateValuationDate", 46276.0, 0.5);
             Assert.Equal("#ERROR EchoFieldRow: values cell (1, 1) is valuation date handle '" + date + "', expected holiday calendar handle", Seam.Call("EchoFieldRow", "fixed_float", Row("payment_holiday_calendar"), date));
+        }
+
+        // A pair of indexes, two-index-fixed-float.md: A a futures index and B an IFERC one over the
+        // one NYMEX NG specification, booked as one row at 3.30 and -0.30, the histories and the
+        // markets handed as a column and a row in either order: the ticket's hand table, 950 of mark
+        // and -0.095 of DV01 on SOFR at 0.95 a year on, each leg a lot; the risk report two commodity
+        // groups and one DV01 column; the readbacks naming each leg; a column of one history and a
+        // grid of handles refused, the seam's words and the kernel's.
+        [Fact]
+        public void a_pair_of_indexes_is_booked_prepared_and_valued_as_one_payment()
+        {
+            var a = Index((string)Seam.Call("_CreateFuturesSchedule", Column("F27", "G27", "H27"), Column(46385.0, 46414.0, 46442.0), ExcelMissing.Value), (string)Seam.Call("_CreateHolidayCalendar", 46388.0), "A");
+            var b = Index((string)Seam.Call("_CreateIfercSchedule", Column("Z26", "F27", "G27", "H27"), Column(46357.0, 46391.0, 46419.0, 46447.0)), ExcelMissing.Value, "B");
+            var date = (string)Seam.Call("_CreateValuationDate", 46391.0, 0.5);
+            var historyA = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", date, a), (string)Seam.Call("_CreateFuturesFixings", Column(46387.0, 46386.0), Column(3.60, 3.58), a));
+            var historyB = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", date, b), (string)Seam.Call("_CreateIfercFixings", Column("Z26"), Column(-0.30), b));
+            var marketA = (string)Seam.Call("_CreateMarket", historyA, (string)Seam.Call("_CreatePriceVector", "A", Column(3.50, 3.60)));
+            var marketB = (string)Seam.Call("_CreateMarket", historyB, (string)Seam.Call("_CreatePriceVector", "B", Column(-0.38, -0.40, -0.42)));
+            var curves = (string)Seam.Call("_CollectDiscountCurves", (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 } }));
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, (string)Seam.Call("_CreateHolidayCalendar", 46388.0)));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "second_fixed_price");
+            var row = Row(1.0, 46371.0, "G27", 1.0, 3.30, -0.30);
+            var trades = (string)Seam.Call("_CreateTrades", Column(a, b), headers, row, template);
+            Assert.StartsWith(Pid + ":trades:A+B:", trades);
+            var prepared = (string)Seam.Call("_PrepareTrades", trades, Column(historyB, historyA));
+            Assert.StartsWith(Pid + ":prepared_trades:A+B:", prepared);
+            var results = (string)Seam.Call("_EvaluateTrades", prepared, Row(marketA, marketB), curves);
+            Assert.StartsWith(Pid + ":trade_results:A+B:", results);
+            var values = (object[,])Seam.Call("_ReportValues", results);
+            Assert.Equal("bilateral_mark", values[0, 0]);
+            Assert.Equal(950.0, (double)values[2, 0], 9);
+            Assert.Equal(0.0, values[2, 1]);
+            var risk = (object[,])Seam.Call("_ReportRisk", results, "all", "day");
+            Assert.Equal(8, risk.GetLength(1));
+            Assert.Equal("A nominal_delta [NYMEX NG]", risk[1, 1]);
+            Assert.Equal("B delta [NYMEX NG]", risk[1, 4]);
+            Assert.Equal("SOFR USD dv01 [USD per basis point]", risk[1, 5]);
+            Assert.Equal("A SOFR cross_gamma [NYMEX NG per basis point]", risk[1, 6]);
+            Assert.Equal("Total", risk[3, 0]);
+            Assert.Equal(1.0, (double)risk[3, 1], 12);
+            Assert.Equal(0.95, (double)risk[3, 4], 12);
+            Assert.Equal(-0.095, (double)risk[3, 5], 12);
+            var read = (object[,])Seam.Call("util_ReadHandle", results);
+            Assert.Equal(4, read.GetLength(0));
+            Assert.Equal("leg", read[0, 0]);
+            Assert.Equal("index", read[0, 1]);
+            Assert.Equal(1.0, read[2, 0]);
+            Assert.Equal("A", read[2, 1]);
+            Assert.Equal("B", read[3, 1]);
+            var booked = (object[,])Seam.Call("util_ReadHandle", trades);
+            Assert.Equal(3, booked.GetLength(0));
+            var combined = Heading(booked, "combined_fixed_price");
+            Assert.True(combined > 0);
+            Assert.Equal(3.0, (double)booked[2, combined], 12);
+            Assert.Equal(-0.3, (double)booked[2, combined - 1], 12);
+            Assert.Equal("#ERROR _PrepareTrades: ValueError: histories are 1, expected 2, one per leg of the trades", Seam.Call("_PrepareTrades", trades, historyA));
+            Assert.Equal("#ERROR _EvaluateTrades: ValueError: market 2 is over the history of index 'A' as market 1 is, expected one market per history of the trades", Seam.Call("_EvaluateTrades", prepared, Column(marketA, marketA), curves));
+            Assert.StartsWith("#ERROR _CreateTrades: indexes is 2x2 array, expected one cell, one row or one column of index handles", (string)Seam.Call("_CreateTrades", new object[,] { { a, b }, { a, b } }, headers, row, template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: second_fixed_price is -0.3, expected none unless two indexes", Seam.Call("_CreateTrades", a, headers, row, template));
         }
 
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;

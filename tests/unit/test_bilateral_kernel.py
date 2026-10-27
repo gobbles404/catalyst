@@ -689,7 +689,8 @@ def test_the_encoding_makes_the_payment_axes_once_for_a_bilateral_batch() -> Non
     # payment period, every saved period placed from the start.
     counter = WorkCounter()
     terms = terms_of()
-    axes = encoded(terms, (observed_of(terms),), UNITS, counter).payment_axes
+    enc = encoded(terms, (observed_of(terms),), UNITS, counter)
+    axes = enc.payment_axes
     assert axes is not None
     assert counter.freeze().as_dict()["encoded_payment_days"] == 2
     np.testing.assert_array_equal(axes.days, dates(A_YEAR, TWO_YEARS))
@@ -699,7 +700,7 @@ def test_the_encoding_makes_the_payment_axes_once_for_a_bilateral_batch() -> Non
     np.testing.assert_array_equal(axes.years, dates("2028-01-01", "2029-01-01"))
     np.testing.assert_array_equal(axes.year_of_month, [0, 1])
     np.testing.assert_array_equal(axes.union_days, dates(AS_OF, A_YEAR, TWO_YEARS))
-    np.testing.assert_array_equal(axes.observed_in_days, [0])
+    np.testing.assert_array_equal(enc.legs[0].day_in_union, [0])  # the leg's own places
     np.testing.assert_array_equal(axes.paid_in_days, [1, 2])
     assert all(not getattr(axes, field.name).flags.writeable for field in fields(axes))
     prep = prepared_on(terms)
@@ -799,7 +800,7 @@ def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -
     np.testing.assert_array_equal(prep.encoded.legs[0].days, dates(AS_OF, "2029-01-05"))
     np.testing.assert_array_equal(axes.days, dates("2029-01-05", "2029-01-10"))
     np.testing.assert_array_equal(axes.union_days, dates(AS_OF, "2029-01-05", "2029-01-10"))
-    np.testing.assert_array_equal(axes.observed_in_days, [0, 1])
+    np.testing.assert_array_equal(prep.encoded.legs[0].day_in_union, [0, 1])
     np.testing.assert_array_equal(axes.paid_in_days, [1, 2])
     flat_from_a_year = curve_of((AS_OF, 1.0), (A_YEAR, 0.9), ("2029-01-10", 0.9))
     result = valued(prep, (80.0, 50.0), flat_from_a_year)

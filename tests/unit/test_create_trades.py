@@ -2079,7 +2079,7 @@ def test_the_creators_refusals_come_in_the_decided_order(sheet: dict[str, Any]) 
     )
     # The arguments alone, in signature order: the index, then the template, before any binding.
     assert create(sheet["holidays"], row("Quantity"), rows, "x:trade_template:9") == (
-        f"#ERROR _CreateTrades: index is holiday calendar handle {sheet['holidays']!r}, "
+        f"#ERROR _CreateTrades: indexes is holiday calendar handle {sheet['holidays']!r}, "
         "expected index handle"
     )
     assert create(ix, row("Quantity"), rows, "x:trade_template:9") == (

@@ -26,7 +26,7 @@ from goosedove.index_definitions.holiday_calendar import holiday_calendar
 from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
-from goosedove.instrumentation.work_counts import WorkCounter
+from goosedove.instrumentation.work_counts import WorkCounter, WorkCounts
 from goosedove.instruments.definitions import FIXED_FLOAT, FieldType, Instrument
 from goosedove.instruments.fields import DatesOrTexts, FieldValues
 from goosedove.market.market import Market, market
@@ -34,6 +34,7 @@ from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
 from goosedove.market_data.iferc_fixings import iferc_fixings
 from goosedove.market_data.price_vector import price_vector
+from goosedove.trades.aggregation import aggregate_results
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.resolution import Trades, trades
@@ -196,8 +197,9 @@ def curve_set(curve: DiscountCurve) -> DiscountCurveSet:
     return collect_discount_curves((curve,), WorkCounter())
 
 
-def counts_of(counter: WorkCounter) -> dict[str, int]:
-    return counter.freeze().as_dict()
+def counts_of(counter: WorkCounter) -> WorkCounts:
+    """The counts, a name never hit read as zero."""
+    return counter.freeze()
 
 
 @pytest.mark.parametrize("n", ROWS)
@@ -222,6 +224,8 @@ def test_creation_counts_each_legs_arrays_and_the_trades_facts_once(n: int) -> N
     ):
         assert two_legs[name] == one_leg[name], name
     assert two_legs["encoded_groups"] == 1 and two_legs["resolved_occurrences"] == n
+    # The pair's observation-day union, the two legs' one day each; one leg makes none.
+    assert two_legs["encoded_pair_days"] == 2 and one_leg["encoded_pair_days"] == 0
 
 
 @pytest.mark.parametrize("n", ROWS)
@@ -285,3 +289,31 @@ def test_a_pair_holds_at_most_twice_a_legs_memory_at_each_step() -> None:
     )
     for name, leg, legs in steps:
         assert least_peak(legs) <= 2 * least_peak(leg) + SLACK, name
+
+
+@pytest.mark.parametrize("n", ROWS)
+def test_a_pair_collects_as_two_legs_from_one_source(n: int) -> None:
+    both, one = pair(n, WorkCounter()), single(n, WorkCounter())
+    hist_a, hist_b = history_a(), history_b()
+    market_a, market_b = quoted(hist_a, 3.50, 3.60), quoted(hist_b, -0.38, -0.40, -0.42)
+    curves = curve_set(SOFR)
+    paired = trade_results(
+        prepared_trades(both.encoded, (hist_a, hist_b), WorkCounter()),
+        (market_a, market_b),
+        WorkCounter(),
+        curves,
+    )
+    alone = trade_results(
+        prepared_trades(one.encoded, (hist_a,), WorkCounter()), (market_a,), WorkCounter(), curves
+    )
+    two_counter, one_counter = WorkCounter(), WorkCounter()
+    aggregate_results((paired,), two_counter)
+    aggregate_results((alone,), one_counter)
+    two_legs, one_leg = counts_of(two_counter), counts_of(one_counter)
+    # One source either way; the pair's contributions one rate and two cross, two index groups
+    # and two cross groups against one of each, the one rate group alike.
+    assert two_legs["sources_collected"] == 1 == one_leg["sources_collected"]
+    assert two_legs["contributions_collected"] == 3 and one_leg["contributions_collected"] == 2
+    assert two_legs["index_groups"] == 2 and one_leg["index_groups"] == 1
+    assert two_legs["cross_groups"] == 2 and one_leg["cross_groups"] == 1
+    assert two_legs["rate_groups"] == 1 == one_leg["rate_groups"]

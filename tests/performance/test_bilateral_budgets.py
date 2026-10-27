@@ -494,16 +494,19 @@ def test_the_encoding_of_a_bilateral_batch_makes_its_payment_axes_once(
     np.testing.assert_array_equal(axes.years[axes.year_of_month], months.astype("datetime64[Y]"))
     # The one union, the days': since #186 the month and year displays are the preparation's.
     np.testing.assert_array_equal(axes.union_days, np.union1d(enc.legs[0].days, axes.days))
-    np.testing.assert_array_equal(axes.union_days[axes.observed_in_days], enc.legs[0].days)
+    places = enc.legs[0].day_in_union  # the leg's own places on the trade's union
+    assert places is not None
+    np.testing.assert_array_equal(axes.union_days[places], enc.legs[0].days)
     np.testing.assert_array_equal(axes.union_days[axes.paid_in_days], axes.days)
     arrays = [getattr(axes, field.name) for field in fields(axes)]
     assert all(not array.flags.writeable for array in arrays)
     # Retained: eight bytes an entry of every array, the three axes with their places and the day
-    # union with both kinds' places.
+    # union with the payment days' places; the leg's own places on the union are the leg's.
     d, m, y = axes.days.size, axes.months.size, axes.years.size
     assert sum(array.nbytes for array in arrays) == 8 * (
-        d + payment_date.size + m + d + y + m + axes.union_days.size + enc.legs[0].days.size + d
+        d + payment_date.size + m + d + y + m + axes.union_days.size + d
     )
+    assert places.nbytes == 8 * enc.legs[0].days.size
     # The cleared encoding's functions and, beside them, the axes once and the one union.
     cleared = call_profile(lambda: encoded(terms, (observed_of(terms),), UNITS, WorkCounter()))
     assert cleared["_the_payment_axes"] == 1 and cleared["_the_union"] == 1

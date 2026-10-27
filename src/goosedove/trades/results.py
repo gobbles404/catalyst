@@ -9,7 +9,7 @@ defines and selects; it never calculates, so it imports the records that precede
 nothing of evaluation, aggregation or Excel. docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
-from typing import assert_never
+from typing import assert_never, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -23,6 +23,7 @@ from goosedove.trades.contributions import (
     curve_words,
 )
 from goosedove.trades.display_axes import EarlyRisk, PeriodAxis, Unit
+from goosedove.trades.encoding import PairAxes
 from goosedove.trades.preparation import PreparedLeg, PreparedTrades
 from goosedove.trades.reserves import Reserves
 from goosedove.trades.risk_report import (
@@ -198,11 +199,17 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
     basis point]`; a result on one curve names it bare, and two curves of one name on one result
     are two words, `SOFR (curve_1)` and `SOFR (curve_2)`.
 
+    A pair, since two-index-fixed-float.md's third pull request, reads as the collection of its
+    two legs would, _pair_view's, each leg's deltas and cross-gamma under its own index and
+    the DV01 the trade's.
+
     Work: a copy per column through the saved places, by reference where a day axis is the
     risk's own, a column of zeros for a cleared result's cross-gamma; nothing summed, nothing
     sorted, nothing discovered, the Total the scalar the evaluation stored.
     """
-    leg = results.legs[0]  # one leg today: its index names the deltas and the cross-gamma
+    if results.prepared.encoded.pair is not None:
+        return _pair_view(results, risk, bucket)
+    leg = results.legs[0]  # one leg: its index names the deltas and the cross-gamma
     leg_terms = leg.prepared.encoded.leg
     nominal_label, delta_label = delta_labels(leg_terms.index, leg_terms.reporting_lot)
     rates = results.rate_contributions
@@ -300,17 +307,17 @@ def _day_view(results: TradeResults, risk: Risk, labels: Labels) -> RiskView:
                 )
                 return RiskView(encoded.days, every, totals, columns)
             union = axes.union_days
+            observed_in = cast(NDArray[np.intp], encoded.day_in_union)  # made with the axes
             return RiskView(
                 union,
                 every,
                 totals,
                 (
-                    placed(union.size, axes.observed_in_days, prepared.daily_lots),
-                    placed(union.size, axes.observed_in_days, leg.discounted_daily_lots),
+                    placed(union.size, observed_in, prepared.daily_lots),
+                    placed(union.size, observed_in, leg.discounted_daily_lots),
                     *[placed(union.size, axes.paid_in_days, c.dv01_by_day) for c in rates],
                     *[
-                        placed(union.size, axes.observed_in_days, c.cross_gamma_by_day)
-                        for c in crosses
+                        placed(union.size, observed_in, c.cross_gamma_by_day) for c in crosses
                     ],  # made with the observation days
                 ),
             )
@@ -465,6 +472,323 @@ def _saved(
             return "Y", prepared.by_year, prepared.yearly_lots, results.discounted_yearly_lots
         case _:
             assert_never(bucket)
+
+
+PairLabels = tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], tuple[str, ...]]
+
+
+def _pair_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
+    """A pair's report, since two-index-fixed-float.md's third pull request: the layout a
+    collection of its two legs as single-index results would have, aggregate_view's, so that a
+    pair and the collection of its legs read alike. Each leg's nominal delta and delta stand
+    under its own index and reporting lot, one column each per leg; the DV01 is the trade's,
+    one column per curve the batch was valued on; the cross-gamma one column per leg and curve,
+    a cleared pair's one of zeros per leg. By day the deltas and the cross-gamma are on the
+    union of the legs' observation days the encoding made once, PairAxes, each leg's vector
+    copied through its saved places and zero where only the other leg observes; the DV01 on the
+    payment days; all four on the payment-time union with each leg's own places. By month or by
+    year each leg's saved vector is placed by its own rows from the one valuation month, the
+    axis the longer of the legs' display axes cut to the selected rows, a saved value before the
+    start refused from the leg's own facts. Selects and copies through saved places; nothing is
+    summed across the legs, the lots of one index never added to the other's."""
+    legs = results.legs
+    rates = results.rate_contributions
+    crosses = [(k, c) for k, leg in enumerate(legs) for c in leg.cross_contributions]
+    terms = [leg.prepared.encoded.leg for leg in legs]
+    pairs = [delta_labels(t.index, t.reporting_lot) for t in terms]
+    nominal_labels = tuple([pair[0] for pair in pairs])
+    delta_words = tuple([pair[1] for pair in pairs])
+    if rates or crosses:
+        words = curve_words([c.curve for c in (*rates, *[c for _, c in crosses])])
+        dv01_labels = tuple([dv01_label(words[id(c.curve)], c.currency) for c in rates])
+        cross_labels = tuple(
+            [
+                cross_gamma_label(terms[k].index, words[id(c.curve)], terms[k].reporting_lot)
+                for k, c in crosses
+            ]
+        )
+    else:
+        # Cleared: no curve values, the one DV01 column and a cross-gamma column of nothing a leg.
+        dv01_labels = (dv01_label(CLEARED, results.currency),)
+        cross_labels = tuple([cross_gamma_label(t.index, CLEARED, t.reporting_lot) for t in terms])
+    labels: PairLabels = (nominal_labels, delta_words, dv01_labels, cross_labels)
+    match bucket:
+        case Bucket.DAY:
+            return _pair_day_view(results, risk, labels)
+        case Bucket.MONTH | Bucket.YEAR:
+            return _pair_period_view(results, risk, bucket, labels)
+        case _:
+            assert_never(bucket)
+
+
+def _pair_day_view(results: TradeResults, risk: Risk, labels: PairLabels) -> RiskView:
+    """A pair's day report: the deltas and the cross-gamma on the union of the legs' observation
+    days through each leg's saved places, the DV01 on the payment days by reference, all four on
+    the payment-time union or, for a cleared pair, on the observation days."""
+    legs = results.legs
+    encoded = results.prepared.encoded
+    pair = cast(PairAxes, encoded.pair)  # the branch is a pair's
+    axes = encoded.payment_axes
+    rates = results.rate_contributions
+    crosses = [(k, c) for k, leg in enumerate(legs) for c in leg.cross_contributions]
+    nominal_labels, delta_words, dv01_labels, cross_labels = labels
+    days = pair.days
+    match risk:
+        case Risk.NOMINAL_DELTA:
+            return RiskView(
+                days,
+                nominal_labels,
+                tuple([leg.nominal_delta_total for leg in legs]),
+                tuple(
+                    [
+                        placed(days.size, places, leg.prepared.daily_lots)
+                        for leg, places in zip(legs, pair.day_in, strict=True)
+                    ]
+                ),
+            )
+        case Risk.DELTA:
+            return RiskView(
+                days,
+                delta_words,
+                tuple([leg.delta_total for leg in legs]),
+                tuple(
+                    [
+                        placed(days.size, places, leg.discounted_daily_lots)
+                        for leg, places in zip(legs, pair.day_in, strict=True)
+                    ]
+                ),
+            )
+        case Risk.DV01:
+            if not rates:
+                return RiskView(NO_DAYS, dv01_labels, (results.dv01,), (NOTHING,))
+            return RiskView(
+                rates[0].days,
+                dv01_labels,
+                tuple([c.dv01 for c in rates]),
+                tuple([c.dv01_by_day for c in rates]),
+            )
+        case Risk.CROSS_GAMMA:
+            if not crosses:
+                # Cleared: the known zero on the observation days, a column per leg.
+                return RiskView(
+                    days,
+                    cross_labels,
+                    tuple([leg.cross_gamma_total for leg in legs]),
+                    tuple([np.zeros(days.size) for _ in legs]),
+                )
+            return RiskView(
+                days,
+                cross_labels,
+                tuple([c.cross_gamma_total for _, c in crosses]),
+                tuple(
+                    [placed(days.size, pair.day_in[k], c.cross_gamma_by_day) for k, c in crosses]
+                ),
+            )
+        case Risk.ALL:
+            every = tuple(
+                [
+                    *[
+                        label
+                        for pair_labels in zip(nominal_labels, delta_words, strict=True)
+                        for label in pair_labels
+                    ],
+                    *dv01_labels,
+                    *cross_labels,
+                ]
+            )
+            dv01_totals = tuple([c.dv01 for c in rates]) if rates else (results.dv01,)
+            cross_totals = (
+                tuple([c.cross_gamma_total for _, c in crosses])
+                if crosses
+                else tuple([leg.cross_gamma_total for leg in legs])
+            )
+            totals = (
+                *[t for leg in legs for t in (leg.nominal_delta_total, leg.delta_total)],
+                *dv01_totals,
+                *cross_totals,
+            )
+            if axes is None:
+                # Cleared: the observation days, the DV01 and the cross-gamma nothing on every row.
+                on = pair.day_in
+                columns = (
+                    *[
+                        column
+                        for leg, places in zip(legs, on, strict=True)
+                        for column in (
+                            placed(days.size, places, leg.prepared.daily_lots),
+                            placed(days.size, places, leg.discounted_daily_lots),
+                        )
+                    ],
+                    *[np.zeros(days.size) for _ in dv01_totals],
+                    *[np.zeros(days.size) for _ in cross_totals],
+                )
+                return RiskView(days, every, totals, columns)
+            union = axes.union_days
+            on = tuple([cast(NDArray[np.intp], leg.prepared.encoded.day_in_union) for leg in legs])
+            columns = (
+                *[
+                    column
+                    for leg, places in zip(legs, on, strict=True)
+                    for column in (
+                        placed(union.size, places, leg.prepared.daily_lots),
+                        placed(union.size, places, leg.discounted_daily_lots),
+                    )
+                ],
+                *[placed(union.size, axes.paid_in_days, c.dv01_by_day) for c in rates],
+                *[placed(union.size, on[k], c.cross_gamma_by_day) for k, c in crosses],
+            )
+            return RiskView(union, every, totals, columns)
+        case _:
+            assert_never(risk)
+
+
+def _pair_period_view(
+    results: TradeResults, risk: Risk, bucket: Period, labels: PairLabels
+) -> RiskView:
+    """A pair's month or year report: each leg's saved vector placed by its own rows from the one
+    valuation month onto the longer of the legs' display axes cut to the selected rows, the DV01
+    the trade's on the payment rows every leg's axis holds alike, a saved value before the
+    start refused from the leg's own facts, worded with the measure asked for."""
+    legs = results.legs
+    rates = results.rate_contributions
+    crosses = [(k, c) for k, leg in enumerate(legs) for c in leg.cross_contributions]
+    nominal_labels, delta_words, dv01_labels, cross_labels = labels
+    saved = [_saved(leg, bucket) for leg in legs]
+    unit = saved[0][0]
+    axes = [axis for _, axis, _, _ in saved]
+    first = axes[0]  # the payment rows are the trade's, alike on every leg's axis
+    delta_rows = max([axis.delta_rows for axis in axes])
+    match risk:
+        case Risk.NOMINAL_DELTA:
+            for leg in legs:
+                leg.prepared.early_nominal.refuse("nominal delta", unit)
+            columns = tuple(
+                [
+                    placed(delta_rows, axis.contract_in, nominal[axis.contract_from :])
+                    for _, axis, nominal, _ in saved
+                ]
+            )
+            totals = tuple([leg.nominal_delta_total for leg in legs])
+            return RiskView(_periods_of(axes, delta_rows), nominal_labels, totals, columns)
+        case Risk.DELTA:
+            for leg in legs:
+                leg.early_delta.refuse("delta", unit)
+            columns = tuple(
+                [
+                    placed(delta_rows, axis.contract_in, discounted[axis.contract_from :])
+                    for _, axis, _, discounted in saved
+                ]
+            )
+            totals = tuple([leg.delta_total for leg in legs])
+            return RiskView(_periods_of(axes, delta_rows), delta_words, totals, columns)
+        case Risk.DV01:
+            if not rates:
+                return RiskView(NO_DAYS, dv01_labels, (results.dv01,), (NOTHING,))
+            for c in rates:
+                c.early_dv01.refuse("DV01", unit)
+            columns = tuple(
+                [
+                    placed(first.dv01_rows, first.paid_in, _dv01_of(c, bucket)[first.paid_from :])
+                    for c in rates
+                ]
+            )
+            return RiskView(
+                first.periods[: first.dv01_rows],
+                dv01_labels,
+                tuple([c.dv01 for c in rates]),
+                columns,
+            )
+        case Risk.CROSS_GAMMA:
+            if not crosses:
+                return RiskView(
+                    _periods_of(axes, delta_rows),
+                    cross_labels,
+                    tuple([leg.cross_gamma_total for leg in legs]),
+                    tuple([np.zeros(delta_rows) for _ in legs]),
+                )
+            for _, c in crosses:
+                c.early_cross_gamma.refuse("cross-gamma", unit)
+            columns = tuple(
+                [
+                    placed(
+                        delta_rows,
+                        axes[k].contract_in,
+                        _cross_of(c, bucket)[axes[k].contract_from :],
+                    )
+                    for k, c in crosses
+                ]
+            )
+            totals = tuple([c.cross_gamma_total for _, c in crosses])
+            return RiskView(_periods_of(axes, delta_rows), cross_labels, totals, columns)
+        case Risk.ALL:
+            return _pair_all(results, bucket, unit, labels, saved, crosses)
+        case _:
+            assert_never(risk)
+
+
+def _pair_all(
+    results: TradeResults,
+    bucket: Period,
+    unit: Unit,
+    labels: PairLabels,
+    saved: list[tuple[Unit, PeriodAxis, NDArray[np.float64], NDArray[np.float64]]],
+    crosses: list[tuple[int, CrossContribution]],
+) -> RiskView:
+    """All four by month or by year for a pair: each leg's two deltas, then a DV01 column per rate
+    contribution or one of zeros where no curve values, then a cross-gamma column per leg and
+    curve or one of zeros per leg, on the display axis through the later of the legs' delta rows
+    and the DV01 rows."""
+    legs = results.legs
+    rates = results.rate_contributions
+    nominal_labels, delta_words, dv01_labels, cross_labels = labels
+    axes = [axis for _, axis, _, _ in saved]
+    first = axes[0]
+    for leg in legs:
+        leg.prepared.early_nominal.refuse("nominal delta", unit)
+        leg.early_delta.refuse("delta", unit)
+    rows = max(max([axis.delta_rows for axis in axes]), first.dv01_rows)
+    every: list[str] = []
+    totals: list[float] = []
+    columns: list[NDArray[np.float64]] = []
+    for leg, (_, axis, nominal, discounted), nominal_label, delta_label in zip(
+        legs, saved, nominal_labels, delta_words, strict=True
+    ):
+        every.extend((nominal_label, delta_label))
+        totals.extend((leg.nominal_delta_total, leg.delta_total))
+        columns.append(placed(rows, axis.contract_in, nominal[axis.contract_from :]))
+        columns.append(placed(rows, axis.contract_in, discounted[axis.contract_from :]))
+    every.extend(dv01_labels)
+    if rates:
+        for c in rates:
+            c.early_dv01.refuse("DV01", unit)
+        totals.extend([c.dv01 for c in rates])
+        columns.extend(
+            [placed(rows, first.paid_in, _dv01_of(c, bucket)[first.paid_from :]) for c in rates]
+        )
+    else:
+        totals.append(results.dv01)
+        columns.append(np.zeros(rows))
+    every.extend(cross_labels)
+    if crosses:
+        for _, c in crosses:
+            c.early_cross_gamma.refuse("cross-gamma", unit)
+        totals.extend([c.cross_gamma_total for _, c in crosses])
+        columns.extend(
+            [
+                placed(rows, axes[k].contract_in, _cross_of(c, bucket)[axes[k].contract_from :])
+                for k, c in crosses
+            ]
+        )
+    else:
+        totals.extend([leg.cross_gamma_total for leg in legs])
+        columns.extend([np.zeros(rows) for _ in legs])
+    return RiskView(_periods_of(axes, rows), tuple(every), tuple(totals), tuple(columns))
+
+
+def _periods_of(axes: list[PeriodAxis], rows: int) -> NDArray[np.datetime64]:
+    """The longer of the legs' display axes cut to the rows: every leg's periods run from the one
+    valuation month, so the longer holds the shorter's as its prefix."""
+    return max(axes, key=lambda axis: axis.periods.size).periods[:rows]
 
 
 def _dv01_of(contribution: RateContribution, bucket: Period) -> NDArray[np.float64]:

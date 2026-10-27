@@ -172,6 +172,7 @@ def test_preparing_resolves_two_handles_and_runs_the_kernels_preparation_alone(
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 2,
+        "_resolve_each": 1,
         "_text": 2,
         "_resolve": 2,
         "_PrepareTrades": 1,
@@ -212,6 +213,7 @@ def test_a_tick_resolves_two_handles_and_runs_the_evaluation_alone(
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 3,  # the two handles and the curve left out, since #177
+        "_resolve_each": 1,
         "_text": 2,
         "_resolve": 2,
         "_EvaluateTrades": 1,
@@ -311,6 +313,7 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 3,
+        "_resolve_each": 1,
         "_text": 3,
         "_resolve": 3,
         "_EvaluateTrades": 1,

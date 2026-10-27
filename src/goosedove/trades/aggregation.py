@@ -433,8 +433,9 @@ def _grouped_by_index(
     index object whose name a group already has is refused, two indexes of one name being a
     mistake to show and not a group to make. A batch of cashflows is held to the valuation day
     and to nothing else, having no index, history or price vector, and joins no group. Each
-    group is its positions and its members, the results' legs, one per result today since
-    two-index-fixed-float.md, in the order given."""
+    group is its positions and its members, the results' legs, each leg of a result since
+    two-index-fixed-float.md, a pair joining two groups under one position, in the order
+    given."""
     groups: list[tuple[list[int], list[LegResults]]] = []
     by_identity: dict[int, int] = {}
     by_name: dict[str, int] = {}
@@ -451,42 +452,44 @@ def _grouped_by_index(
                 pass
             case _:
                 assert_never(source)
-        leg = source.legs[0]  # one leg today; the ticket's third PR groups every leg
-        ix = leg.prepared.encoded.leg.index
-        g = by_identity.get(id(ix))
-        if g is None:
-            named = by_name.get(ix.name)
-            if named is not None:
+        for leg in source.legs:  # each leg its index's, a pair in two groups
+            ix = leg.prepared.encoded.leg.index
+            g = by_identity.get(id(ix))
+            if g is None:
+                named = by_name.get(ix.name)
+                if named is not None:
+                    raise ValueError(
+                        f"results {k + 1} is on another index named {ix.name!r} than results "
+                        f"{groups[named][0][0] + 1}, expected one index for one name"
+                    )
+                by_identity[id(ix)] = by_name[ix.name] = len(groups)
+                groups.append(([k], [leg]))
+                continue
+            positions, members = groups[g]
+            first = members[0]
+            if leg.prepared.history is not first.prepared.history:
                 raise ValueError(
-                    f"results {k + 1} is on another index named {ix.name!r} than results "
-                    f"{groups[named][0][0] + 1}, expected one index for one name"
+                    f"results {k + 1} is on index {ix.name!r} over another history than "
+                    f"results {positions[0] + 1}, expected one history for one index"
                 )
-            by_identity[id(ix)] = by_name[ix.name] = len(groups)
-            groups.append(([k], [leg]))
-            continue
-        positions, members = groups[g]
-        first = members[0]
-        if leg.prepared.history is not first.prepared.history:
-            raise ValueError(
-                f"results {k + 1} is on index {ix.name!r} over another history than results "
-                f"{positions[0] + 1}, expected one history for one index"
-            )
-        if leg.market.price_vector is not first.market.price_vector:
-            raise ValueError(
-                f"results {k + 1} is on index {ix.name!r} quoted off another price vector than "
-                f"results {positions[0] + 1}, expected one price vector for one index"
-            )
-        positions.append(k)
-        members.append(leg)
+            if leg.market.price_vector is not first.market.price_vector:
+                raise ValueError(
+                    f"results {k + 1} is on index {ix.name!r} quoted off another price vector "
+                    f"than results {positions[0] + 1}, expected one price vector for one index"
+                )
+            positions.append(k)
+            members.append(leg)
     return groups
 
 
 def _cross_contributions(source: Source) -> tuple[CrossContribution, ...]:
-    """A source's cross contributions: a batch of trades' own, a batch of cashflows' none, having
-    no commodity risk."""
+    """A source's cross contributions: a batch of trades' legs' own, in leg order, the one leg's
+    by reference, a batch of cashflows' none, having no commodity risk."""
     match source:
         case TradeResults():
-            return source.legs[0].cross_contributions  # one leg today
+            if len(source.legs) == 1:
+                return source.legs[0].cross_contributions
+            return tuple([c for leg in source.legs for c in leg.cross_contributions])
         case CashflowResults():
             return ()
         case _:
@@ -681,20 +684,20 @@ def _grouped_by_index_and_curve(
                 pass
             case _:
                 assert_never(source)
-        leg = source.legs[0]  # one leg today, two-index-fixed-float.md
-        ix = id(leg.prepared.encoded.leg.index)
-        contributions: tuple[CrossContribution | None, ...] = leg.cross_contributions or (None,)
-        for c in contributions:
-            key = (ix, None if c is None else id(c.curve))
-            g = where.get(key)
-            if g is None:
-                where[key] = len(groups)
-                groups.append((leg, [k], [c]))
-            else:
-                _, positions, members = groups[g]
-                if positions[-1] != k:
-                    positions.append(k)
-                members.append(c)
+        for leg in source.legs:  # each leg its index's pairs, two-index-fixed-float.md
+            ix = id(leg.prepared.encoded.leg.index)
+            contributions: tuple[CrossContribution | None, ...] = leg.cross_contributions or (None,)
+            for c in contributions:
+                key = (ix, None if c is None else id(c.curve))
+                g = where.get(key)
+                if g is None:
+                    where[key] = len(groups)
+                    groups.append((leg, [k], [c]))
+                else:
+                    _, positions, members = groups[g]
+                    if positions[-1] != k:
+                        positions.append(k)
+                    members.append(c)
     return groups
 
 

@@ -8,7 +8,7 @@ and not checked against a confirmation; separately paying legs are outside this
 version. This ticket supersedes the issue's original single-fixed-price and
 combined-index alternatives. The first pull request, the internal one-leg
 representation, is #215; the second, two-leg resolution and pricing, is #216,
-stacked on it; the third follows.
+stacked on it; the third, the pair on the sheet, is #217, stacked on #216.
 
 ## Outcome
 

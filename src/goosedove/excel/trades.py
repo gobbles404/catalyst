@@ -73,10 +73,10 @@ def _CreateTradeTemplate(
 
 @excel_function
 def _CreateTrades(
-    index: Annotated[
-        Handle[Index],
-        "The index handle: the cell showing _CreateIndex's result, such as I3, or a name for it, "
-        "the one index every trade of the batch is on.",
+    indexes: Annotated[
+        Handles[Index],
+        "The index handle, or a row or column of two for a pair: the cells showing _CreateIndex's "
+        "results, such as I3 or I3:I4, or names for them, the first leg's index first.",
     ],
     fields: Annotated[
         TextRow,
@@ -94,10 +94,10 @@ def _CreateTrades(
         "or a name for it, which selects the instrument and supplies the shared fields.",
     ],
 ) -> Handle[Trades]:
-    """Creates a batch of trades on one index from a template's shared fields and a ticket's rows,
-    each contract code resolved against the index's schedule, and shows its handle, the text other
-    formulas take as the trades."""
-    return trades((index,), trade_rows, template, UNITS, WorkCounter())
+    """Creates a batch of trades on one index, or on a pair as two legs, from a
+    template's shared fields and a ticket's rows, each contract code resolved against each
+    index's schedule, and shows its handle, the text other formulas take as the trades."""
+    return trades(indexes, trade_rows, template, UNITS, WorkCounter())
 
 
 @excel_function
@@ -107,16 +107,16 @@ def _PrepareTrades(
         "The trades handle: the cell showing _CreateTrades's result, such as A10, or a name "
         "for it.",
     ],
-    history: Annotated[
-        Handle[MarketHistory],
-        "The market-history handle of the trades' index: the cell showing _CreateMarketHistory's "
-        "result, such as I11, or a name for it, valued on the day the trades are prepared for.",
+    histories: Annotated[
+        Handles[MarketHistory],
+        "The market-history handle of the trades' index, or a row or column of one per index of a "
+        "pair, such as I11 or I11:I12, each valued on the day the trades are prepared for.",
     ],
 ) -> Handle[PreparedTrades]:
-    """Prepares a batch of trades against one market history, each observation whose day has
-    passed fixed at that day's settle and each payment that has fallen due settled, and shows
-    its handle, the text _EvaluateTrades takes as the prepared trades."""
-    return prepared_trades(trades.encoded, (history,), WorkCounter())
+    """Prepares a batch of trades against its market histories, one per index, each observation
+    whose day has passed fixed at that day's settle and each payment fallen due settled, and
+    shows its handle, the text _EvaluateTrades takes as the prepared trades."""
+    return prepared_trades(trades.encoded, histories, WorkCounter())
 
 
 @excel_function
@@ -126,10 +126,10 @@ def _EvaluateTrades(
         "The prepared-trades handle: the cell showing _PrepareTrades's result, such as A11, or a "
         "name for it.",
     ],
-    market: Annotated[
-        Handle[Market],
-        "The market handle over the history the trades were prepared against: the cell showing "
-        "_CreateMarket's result, such as I12, or a name for it, with the day's quotes.",
+    markets: Annotated[
+        Handles[Market],
+        "The market handle over the history the trades were prepared against, or a row or column "
+        "of one per index of a pair, such as I12 or I12:I13, each with the day's quotes.",
     ],
     discount_curve_set: Annotated[
         Handle[DiscountCurveSet] | None,
@@ -138,10 +138,10 @@ def _EvaluateTrades(
         "discount_curve_key, each starting on the valuation day; left out for a cleared batch.",
     ] = None,
 ) -> Handle[TradeResults]:
-    """Evaluates prepared trades against one market, live observations at their quotes and fixed
-    at their settles, each bilateral payment discounted on its row's curve, into mark, cash, delta
+    """Evaluates prepared trades against their markets, one per index, live observations at quotes
+    and fixed at settles, each bilateral payment discounted on its curve, into mark, cash, delta
     and DV01, and shows the results' handle, which the reports take."""
-    return trade_results(prepared, (market,), WorkCounter(), discount_curve_set)
+    return trade_results(prepared, markets, WorkCounter(), discount_curve_set)
 
 
 @excel_function
