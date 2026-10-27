@@ -262,6 +262,7 @@ def test_a_host_function_is_prepared_and_checked_but_never_told_to_excel() -> No
     def HostOnly(label: str) -> str:
         return label.upper()
 
+    assert HostOnly("x") == "X"
     assert "HostOnly" not in {name for name, *_ in bridge.function_specs()}
     assert bridge.entry("HostOnly")("x") == "X"
     assert bridge.entry("HostOnly")(1.0) == "#ERROR HostOnly: label is number 1.0, expected text"

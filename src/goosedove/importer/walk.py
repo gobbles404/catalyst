@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Final, cast
 
 import numpy as np
+from numpy.typing import NDArray
 
 from goosedove.instrumentation.work_counts import WorkCounter
 
@@ -74,7 +75,9 @@ def _described(value: object) -> str:
             return repr(value)
 
 
-def walk(returned: Sequence[int], imported: Sequence[int], counter: WorkCounter) -> Walk:
+def walk(
+    returned: Sequence[int], imported: Sequence[int] | NDArray[np.int64], counter: WorkCounter
+) -> Walk:
     """The walk: the returned IDs sorted descending, a repeated ID refused by name since the
     filter names each trade once; then read newest first until the first ID the workbook holds,
     which stops the walk, every ID before it to fetch in that order and every ID after it

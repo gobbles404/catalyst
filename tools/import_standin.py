@@ -28,7 +28,7 @@ import json
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Final
+from typing import Final, cast
 
 ANSWERS: Final[dict[str, tuple[int, bytes]]] = {
     "/ids/three": (200, b"[103, 105, 104]"),
@@ -73,12 +73,11 @@ class StandIn(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server: StandIn
-
     def _answer(self) -> None:
+        standin = cast(StandIn, self.server)
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length) if length else b""
-        self.server.record(
+        standin.record(
             {
                 "method": self.command,
                 "path": self.path,
@@ -87,7 +86,7 @@ class Handler(BaseHTTPRequestHandler):
             }
         )
         if self.path == "/slow":
-            self.server.stopping.wait()
+            standin.stopping.wait()
             return
         status, answer = ANSWERS.get(self.path, (404, b"no such path"))
         self.send_response(status)
