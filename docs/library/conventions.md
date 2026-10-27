@@ -39,6 +39,7 @@ A worksheet function leads with a verb that says what it does, and the verbs sta
 | Prepare | binds a batch to one market history, the dated side settled once, and shows its handle: a Create by another name, kept apart since what it makes is a step of the pipeline and not a thing the sheet types | `_PrepareTrades`, built in #141 |
 | Evaluate | values a preparation against one market and shows its handle, the other step | `_EvaluateTrades`, built in #141 |
 | Report | spills one aspect of a result's numbers under their labels, a Read by another name, kept for what a desk reads off a sheet | `_ReportValues`, `_ReportRisk`, built in #141 |
+| Import | brings trades in from outside the workbook on a person's command; the one entry the host alone calls and no cell may, registered through `host_function` and never told to Excel, named as a worksheet function is since the status cell shows its refusals in a cell's form | `_ImportTradeIds`, [import-trades.md](importer/import-trades.md) |
 
 List and Show are the owner's agreed verbs for instrument-definition inspection. Both read
 the library catalog directly and return tables without creating handles; they precede

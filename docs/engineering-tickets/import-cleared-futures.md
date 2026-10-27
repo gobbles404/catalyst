@@ -7,7 +7,9 @@
 **Status:** Agreed with the owner, 26 October 2026, from issue #225, which holds the workflow and its
 rationale; this page holds the decisions and the design. Two pull requests: the first sends the
 filter request, walks the IDs it returns and reports what it would fetch; the second fetches each
-trade, turns it into ticket rows and inserts them. The first is in progress on `feat/import-ids`.
+trade, turns it into ticket rows and inserts them. The first is built, on `feat/import-ids`, and
+[import-trades.md](../library/importer/import-trades.md) says what it does today; the second waits
+on the owner's redacted detail payload.
 
 ## Outcome
 
@@ -79,33 +81,61 @@ carrying the source ID. The ID found anywhere in any participating table counts 
    the fetching on a background thread, which takes Python's lock in turn with any recalculation,
    and hands the reading of tables, the insertion and the status line to Excel's main thread
    through Excel-DNA's `QueueAsMacro`, the one way the add-in may use Excel's object model.
-9. **Tests from recorded payloads.** The importer takes its fetcher as an argument, so the suite
-   replays real answers with no network; the owner supplies a redacted detail payload. The command
-   is exercised in a hidden Excel against a local stand-in for the API, as the lifetime groups
-   exercise the add-in, before any run against the real one.
+9. **Tests from recorded answers.** The suite runs against a stand-in for the API that serves
+   recorded answers on the loopback interface, `tools/import_standin.py`, in the test process for
+   the rules and in a process of its own for the pins; the owner supplies a redacted detail
+   payload for the second slice. The command is exercised in a hidden Excel against the same
+   stand-in, as the lifetime groups exercise the add-in, before any run against the real one.
+
+Decided while building the first slice, 27 October 2026:
+
+10. **The filter request is a POST carrying the filter's text as its body**, sent as it stands in
+    the cell with `Content-Type: application/json; charset=utf-8`, the form a search request on an
+    internal API usually takes; the issue left the form to the real API, and the first run against
+    it settles the question. If the API takes the filter in the address instead, `fetch_ids` in
+    `src/goosedove/importer/fetch.py` changes in one line and the settings keep their names.
+11. **The seam keeps one entry for the host alone.** `_ImportTradeIds` is registered through
+    `host_function`, so `entry` finds it and `function_specs` leaves it out: Excel is never told its
+    name, no formula reaches it and nothing fetches on a recalculation, while its arguments are
+    checked and its failure is cell text as for any function; a hidden worksheet function would
+    have kept decision 7 only by convention.
+12. **The host reads a Table's `trade_id` column cell by cell and judges kinds alone.** A number
+    crosses; a blank holds no trade and is passed over, so a Table made of headers alone, with the
+    one empty row Excel gives it, holds nothing; a text, a boolean or an Excel error is refused by
+    the Table and the row, since the IDs of every Table cross as one column and the seam's words
+    could name no Table. The settings' values cross as their cells hold them for the seam to judge.
+    The ID the walk stopped at is held by the first Table, in the destinations' order, whose IDs
+    hold it; the host passes one Table name per ID for that and for the whole-ID refusal.
+13. **The line names twenty IDs and counts the rest**, so a first run against an empty workbook
+    never writes a cell's worth of IDs; and with the name `import_status` missing the one line goes
+    to Excel's status bar, the one place left that is no pop-up.
 
 ## Pull request 1: the first request and the walk
 
-What it builds:
+Built, on `feat/import-ids`; [import-trades.md](../library/importer/import-trades.md) is the page.
 
 - `goosedove.importer.walk`: `ids_from_json(text)`, the filter's answer read at the edge into
   IDs, a JSON list of whole numbers and nothing else; `walk(returned, imported, counter)`, the
   IDs to fetch newest first and the ID the walk stopped at, a repeated ID refused by name. Array
   code: one sort, one uniqueness check, one membership test over the IDs, no per-ID loop. Work
   reported as `ids_returned` and `ids_to_fetch`.
-- `goosedove.importer.fetch`: the filter request through `urllib.request` with a timeout, its
-  answer handed to `ids_from_json`; a connection refused, a timeout or a status other than 200 is
-  a refusal naming the address and the cause.
-- The host's command `GoosedoveImportTrades` on Ctrl+Shift+F: reads `import_settings`,
-  `import_destinations` and the `trade_id` column of every participating Table, calls one hidden
-  seam entry with the endpoint, the filter and the IDs, and writes the walk's result into
-  `import_status`: `7 IDs returned, 3 to fetch: 107, 106, 105; stopped at 104, held by
-  Trades_NYMEX_CME` or `7 IDs returned, none new; stopped at 107`. It fetches no details and
-  inserts nothing, so a first run against the real API proves the shortcut, the configuration,
-  the Tables and the walk before any row moves.
-- The page under `docs/library/` for the command and the seam entry, the smoke and lifetime
-  coverage the hidden Excel can give with a local stand-in, and a settings block in the kept
-  workbook.
+- `goosedove.importer.fetch`: the filter request, decision 10, through `urllib.request` with a
+  timeout, its answer handed to `ids_from_json`; a connection refused, a timeout, a status other
+  than 200, an answer that is no text or an endpoint that is no address is a refusal naming the
+  address and the cause. Work reported as `requests_made` and `bytes_received`.
+- `goosedove.importer.run`: `import_ids`, one run of this slice, the IDs made whole, the request,
+  the walk and the line, `7 IDs returned, 3 to fetch: 107, 106, 105; stopped at 104, held by
+  Trades_NYMEX_CME`, `7 IDs returned, none new; stopped at 107, held by Trades_NYMEX_CME`,
+  `3 IDs returned, 3 to fetch: 105, 104, 103; none held`, `0 IDs returned, none new; none held`.
+- The seam's entry `_ImportTradeIds(endpoint, filter, [trade_ids], [tables])`, decision 11.
+- The host's command `GoosedoveImportTrades` on Ctrl+Shift+F, `host/Goosedove.Host/Importer.cs`:
+  reads `import_settings`, `import_destinations` and the `trade_id` column of every participating
+  Table, decision 12, calls the entry on a thread of its own and writes the line into
+  `import_status` through `QueueAsMacro`, decision 8. It fetches no details and inserts nothing,
+  so a first run against the real API proves the shortcut, the configuration, the Tables and the
+  walk before any row moves.
+- The page under `docs/library/importer/`, the host's tests without Excel, the lifetime group
+  `import` in a hidden Excel against the stand-in, and a block in the kept workbook.
 
 ## Pull request 2: the details, the rows and the insertion
 

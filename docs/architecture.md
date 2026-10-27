@@ -57,6 +57,7 @@ The deltas are reported by observation day or by the pricing contract's month or
 |---|---|
 | the library's objects, one package per group, in the order they import one another: globals and instrumentation first, then index_definitions, then instruments, calendar and market_data, then market, then trades | `src/goosedove/` |
 | the worksheet functions, one module per group, and the bridge; the library never imports this package | `src/goosedove/excel/` |
+| the importer, what brings trades in from the desk's API on a person's command, apart from the pricing library, which never imports it, and from the seam, which it never imports; its one page is [import-trades.md](library/importer/import-trades.md) | `src/goosedove/importer/`, with the command in `host/Goosedove.Host/Importer.cs` |
 | the host, Excel-DNA integration, the scan, the way out, handle lifetime, the work counter | `host/Goosedove.Host/`, with its tests, started without Excel, in `host/Goosedove.Host.Tests/` |
 | the Python tests: the rules and the hand-worked numbers under `unit/`, the counts, ledgers and ceilings under `performance/` | `tests/` |
 | the whole check, the smoke test in a hidden Excel, the lifetime script, the runners and the profiler | `check.ps1`, `tools/` |
