@@ -252,3 +252,16 @@ def test_entry_of_an_unregistered_name_fails_at_registration_not_at_the_call() -
 
 def test_call_by_name_is_the_same_path() -> None:
     assert bridge.call("Add", [1.0, 2.0]) == bridge.entry("Add")(1.0, 2.0)
+
+
+def test_a_host_function_is_prepared_and_checked_but_never_told_to_excel() -> None:
+    # Since import-cleared-futures.md: an entry the host calls on a person's command is registered
+    # as every function is, so its arguments are checked and its failure is cell text, and left out
+    # of the specs Excel is told, so no formula reaches it.
+    @bridge.host_function
+    def HostOnly(label: str) -> str:
+        return label.upper()
+
+    assert "HostOnly" not in {name for name, *_ in bridge.function_specs()}
+    assert bridge.entry("HostOnly")("x") == "X"
+    assert bridge.entry("HostOnly")(1.0) == "#ERROR HostOnly: label is number 1.0, expected text"

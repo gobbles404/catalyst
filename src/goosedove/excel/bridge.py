@@ -1712,6 +1712,7 @@ class Registered:
     tables: tuple[tuple[int, Schema], ...]  # each table parameter's position and its schema
     fields: tuple[tuple[int, FieldsSchema], ...]  # each field-values parameter's, likewise
     publishes: bool  # the declared result is a handle, so the host observes the call
+    worksheet: bool  # told to Excel as a worksheet function; False for the host's command entry
 
     def run(self, *args: object) -> object:
         """The prepared path: validate the arguments, run the function, convert the result.
@@ -2133,8 +2134,9 @@ def _result(function: str, annotation: object) -> Callable[[object], object]:
     return convert
 
 
-def register[F: Callable[..., object]](fn: F, *, hidden: bool) -> F:
-    """Register a worksheet function under its own name; the signature is the contract."""
+def register[F: Callable[..., object]](fn: F, *, hidden: bool, worksheet: bool = True) -> F:
+    """Register a worksheet function under its own name; the signature is the contract. An entry
+    the host alone calls is registered the same way and left out of what Excel is told."""
     name = fn.__name__
     if name in _FUNCTIONS:
         raise TypeError(f"{name} is already registered")
@@ -2159,7 +2161,7 @@ def register[F: Callable[..., object]](fn: F, *, hidden: bool) -> F:
     description = _description(name, fn, hidden)
     publishes = _is_handle(signature.return_annotation)
     _FUNCTIONS[name] = Registered(
-        fn, description, parameters, hidden, convert, tables, field_values, publishes
+        fn, description, parameters, hidden, convert, tables, field_values, publishes, worksheet
     )
     return fn
 
@@ -2169,10 +2171,18 @@ def excel_function[F: Callable[..., object]](fn: F) -> F:
     return register(fn, hidden=False)
 
 
+def host_function[F: Callable[..., object]](fn: F) -> F:
+    """Register an entry the host calls on a person's command and never a cell: prepared and
+    checked as every function is, fetched by `entry`, and left out of `function_specs`, so Excel
+    is never told its name, no formula reaches it and nothing runs on a recalculation. The one
+    today is `_ImportTradeIds`, import-cleared-futures.md."""
+    return register(fn, hidden=True, worksheet=False)
+
+
 def function_specs() -> list[tuple[str, str, list[tuple[str, str]], bool, bool]]:
     """Name, description, each argument's label and help, whether hidden, and whether it creates
-    a handle, for every registered function: what the host registers with Excel, the last
-    choosing the observed path for a creator."""
+    a handle, for every registered worksheet function: what the host registers with Excel, the
+    last choosing the observed path for a creator. The host's command entry is not among them."""
     return [
         (
             name,
@@ -2182,6 +2192,7 @@ def function_specs() -> list[tuple[str, str, list[tuple[str, str]], bool, bool]]
             registered.publishes,
         )
         for name, registered in _FUNCTIONS.items()
+        if registered.worksheet
     ]
 
 
