@@ -18,7 +18,12 @@ The paths, each the answer the importer must read or refuse:
     /ids/fraction  200  [105.5]               an ID that is no whole number
     /ids/text      200  not json              an answer that is no JSON
     /ids/bytes     200  two bytes of no text  an answer that is no UTF-8
+    /status/201    201  [103, 105, 104]       IDs under a status that is not 200
+    /status/202    202  [103, 105, 104]       the same
+    /status/206    206  [103, 105, 104]       the same, a partial answer
     /status/500    500  a failure             the API failing
+    /redirect      302  to /ids/three         a redirect, which must not be followed
+    /slow/N        200  [103, 105, 104]       after N seconds; a run caught mid-request
     /slow          no answer until the server stops; a read that times out
     anything else  404
 """
@@ -43,6 +48,9 @@ ANSWERS: Final[dict[str, tuple[int, bytes]]] = {
     "/ids/fraction": (200, b"[105.5]"),
     "/ids/text": (200, b"not json"),
     "/ids/bytes": (200, b"\xff\xfe"),
+    "/status/201": (201, b"[103, 105, 104]"),
+    "/status/202": (202, b"[103, 105, 104]"),
+    "/status/206": (206, b"[103, 105, 104]"),
     "/status/500": (500, b"the stand-in failed on purpose"),
 }
 
@@ -88,9 +96,21 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/slow":
             standin.stopping.wait()
             return
-        status, answer = ANSWERS.get(self.path, (404, b"no such path"))
+        if self.path == "/redirect":
+            self.send_response(302)
+            self.send_header("Location", "/ids/three")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if self.path.startswith("/slow/"):
+            # The issue's table after that many seconds, or nothing when the server stops first.
+            if standin.stopping.wait(float(self.path[len("/slow/") :])):
+                return
+            status, answer = ANSWERS["/ids/three"]
+        else:
+            status, answer = ANSWERS.get(self.path, (404, b"no such path"))
         self.send_response(status)
-        self.send_header("Content-Type", "application/json" if status == 200 else "text/plain")
+        self.send_header("Content-Type", "application/json" if status < 300 else "text/plain")
         self.send_header("Content-Length", str(len(answer)))
         self.end_headers()
         self.wfile.write(answer)

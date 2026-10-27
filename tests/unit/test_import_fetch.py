@@ -93,5 +93,36 @@ def test_an_answer_that_never_comes_is_refused_as_timed_out(standin: StandIn) ->
     refused(f"the filter request to {slow} failed: timed out", slow, timeout=0.2)
 
 
-def test_an_endpoint_that_is_no_address_is_refused() -> None:
-    refused("the filter request to nowhere failed: unknown url type: 'nowhere'", "nowhere")
+def test_an_endpoint_that_is_no_http_address_is_refused_before_any_request() -> None:
+    for endpoint in ("nowhere", "file:///C:/trades.json", "ftp://api/ids"):
+        counter = WorkCounter()
+        message = f"the filter request to {endpoint} failed: expected an http or https address"
+        with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
+            fetch_ids(endpoint, "today", counter)
+        assert counter.freeze().as_dict() == {}
+
+
+def test_a_redirect_is_refused_with_its_status_and_never_followed(standin: StandIn) -> None:
+    # The review's probe: followed, a 302 turns the POST into a GET without the filter's text
+    # and reports the other address's IDs as the answer, with a second request the counter
+    # never saw. The one request is sent, refused by the status, and no other leaves.
+    seen = len(standin.requests)
+    counter = WorkCounter()
+    redirect = address(standin, "/redirect")
+    message = f"the filter request to {redirect} answered 302 Found, expected 200"
+    with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
+        fetch_ids(redirect, "today", counter)
+    assert len(standin.requests) == seen + 1
+    assert standin.requests[-1]["path"] == "/redirect"
+    assert counter.freeze().as_dict() == {"requests_made": 1}
+
+
+def test_a_status_other_than_200_is_refused_even_with_ids_in_the_answer(
+    standin: StandIn,
+) -> None:
+    # A 206 is a partial answer, and 201 and 202 are no answer at all; only 200 is read.
+    for status, reason in ((201, "Created"), (202, "Accepted"), (206, "Partial Content")):
+        endpoint = address(standin, f"/status/{status}")
+        refused(
+            f"the filter request to {endpoint} answered {status} {reason}, expected 200", endpoint
+        )
