@@ -267,12 +267,17 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
             "cross_gamma_unit",
             "discount_curve_key",
             "discount_curve",
+            "observation_coefficient",
+            "observation_price",
+            "price_unit",
+            "floating_contribution",
         ],
         ["str", "str", "datetime64[D]", "bool"]
         + ["float64"] * 7
         + ["str", "str"]
         + ["float64"] * 7
-        + ["str", "float64", "str", "str", "str"],
+        + ["str", "float64", "str", "str", "str"]
+        + ["float64", "float64", "str", "float64"],
     ]
     assert table[2][:6] == ["Z26", "Z26", serial("2026-11-25"), False, 160_000.0, 16.0]
     # The contract's risk four ways, the discounted twins the nominal arrays for a cleared
@@ -291,12 +296,20 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
         NG_PER_BP,
         "-",  # since named-curves-slice-3.md the key and the curve, none for a cleared batch
         "-",
+        160_000.0,  # since observation-prices-readback.md the slot's own coefficient, its price,
+        3.20,  # the quote of a live slot, the unit it is in and the exposure times the price
+        "USD/MMBTU",
+        pytest.approx(512_000.0),
     ]
     assert table[3][11:] == ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"] + ["-"] * 8 + [
         0.0,
         NG_PER_BP,
         "-",
         "-",
+        -50_000.0,
+        3.50,
+        "USD/MMBTU",
+        pytest.approx(-175_000.0),
     ]
     assert table[3][4:6] == [160_000.0 * -5 / 16, -5.0]
     assert table[3][6:11] == [pytest.approx(-175_000.0), -50_000.0, -50_000.0, -5.0, -5.0]
@@ -511,8 +524,13 @@ def test_the_paid_contract_reads_back_fixed_and_settled_with_no_live_exposure(
         TOY_PER_BP,
         "-",
         "-",
+        160_000.0,  # paid, its settle and its contribution still shown: history, not mark
+        3.23,
+        "USD/MMBTU",
+        pytest.approx(516_800.0),
     ]
-    assert table[3][-8:-4] == ["-"] * 4
+    assert table[3][-12:-8] == ["-"] * 4  # the four price columns follow the key and curve
+    assert table[3][-4:] == [-50_000.0, 3.50, "USD/MMBTU", pytest.approx(-175_000.0)]
     assert table[3][:7] == [
         "F27",
         "F27",
@@ -536,12 +554,14 @@ def test_a_fully_fixed_batch_inside_a_live_market_reports_its_cash_and_no_live_e
         + [0.0] * 7
         + TOY_UNITS
         + ["-"] * 4
-        + [0.0, 0.0, 0.0, "USD", 0.0, TOY_PER_BP, "-", "-"],
+        + [0.0, 0.0, 0.0, "USD", 0.0, TOY_PER_BP, "-", "-"]
+        + [160_000.0, 3.23, "USD/MMBTU", pytest.approx(516_800.0)],
         ["F27", "F27", serial("2026-12-29"), serial("2026-12-31"), True]
         + [0.0] * 7
         + TOY_UNITS
         + ["-"] * 8
-        + [0.0, TOY_PER_BP, "-", "-"],
+        + [0.0, TOY_PER_BP, "-", "-"]
+        + [-50_000.0, 3.45, "USD/MMBTU", pytest.approx(-172_500.0)],
     ]
     assert valued(results) == (pytest.approx(0.0), pytest.approx(14_300), 0.0)
 
@@ -1160,6 +1180,10 @@ def test_the_pages_example_marks_2000_with_the_row_kept_ready_and_1000_once_it_i
         NG_PER_BP,
         "-",
         "-",
+        0.0,  # the row kept ready: nothing of coefficient, at F27's own quote
+        3.40,
+        "USD/MMBTU",
+        0.0,
     ]
     sold_trades, sold_prepared, sold = entry_state(ng, -1.0)
     assert sold_trades != trades and sold_prepared != prepared and sold != results
@@ -2268,10 +2292,14 @@ def test_two_payment_days_on_one_contract_value_on_the_sheet_as_the_ticket_says(
         "cross_gamma_unit",
         "discount_curve_key",
         "discount_curve",
+        "observation_coefficient",
+        "observation_price",
+        "price_unit",
+        "floating_contribution",
     ]
     assert [line[3] for line in table[2:]] == [line[3] for line in slots[2:]]
-    assert table[2][-8:-4] == [0.0, 0.0, 0.0, "USD"]
-    assert [line[-8:-4] for line in table[3:]] == [["-"] * 4] * 5  # once, not per slot
+    assert table[2][-12:-8] == [0.0, 0.0, 0.0, "USD"]
+    assert [line[-12:-8] for line in table[3:]] == [["-"] * 4] * 5  # once, not per slot
     assert (
         by_header(results, "contract_nominal_delta") == [pytest.approx(delta)] * 6
     )  # the contract's
@@ -2734,6 +2762,10 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
         "cross_gamma_unit",
         "discount_curve_key",
         "discount_curve",
+        "observation_coefficient",
+        "observation_price",
+        "price_unit",
+        "floating_contribution",
     ]
     assert table[2][5:] == [
         pytest.approx(420.0),
@@ -2754,6 +2786,10 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
         "lots of LOT (1000 BBL) per basis point",
         "-",
         "-",
+        pytest.approx(420.0),  # the slot's own coefficient, price, unit and amount
+        28.0,
+        "CENT/GAL",
+        pytest.approx(11_760.0),
     ]
 
 
@@ -2783,6 +2819,10 @@ def test_the_three_ete_rows_together_report_three_lots(ete: dict[str, Any]) -> N
         "lots of LOT (1000 BBL) per basis point",
         "-",
         "-",
+        pytest.approx(1_260.0),
+        28.0,
+        "CENT/GAL",
+        pytest.approx(35_280.0),
     ]
 
 
@@ -2881,7 +2921,7 @@ def test_a_lot_is_one_lot_in_every_quote_and_settlement_unit(
     # The results read back the two units the risk numbers are in, on every row: the same
     # nominal delta under the same heading is 420 or 42,000 of sensitivity, and the units say which.
     table = spilled(ENTRY["util_ReadHandle"](results))
-    assert table[2][12:] == [
+    assert table[2][12:-4] == [
         f"{settled} per {quote[0]}/{quote[1]}",
         "lots of LOT (1000 BBL)",
         *["-"] * 4,
@@ -2894,6 +2934,7 @@ def test_a_lot_is_one_lot_in_every_quote_and_settlement_unit(
         "-",
         "-",
     ]
+    assert set(by_header(results, "price_unit")) == {f"{quote[0]}/{quote[1]}"}  # the quote's
 
 
 def test_the_reporting_lot_is_the_indexs_choice_and_scales_the_lots_alone() -> None:
@@ -3768,10 +3809,10 @@ def test_the_tickets_four_rows_report_fifty_and_twenty_dollars_of_reserves(
     # The results readback shows the four once, on its one slot row here; the batch's readback
     # carries no reserve, the owner's choice of the evaluated results as the place to read them.
     table = spilled(ENTRY["util_ReadHandle"](results))
-    assert table[0][-8:-4] == RESERVE_HEADERS  # the cross-gamma's two columns follow, then
-    # since named-curves-slice-3.md the key and the curve
-    assert table[1][-8:-4] == ["float64", "float64", "float64", "str"]
-    assert len(table) == 3 and table[2][-8:-4] == [50.0, 20.0, 0.0, "USD"]
+    assert table[0][-12:-8] == RESERVE_HEADERS  # the cross-gamma's two columns follow, then
+    # since named-curves-slice-3.md the key and the curve, then the four price columns
+    assert table[1][-12:-8] == ["float64", "float64", "float64", "str"]
+    assert len(table) == 3 and table[2][-12:-8] == [50.0, 20.0, 0.0, "USD"]
     batch = spilled(ENTRY["util_ReadHandle"](trades))
     assert not any("reserve" in str(header) for header in batch[0])
     # Value and risk are the free rows': the two LOT rows net, the barrels mark three cents on
@@ -3794,8 +3835,8 @@ def test_the_pricing_days_change_no_reserve_and_the_readback_shows_it_once(
     assert reserved(results) == RESERVE_SPILL
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert len(table) == 2 + slots
-    assert table[2][-8:-4] == [50.0, 20.0, 0.0, "USD"]
-    assert [line[-8:-4] for line in table[3:]] == [["-", "-", "-", "-"]] * (slots - 1)
+    assert table[2][-12:-8] == [50.0, 20.0, 0.0, "USD"]
+    assert [line[-12:-8] for line in table[3:]] == [["-", "-", "-", "-"]] * (slots - 1)
 
 
 def test_one_batch_keeps_its_reserves_through_ticks_fixings_corrections_and_payment(
@@ -4213,7 +4254,7 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_
     assert [line[1] for line in table[2:]] == [1001.0, 1002.0, 1003.0, 1003.0, 1004.0]
     assert [line[i] for line in table[2:]] == [15.0, 20.0, 25.0, 25.0, 5.0]
     readback = spilled(ENTRY["util_ReadHandle"](results))
-    assert readback[2][-8:-4] == [60.0, 24.0, 65.0, "USD"]
+    assert readback[2][-12:-8] == [60.0, 24.0, 65.0, "USD"]
     # The same rows without the column: the same value and risk, nought of marketing.
     plain_rows = [line[:-1] for line in MARKETING_ROWS]
     plain_trades, _, plain = ete_state(
@@ -4390,6 +4431,10 @@ RESULT_COLUMNS = [
     "cross_gamma_unit",
     "discount_curve_key",
     "discount_curve",
+    "observation_coefficient",
+    "observation_price",
+    "price_unit",
+    "floating_contribution",
 ]
 
 
@@ -4576,7 +4621,12 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
     assert table[0] == RESULT_COLUMNS
     assert table[1] == ["str", "str", "datetime64[D]", "datetime64[D]", "bool"] + [
         "float64"
-    ] * 7 + ["str", "str"] + ["float64"] * 7 + ["str", "float64", "str", "str", "str"]
+    ] * 7 + ["str", "str"] + ["float64"] * 7 + ["str", "float64", "str", "str", "str"] + [
+        "float64",
+        "float64",
+        "str",
+        "float64",
+    ]
     assert [line[:5] for line in table[2:]] == [
         ["F27", "F27", serial(UNIT_AS_OF), serial(A_YEAR_OUT), False],
         ["F27", "F27", serial(UNIT_AS_OF), serial(TWO_YEARS_OUT), False],
@@ -4599,6 +4649,10 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         "lots of UNIT (1 BBL) per basis point",
         "SOFR",  # since named-curves-slice-3.md the group's key and its curve's name
         "SOFR",
+        10.0,  # the slot's own coefficient, price, unit and amount, the live ones here
+        80.0,
+        "USD/BBL",
+        pytest.approx(800.0),
     ]
     assert table[3][12:] == [
         "USD per USD/BBL",
@@ -4612,6 +4666,10 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         "lots of UNIT (1 BBL) per basis point",
         "SOFR",
         "SOFR",
+        -10.0,
+        80.0,
+        "USD/BBL",
+        pytest.approx(-800.0),
     ]
     # A tick to 81 over the same preparation and curve: 5.5 and 0.00935, the lots as they were,
     # the old results standing; a replacement curve at 0.96 and 0.92 over the same preparation

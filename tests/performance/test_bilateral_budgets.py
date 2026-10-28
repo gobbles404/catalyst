@@ -360,8 +360,8 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
     # coverage, the amounts, the discounted lots by reference, the sensitivity, the three views of
     # the lots, the three of the DV01 and, since #197, the cross-gamma by reference and its three
     # views finite, with the market's own; the bincounts' reductions among the rest; and the new
-    # arrays frozen, seventeen of them. The same with no slot live: the sums are over every slot
-    # and never over none.
+    # arrays frozen, seventeen of them and the quotes. The same with no slot live: the sums are
+    # over every slot and never over none.
     assert numpy_calls(lambda: tick(prep, quoted, curves)) == {
         "ndarray.any": 17,  # since #190 the live contributions finite before the groups sum
         # them; since slice 3 each curve's cross-gamma total looked at
@@ -369,7 +369,8 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
         "ndarray.nonzero": 6,  # the lots, the DV01 and the cross-gamma before the start
         "ndarray.ravel": 6,
         "ndarray.reshape": 1,  # the cross-gamma by reference as a row per curve, since slice 3
-        "ndarray.setflags": 19,  # since slice 3 the DV01 and cross-gamma totals by curve too
+        "ndarray.setflags": 20,  # since slice 3 the DV01 and cross-gamma totals by curve too;
+        # since observation-prices-readback.md the quotes, kept for the readback
         "ndarray.sum": 5,  # the global live sum is the cleared route's alone since #190; since
         # slice 3 the cross-gamma totals by curve and their sum
         "numpy._make_extobj": 3,  # the contributions' flags, the discounting's, the cross-gamma's

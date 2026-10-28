@@ -958,7 +958,12 @@ namespace Goosedove.Host.Tests
             Assert.Equal("group_dv01", contributions[0, 16]);
             Assert.Equal("-", contributions[2, 13]);  // a cleared batch retains no payment facts
             Assert.Equal("brokerage_reserve", contributions[0, 17]);
-            Assert.Equal(25, contributions.GetLength(1));  // since #197 the contract's cross-gamma and its unit, since named-curves-slice-3.md the key and the curve, last
+            Assert.Equal(29, contributions.GetLength(1));  // since #197 the contract's cross-gamma and its unit, since named-curves-slice-3.md the key and the curve, since observation-prices-readback.md the four price columns, last
+            Assert.Equal("observation_coefficient", contributions[0, 25]);
+            Assert.Equal(20000.0, contributions[2, 25]);
+            Assert.Equal(72.1, (double)contributions[2, 26], 9);  // the live quote the contribution was made of
+            Assert.Equal("USD/MMBTU", contributions[2, 27]);
+            Assert.Equal(1442000.0, (double)contributions[2, 28], 6);
             Assert.Equal("contract_cross_gamma", contributions[0, 21]);
             Assert.Equal("cross_gamma_unit", contributions[0, 22]);
             Assert.Equal(0.0, contributions[2, 21]);
@@ -1554,6 +1559,22 @@ namespace Goosedove.Host.Tests
             var results = (string)Seam.Call("_EvaluateTrades", live, market, ExcelMissing.Value);
             Assert.Equal(150.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
             Assert.Equal(20.0, (double)((object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year"))[3, 1], 6);
+            var mixed = (object[,])Seam.Call("util_ReadHandle", results);  // observation-prices-readback.md: the 2nd fixed at 71, the 3rd and the 4th live at 74, each slot's own, last
+            Assert.Equal(30, mixed.GetLength(1));
+            Assert.Equal("observation_coefficient", mixed[0, 26]);
+            Assert.Equal("observation_price", mixed[0, 27]);
+            Assert.Equal("price_unit", mixed[0, 28]);
+            Assert.Equal("floating_contribution", mixed[0, 29]);
+            Assert.Equal(20.0, (double)mixed[2, 26], 9);
+            Assert.Equal(71.0, (double)mixed[2, 27], 9);
+            Assert.Equal("USD/MMBTU", mixed[2, 28]);
+            Assert.Equal(1420.0, (double)mixed[2, 29], 9);
+            Assert.Equal(0.0, (double)mixed[2, 7], 9);  // the live contribution stays zero on a fixed slot
+            Assert.Equal(74.0, (double)mixed[3, 27], 9);
+            Assert.Equal(1480.0, (double)mixed[3, 29], 9);
+            Assert.Equal(1480.0, (double)mixed[3, 7], 9);
+            Assert.Equal(-10.0, (double)mixed[5, 26], 9);
+            Assert.Equal(-710.0, (double)mixed[5, 29], 9);
             var ticked = (string)Seam.Call("_EvaluateTrades", live, (string)Seam.Call("_CreateMarket", early, (string)Seam.Call("_CreatePriceVector", "PAYS", Column(75.0, 80.0))), ExcelMissing.Value);
             Assert.Equal(170.0, (double)((object[,])Seam.Call("_ReportValues", ticked))[2, 0], 6);
             var seventh = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46363.0, 0.5), index);
@@ -1578,11 +1599,17 @@ namespace Goosedove.Host.Tests
             Assert.Equal(180.0, (double)values[2, 1], 6);
             Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", paid, "nominal_delta", "year"))[3, 1], 6);
             var contributions = (object[,])Seam.Call("util_ReadHandle", paid);
-            Assert.Equal(26, contributions.GetLength(1));  // since #197 two columns more, since slice 3 two more, last
+            Assert.Equal(30, contributions.GetLength(1));  // since #197 two columns more, since slice 3 two more, since observation-prices-readback.md four more, last
             Assert.Equal("contract_nominal_delta", contributions[0, 10]);
             Assert.Equal("contract_delta", contributions[0, 11]);
             Assert.Equal(46365.0, contributions[5, 3]);
             Assert.Equal(0.0, contributions[5, 10]);
+            Assert.Equal(20.0, (double)contributions[2, 26], 9);  // paid: every slot's settle and contribution still shown, history and no mark
+            Assert.Equal(75.0, (double)contributions[3, 27], 9);
+            Assert.Equal(1500.0, (double)contributions[3, 29], 9);
+            Assert.Equal(73.0, (double)contributions[7, 27], 9);
+            Assert.Equal(-730.0, (double)contributions[7, 29], 9);
+            Assert.Equal(0.0, (double)contributions[7, 7], 9);  // the live contribution, zero once fixed
         }
 
         // Mixed fields in one batch, mixed-trade-fields.md: the index MIXED, USD per GAL, X26, Z26, F27
@@ -2688,7 +2715,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("USD", reserves[2, 3]);
             var table = (object[,])Seam.Call("util_ReadHandle", results);
             Assert.Equal(3, table.GetLength(0));
-            Assert.Equal(26, table.GetLength(1));  // since #197 the two cross-gamma columns, since slice 3 the key and the curve, last
+            Assert.Equal(30, table.GetLength(1));  // since #197 the two cross-gamma columns, since slice 3 the key and the curve, since observation-prices-readback.md the four price columns, last
             Assert.Equal("brokerage_reserve", table[0, 18]);
             Assert.Equal("currency", table[0, 21]);
             Assert.Equal(50.0, (double)table[2, 18], 9);
@@ -2782,7 +2809,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("RESERVES SOFR cross_gamma [LOT per basis point]", facedAll[1, 4]);
             Assert.Equal(0.99, (double)facedAll[3, 2], 12);
             var facedReadback = (object[,])Seam.Call("util_ReadHandle", facedResults);
-            Assert.Equal(26, facedReadback.GetLength(1));
+            Assert.Equal(30, facedReadback.GetLength(1));
             Assert.Equal("contract_cross_gamma", facedReadback[0, 22]);
             Assert.Equal(-0.0001 * 34 / 365 * 0.99, (double)facedReadback[2, 22], 12);
             Assert.Equal("lots of LOT (1000 BBL) per basis point", facedReadback[2, 23]);
@@ -2790,6 +2817,8 @@ namespace Goosedove.Host.Tests
             Assert.Equal("SOFR", facedReadback[2, 24]);
             Assert.Equal("discount_curve", facedReadback[0, 25]);
             Assert.Equal("SOFR", facedReadback[2, 25]);
+            Assert.Equal("observation_coefficient", facedReadback[0, 26]);  // observation-prices-readback.md: the four price columns, last
+            Assert.Equal("floating_contribution", facedReadback[0, 29]);
             // Since named-curves-slice-3.md: two rows naming their curves on the ticket, two lots of Z26 on SOFR and one
             // short on FFOIS, 0.99 and 0.98 on the payment day, 34 days out: 2,520 and -1,260 of amount, 1,260 of mark,
             // one lot net and 1.98 less 0.98 discounted, each curve's DV01 and cross-gamma in its own column in key
