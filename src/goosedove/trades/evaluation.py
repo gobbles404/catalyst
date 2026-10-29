@@ -122,17 +122,19 @@ def trade_results(
         case _:
             assert_never(terms.route)
     contributions: list[NDArray[np.float64]] = []
+    quotes: list[NDArray[np.float64]] = []
     live_amounts: list[float] = []
     quotes_read = 0
     for leg, market in zip(legs, matched, strict=True):
-        contribution, live = _the_contributions(leg, market, not curves)
+        contribution, quote, live = _the_contributions(leg, market, not curves)
         contributions.append(contribution)
+        quotes.append(quote)
         live_amounts.append(live)
         quotes_read += int(leg.live_references.size)
     counter.hit(KERNEL)
     counter.hit(LIVE_PRICES_READ, quotes_read)
     if curves:
-        return _discounted(prepared, matched, curves, contributions, counter)
+        return _discounted(prepared, matched, curves, contributions, quotes, counter)
     currency = legs[0].encoded.leg.index.conventions.currency_unit
     # The cleared mark: the legs' live amounts, then the unsettled fixed legs and set amounts
     # added, each finite or refused for the batch; Python adds two finite floats past the
@@ -162,9 +164,9 @@ def trade_results(
         prepared=prepared,
         legs=tuple(
             [
-                _cleared_leg(leg, market, contribution, leg_mark, leg_cash)
-                for leg, market, contribution, (leg_mark, leg_cash) in zip(
-                    legs, matched, contributions, values, strict=True
+                _cleared_leg(leg, market, contribution, quote, leg_mark, leg_cash)
+                for leg, market, contribution, quote, (leg_mark, leg_cash) in zip(
+                    legs, matched, contributions, quotes, values, strict=True
                 )
             ]
         ),
@@ -222,13 +224,15 @@ def _the_markets(legs: tuple[PreparedLeg, ...], markets: Sequence[Market]) -> tu
 
 def _the_contributions(
     leg: PreparedLeg, market: Market, cleared: bool
-) -> tuple[NDArray[np.float64], float]:
+) -> tuple[NDArray[np.float64], NDArray[np.float64], float]:
     """A leg's dated live contributions, each live slot's exposure times its reference's quote
     read off the leg's market, one gather and one multiplication, each finite or the first that
     is not refused by its slot and its quote; and for a cleared batch their sum, the leg's live
     amount, the one reduction the cleared route makes per leg, zero for a bilateral batch, whose
     route sums them by payment group. The arithmetic runs with numpy's flags down and the rules
-    judge, since #190."""
+    judge, since #190. The quotes come back beside them, frozen, since
+    observation-prices-readback.md: one per live reference, the array the readback gathers each
+    live slot's price from, read here once and never again."""
     quotes = market.live_prices(leg.live_references)
     currency = leg.encoded.leg.index.conventions.currency_unit
     with np.errstate(over="ignore", invalid="ignore"):
@@ -247,7 +251,8 @@ def _the_contributions(
             )
         live = float(dated_live_contribution.sum()) if cleared else 0.0
     dated_live_contribution.setflags(write=False)
-    return dated_live_contribution, live
+    quotes.setflags(write=False)
+    return dated_live_contribution, quotes, live
 
 
 def _the_leg_values(
@@ -283,7 +288,12 @@ def _finite_leg_values(
 
 
 def _cleared_leg(
-    leg: PreparedLeg, market: Market, contribution: NDArray[np.float64], mark: float, cash: float
+    leg: PreparedLeg,
+    market: Market,
+    contribution: NDArray[np.float64],
+    quote: NDArray[np.float64],
+    mark: float,
+    cash: float,
 ) -> LegResults:
     """A cleared leg's results: nothing discounts, so the valuation-adjusted risk is the nominal
     risk itself, the preparation's arrays by reference, no rate moves the lots, the known zero,
@@ -296,6 +306,7 @@ def _cleared_leg(
         cash=cash,
         dv01=0.0,
         dated_live_contribution=contribution,
+        quote=quote,
         contracts=leg.encoded.references,
         price_sensitivity=leg.price_sensitivity,
         price_sensitivity_unit=(
@@ -399,6 +410,7 @@ def _discounted(
     markets: tuple[Market, ...],
     curves: tuple[DiscountCurve, ...],
     contributions: list[NDArray[np.float64]],
+    quotes: list[NDArray[np.float64]],
     counter: WorkCounter,
 ) -> TradeResults:
     """The bilateral snapshot, since #176, over the rules _the_curves checked, every leg beside
@@ -598,18 +610,29 @@ def _discounted(
         for array in (*amounts, *npvs, *dv01s):
             array.setflags(write=False)
     results: list[LegResults] = []
-    for leg, market, contribution, leg_amount, leg_npv, leg_dv01, each, cross, (
+    for leg, market, contribution, quote, leg_amount, leg_npv, leg_dv01, each, cross, (
         leg_mark,
         leg_cash,
         leg_rate,
     ) in zip(
-        legs, markets, contributions, amounts, npvs, dv01s, lots, crosses, values, strict=True
+        legs,
+        markets,
+        contributions,
+        quotes,
+        amounts,
+        npvs,
+        dv01s,
+        lots,
+        crosses,
+        values,
+        strict=True,
     ):
         results.append(
             _discounted_leg(
                 leg,
                 market,
                 contribution,
+                quote,
                 leg_amount,
                 leg_npv,
                 leg_dv01,
@@ -807,6 +830,7 @@ def _discounted_leg(
     leg: PreparedLeg,
     market: Market,
     contribution: NDArray[np.float64],
+    quote: NDArray[np.float64],
     amount: NDArray[np.float64],
     npv: NDArray[np.float64],
     dv01_by_group: NDArray[np.float64],
@@ -863,6 +887,7 @@ def _discounted_leg(
         cash=cash,
         dv01=dv01,
         dated_live_contribution=contribution,
+        quote=quote,
         contracts=encoded.references,
         price_sensitivity=leg.price_sensitivity,
         price_sensitivity_unit=(

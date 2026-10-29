@@ -17,6 +17,7 @@ from numpy.typing import NDArray
 from test_seam_allocation import KEYWORD_CALL, SLACK, least_peak
 
 from goosedove.calendar.calendar import calendar
+from goosedove.excel.utilities import shown
 from goosedove.globals.unit_conversions import UNITS
 from goosedove.globals.valuation_date import valuation_date
 from goosedove.index_definitions.contract_codes import schedule_months
@@ -294,8 +295,9 @@ PREPARATION_NUMPY = {
     "ndarray.reshape": 1,
     "ndarray.searchsorted": 3,  # the fixed rows, and since #186 the contract periods' places, one
     # a bucket
-    "ndarray.setflags": 19,  # the eight, the two lot arrays of the nominal delta, the three views,
-    # and since #186 the two display axes' three arrays each
+    "ndarray.setflags": 21,  # the eight, the two lot arrays of the nominal delta, the three views,
+    # since #186 the two display axes' three arrays each, and since
+    # observation-prices-readback.md the settles and the fixed contributions kept for the readback
     "ndarray.sum": 4,
     "numpy._make_extobj": 4,  # the error state set for the set amounts, the sensitivity, the lots
     # and the unsettled totals, since #190, the overflow the fourth rule's to catch
@@ -326,10 +328,11 @@ def test_a_tick_runs_evaluation_alone_and_nothing_of_the_steps_before(
     # The gather and the multiplication are dispatched in C and unseen; delta and its total are
     # the preparation's, shared and not made again. What is seen is the market's one look at the
     # references asked for, with its reduction, the sum of the dated contributions, and the
-    # contributions frozen.
+    # contributions frozen, and since observation-prices-readback.md the quotes frozen too, kept
+    # for the readback.
     assert numpy_calls(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "ndarray.any": 2,  # the market's coverage, and since #190 the live contributions finite
-        "ndarray.setflags": 1,
+        "ndarray.setflags": 2,  # the contributions and, since #229, the quotes for the readback
         "ndarray.sum": 1,
         "numpy._make_extobj": 1,  # the error state set for the live contributions and their sum
         "ufunc.reduce": 3,
@@ -681,12 +684,17 @@ def test_a_daily_batch_prepares_per_slot_and_ticks_per_live_reference(
         and prep.legs[0].dated_live_lots.nbytes == 8 * slots  # the lot view per slot
         and prep.legs[0].price_sensitivity.nbytes == 8 * contracts
         and prep.legs[0].nominal_delta.nbytes == 8 * contracts
+        # since observation-prices-readback.md the settles, one per fixed slot, and the fixed
+        # contributions, one per slot, kept for the readback
+        and prep.legs[0].settle.nbytes == 8 * fixed
+        and prep.legs[0].fixed_contribution.nbytes == 8 * slots
     )
     counter = WorkCounter()
     result = trade_results(prep, (a_market(history),), counter)
     live_references = int(np.unique(enc.legs[0].slot_reference[prep.legs[0].live_slot]).size)
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": live_references}
     assert result.legs[0].dated_live_contribution.nbytes == 8 * (slots - fixed)  # one per live slot
+    assert result.legs[0].quote.nbytes == 8 * live_references  # one per live reference, kept
     assert result.legs[0].dated_live_contribution.sum() == pytest.approx(
         result.mark - prep.offset_unsettled - prep.set_unsettled
     )
@@ -697,6 +705,30 @@ def test_a_daily_batch_prepares_per_slot_and_ticks_per_live_reference(
             minlength=contracts,
         ),
         prep.legs[0].price_sensitivity,
+    )
+
+
+def test_the_results_readback_reads_no_fixing_and_no_quote(call_profile: CallProfile) -> None:
+    """observation-prices-readback.md: the four price columns are the retained settles, quotes
+    and contributions placed on their slots; the readback asks the history and the market for
+    nothing, prepares nothing and multiplies nothing."""
+    enc = a_daily_batch(*DAILY[1])
+    history = a_history()
+    prep = prepared_trades(enc, (history,), WorkCounter())
+    result = trade_results(prep, (a_market(history),), WorkCounter())
+    profile = call_profile(lambda: shown(result))
+    assert profile["trade_results_table"] == 1 and profile["_observation_facts"] == 1
+    assert profile["_quote_unit"] == 1  # the leg's unit once, repeated on its rows
+    assert (
+        not {
+            "Market.live_prices",
+            "_the_contributions",
+            "_the_set_amounts",
+            "_the_prepared_leg",
+            "prepared_trades",
+            "trade_results",
+        }
+        & profile.keys()
     )
 
 
@@ -821,7 +853,7 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
     }
     assert numpy_calls(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "ndarray.any": 2,  # the market's coverage, and since #190 the live contributions finite
-        "ndarray.setflags": 1,
+        "ndarray.setflags": 2,  # the contributions and, since #229, the quotes for the readback
         "ndarray.sum": 1,
         "numpy._make_extobj": 1,  # the error state set for the live contributions and their sum
         "ufunc.reduce": 3,
@@ -1450,7 +1482,7 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
     }
     assert numpy_calls(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "ndarray.any": 2,  # the market's coverage, and since #190 the live contributions finite
-        "ndarray.setflags": 1,
+        "ndarray.setflags": 2,  # the contributions and, since #229, the quotes for the readback
         "ndarray.sum": 1,
         "numpy._make_extobj": 1,  # the error state set for the live contributions and their sum
         "ufunc.reduce": 3,

@@ -61,7 +61,7 @@ from goosedove.trades.aggregation import AggregateResults
 from goosedove.trades.encoding import Encoded, EncodedLeg
 from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.resolution import Trades
-from goosedove.trades.results import TradeResults
+from goosedove.trades.results import LegResults, TradeResults
 from goosedove.trades.schedule_methods import METHOD_NAMES
 from goosedove.trades.template import DayOrRule, TradeTemplate
 from goosedove.trades.terms import BASIS_NAMES
@@ -801,6 +801,8 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # leg's own; appended last so that no column before them moves. Then, since
     # named-curves-slice-3.md, the slot's group's key and the name of the curve the group was
     # discounted on, on every row, a cleared result a dash in both; appended last likewise.
+    # Then, since observation-prices-readback.md, the slot's own price facts on every row, fixed
+    # or live, _observation_facts, appended last so that no column before them moves.
     encoding = obj.prepared.encoded
     legs = obj.legs
     names, types, columns = _slot_rows(encoding)
@@ -903,8 +905,62 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
             _words_on("cross_gamma_unit", per_bp),
             _words_on("discount_curve_key", keys),
             _words_on("discount_curve", curve_names),
+            *_observation_facts(legs, slots, offsets, sizes, every),
         ],
     )
+
+
+def _observation_facts(
+    legs: tuple[LegResults, ...],
+    slots: int,
+    offsets: list[int],
+    sizes: list[int],
+    every: NDArray[np.bool_],
+) -> list[Added]:
+    """The four columns of observation-prices-readback.md, one row per slot, fixed or live:
+    observation_coefficient, the slot's exposure, what every price of it multiplies;
+    observation_price, the settle the preparation kept where the slot has fixed and the quote
+    the evaluation kept where it is live, each the retained number placed on its slot;
+    price_unit, the index's quote currency over its quote quantity unit, USD/LB, on every row
+    of the leg; and floating_contribution, the exposure times that price, the preparation's
+    amount of a fixed slot and the evaluation's of a live one, before the fixed leg and before
+    any discounting. Selected and placed: no fixing or quote is read again, no product is made
+    and no amount is divided by its coefficient."""
+    price = np.empty(slots)
+    contribution = np.empty(slots)
+    for leg, offset, size in zip(legs, offsets, sizes, strict=True):
+        prepared = leg.prepared
+        leg_price = price[offset : offset + size]
+        leg_price[prepared.is_fixed] = prepared.settle
+        leg_price[prepared.live_slot] = leg.quote[prepared.reference_of_live_slot]
+        leg_contribution = contribution[offset : offset + size]
+        leg_contribution[:] = prepared.fixed_contribution
+        leg_contribution[prepared.live_slot] = leg.dated_live_contribution
+    units = np.array(
+        [
+            unit
+            for leg, size in zip(legs, sizes, strict=True)
+            for unit in (_quote_unit(leg),) * size  # the leg's words once, on each of its rows
+        ],
+        dtype=object,
+    )
+    return [
+        _numbers_on(
+            "observation_coefficient",
+            _stacked([leg.prepared.encoded.slot_exposure for leg in legs]),
+            every,
+        ),
+        _numbers_on("observation_price", price, every),
+        _words_on("price_unit", units),
+        _numbers_on("floating_contribution", contribution, every),
+    ]
+
+
+def _quote_unit(leg: LegResults) -> str:
+    """The leg's index's quote unit as price_unit spells it, the currency over the quantity
+    unit, USD/LB or CENT/GAL, the unit every observation_price of the leg is in."""
+    conventions = leg.prepared.encoded.leg.index.conventions
+    return f"{conventions.quote_currency_unit}/{conventions.quote_quantity_unit}"
 
 
 def _leg_values(

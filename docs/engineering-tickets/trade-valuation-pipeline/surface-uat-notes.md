@@ -798,3 +798,23 @@ weighted-price arithmetic; distinguish monthly totals from `calday` quantities; 
 template with and without exact dates; check that payment sources and effective dates are
 visible and that a price tick reuses the request. Compare cleared and bilateral quotes,
 repeated months paying differently, partial fixings, a curve bump and an as-of roll.
+
+## 29. Observation prices on the results readback
+
+Built in #229 from main, issue #228: [observation-prices-readback.md](observation-prices-readback.md),
+[evaluate-trades.md](../../library/trades/evaluate-trades.md) the page. `util_ReadHandle` on an
+`_EvaluateTrades` result spills four more columns, last: `observation_coefficient`,
+`observation_price`, `price_unit` and `floating_contribution`, each observation's exposure, the
+fixing or the live quote it was priced at, the index's quote unit, such as `USD/LB`, and the
+exposure times that price in the settlement currency, before the fixed leg and before any
+discounting, on fixed and live rows alike. The columns before them stand, and the live columns
+still show zero once an observation fixes.
+
+UAT: on an October COMEX HG asian swap, read the result back and check each day's price
+against the fixings and the day's quote; sum `floating_contribution` and take the fixed leg
+away to reach the mark of an unpaid cleared batch; tick the quote and see only the live rows
+move; correct a fixing and see the change arrive only after `_PrepareTrades` again; book a row
+of zero quantity, or two rows that net to nothing, and see the prices still shown; value a paid
+batch and see its prices and contributions kept as history while the mark is zero; compare a
+bilateral batch's contributions, unchanged by its curve, and a two-index pair's leg rows, each
+at its own index's quote.

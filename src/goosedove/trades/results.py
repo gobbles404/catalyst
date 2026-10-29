@@ -47,7 +47,10 @@ class LegResults:
     market it was valued against, by reference, and the snapshot they make, read-only.
     dated_live_contribution[i] is live slot i's exposure times its reference's quote, paired with
     the preparation's live_slot; their sum is the leg's live amount, and they allocate neither
-    the offsets nor the mark among dates. contracts is the leg's axis, the schedule rows of its
+    the offsets nor the mark among dates; quote[q], since observation-prices-readback.md, is the
+    quote the evaluation read off the market for the preparation's q-th live reference, in the
+    index's quote unit, the one array the readback gathers each live slot's price from, frozen
+    and never read again. contracts is the leg's axis, the schedule rows of its
     references in the schedule's order, the same whatever has fixed; price_sensitivity[r] is the
     change in mark for a move of one quote unit in contract r, the live exposure referencing it
     and zero where every slot of it has fixed, in price_sensitivity_unit, currency per quote
@@ -91,6 +94,7 @@ class LegResults:
     cash: float
     dv01: float
     dated_live_contribution: NDArray[np.float64]
+    quote: NDArray[np.float64]
     contracts: NDArray[np.intp]
     price_sensitivity: NDArray[np.float64]
     price_sensitivity_unit: str

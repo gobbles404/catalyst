@@ -71,7 +71,12 @@ class PreparedLeg:
     quote price; dated_live_lots[s], the same exposure counted in lots of the index's reporting
     lot, the exposure over the lot's coefficient. Per payment group, aligned with the trade's
     groups: set_amount[g], the sum over the group's fixed slots on this leg of exposure times
-    settle, the leg's fixed amount of the group.
+    settle, the leg's fixed amount of the group. And since observation-prices-readback.md the
+    two facts that sum is made of, kept beside it: settle[k], the settle read for the k-th fixed
+    slot, in slot order and aligned with the fixed slots alone, the index's quote unit; and
+    fixed_contribution[s], aligned with the leg's slots, each slot's exposure times its settle
+    where it has fixed and zero where it is live, the floating leg's amount of a fixed slot,
+    which the results readback shows and nothing prices again.
 
     Then the live side for the tick: live_slot, the positions of the live slots on the dated axis;
     live_references, the schedule rows of the distinct contracts those slots reference, in the
@@ -103,6 +108,8 @@ class PreparedLeg:
     dated_live_exposure: NDArray[np.float64]
     dated_live_lots: NDArray[np.float64]
     set_amount: NDArray[np.float64]
+    settle: NDArray[np.float64]
+    fixed_contribution: NDArray[np.float64]
     live_slot: NDArray[np.intp]
     live_references: NDArray[np.intp]
     reference_of_live_slot: NDArray[np.intp]
@@ -230,12 +237,14 @@ def _the_set_amounts(
     is_fixed: NDArray[np.bool_],
     settles: NDArray[np.float64],
     currency: str,
-) -> NDArray[np.float64]:
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Each group's set amount: each fixed slot's, its exposure times its settle, summed by group,
     one bincount; since #190 each finite before anything is made of it, the arithmetic
     running with numpy's flags down, else the first slot that is not is refused by its trade, its
     day and its settle, and then the first group by its contract and payment day, a sum blamed on
-    the group and never on one of its trades."""
+    the group and never on one of its trades. The slots' amounts come back beside the sums,
+    since observation-prices-readback.md, for the record to keep: the floating leg's amount of
+    each fixed slot and zero for a live one."""
     with np.errstate(over="ignore", invalid="ignore"):
         set_of_slot = np.zeros(is_fixed.size)
         set_of_slot[is_fixed] = leg.slot_exposure[is_fixed] * settles
@@ -266,7 +275,7 @@ def _the_set_amounts(
             f"the set amount of {group} is {float(set_amount[g])!r}, expected a finite amount of "
             f"{currency}; its fixed slots' set amounts, each finite, sum past the largest number"
         )
-    return set_amount
+    return set_amount, set_of_slot
 
 
 def _the_sensitivity(
@@ -527,7 +536,7 @@ def _the_prepared_leg(
     # Since #190 each number made here is finite before the record is made, the arithmetic
     # running with numpy's flags down and the rules judging, else the first that is not is
     # refused by its operation and its slot, group, contract or the batch.
-    set_amount = _the_set_amounts(encoded, leg, is_fixed, settles, currency)
+    set_amount, fixed_contribution = _the_set_amounts(encoded, leg, is_fixed, settles, currency)
     is_live = ~is_fixed
     dated_live_exposure = np.where(is_live, leg.slot_exposure, 0.0)
     live_slot = np.flatnonzero(is_live)
@@ -609,6 +618,8 @@ def _the_prepared_leg(
         dated_live_exposure,
         dated_live_lots,
         set_amount,
+        settles,
+        fixed_contribution,
         live_slot,
         live_references,
         reference_of_live_slot,

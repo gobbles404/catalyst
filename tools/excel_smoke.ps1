@@ -953,7 +953,10 @@ $formulas = [ordered]@{
     # back off the batch in JT5; on the 7th, every settle in, A is cash, 60 * (73 - 70) = 180,
     # and B mark, -30 * (73 - 72) = -30, nothing live; the preparation in KA13 spills six slots,
     # the three days once per group, each with its payment day, A's settled and B's not, and the
-    # results in KA14 the contract's delta of nothing on every slot.
+    # results in KA14 the contract's delta of nothing on every slot, and since
+    # observation-prices-readback.md each slot's own settle and contribution, last: A's 20 of
+    # coefficient at 71, 75 and 73, 1,420, 1,500 and 1,460, and B's -10, -710, -750 and -730,
+    # under USD/MMBTU.
     "=INDEX(util_ReadHandle(JT5),3,13)"  = "+1bd"
     "=INDEX(util_ReadHandle(JT5),4,13)"  = "+3bd"
     "=INDEX(util_ReadHandle(JT5),3,14)"  = "46363"
@@ -972,9 +975,25 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(KA14),3,1)"    = "-30"
     "=INDEX(_ReportValues(KA14),3,2)"    = "180"
     '=INDEX(_ReportRisk(KA14,"nominal_delta","year"),4,2)'      = "0"
-    "=COLUMNS(util_ReadHandle(KA14))"    = "26"
+    "=COLUMNS(util_ReadHandle(KA14))"    = "30"
     "=INDEX(util_ReadHandle(KA14),1,11)"  = "contract_nominal_delta"
     "=INDEX(util_ReadHandle(KA14),6,11)"  = "0"
+    "=INDEX(util_ReadHandle(KA14),1,27)"  = "observation_coefficient"
+    "=INDEX(util_ReadHandle(KA14),1,28)"  = "observation_price"
+    "=INDEX(util_ReadHandle(KA14),1,29)"  = "price_unit"
+    "=INDEX(util_ReadHandle(KA14),1,30)"  = "floating_contribution"
+    "=INDEX(util_ReadHandle(KA14),2,30)"  = "float64"
+    "=INDEX(util_ReadHandle(KA14),3,27)"  = "20"
+    "=INDEX(util_ReadHandle(KA14),3,28)"  = "71"
+    "=INDEX(util_ReadHandle(KA14),4,28)"  = "75"
+    "=INDEX(util_ReadHandle(KA14),5,28)"  = "73"
+    "=INDEX(util_ReadHandle(KA14),3,29)"  = "USD/MMBTU"
+    "=INDEX(util_ReadHandle(KA14),3,30)"  = "1420"
+    "=INDEX(util_ReadHandle(KA14),4,30)"  = "1500"
+    "=INDEX(util_ReadHandle(KA14),6,27)"  = "-10"
+    "=INDEX(util_ReadHandle(KA14),6,30)"  = "-710"
+    "=INDEX(util_ReadHandle(KA14),8,30)"  = "-730"
+    "=INDEX(util_ReadHandle(KA14),8,8)"   = "0"
     # Mixed fields in one batch, mixed-trade-fields.md: the four rows of Z26 at 10 in KU2:LA5, each
     # its own unit, basis, method and clearing house, read back row by row off the batch in KU7;
     # on 31 December, every settle 11 and the projection 12, B fixed and paid, -62 of cash, and
@@ -1201,7 +1220,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(OR23),3,1)"      = "1260"
     '=INDEX(_ReportRisk(OR23,"nominal_delta","year"),4,2)'        = "1"
     "=ROWS(util_ReadHandle(OR23))"         = "3"
-    "=COLUMNS(util_ReadHandle(OR23))"      = "26"
+    "=COLUMNS(util_ReadHandle(OR23))"      = "30"
     "=INDEX(util_ReadHandle(OR23),1,19)"   = "brokerage_reserve"
     "=INDEX(util_ReadHandle(OR23),1,22)"   = "currency"
     "=INDEX(util_ReadHandle(OR23),3,19)"   = "50"
@@ -1587,7 +1606,8 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(QV31,"cross_gamma","year"),4,3)' = "0.00184"
     '=INDEX(_ReportRisk(QV31,"nominal_delta","year"),4,2)' = "0"
     '=ROUND(INDEX(_ReportRisk(QV31,"delta","year"),4,2),12)' = "0.3"
-    "=COLUMNS(util_ReadHandle(QV31))"      = "26"
+    "=COLUMNS(util_ReadHandle(QV31))"      = "30"
+    "=INDEX(util_ReadHandle(QV31),1,27)"   = "observation_coefficient"
     "=INDEX(util_ReadHandle(QV31),1,25)"   = "discount_curve_key"
     "=INDEX(util_ReadHandle(QV31),1,26)"   = "discount_curve"
     "=INDEX(util_ReadHandle(QV31),3,25)"   = "SOFR"
@@ -1643,7 +1663,7 @@ $formulas = [ordered]@{
     '=ROWS(_ReportRisk(QV24,"cross_gamma","year"))' = "5"
     "=INDEX(_ReportReserves(QV8),3,3)"    = "10"
     "=ROWS(util_ReadHandle(QV8))"         = "4"
-    "=COLUMNS(util_ReadHandle(QV8))"      = "26"
+    "=COLUMNS(util_ReadHandle(QV8))"      = "30"
     "=INDEX(util_ReadHandle(QV8),1,25)"   = "discount_curve_key"
     "=INDEX(util_ReadHandle(QV8),3,25)"   = "SOFR"
     "=INDEX(util_ReadHandle(QV8),1,26)"   = "discount_curve"
@@ -2068,7 +2088,17 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(WJ23),4,5)"  = "46419"
     "=INDEX(util_ReadHandle(WJ23),4,10)" = "1"
     "=ROWS(util_ReadHandle(WJ24))"       = "4"
-    "=COLUMNS(util_ReadHandle(WJ24))"    = "34"
+    "=COLUMNS(util_ReadHandle(WJ24))"    = "38"
+    # since observation-prices-readback.md each leg's slot at its own quote, last: A's 10,000
+    # at G27's 3.50, 35,000, and B's at -0.40, -4,000, each under its index's quote unit
+    "=INDEX(util_ReadHandle(WJ24),1,35)" = "observation_coefficient"
+    "=INDEX(util_ReadHandle(WJ24),1,38)" = "floating_contribution"
+    "=INDEX(util_ReadHandle(WJ24),3,35)" = "10000"
+    "=INDEX(util_ReadHandle(WJ24),3,36)" = "3.5"
+    "=INDEX(util_ReadHandle(WJ24),4,36)" = "-0.4"
+    "=INDEX(util_ReadHandle(WJ24),3,37)" = "USD/MMBTU"
+    "=ROUND(INDEX(util_ReadHandle(WJ24),3,38),6)" = "35000"
+    "=ROUND(INDEX(util_ReadHandle(WJ24),4,38),6)" = "-4000"
     "=INDEX(util_ReadHandle(WJ24),1,21)" = "leg_amount"
     "=INDEX(util_ReadHandle(WJ24),1,26)" = "leg_dv01"
     "=INDEX(util_ReadHandle(WJ24),3,2)"  = "A"

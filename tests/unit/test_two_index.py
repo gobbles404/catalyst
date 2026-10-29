@@ -1050,7 +1050,24 @@ def test_the_prepared_and_valued_pair_read_back_one_row_per_slot_naming_its_leg(
     assert cell(table, 1, "contract_cross_gamma") == pytest.approx(-0.00038, **CLOSE)
     assert cell(table, 1, "cross_gamma_unit") != cell(table, 0, "cross_gamma_unit")
     assert cell(table, 0, "discount_curve") == "SOFR" and cell(table, 1, "discount_curve") == "SOFR"
+    # Since observation-prices-readback.md each leg's slot shows its own price facts, last:
+    # A's 10,000 of coefficient at G27's 3.50, 35,000 of contribution, and B's at -0.40,
+    # -4,000, each in its index's quote unit.
+    assert cell(table, 0, "observation_coefficient") == 10_000.0
+    assert cell(table, 1, "observation_coefficient") == 10_000.0
+    assert cell(table, 0, "observation_price") == 3.50
+    assert cell(table, 1, "observation_price") == -0.40
+    assert cell(table, 0, "price_unit") == "USD/MMBTU"
+    assert cell(table, 1, "price_unit") == "USD/MMBTU"
+    assert cell(table, 0, "floating_contribution") == pytest.approx(35_000.0, **CLOSE)
+    assert cell(table, 1, "floating_contribution") == pytest.approx(-4_000.0, **CLOSE)
     headings = table[0]
+    assert headings[-4:] == [
+        "observation_coefficient",
+        "observation_price",
+        "price_unit",
+        "floating_contribution",
+    ]
     assert headings.index("leg_amount") == headings.index("group_dv01") + 1
     assert headings.index("brokerage_reserve") == headings.index("leg_dv01") + 1
     # A cleared pair: the leg totals stand, the group and leg shares are none.
