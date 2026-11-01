@@ -475,24 +475,26 @@ def test_a_fully_fixed_month_discounts_its_unpaid_payment_and_a_payment_today_ta
 
 
 def test_a_onetime_template_and_a_period_basis_are_refused_by_the_quote_by_name() -> None:
-    # onetime-averaging.md's second slice: a quote template may hold onetime, the field required
-    # of a quote as of a booking, and _Quote refuses it in so many words rather than quote
-    # monthly economics for a whole-period request; period, the window's total, with it.
+    # onetime-averaging.md's second slice and dated-quotes.md: a quote template may hold onetime,
+    # the field required of a quote as of a booking, and _Quote, whose label names months,
+    # refuses it in so many words naming _QuoteByDates, which prices the window; period, the
+    # window's total, is refused under monthly by the kernel's rule over the frequency.
     market = priced(STRIP, DEC_31, 3.0, 30.0, 60.0)
     onetime = a_template(**{**dict(financial().values), "settlement_frequency": "onetime"})
     refused(
         market,
         "F27-G27",
         onetime,
-        "settlement_frequency is 'onetime', expected 'monthly'; a quote prices by the month and "
-        "does not price a onetime period across a window's dates as monthly",
+        "settlement_frequency is 'onetime', expected 'monthly'; a quote by contract code prices "
+        "by the month, and _QuoteByDates prices a onetime period across two dates",
     )
     refused(
         market,
         "F27-G27",
         financial(per="period"),
-        "quantity_per is 'period', expected 'month' or 'calday'; period is the total of a "
-        "onetime period, which a quote does not price",
+        "quantity_per of the quote is 'period', expected 'month' or 'calday' under "
+        "settlement_frequency = monthly; period is the total of a onetime period and says "
+        "nothing of a month",
     )
     assert quote_on(market, "F27-G27", financial()) == pytest.approx(MONTH_CLEARED, **CLOSE)
 

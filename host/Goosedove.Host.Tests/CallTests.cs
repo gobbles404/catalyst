@@ -297,6 +297,8 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("route"), "Cleared" }, "#ERROR _CreateQuoteTemplate: ValueError: route is 'Cleared', expected cleared or bilateral" };
             yield return new object[] { "_Quote", new object[] { ExcelMissing.Value, "F27", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _Quote: market is missing, expected market handle" };
             yield return new object[] { "_Quote", new object[] { "x:market:gas:9", "F27", "y:quote_template:9", ExcelMissing.Value }, "#ERROR _Quote: market is text 'x:market:gas:9' naming no live object, expected market handle" };
+            yield return new object[] { "_QuoteByDates", new object[] { ExcelMissing.Value, 46168.0, 46198.0, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _QuoteByDates: market is missing, expected market handle" };
+            yield return new object[] { "_QuoteByDates", new object[] { "x:market:gas:9", "26-May-2026", 46198.0, "y:quote_template:9", ExcelMissing.Value }, "#ERROR _QuoteByDates: market is text 'x:market:gas:9' naming no live object, expected market handle" };
             yield return new object[] { "_CreateRFQ", new object[] { ExcelMissing.Value, Column("F27"), 1.0, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateRFQ: index is missing, expected index handle" };
             yield return new object[] { "_CreateRFQ", new object[] { "x:index:gas:9", Row("F27", "G27"), 1.0, "y:quote_template:9", ExcelMissing.Value }, "#ERROR _CreateRFQ: index is text 'x:index:gas:9' naming no live object, expected index handle" };
             yield return new object[] { "_QuoteRFQ", new object[] { ExcelMissing.Value, "x:rfq:gas:9", ExcelMissing.Value }, "#ERROR _QuoteRFQ: market is missing, expected market handle" };
@@ -920,6 +922,40 @@ namespace Goosedove.Host.Tests
             Assert.Equal(2200.0, (double)risk[3, 1], 6);
             var lastday = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("BBL", "period", "onetime", "lastday", "cleared", "financial", "CME Clearing", 46202.0, holidays));
             Assert.Equal("#ERROR _CreateTrades: ValueError: schedule_method of trade 1 at row 1 is 'lastday', expected 'asian' under settlement_frequency = onetime; a onetime period averages every pricing day it covers, and the expiry-based methods take their contract's month", Seam.Call("_CreateTrades", index, headers, booking, lastday));
+        }
+
+        // The quote by dates, dated-quotes.md: the onetime fact's index and market, valued 23 April 2026
+        // with N26 at 70 and Q26 at 72, the trade month 26 May to 25 June under a onetime quote template
+        // one average of 22 fixings, (19 * 70 + 3 * 72) / 22, and under a monthly one a dated strip,
+        // May's four days at 70 and June's eighteen at 70.333333 in equal quantities; the window booked
+        // at its quote marks zero; the dates reversed and a text date refused in the seam's words, and a
+        // label under the onetime template in the library's, naming the function that prices a window.
+        [Fact]
+        public void a_window_is_quoted_by_its_dates_under_the_templates_frequency()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("K26", "M26", "N26", "Q26", "U26"), Column(46133.0, 46161.0, 46195.0, 46224.0, 46254.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46167.0, 46192.0, 46206.0));
+            var conventions = Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 } });
+            var index = (string)Seam.Call("_CreateIndex", "CL", "CL index", schedule, conventions, specifications, holidays, "BBL");
+            var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46135.0, 0.5), index);
+            var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46134.0), Column(69.0), index);
+            var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
+            var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "CL", Column(69.0, 70.0, 72.0, 74.0)));
+            var fields = Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_holiday_calendar", "settlement_frequency");
+            var onetime = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", fields, Row("cleared", "financial", "asian", "period", 46202.0, holidays, "onetime"));
+            var monthly = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", fields, Row("cleared", "financial", "asian", "month", 46202.0, holidays, "monthly"));
+            var window = (double)Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, onetime, ExcelMissing.Value);
+            Assert.Equal((19 * 70.0 + 3 * 72.0) / 22, window, 12);
+            Assert.Equal((70.0 + (15 * 70.0 + 3 * 72.0) / 18) / 2, (double)Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, monthly, ExcelMissing.Value), 12);
+            var booking = Row("quantity_unit", "quantity_per", "settlement_frequency", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", booking, Row("BBL", "period", "onetime", "asian", "cleared", "financial", "CME Clearing", 46202.0, holidays));
+            var trades = (string)Seam.Call("_CreateTrades", index, Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price"), Row(1.0, 46157.0, 46168.0, 46198.0, 2200.0, window), template);
+            var results = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", trades, history), market, ExcelMissing.Value);
+            Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
+            Assert.Equal("#ERROR _QuoteByDates: ValueError: end_date is 2026-05-26, expected a day on or after start_date, 2026-06-25", Seam.Call("_QuoteByDates", market, 46198.0, 46168.0, onetime, ExcelMissing.Value));
+            Assert.Equal("#ERROR _QuoteByDates: start_date is text '26-May-2026', expected date", Seam.Call("_QuoteByDates", market, "26-May-2026", 46198.0, onetime, ExcelMissing.Value));
+            Assert.Equal("#ERROR _Quote: ValueError: settlement_frequency is 'onetime', expected 'monthly'; a quote by contract code prices by the month, and _QuoteByDates prices a onetime period across two dates", Seam.Call("_Quote", market, "K26-M26", onetime, ExcelMissing.Value));
         }
 
         // The valuation path from the host's side: the market fact's chain, valued on 26 May 2026 with

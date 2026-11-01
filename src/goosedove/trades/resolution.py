@@ -266,7 +266,7 @@ def resolved(
         settlement,
         index.kind,
         paired,
-        trade_ids,
+        partial(named_trade, trade_ids),
     )
     onetime_rows = settlement_frequency == FREQUENCIES.index(SettlementFrequency.ONETIME)
     schedule = trade_schedule_of(index)
@@ -278,7 +278,7 @@ def resolved(
     if paired:
         second = _the_second_schedule(indexes[1], counter)
         schedules.append((second[1], _schedule_of(indexes[1], True)))
-    periods = _the_periods(fields, tuple(schedules), onetime_rows, _contract_days(schedule))
+    periods = _the_periods(fields, tuple(schedules), onetime_rows, contract_days(schedule))
     counter.hit(TICKET_CODES_READ, periods.codes_read)
     occurrence = periods.occurrence
     start, end = periods.start, periods.end
@@ -744,12 +744,13 @@ def _the_periods(
     return _Periods(occurrence, contracts, start, end, window, (entered, codes), len(spans))
 
 
-def _contract_days(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.datetime64]:
+def contract_days(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.datetime64]:
     """The day each contract of the schedule prices on last: a futures contract's expiry, an IFERC
     month's publication day; what a onetime window's contract is found by, since the review of
     onetime-averaging.md's third slice, the first contract pricing on or after the window's first
-    day, as the calendar gives a day its contract. An IFERC schedule's days are never searched,
-    a window on an IFERC index being refused by the frequency's rules first."""
+    day, as the calendar gives a day its contract, window_rows' search key for a booking and
+    since dated-quotes.md for a quote. An IFERC schedule's days are never searched, a window on
+    an IFERC index being refused by the frequency's rules first."""
     match schedule:
         case FuturesSchedule():
             return schedule.future_expiry
@@ -757,6 +758,31 @@ def _contract_days(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.date
             return schedule.publication_date
         case _:
             assert_never(schedule)
+
+
+def window_rows(
+    contract_day: NDArray[np.datetime64],
+    opens: NDArray[np.datetime64],
+    named: Callable[[int], str],
+    schedule: str = "the index's schedule",
+) -> NDArray[np.intp]:
+    """Each window's row on the schedule, the contract pricing its first day: the first whose
+    day, contract_day, the schedule's expiries or publication days, is on or after the day it
+    opens, by the calendar's rule, one search over the windows and no month looked up, since a
+    window is bound to no month and may open in a month the schedule has no contract for while
+    every day of it prices; the row is read for nothing that prices, the window's two dates
+    naming it. A window opening after the last day the schedule's contracts price is refused in
+    the words `named` gives it, the schedule named as given. The one search a booking's windows
+    and since dated-quotes.md a quote's share."""
+    row = np.searchsorted(contract_day, opens)
+    late = row >= contract_day.size
+    if late.any():
+        k = int(late.argmax())
+        raise ValueError(
+            f"{named(k)}, expected a window priced by the contracts of {schedule}; it opens on "
+            f"{opens[k]}, after the last day they price, {contract_day[-1]}"
+        )
+    return row
 
 
 def _the_contracts(
@@ -771,12 +797,9 @@ def _the_contracts(
 ) -> NDArray[np.intp]:
     """Each component's row on one leg's schedule: a monthly component's the row of its calendar
     month, schedule_rows over those components, and since the review of onetime-averaging.md's
-    third slice a onetime component's the row of the contract pricing its first day, the first
-    whose day is on or after it by the calendar's rule, one search over the windows, since a
-    window is bound to no month and may open in a month the schedule has no contract for while
-    every day of it prices; the row is read for nothing that prices, the window's two dates
-    naming it. A window opening after the last day the schedule's contracts price is refused by
-    its row. window is None when no row is a window, the monthly lookup then over every
+    third slice a onetime component's the row of the contract pricing its first day, window_rows
+    over the windows, a window opening after the last day the schedule's contracts price refused
+    by its row. window is None when no row is a window, the monthly lookup then over every
     component as it was."""
     if window is None:
         return schedule_rows(months, month, occurrence, period_of, schedule)
@@ -785,17 +808,10 @@ def _the_contracts(
     contract[monthly] = schedule_rows(
         months, month[monthly], occurrence[monthly], period_of, schedule
     )
-    opens = start[window]
-    row = np.searchsorted(contract_day, opens)
-    late = row >= contract_day.size
-    if late.any():
-        k = int(late.argmax())
-        raise ValueError(
-            f"{period_of(int(occurrence[window][k]))}, expected a window priced by the contracts "
-            f"of {schedule}; it opens on {opens[k]}, after the last day they price, "
-            f"{contract_day[-1]}"
-        )
-    contract[window] = row
+    windows = occurrence[window]
+    contract[window] = window_rows(
+        contract_day, start[window], lambda k: period_of(int(windows[k])), schedule
+    )
     return contract
 
 

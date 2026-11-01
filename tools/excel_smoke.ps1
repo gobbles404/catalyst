@@ -1094,6 +1094,17 @@ $formulas = [ordered]@{
     '=ROUND(INDEX(_ReportRisk(MS9,"nominal_delta","year"),4,2),6)' = "1.9"
     "=ROUND(INDEX(util_ReadHandle(MS9),3,11),6)" = "0.2"
     "=ROUND(INDEX(util_ReadHandle(MS9),5,11),6)" = "1.7"
+    # The quote by dates, dated-quotes.md: the same window quoted off the market in MY9 under the
+    # onetime quote template in MJ9, (2 * 72 + 17 * 75) / 19, the booked mark over its 1,900 barrels
+    # above 70; under the monthly template in MJ11 a dated strip, December's nine days at 669/9 and
+    # January's ten at 75 in equal quantities, 224/3; the dates reversed and a text date refused in
+    # the seam's words, a label under the onetime template in the library's.
+    '=TEXT(MS10,"0.000000")' = "74.684211"
+    "=ROUND(1900*(MS10-70)-INDEX(_ReportValues(MS9),3,1),6)" = "0"
+    '=TEXT(MS11,"0.000000")' = "74.666667"
+    "=_QuoteByDates(MY9,MV6,MU6,MJ9)" = "#ERROR _QuoteByDates: ValueError: end_date is 2026-12-18, expected a day on or after start_date, 2027-01-15"
+    '=_QuoteByDates(MY9,"18-Dec-2026",MV6,MJ9)' = "#ERROR _QuoteByDates: start_date is text '18-Dec-2026', expected date"
+    '=_Quote(MY9,"F27-G27",MJ9)' = "#ERROR _Quote: ValueError: settlement_frequency is 'onetime', expected 'monthly'; a quote by contract code prices by the month, and _QuoteByDates prices a onetime period across two dates"
     # The risk by day, month and year, unified-risk-reporting.md: _ReportRisk on the WTI block's
     # results, the nominal delta by day six rows under the Total, 0.2 a day from 46374, by month one
     # row from 46357 and by year one from 46023, each 1.2; all three on one axis with the DV01
@@ -2729,6 +2740,12 @@ $cells = [ordered]@{
     "MS7" = "=_CreateTrades(MA6,MS1:MX1,MS6:MX6,MJ6)"
     "MS8" = "=_PrepareTrades(MS7,MY5)"
     "MS9" = "=_EvaluateTrades(MS8,MY9)"
+    "MJ8" = "cleared"; "MK8" = "financial"; "ML8" = "asian"; "MM8" = "period"; "MN8" = "+2bd"; "MO8" = "=MC3"; "MP8" = "onetime"
+    "MJ9" = '=_CreateQuoteTemplate("fixed_float",VF5:VL5,MJ8:MP8)'
+    "MJ10" = "cleared"; "MK10" = "financial"; "ML10" = "asian"; "MM10" = "month"; "MN10" = "+2bd"; "MO10" = "=MC3"; "MP10" = "monthly"
+    "MJ11" = '=_CreateQuoteTemplate("fixed_float",VF5:VL5,MJ10:MP10)'
+    "MS10" = "=_QuoteByDates(MY9,MU6,MV6,MJ9)"
+    "MS11" = "=_QuoteByDates(MY9,MU6,MV6,MJ11)"
     "NH1" = "X26"; "NJ1" = "2-Nov-2026"
     "NH2" = "Z26"; "NJ2" = "1-Dec-2026"
     "NH3" = "F27"; "NJ3" = "4-Jan-2027"

@@ -141,6 +141,9 @@ def test_creation_runs_the_resolution_once_and_nothing_of_the_pricing(
         "choice": 5,
         "payment_rule_of": 1,
         "read_offset": 1,
+        "by_the_month": 1,  # a request's rows are months until dated-quotes.md's second slice
+        "the_frequency": 1,  # the kernel's rule over the template's one set of terms
+        "frequency_rules": 1,
         "trade_schedule_of": 2,  # the request's own read and the observations'
         "the_method": 1,
         "_aligned": 1,
@@ -290,14 +293,18 @@ def test_the_seam_quotes_a_saved_request_resolving_three_handles_and_publishing_
 
 def retained(saved: Rfq) -> int:
     """The bytes a request keeps in its arrays, each counted once: the entered quantities, the
-    component quantities where they are not the entered ones, the contract rows, the payment
-    days, the observations' three arrays and their references."""
+    component quantities where they are not the entered ones, the period's contract rows, first
+    and last days and window marks, the payment days, the observations' three arrays and their
+    references."""
     request = saved.request
     arrays = [
         saved.quantity,
         saved.component_quantity,
         request.quantity,
-        request.contract,
+        request.period.contract,
+        request.period.first,
+        request.period.last,
+        request.period.window,
         request.references,
         request.observations.component,
         request.observations.date,
@@ -318,13 +325,14 @@ def retained(saved: Rfq) -> int:
 def test_a_request_retains_its_arrays_and_allocates_within_its_observations(
     n: int, observations: int
 ) -> None:
-    # Retained: eight bytes a month for the quantities, the contract rows and the payment days,
-    # and 32 an observation for its component, day, weight and reference; the component
-    # quantities are the entered ones per month, by reference, and the pricing form's are the
-    # component quantities themselves.
+    # Retained: eight bytes a month for the quantities, the contract rows, the payment days and
+    # since dated-quotes.md the period's first and last days, one for its window mark, and 32 an
+    # observation for its component, day, weight and reference; the component quantities are the
+    # entered ones per month, by reference, and the pricing form's are the component quantities
+    # themselves.
     saved = made(n)
     assert saved.request.quantity is saved.component_quantity
-    assert retained(saved) == 8 * 3 * n + 32 * observations
+    assert retained(saved) == 8 * 5 * n + n + 32 * observations
     # Creation's peak, measured on 2026-10-22: 6,568 bytes for a month's 21 observations and
     # 18,610 for the year's 261, about 50 an observation over a floor of 5,500 for the terms,
     # the columns and the arrays over the months; quoting the saved request 3,011 and 15,562,

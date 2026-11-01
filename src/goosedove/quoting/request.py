@@ -1,18 +1,20 @@
 """What a quote prices and how, defined once for the quote and the request for quote,
-template-based-quoting.md and rfq-quoting.md: the terms a quote template must hold for a
-completed quote, the curve a bilateral quote discounts on, the terms against the index's kind,
-the payments a template's day or rule gives the months, and the pricing of a resolved request
-on a market:
+template-based-quoting.md, rfq-quoting.md and dated-quotes.md: the terms a quote template must
+hold for a completed quote, the curve a bilateral quote discounts on, the terms against the
+index's kind and the frequency's rules over them, the period a span of days resolves to under
+the template's frequency, the months of a label or two dates under monthly and the one window
+under onetime, the request made from it, the payments a template's day or rule gives the
+components, and the pricing of a resolved request on a market:
 
-    P_i = sum(weight_ij * price_ij)      each month's observations' weighted prices
+    P_i = sum(weight_ij * price_ij)      each component's observations' weighted prices
     D_i = 1 cleared; 1 bilateral with payment_i <= as_of; curve(payment_i) otherwise
     K   = sum(q_i D_i P_i) / sum(q_i D_i)
 
-in the index's quote units, every month in both sums whether its payment has passed or not,
-the agreed full-period convention. A quote resolves its period to a request on each call and
-prices it at once, quote.py; a request for quote retains one and prices it on each market,
-rfq.py. docs/library/quoting/quote.md owns the calculation and docs/library/quoting/rfq.md the
-request."""
+in the index's quote units, every component in both sums whether its payment has passed or
+not, the agreed full-period convention. A quote resolves its period to a request on each call
+and prices it at once, quote.py; a request for quote retains one and prices it on each market,
+rfq.py. docs/library/quoting/quote.md owns the calculation, docs/library/quoting/quote-by-dates.md
+the dated quote and docs/library/quoting/rfq.md the request."""
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -24,22 +26,32 @@ from numpy.typing import NDArray
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.discount_curve_set import DiscountCurveSet
 from goosedove.globals.payments import curve_starts_on, factors_on
+from goosedove.index_definitions.contract_codes import schedule_months
 from goosedove.index_definitions.date_offsets import Instruction, shift_days
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index
-from goosedove.index_definitions.kind import named
+from goosedove.index_definitions.kind import Kind, named
 from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import NONE
 from goosedove.market.market import Market
 from goosedove.quoting.template import QuoteTemplate
+from goosedove.trades.encoding import observation_references
 from goosedove.trades.evaluation import CURVES_SELECTED, LIVE_PRICES_READ, PAYMENT_FACTORS_READ
-from goosedove.trades.observations import Observations
+from goosedove.trades.observations import Observations, observed
 from goosedove.trades.preparation import FIXINGS_READ, calendar_rows
-from goosedove.trades.resolution import PAYMENT_RULES_READ, PAYMENT_SHIFTS, last_days
-from goosedove.trades.schedule_methods import ScheduleMethod
+from goosedove.trades.resolution import (
+    PAYMENT_RULES_READ,
+    PAYMENT_SHIFTS,
+    SCHEDULE_CODES_READ,
+    contract_days,
+    last_days,
+    schedule_rows,
+    window_rows,
+)
+from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 from goosedove.trades.template import (
     DayOrRule,
     payment_rule_of,
@@ -50,11 +62,16 @@ from goosedove.trades.template import (
     settlement_of,
 )
 from goosedove.trades.terms import (
+    BASES,
+    FREQUENCIES,
     QuantityPer,
     Route,
     Settlement,
     SettlementFrequency,
+    frequency_rules,
+    month_bounds,
     payments_after_observations,
+    period_words,
 )
 
 # The work a quote and a request report, beside the pipeline's own names where the fact is the
@@ -62,7 +79,9 @@ from goosedove.trades.terms import (
 # shifts, the curve selected and the payment factors read.
 TEMPLATE_FIELDS_READ: Final = "template_fields_read"  # the template's values read for the terms
 MONTHS_RESOLVED: Final = "months_resolved"  # the months resolved to schedule rows
-OBSERVATIONS_MADE: Final = "observations_made"  # observations made over the months
+WINDOWS_RESOLVED: Final = "windows_resolved"  # the windows resolved to the contract pricing their
+# first day, since dated-quotes.md
+OBSERVATIONS_MADE: Final = "observations_made"  # observations made over the components
 PAYMENT_DAYS_MADE: Final = "payment_days_made"  # one per month of a financial quote or request
 PRICE_REDUCTIONS: Final = "price_reductions"  # the reductions formed: the months' prices,
 # the largest weight's exponent, the weights and the price
@@ -70,16 +89,18 @@ PRICE_REDUCTIONS: Final = "price_reductions"  # the reductions formed: the month
 
 @dataclass(frozen=True, slots=True)
 class Terms:
-    """The template's terms as a quote reads them: the four codes as their enums; for a
-    financial settlement the payment day, since payment-day-date-or-rule.md a date as entered
-    or a rule read whole with its text, the other None, and both None for a request paying on
-    its own dates under a template without one, rfq-quoting.md, and the calendar; and the curve
-    key on the bilateral route."""
+    """The template's terms as a quote reads them: the five codes as their enums, since
+    dated-quotes.md the frequency among them, monthly or onetime, read and held to the kernel's
+    rules by the_frequency; for a financial settlement the payment day, since
+    payment-day-date-or-rule.md a date as entered or a rule read whole with its text, the other
+    None, and both None for a request paying on its own dates under a template without one,
+    rfq-quoting.md, and the calendar; and the curve key on the bilateral route."""
 
     route: Route
     settlement: Settlement
     method: ScheduleMethod
     quantity_per: QuantityPer
+    frequency: SettlementFrequency
     payment_day: np.datetime64 | None
     payment_rule: tuple[Instruction, ...] | None
     payment_rule_text: str | None
@@ -88,27 +109,55 @@ class Terms:
 
 
 @dataclass(frozen=True, slots=True)
+class Period:
+    """The components a request prices, resolved once, since dated-quotes.md the one form a
+    label's months, a span's months and a span's one window take: contract[k] the k-th
+    component's row of the schedule, a month's own contract or the contract pricing a window's
+    first day, read for nothing that prices; first[k] and last[k] the days it covers, a month's
+    clipped to the span's; and window[k] whether it is a onetime window, named by its two dates
+    where a month is named by its code."""
+
+    contract: NDArray[np.intp]
+    first: NDArray[np.datetime64]
+    last: NDArray[np.datetime64]
+    window: NDArray[np.bool_]
+
+
+@dataclass(frozen=True, slots=True)
 class Request:
     """What a quote prices, resolved once and read for nothing else: the index and its schedule,
-    the terms, each month as a row of the schedule, the observations the method gives the months
-    and each observation's pricing reference, each month's quantity, one or its calendar days
-    for a quote and the month's own quantity for a request for quote, which the price weighs
-    with the factor at any scale, and for a financial settlement each month's payment day, None
-    for a physical one, which pays on no day. No history, price, factor or valuation day: those
-    are the market's, read when the request is priced."""
+    the terms, the period, each component a row of the schedule with the days it covers, the
+    observations the method gives the components and each observation's pricing reference, each
+    component's quantity, one or its calendar days for a quote and the row's own quantity for a
+    request for quote, which the price weighs with the factor at any scale, and for a financial
+    settlement each component's payment day, None for a physical one, which pays on no day. No
+    history, price, factor or valuation day: those are the market's, read when the request is
+    priced."""
 
     index: Index
     schedule: FuturesSchedule | IfercSchedule
     terms: Terms
-    contract: NDArray[np.intp]
+    period: Period
     observations: Observations
     references: NDArray[np.intp]
     quantity: NDArray[np.float64]
     payment_date: NDArray[np.datetime64] | None
 
     def component(self, k: int) -> str:
-        """The k-th month's contract code, the schedule's spelling, as a refusal names it."""
-        return self.schedule.codes[int(self.contract[k])]
+        """The k-th component as a refusal names it: a month's contract code, the schedule's
+        spelling, or a window's two dates."""
+        return component_words(self.schedule.codes, self.period, k)
+
+
+def component_words(codes: tuple[str, ...], period: Period, k: int) -> str:
+    """The k-th component of a period in words, the one form period_words gives every reader of
+    a period: its contract's code, `F27`, or a window's two dates, `2026-05-26 to 2026-06-25`."""
+    at = slice(k, k + 1)
+    return str(
+        period_words(
+            codes, period.contract[at], period.window[at], period.first[at], period.last[at]
+        )[0]
+    )
 
 
 # --- the terms ------------------------------------------------------------------------------------
@@ -138,19 +187,6 @@ def the_terms(
     frequency = settlement_frequency_of(
         "settlement_frequency", _text(values, "settlement_frequency")
     )
-    # A quote and a request for quote price by the month, since onetime-averaging.md: a
-    # template may hold onetime, and each consumer refuses it by name rather than quote monthly
-    # economics for a whole-period request; period, the window's total, is refused with it.
-    if frequency is SettlementFrequency.ONETIME:
-        raise ValueError(
-            "settlement_frequency is 'onetime', expected 'monthly'; a quote prices by the month "
-            "and does not price a onetime period across a window's dates as monthly"
-        )
-    if quantity_per is QuantityPer.PERIOD:
-        raise ValueError(
-            "quantity_per is 'period', expected 'month' or 'calday'; period is the total of a "
-            "onetime period, which a quote does not price"
-        )
     if route is Route.BILATERAL and settlement is Settlement.PHYSICAL:
         raise ValueError(
             "settlement_method is 'physical', expected 'financial' with route = bilateral; a "
@@ -173,11 +209,41 @@ def the_terms(
         settlement,
         method,
         quantity_per,
+        frequency,
         payment_day,
         rule,
         rule_text,
         payment_calendar,
         key,
+    )
+
+
+def by_the_month(terms: Terms, who: str) -> None:
+    """A quote by contract code prices by the month, its label naming months, and so does a
+    request for quote until dated-quotes.md's second slice: a template holding onetime is refused
+    by name, since a label's span as one average is not what the label says and _QuoteByDates
+    prices the window two dates name."""
+    if terms.frequency is SettlementFrequency.ONETIME:
+        raise ValueError(
+            f"settlement_frequency is 'onetime', expected 'monthly'; {who} prices by the month, "
+            "and _QuoteByDates prices a onetime period across two dates"
+        )
+
+
+def the_frequency(terms: Terms, kind: Kind, who: str) -> None:
+    """The template's frequency with the terms it stands under, since dated-quotes.md the
+    kernel's one rule, frequency_rules, over the template's one set of terms on one index,
+    named as the quote or the request in a refusal: a onetime period on a futures index alone,
+    financially settled, under the asian method and in a quantity of period or calday; under
+    monthly a quantity of month or calday, period being a window's total."""
+    frequency_rules(
+        np.array([FREQUENCIES.index(terms.frequency)], dtype=np.intp),
+        np.array([BASES.index(terms.quantity_per)], dtype=np.intp),
+        np.array([METHODS.index(terms.method)], dtype=np.intp),
+        terms.settlement,
+        kind,
+        False,
+        lambda _: who,
     )
 
 
@@ -310,6 +376,116 @@ def the_method(terms: Terms, schedule: FuturesSchedule | IfercSchedule) -> None:
             assert_never(schedule)
 
 
+# --- the period and the request -------------------------------------------------------------
+
+
+def the_period(
+    first_day: np.datetime64,
+    last_day: np.datetime64,
+    frequency: SettlementFrequency,
+    schedule: FuturesSchedule | IfercSchedule,
+    period_of: Callable[[], str],
+    counter: WorkCounter,
+) -> Period:
+    """The components of the days from first_day to last_day under the frequency, since
+    dated-quotes.md the one resolution a quote's label and a quote's two dates share. Under
+    monthly the span is split at month ends, the first and the last month clipped to the days
+    the span covers and a month between them whole, as the resolution splits a dated row; every
+    schedule code is read for its month, and a month the schedule lacks is refused by name in
+    the period's words. Under onetime the span is one component, the window, whatever months it
+    crosses, its schedule row the contract pricing its first day by window_rows, the one search
+    a booking's windows take, a window opening after the last day the schedule's contracts price
+    refused in the period's words. Work: the codes read and the months resolved, or the window
+    resolved."""
+    match frequency:
+        case SettlementFrequency.MONTHLY:
+            first_month = int(first_day.astype("datetime64[M]").astype(np.int64))
+            last_month = int(last_day.astype("datetime64[M]").astype(np.int64))
+            month = np.arange(first_month, last_month + 1, dtype=np.int64)
+            months = schedule_months(schedule)
+            counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
+            contract = schedule_rows(
+                months, month, np.arange(month.size, dtype=np.intp), lambda _: period_of()
+            )
+            counter.hit(MONTHS_RESOLVED, month.size)
+            first, last = month_bounds(month)
+            first[0] = max(first[0], first_day)
+            last[-1] = min(last[-1], last_day)
+            return Period(contract, first, last, np.zeros(month.size, dtype=np.bool_))
+        case SettlementFrequency.ONETIME:
+            opens = np.array([first_day], dtype="datetime64[D]")
+            contract = window_rows(contract_days(schedule), opens, lambda _: period_of())
+            counter.hit(WINDOWS_RESOLVED, 1)
+            closes = np.array([last_day], dtype="datetime64[D]")
+            return Period(contract, opens, closes, np.ones(1, dtype=np.bool_))
+        case _:
+            assert_never(frequency)
+
+
+def the_request(
+    index: Index,
+    schedule: FuturesSchedule | IfercSchedule,
+    terms: Terms,
+    period: Period,
+    counter: WorkCounter,
+) -> Request:
+    """A quote's request from its resolved period, the steps a label and two dates share: the
+    observations by the template's method over each component's days, a window's over the whole
+    of it, the quote named in a refusal and a component by what it is booked under, its code or
+    `the window`; each observation's pricing reference by the pipeline's rules, a component named
+    by its code or its two dates; each component's quantity, one or its calendar days; and a
+    financial quote's payment days from the template, after each component's last observation.
+    Work: the observations made, and the payments' as the_payments reports it."""
+    n = period.contract.size
+    codes = schedule.codes
+
+    def booked(k: int) -> str:
+        return "the window" if period.window[k] else codes[int(period.contract[k])]
+
+    def component(k: int) -> str:
+        return component_words(codes, period, k)
+
+    method = np.full(n, METHODS.index(terms.method), dtype=np.intp)
+    observations = observed(
+        method,
+        index,
+        period.contract,
+        period.first,
+        period.last,
+        lambda _: "the quote",
+        booked=booked,
+    )
+    counter.hit(OBSERVATIONS_MADE, observations.component.size)
+    references = observation_references(
+        schedule, index.holiday_calendar, observations, period.contract, method, component
+    )
+    return Request(
+        index,
+        schedule,
+        terms,
+        period,
+        observations,
+        references,
+        _the_quantities(terms.quantity_per, period.first, period.last),
+        the_payments(terms, observations, n, component, counter),
+    )
+
+
+def _the_quantities(
+    quantity_per: QuantityPer, first: NDArray[np.datetime64], last: NDArray[np.datetime64]
+) -> NDArray[np.float64]:
+    """Each component's quantity: one for a quantity per month, or per period, the window's
+    total; its calendar days, weekends and holidays included, for one per calendar day; a
+    common scale cancels in the price, and one component's share is one whatever its quantity."""
+    match quantity_per:
+        case QuantityPer.MONTH | QuantityPer.PERIOD:
+            return np.ones(first.size)
+        case QuantityPer.CALDAY:
+            return ((last - first).astype(np.int64) + 1).astype(np.float64)
+        case _:
+            assert_never(quantity_per)
+
+
 # --- the payments ------------------------------------------------------------------------------
 
 
@@ -392,7 +568,7 @@ def priced(
     )
     is_fixed = calendar.is_fixed[rows]
     prices = _the_prices(market, request.references, rows, is_fixed, counter)
-    n = request.contract.size
+    n = request.period.contract.size
     monthly = np.bincount(observations.component, weights=observations.weight * prices, minlength=n)
     pays = request.payment_date
     if pays is None:

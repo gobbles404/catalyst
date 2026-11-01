@@ -32,7 +32,7 @@ from goosedove.market.market import Market, market
 from goosedove.market.market_history import market_history
 from goosedove.market_data.futures_fixings import futures_fixings
 from goosedove.market_data.price_vector import price_vector
-from goosedove.quoting.quote import quote
+from goosedove.quoting.quote import quote, quote_by_dates
 from goosedove.quoting.template import QuoteTemplate
 from goosedove.trades.template import DayOrRule
 
@@ -241,12 +241,16 @@ def test_a_month_and_a_strip_report_their_work() -> None:
 
 
 # The package's functions a quote runs, once each whatever the period, a month and a year alike:
-# the terms read, the key bound to the collection's first curve, the period read as the two date
-# utilities read it and resolved against the schedule's thirteen codes, the observations made by
-# one method, their references
-# and rows, the prices, quantities, payments and factors, the shares and their sum.
+# the terms read and since dated-quotes.md held to the month and the frequency's rules, the key
+# bound to the collection's first curve, the period read as the two date utilities read it and
+# resolved against the schedule's thirteen codes by the resolution a label and two dates share,
+# the observations made by one method, their references and rows, the prices, quantities,
+# payments and factors, the shares and their sum.
 LEDGER = {
     "quote": 1,
+    "quote.<locals>.<lambda>": 1,  # the span read once the terms are checked; the period's
+    # words never, nothing refused
+    "_priced": 1,  # the steps a label and two dates share, since dated-quotes.md
     "the_terms": 1,
     "_the_conditions": 1,  # the conditional fields, since rfq-quoting.md
     "_text": 6,  # the six texts the bilateral template holds beside its payment day
@@ -258,6 +262,9 @@ LEDGER = {
     "choice": 5,
     "payment_rule_of": 1,
     "read_offset": 1,
+    "by_the_month": 1,  # a label names months, since dated-quotes.md
+    "the_frequency": 1,  # the kernel's rule over the template's one set of terms
+    "frequency_rules": 1,
     "the_curve": 1,
     "the_curve.<locals>.<genexpr>": 2,  # the collection searched to SOFR, its first curve
     "DiscountCurve.start_date": 2,
@@ -265,7 +272,8 @@ LEDGER = {
     "DiscountCurve.max_date": 1,
     "trade_schedule_of": 2,  # the quote's own read and the observations'
     "the_method": 1,
-    "_the_period": 1,
+    "the_period": 1,  # the span resolved under the frequency, request.py's since dated-quotes.md
+    "the_request": 1,  # the observations, references, quantities and payments from it
     "_the_span": 1,
     "start_date": 1,  # the two readers the date utilities use, balance-of-period-quotes.md
     "end_date": 1,
@@ -324,3 +332,91 @@ def test_a_month_and_a_strip_run_the_same_functions_once(call_profile: CallProfi
 def test_a_quote_allocates_within_its_observations(code: str, observations: int) -> None:
     peak = least_peak(lambda: quote(MARKET, code, BILATERAL, RATES, WorkCounter()))
     assert peak <= 10_000 + 70 * observations + SLACK
+
+
+# --- the quote by dates, dated-quotes.md ----------------------------------------------------------
+# The balance of the year's days, 16 June to 31 December 2027, as two dates: under onetime one
+# window of 143 observations paying once, +1bd from 31 December, 3 January 2028; under monthly the
+# seven months of BALCAL27, the balance's own counts.
+
+DEC_31 = np.datetime64("2027-12-31", "D")
+ONETIME_BILATERAL = QuoteTemplate(
+    FIXED_FLOAT,
+    BILATERAL.names,
+    MappingProxyType(
+        {**BILATERAL.values, "quantity_per": "period", "settlement_frequency": "onetime"}
+    ),
+)
+# The functions a label runs and two dates do not, the label's own entry, the month rule and the
+# span read through the two date utilities' grammar; and the months' functions, which a window
+# does not run, the schedule's codes read and the months resolved against them.
+BY_LABEL = (
+    "quote",
+    "quote.<locals>.<lambda>",
+    "by_the_month",
+    "_the_span",
+    "start_date",
+    "end_date",
+    "balance_of",
+    "period_months",
+    "_period_months",
+    "_label_months",
+)
+BY_MONTH = ("schedule_months", "month_and_year", "schedule_rows", "month_bounds")
+
+
+def test_a_window_reports_its_work_and_the_same_dates_under_monthly_the_balances() -> None:
+    counter = WorkCounter()
+    quote_by_dates(MARKET, JUNE_16, DEC_31, ONETIME_BILATERAL, RATES, counter)
+    assert counter.freeze().as_dict() == {
+        "curves_selected": 1,
+        "fixings_read": 0,
+        "live_prices_read": 7,
+        "observations_made": 143,
+        "payment_days_made": 1,
+        "payment_factors_read": 1,
+        "payment_rules_read": 1,
+        "payment_shifts": 1,
+        "price_reductions": 4,
+        "template_fields_read": 8,
+        "windows_resolved": 1,
+    }
+    counter = WorkCounter()
+    quote_by_dates(MARKET, JUNE_16, DEC_31, BILATERAL, RATES, counter)
+    assert counter.freeze().as_dict() == counted("BALCAL27", BILATERAL, RATES)
+
+
+def test_two_dates_run_the_quotes_functions_once_but_the_labels(call_profile: CallProfile) -> None:
+    # A window: the quote's functions but the label's and the months', the two dates checked
+    # against each other, the schedule's pricing days read once and the window's contract found
+    # in one search; one counter hit fewer, the window resolved where the codes and the months
+    # were counted. The dated strip: the label's functions but its entry and grammar.
+    shared = {name: count for name, count in LEDGER.items() if name not in BY_LABEL + BY_MONTH}
+    window = call_profile(
+        lambda: quote_by_dates(MARKET, JUNE_16, DEC_31, ONETIME_BILATERAL, RATES, WorkCounter())
+    )
+    assert window == {
+        **shared,
+        "quote_by_dates": 1,
+        "quote_by_dates.<locals>.<lambda>": 1,
+        "_the_dates": 1,
+        "contract_days": 1,
+        "window_rows": 1,
+        "WorkCounter.hit": 11,
+    }
+    strip = call_profile(
+        lambda: quote_by_dates(MARKET, JUNE_16, DEC_31, BILATERAL, RATES, WorkCounter())
+    )
+    assert strip == {
+        **{name: count for name, count in LEDGER.items() if name not in BY_LABEL},
+        "quote_by_dates": 1,
+        "quote_by_dates.<locals>.<lambda>": 1,
+        "_the_dates": 1,
+    }
+
+
+def test_a_window_allocates_within_its_observations() -> None:
+    peak = least_peak(
+        lambda: quote_by_dates(MARKET, JUNE_16, DEC_31, ONETIME_BILATERAL, RATES, WorkCounter())
+    )
+    assert peak <= 10_000 + 70 * 143 + SLACK
