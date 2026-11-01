@@ -107,14 +107,15 @@ def codes_of(batch: Trades, rows_: Any) -> list[str]:
 def test_the_wti_trade_month_is_one_average_one_quantity_and_one_payment() -> None:
     # The ticket's acceptance case: 2,200 barrels receiving the average of 26 May to 25 June
     # against 71, paid 29 June. One component over the 31 calendar days, its period the window,
-    # booked under the row of the month it opens in, which prices nothing; 22 observations of
-    # 1/22, 100 barrels a day, N26 pricing nineteen and Q26 three; one group, labelled by the two
-    # dates, with the one fixed leg of -156,200; before any day fixes, with N26 at 70 and Q26 at
+    # its contract N26, the one pricing its first day, read for nothing that prices; 22
+    # observations of 1/22, 100 barrels a day, N26 pricing nineteen and Q26 three; one group,
+    # labelled by the two dates, with the one fixed leg of -156,200; before any day fixes, with
+    # N26 at 70 and Q26 at
     # 72, the average 70.2727, the mark -1,600 and the delta 1,900 barrels to N26 and 300 to Q26.
     batch, counter = created(CL, TMA_TICKET, TMA_TEMPLATE)
     terms, enc = batch.resolved, batch.encoded
     leg = enc.legs[0]
-    assert components_of(batch) == (["K26"], ["2026-05-26"], ["2026-06-25"], [31], [2_200.0])
+    assert components_of(batch) == (["N26"], ["2026-05-26"], ["2026-06-25"], [31], [2_200.0])
     assert [str(d) for d in terms.period_start] == ["2026-05-26"]
     assert [str(d) for d in terms.period_end] == ["2026-06-25"]
     np.testing.assert_array_equal(
@@ -126,7 +127,7 @@ def test_the_wti_trade_month_is_one_average_one_quantity_and_one_payment() -> No
     np.testing.assert_array_equal(leg.observations.component, np.zeros(22, dtype=np.intp))
     assert codes_of(batch, leg.slot_reference) == ["N26"] * 19 + ["Q26"] * 3
     np.testing.assert_allclose(leg.slot_exposure, np.full(22, 100.0))
-    assert enc.group_head.tolist() == [0] and codes_of(batch, leg.group_contract) == ["K26"]
+    assert enc.group_head.tolist() == [0] and codes_of(batch, leg.group_contract) == ["N26"]
     np.testing.assert_allclose(enc.offset_of_group, [-156_200.0])
     assert terms.payment is not None
     assert [str(d) for d in terms.payment.date] == ["2026-06-29"]
@@ -182,6 +183,83 @@ def test_a_thousand_barrels_books_directly_and_the_window_equals_the_monthly_wor
     assert labels(pieces) == ["K26", "M26"]
 
 
+def test_a_window_needs_no_contract_for_the_month_it_opens_in() -> None:
+    # The review's first case on the third slice: the WTI window on a schedule without K26, the
+    # contract of the month it opens in, books and prices as on the full schedule, since its
+    # days price off N26 and Q26 alone; its contract is N26, the one pricing its first day, read
+    # for nothing that prices. A window opening after the last day the schedule's contracts
+    # price is refused by its row.
+    without_k26 = an_index(
+        "CL", CL_CONTRACTS[1:], CL_HOLIDAYS, (("BBL", 1.0, "BBL"),), ("VOLUME", "BBL")
+    )
+    batch, _ = created(without_k26, TMA_TICKET, TMA_TEMPLATE)
+    full, _ = created(CL, TMA_TICKET, TMA_TEMPLATE)
+    assert components_of(batch) == (["N26"], ["2026-05-26"], ["2026-06-25"], [31], [2_200.0])
+    assert labels(batch) == [WINDOW]
+    for name in ("slot_date", "slot_exposure", "offset_of_group"):
+        np.testing.assert_array_equal(
+            getattr(batch.encoded.legs[0], name), getattr(full.encoded.legs[0], name)
+        )
+    assert codes_of(batch, batch.encoded.legs[0].slot_reference) == ["N26"] * 19 + ["Q26"] * 3
+    results = valued_on(batch, "2026-05-20", 70.0, 70.0, 72.0, 74.0)
+    assert results.mark == pytest.approx(-1_600.0)
+    assert deltas(results) == pytest.approx({"N26": 1_900.0, "Q26": 300.0})
+    assert refused(
+        CL,
+        {**TMA_TICKET, "start_date": ["2027-04-01"], "end_date": ["2027-04-30"]},
+        {**TMA_TEMPLATE, "payment_day": "+2bd"},
+    ) == (
+        "start_date row 1 is 2027-04-01 and end_date row 1 2027-04-30, expected a window priced "
+        "by the contracts of the index's schedule; it opens on 2027-04-01, after the last day they "
+        "price, 2027-03-22"
+    )
+
+
+def test_a_month_and_a_window_over_the_same_days_are_two_groups_whatever_the_row_order() -> None:
+    # The review's second case: a monthly row of 1 to 15 June, whose period is June, and a
+    # onetime row of 1 to 30 June, whose period is the same two days, both paying 2 July, are two
+    # groups, a month and a window being periods of different kinds, so that every slot carries
+    # its own row's label, `M26` on the month's eleven days and the two dates on the window's
+    # twenty-one, in either row order, the groups the month's first; the mark is the same either
+    # way.
+    template: dict[str, object] = {
+        **{
+            name: value
+            for name, value in TMA_TEMPLATE.items()
+            if name not in ("quantity_per", "settlement_frequency")
+        },
+        "payment_day": day("2026-07-02"),
+    }
+    rows: dict[str, list[object]] = {
+        "trade_id": [1, 2],
+        "trade_date": ["2026-05-15", "2026-05-15"],
+        "start_date": ["2026-06-01", "2026-06-01"],
+        "end_date": ["2026-06-15", "2026-06-30"],
+        "quantity": [1_100.0, 2_100.0],
+        "fixed_price": [71.0, 71.0],
+        "quantity_per": ["month", "period"],
+        "settlement_frequency": ["monthly", "onetime"],
+    }
+    june = "2026-06-01 to 2026-06-30"
+    month_days = [f"2026-06-{d:02d}" for d in (1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 15)]
+    window_days = month_days + [
+        f"2026-06-{d:02d}" for d in (16, 17, 18, 22, 23, 24, 25, 26, 29, 30)
+    ]
+    expected = sorted([(d, "M26") for d in month_days] + [(d, june) for d in window_days])
+    marks: list[float] = []
+    for order in ((0, 1), (1, 0)):
+        picked = {name: [values[i] for i in order] for name, values in rows.items()}
+        batch, _ = created(CL, picked, template)
+        terms, leg = batch.resolved, batch.encoded.legs[0]
+        assert terms.occurrence.size == 2 and batch.encoded.group_head.size == 2
+        group_labels = booked_words(terms, terms.legs[0], batch.encoded.group_head)
+        assert list(group_labels) == ["M26", june]
+        slot_labels = group_labels[leg.slot_group]
+        assert sorted(zip([str(d) for d in leg.slot_date], slot_labels, strict=True)) == expected
+        marks.append(valued_on(batch, "2026-05-20", 70.0, 70.0, 72.0, 74.0).mark)
+    assert marks[0] == pytest.approx(marks[1])
+
+
 def test_calday_multiplies_the_daily_quantity_by_the_windows_calendar_days() -> None:
     # 100 barrels a day over the 31 calendar days of 26 May to 25 June, weekends and holidays
     # included, is 3,100 barrels for the one period, as 3,100 entered under period is; the fixing
@@ -190,7 +268,7 @@ def test_calday_multiplies_the_daily_quantity_by_the_windows_calendar_days() -> 
         CL, {**TMA_TICKET, "quantity": [100.0]}, {**TMA_TEMPLATE, "quantity_per": "calday"}
     )
     total, _ = created(CL, {**TMA_TICKET, "quantity": [3_100.0]}, TMA_TEMPLATE)
-    assert components_of(by_day) == (["K26"], ["2026-05-26"], ["2026-06-25"], [31], [3_100.0])
+    assert components_of(by_day) == (["N26"], ["2026-05-26"], ["2026-06-25"], [31], [3_100.0])
     assert components_of(by_day) == components_of(total)
     np.testing.assert_allclose(by_day.encoded.legs[0].observations.weight, np.full(22, 1 / 22))
     np.testing.assert_allclose(
@@ -262,7 +340,7 @@ def test_a_window_whose_month_fragment_has_no_pricing_day_is_one_period_or_refus
     }
     template: dict[str, object] = {**TMA_TEMPLATE, "quantity_per": "calday", "payment_day": "+2bd"}
     batch, _ = created(CL, ticket, template)
-    assert components_of(batch) == (["F27"], ["2027-01-30"], ["2027-02-10"], [12], [1_200.0])
+    assert components_of(batch) == (["H27"], ["2027-01-30"], ["2027-02-10"], [12], [1_200.0])
     leg = batch.encoded.legs[0]
     assert [str(d) for d in leg.observations.date] == [
         *("2027-02-01", "2027-02-02", "2027-02-03", "2027-02-04", "2027-02-05"),
@@ -408,7 +486,7 @@ def test_an_ng_average_over_the_whole_strip_is_another_contract_and_books_as_one
         },
     )
     leg = batch.encoded.legs[0]
-    assert components_of(batch) == (["F27"], ["2027-01-01"], ["2027-03-31"], [90], [30_000.0])
+    assert components_of(batch) == (["G27"], ["2027-01-01"], ["2027-03-31"], [90], [30_000.0])
     assert labels(batch) == ["2027-01-01 to 2027-03-31"]
     assert leg.observations.date.size == 63
     np.testing.assert_allclose(leg.observations.weight, np.full(63, 1 / 63))

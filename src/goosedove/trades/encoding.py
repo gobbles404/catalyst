@@ -42,6 +42,7 @@ from goosedove.trades.terms import (
     Route,
     booked_words,
     named_trade,
+    onetime_components,
     payments_after_observations,
 )
 
@@ -222,10 +223,13 @@ class Encoded:
     the legs, one EncodedLeg per leg of the terms in leg order, one today, each holding what its
     index owns, since two-index-fixed-float.md.
 
-    Per payment group, the components of one calculation period that pay on one day and, since
-    named-curves-slice-3.md, under one discount_curve_key, the period since onetime-averaging.md
-    the terms' period_start and period_end, a component's calendar month: the groups in period
-    order, within a period by the day they pay and within a day by their key, the keys in the
+    Per payment group, the components of one calculation period and one frequency that pay on
+    one day and, since named-curves-slice-3.md, under one discount_curve_key, the period since
+    onetime-averaging.md the terms' period_start and period_end, a monthly component's calendar
+    month or a onetime row's window, and the frequency since the review of that ticket's third
+    slice, so that a month and a window over the same days are two groups, each labelled as its
+    own, whatever order the rows came in: the groups in period order, within a period a month's
+    before a window's, then by the day they pay and within a day by their key, the keys in the
     order the rows first name them, so that a month whose components pay on two days is two
     groups, two components paying on one day under two keys two groups never netted before
     discounting, and a month under a physical settlement, which pays on no day, one; each
@@ -746,18 +750,26 @@ def _the_groups(
     NDArray[np.intp] | None,
 ]:
     """The payment groups, keyed since onetime-averaging.md by the terms' calculation period, its
-    first and its last day, a component's calendar month, and not by the contract: under a
-    financial settlement the distinct pairs of period and payment day among the components, in
-    period order and by day within a period, and since named-curves-slice-3.md the distinct
-    triples with the row's key where the batch has keys, by key within a day, the keys in the
-    order the rows first name them; under a physical settlement, which pays on no day, the
-    distinct periods; one lexsort either way. Each group's first component, its head, whose
+    first and its last day, a monthly component's calendar month or a onetime row's window, and
+    since the review of that ticket's third slice by the frequency, so that a month and a window
+    over the same days, `M26` and `2026-06-01 to 2026-06-30`, are two groups whatever order the
+    rows came in, each labelled as its own, and not by the contract: under a financial
+    settlement the distinct tuples of period, frequency and payment day among the components, in
+    period order, a month's group before a window's within a period and by day, and since
+    named-curves-slice-3.md the distinct tuples with the row's key where the batch has keys, by
+    key within a day, the keys in the order the rows first name them; under a physical
+    settlement, which pays on no day, the distinct periods and frequencies; one lexsort either
+    way. Each group's first component, its head, whose
     contract row on each leg's schedule is the group's contract there, the contract of its month,
     its payment day or None, each component's group, the batch's distinct keys and each group's
     key, the keys empty and the key of each group None where the batch has none. The trade's
     periods name the groups; a second leg's components stand in the same periods, so its groups
     are the same."""
-    period = (terms.period_start.astype(np.int64), terms.period_end.astype(np.int64))
+    period = (
+        terms.period_start.astype(np.int64),
+        terms.period_end.astype(np.int64),
+        onetime_components(terms),
+    )
     if terms.payment is None:
         group_of_component, heads = _distinct(*period)
         return heads, None, group_of_component, (), None

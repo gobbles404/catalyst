@@ -270,6 +270,9 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_periods": 1,  # each row's period chosen, since #172, and resolved to its components
         "_the_periods.<locals>.<lambda>": distinct,  # each distinct code named for its first row
         "schedule_rows": 1,
+        "_the_contracts": 1,  # each component's row, a month's by its month, a window's by its
+        # first day, since the review of onetime-averaging.md's third slice
+        "_contract_days": 1,  # the days the schedule's contracts price on, a window's search key
         "month_bounds": 2,  # the first and last day of each component's month, and since
         # onetime-averaging.md the terms' calculation period of each component, that month
         "_each_distinct": 4,  # the units, the methods, the bases and the frequencies; the rules
@@ -700,6 +703,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "UnitConversions.factor": 2,
         "UnitConversions.category": 2,
         "_payments_after_observations": 1,
+        "onetime_components": 1,  # the groups keyed by the frequency beside the period
         "payments_after_observations": 1,  # the kernel's rule, one owner since
         # payment-day-date-or-rule.md
         "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
@@ -978,8 +982,10 @@ def test_a_onetime_window_is_one_component_across_its_month_end_and_nothing_runs
     # same observations and slots either way, since the days are the same days. The resolution
     # runs the dated asian ticket's functions, the month bounds once more for the windows' last
     # month, the frequency's rules looking twice more under onetime, twice in each of their two
-    # runs, and the periods' two conversions of the windows' ends and their look at the windows;
-    # the encoding runs the same functions and numpy over a window as over months.
+    # runs, the periods' two conversions of the windows' ends and their look at the windows, and
+    # one search for the windows' contracts, the first pricing each one's first day, with its
+    # look at the windows opening too late; the encoding runs the same functions and numpy over
+    # a window as over months.
     ticket, template = a_window_ticket(rows, contracts), window_template()
     counter = WorkCounter()
     batch = trades((ASIAN_GAS,), ticket, template, UNITS, counter)
@@ -1004,15 +1010,18 @@ def test_a_onetime_window_is_one_component_across_its_month_end_and_nothing_runs
     }
     assert numpy_calls(lambda: resolved((ASIAN_GAS,), ticket, template, WorkCounter())) == {
         **dated_numpy(contracts),
-        "ndarray.any": 37,  # the part-month asian ticket's 33, and the frequency's two looks
-        # under onetime, the method and the basis, in each of its two runs
+        "ndarray.any": 38,  # the part-month asian ticket's 33, the frequency's two looks under
+        # onetime, the method and the basis, in each of its two runs, and whether any window
+        # opens after the last day the schedule's contracts price
         "ndarray.astype": 28,  # and the windows' ends, two conversions, and the periods' two
         "ndarray.cumsum": 14,
         "ndarray.repeat": 5,
+        "ndarray.searchsorted": 2,  # and the windows' contracts, the first pricing each one's
+        # first day, one search over the windows
         "ndarray.sum": 1,
         "numpy.arange": 5,
-        "numpy.empty": 28,
-        "ufunc.reduce": 41,
+        "numpy.empty": 29,  # and the components' rows, the months' and the windows' placed
+        "ufunc.reduce": 42,
     }
     terms, (observations,), _ = resolved((ASIAN_GAS,), ticket, template, WorkCounter())
     months, (by_month,), _ = resolved((ASIAN_GAS,), ticket, a_template("asian"), WorkCounter())

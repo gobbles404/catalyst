@@ -410,6 +410,8 @@ ENCODING_LEDGER = {
     "_the_day_axis": 1,  # the day axis, since #166
     "_the_contract_periods": 1,  # the contract month and year axes, since #186
     "_payments_after_observations": 1,
+    "onetime_components": 1,  # the groups keyed by the frequency beside the period, since the
+    # review of onetime-averaging.md's third slice
     "payments_after_observations": 1,  # the kernel's rule, one owner since
     # payment-day-date-or-rule.md
     "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170

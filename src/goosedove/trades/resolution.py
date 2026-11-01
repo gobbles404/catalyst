@@ -28,7 +28,9 @@ from goosedove.globals.discount_curve import curve_name
 from goosedove.globals.unit_conversions import UnitConversions
 from goosedove.index_definitions.contract_codes import month_label, schedule_months
 from goosedove.index_definitions.date_offsets import shift_days
+from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
+from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import named
 from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
@@ -276,7 +278,7 @@ def resolved(
     if paired:
         second = _the_second_schedule(indexes[1], counter)
         schedules.append((second[1], _schedule_of(indexes[1], True)))
-    periods = _the_periods(fields, tuple(schedules), onetime_rows)
+    periods = _the_periods(fields, tuple(schedules), onetime_rows, _contract_days(schedule))
     counter.hit(TICKET_CODES_READ, periods.codes_read)
     occurrence = periods.occurrence
     start, end = periods.start, periods.end
@@ -603,10 +605,11 @@ def _each_distinct[T](
 @dataclass(frozen=True, slots=True)
 class _Periods:
     """What the rows' periods resolved to: per component its occurrence, its schedule row on each
-    leg's schedule, one array per leg in leg order, the first and the last day it covers, and
-    since onetime-averaging.md whether it is a onetime row's window, aligned; which rows entered
-    a code, a read-only mask the batch owns, with the texts they entered in row order; and how
-    many distinct codes were read for their months."""
+    leg's schedule, one array per leg in leg order, a monthly component's the row of its month
+    and a onetime component's the row of the contract pricing its first day, the first and the
+    last day it covers, and since onetime-averaging.md whether it is a onetime row's window,
+    aligned; which rows entered a code, a read-only mask the batch owns, with the texts they
+    entered in row order; and how many distinct codes were read for their months."""
 
     occurrence: NDArray[np.intp]
     contracts: tuple[NDArray[np.intp], ...]
@@ -621,6 +624,7 @@ def _the_periods(
     fields: _Fields,
     schedules: tuple[tuple[NDArray[np.int64], str], ...],
     onetime_rows: NDArray[np.bool_],
+    contract_day: NDArray[np.datetime64],
 ) -> _Periods:
     """Each occurrence's period chosen row by row and resolved to its components, one per
     calendar month it covers, or since onetime-averaging.md one for the whole of it where the row
@@ -636,11 +640,14 @@ def _the_periods(
     up in each leg's schedule, the schedules' months given with the words a refusal names each
     schedule by, a month without a contract refused by the row and the month, the first leg's
     schedule first, and each component's days its month's, a dated row's first and last clipped
-    to its dates. A onetime row is one component whatever months it spans, its month the one
-    its window opens in, the row of the schedule it is booked under, and its days the whole
-    window, a dated row's two dates or a code's first day to its last, since onetime-averaging.md.
-    The month bounds are one conversion each over the components, the clipping one maximum and
-    one minimum over the dated components, and the days are the kernel's to count."""
+    to its dates. A onetime row is one component whatever months it spans, its days the whole
+    window, a dated row's two dates or a code's first day to its last, and its schedule row the
+    contract pricing its first day, the first whose day, contract_day, the first leg's expiries,
+    is on or after it by the calendar's rule, one search over the windows and no month looked up,
+    since a window may open in a month the schedule has no contract for while every day of it
+    prices, since onetime-averaging.md and the review of its third slice. The month bounds are one
+    conversion each over the components, the clipping one maximum and one minimum over the dated
+    components, and the days are the kernel's to count."""
     rows = fields.rows
     code_on, codes = fields.period_texts("contract_code")
     start_on, starts = fields.period_dates("start_date")
@@ -706,12 +713,10 @@ def _the_periods(
             )
         return f"{fields.where('contract_code', i)} is {codes[int(rank_code[i])]!r}"
 
-    contracts = tuple(
-        [schedule_rows(months, month, occurrence, period_of, words) for months, words in schedules]
-    )
     start, end = month_bounds(month)
     window = onetime_rows[occurrence]  # a onetime component runs to its row's last month's end
-    if window.any():
+    windows = bool(window.any())
+    if windows:
         _, span_end = month_bounds(after[occurrence[window]] - 1)
         end[window] = span_end
     on = dated[occurrence]  # the dated rows' components, clipped to their rows' dates
@@ -719,9 +724,79 @@ def _the_periods(
         k = rank_dated[occurrence[on]]
         start[on] = np.maximum(start[on], dated_starts[k])
         end[on] = np.minimum(end[on], dated_ends[k])
+    contracts = tuple(
+        [
+            _the_contracts(
+                months,
+                month,
+                occurrence,
+                period_of,
+                words,
+                window if windows else None,
+                contract_day,
+                start,
+            )
+            for months, words in schedules
+        ]
+    )
     entered = np.array(code_on, dtype=bool)  # the batch's own copy of which rows entered a code
     entered.setflags(write=False)
     return _Periods(occurrence, contracts, start, end, window, (entered, codes), len(spans))
+
+
+def _contract_days(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.datetime64]:
+    """The day each contract of the schedule prices on last: a futures contract's expiry, an IFERC
+    month's publication day; what a onetime window's contract is found by, since the review of
+    onetime-averaging.md's third slice, the first contract pricing on or after the window's first
+    day, as the calendar gives a day its contract. An IFERC schedule's days are never searched,
+    a window on an IFERC index being refused by the frequency's rules first."""
+    match schedule:
+        case FuturesSchedule():
+            return schedule.future_expiry
+        case IfercSchedule():
+            return schedule.publication_date
+        case _:
+            assert_never(schedule)
+
+
+def _the_contracts(
+    months: NDArray[np.int64],
+    month: NDArray[np.int64],
+    occurrence: NDArray[np.intp],
+    period_of: Callable[[int], str],
+    schedule: str,
+    window: NDArray[np.bool_] | None,
+    contract_day: NDArray[np.datetime64],
+    start: NDArray[np.datetime64],
+) -> NDArray[np.intp]:
+    """Each component's row on one leg's schedule: a monthly component's the row of its calendar
+    month, schedule_rows over those components, and since the review of onetime-averaging.md's
+    third slice a onetime component's the row of the contract pricing its first day, the first
+    whose day is on or after it by the calendar's rule, one search over the windows, since a
+    window is bound to no month and may open in a month the schedule has no contract for while
+    every day of it prices; the row is read for nothing that prices, the window's two dates
+    naming it. A window opening after the last day the schedule's contracts price is refused by
+    its row. window is None when no row is a window, the monthly lookup then over every
+    component as it was."""
+    if window is None:
+        return schedule_rows(months, month, occurrence, period_of, schedule)
+    monthly = ~window
+    contract = np.empty(window.size, dtype=np.intp)
+    contract[monthly] = schedule_rows(
+        months, month[monthly], occurrence[monthly], period_of, schedule
+    )
+    opens = start[window]
+    row = np.searchsorted(contract_day, opens)
+    late = row >= contract_day.size
+    if late.any():
+        k = int(late.argmax())
+        raise ValueError(
+            f"{period_of(int(occurrence[window][k]))}, expected a window priced by the contracts "
+            f"of {schedule}; it opens on {opens[k]}, after the last day they price, "
+            f"{contract_day[-1]}"
+        )
+    contract[window] = row
+    return contract
 
 
 def _owner(index: Index, paired: bool) -> str:

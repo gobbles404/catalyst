@@ -143,9 +143,10 @@ class LegTerms:
     quantity of the index that its quantity_unit named, and schedule_method[i] the method, the
     position of the member among METHODS. Per component, aligned with the trade's components:
     contract[k] the row of the schedule the component's month is, or, for a onetime period since
-    onetime-averaging.md, the row of the month its window opens in, which books it on the
-    schedule and prices nothing of it, the calendar giving each of its days its own contract and
-    the window's two dates naming it; and fixed_price[k] the price agreed for the leg, in the
+    onetime-averaging.md, the row of the contract pricing the window's first day, the first whose
+    expiry is on or after it by the calendar's rule, read for nothing that prices, the calendar
+    giving each of its days its own contract and the window's two dates naming it; and
+    fixed_price[k] the price agreed for the leg, in the
     index's quote units. Then schedule_month[i], since #186, the
     calendar month of every row of the schedule as numpy counts months from 1970, read once by
     the resolution against the ticket's codes and kept for the encoding's contract-month axes.
