@@ -299,8 +299,8 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_Quote", new object[] { "x:market:gas:9", "F27", "y:quote_template:9", ExcelMissing.Value }, "#ERROR _Quote: market is text 'x:market:gas:9' naming no live object, expected market handle" };
             yield return new object[] { "_QuoteByDates", new object[] { ExcelMissing.Value, 46168.0, 46198.0, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _QuoteByDates: market is missing, expected market handle" };
             yield return new object[] { "_QuoteByDates", new object[] { "x:market:gas:9", "26-May-2026", 46198.0, "y:quote_template:9", ExcelMissing.Value }, "#ERROR _QuoteByDates: market is text 'x:market:gas:9' naming no live object, expected market handle" };
-            yield return new object[] { "_CreateRFQ", new object[] { ExcelMissing.Value, Column("F27"), 1.0, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateRFQ: index is missing, expected index handle" };
-            yield return new object[] { "_CreateRFQ", new object[] { "x:index:gas:9", Row("F27", "G27"), 1.0, "y:quote_template:9", ExcelMissing.Value }, "#ERROR _CreateRFQ: index is text 'x:index:gas:9' naming no live object, expected index handle" };
+            yield return new object[] { "_CreateRFQ", new object[] { ExcelMissing.Value, Row("contract_code", "quantity"), Row("F27", 1.0), ExcelMissing.Value }, "#ERROR _CreateRFQ: index is missing, expected index handle" };
+            yield return new object[] { "_CreateRFQ", new object[] { "x:index:gas:9", Row("contract_code", "quantity"), Row("F27", 1.0), "y:quote_template:9" }, "#ERROR _CreateRFQ: index is text 'x:index:gas:9' naming no live object, expected index handle" };
             yield return new object[] { "_QuoteRFQ", new object[] { ExcelMissing.Value, "x:rfq:gas:9", ExcelMissing.Value }, "#ERROR _QuoteRFQ: market is missing, expected market handle" };
             yield return new object[] { "_QuoteRFQ", new object[] { "x:market:gas:9", "x:rfq:gas:9", ExcelMissing.Value }, "#ERROR _QuoteRFQ: market is text 'x:market:gas:9' naming no live object, expected market handle" };
             yield return new object[] { "_CreateTrades", new object[] { ExcelMissing.Value, Row("quantity"), 1.0, ExcelMissing.Value }, "#ERROR _CreateTrades: indexes is missing, expected index handles in a cell, a row or a column" };
@@ -1269,12 +1269,15 @@ namespace Goosedove.Host.Tests
             Assert.Equal($"#ERROR _CreateTrades: template is quote template handle '{otc}', expected trade template handle", Seam.Call("_CreateTrades", index, Row("quantity"), 1.0, otc));
         }
 
-        // A request for quote, rfq-quoting.md, on the quote fact's strip: F27 at 100,000 and G27 at
-        // 300,000 under the bilateral +1bd template paying 1 February at 0.99 and 1 March at 0.98,
-        // 20,610,000 over 393,000; the request's own 8 February, 46426, interpolated to 0.9875, and 1
-        // March, 20,602,500 over 392,750; the cleared calendar-day template, 3,100,000 and 8,400,000 a
-        // month, 597 over 11.5; the readback's rows, sources and days; the columns, a quantity cell, the
-        // template's kind, a blank date cell and the collection refused in the seam's words and the
+        // A request for quote, rfq-quoting.md and dated-quotes.md, on the quote fact's strip as a ticket's
+        // rows: F27 at 100,000 and G27 at 300,000 under the bilateral +1bd template paying 1 February at
+        // 0.99 and 1 March at 0.98, 20,610,000 over 393,000; the request's own 8 February, 46426,
+        // interpolated to 0.9875, and 1 March, 20,602,500 over 392,750; the cleared calendar-day template,
+        // 3,100,000 and 8,400,000 a month, 597 over 11.5; the readback's rows, periods, sources and days;
+        // two windows by their dates under a onetime template, 11 January to 26 February at 47.142857 and
+        // 1 to 12 February at 60 paying 1 March at 0.98 and 15 February at 0.985, 22,350,000 over
+        // 393,500; a booking header, a text quantity, a rule in the payment column, a bad code, a date on
+        // a month's last observation and the template's kind refused in the seam's words and the
         // library's, and a market over another index refused before any data is gathered.
         [Fact]
         public void a_request_for_quote_is_saved_and_priced_on_the_strip()
@@ -1292,20 +1295,22 @@ namespace Goosedove.Host.Tests
             var cleared = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_holiday_calendar", "settlement_frequency"), Row("cleared", "financial", "asian", "calday", "+1bd", weekends, "monthly"));
             var sofr = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46387.0, 1.0 }, { 46419.0, 0.99 }, { 46447.0, 0.98 } });
             var rates = (string)Seam.Call("_CollectDiscountCurves", sofr);
-            var codes = Column("F27", "G27");
-            var quantities = Column(100000.0, 300000.0);
-            var saved = (string)Seam.Call("_CreateRFQ", index, codes, quantities, otc, ExcelMissing.Value);
+            var byCode = Row("contract_code", "quantity");
+            var ticket = new object[,] { { "F27", 100000.0 }, { "G27", 300000.0 } };
+            var saved = (string)Seam.Call("_CreateRFQ", index, byCode, ticket, otc);
             Assert.StartsWith(Pid + ":rfq:STRIP:", saved);
-            var dated = (string)Seam.Call("_CreateRFQ", index, codes, quantities, otc, Column(46426.0, 46447.0));
+            var withDays = Row("contract_code", "quantity", "payment_day");
+            var dated = (string)Seam.Call("_CreateRFQ", index, withDays, new object[,] { { "F27", 100000.0, 46426.0 }, { "G27", 300000.0, 46447.0 } }, otc);
             Assert.StartsWith(Pid + ":rfq:STRIP:", dated);
-            var daily = (string)Seam.Call("_CreateRFQ", index, codes, quantities, cleared, ExcelMissing.Value);
+            var daily = (string)Seam.Call("_CreateRFQ", index, byCode, ticket, cleared);
             Assert.Equal(20610000.0 / 393000.0, (double)Seam.Call("_QuoteRFQ", market, saved, rates), 12);
             Assert.Equal(20602500.0 / 392750.0, (double)Seam.Call("_QuoteRFQ", market, dated, rates), 12);
             Assert.Equal(597.0 / 11.5, (double)Seam.Call("_QuoteRFQ", market, daily, ExcelMissing.Value), 12);
             var shown = (object[,])Seam.Call("util_ReadHandle", dated);
             Assert.Equal(4, shown.GetLength(0));
-            Assert.Equal(13, shown.GetLength(1));
+            Assert.Equal(14, shown.GetLength(1));
             Assert.Equal("row", shown[0, 0]);
+            Assert.Equal("period", shown[0, 1]);
             Assert.Equal("payment_source", shown[0, 5]);
             Assert.Equal("datetime64[D]", shown[1, 6]);
             Assert.Equal("F27", shown[2, 1]);
@@ -1315,16 +1320,24 @@ namespace Goosedove.Host.Tests
             Assert.Equal(46447.0, shown[3, 6]);
             Assert.Equal("STRIP", shown[2, 7]);
             Assert.Equal("SOFR", shown[2, 12]);
+            Assert.Equal("monthly", shown[2, 13]);
             var byTemplate = (object[,])Seam.Call("util_ReadHandle", saved);
             Assert.Equal("template", byTemplate[2, 5]);
             Assert.Equal(46419.0, byTemplate[2, 6]);
             Assert.Equal(3100000.0, ((object[,])Seam.Call("util_ReadHandle", daily))[2, 4]);
-            Assert.Equal("#ERROR _CreateRFQ: ValueError: quantities has 1 rows, expected 2, one per contract code", Seam.Call("_CreateRFQ", index, codes, 100000.0, otc, ExcelMissing.Value));
-            Assert.Equal("#ERROR _CreateRFQ: contract_codes is 1x2 array, expected column of text", Seam.Call("_CreateRFQ", index, Row("F27", "G27"), quantities, otc, ExcelMissing.Value));
-            Assert.Equal("#ERROR _CreateRFQ: quantities cell (2, 1) is text 'ten', expected number", Seam.Call("_CreateRFQ", index, codes, Column(1.0, "ten"), otc, ExcelMissing.Value));
-            Assert.Equal($"#ERROR _CreateRFQ: template is market handle '{market}', expected quote template handle", Seam.Call("_CreateRFQ", index, codes, quantities, market, ExcelMissing.Value));
-            Assert.Equal("#ERROR _CreateRFQ: payment_dates cell (2, 1) is blank, expected date", Seam.Call("_CreateRFQ", index, codes, quantities, otc, Column(46426.0, ExcelEmpty.Value)));
-            Assert.Equal("#ERROR _CreateRFQ: ValueError: contract_codes row 2 is 'F27-G27', expected a month letter and a two-digit year, such as F26", Seam.Call("_CreateRFQ", index, Column("F27", "F27-G27"), quantities, otc, ExcelMissing.Value));
+            var onetime = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", fields, Row("bilateral", "financial", "asian", "period", "+1bd", weekends, "SOFR", "onetime"));
+            var windows = (string)Seam.Call("_CreateRFQ", index, Row("start_date", "end_date", "quantity", "payment_day"), new object[,] { { 46398.0, 46444.0, 100000.0, 46447.0 }, { 46419.0, 46430.0, 300000.0, 46433.0 } }, onetime);
+            Assert.Equal(22350000.0 / 393500.0, (double)Seam.Call("_QuoteRFQ", market, windows, rates), 9);
+            var byDates = (object[,])Seam.Call("util_ReadHandle", windows);
+            Assert.Equal("2027-01-11 to 2027-02-26", byDates[2, 1]);
+            Assert.Equal("2027-02-01 to 2027-02-12", byDates[3, 1]);
+            Assert.Equal("onetime", byDates[3, 13]);
+            Assert.Equal("#ERROR _CreateRFQ: ValueError: trade_id is a field of booking alone, expected one a request's rows hold: contract_code, start_date, end_date, quantity, payment_day", Seam.Call("_CreateRFQ", index, Row("trade_id", "quantity"), Row(1.0, 100000.0), otc));
+            Assert.Equal("#ERROR _CreateRFQ: rows cell (2, 2) is text 'ten', expected number", Seam.Call("_CreateRFQ", index, byCode, new object[,] { { "F27", 1.0 }, { "G27", "ten" } }, otc));
+            Assert.Equal($"#ERROR _CreateRFQ: template is market handle '{market}', expected quote template handle", Seam.Call("_CreateRFQ", index, byCode, ticket, market));
+            Assert.Equal("#ERROR _CreateRFQ: ValueError: payment_day row 1 is '+2bd', expected a date; a request's rows pay on dates, and a rule is the template's to hold", Seam.Call("_CreateRFQ", index, withDays, Row("F27", 100000.0, "+2bd"), otc));
+            Assert.Equal("#ERROR _CreateRFQ: ValueError: contract_code row 2 is 'H27', expected months the index's schedule has a contract for; it has none for 2027-03", Seam.Call("_CreateRFQ", index, byCode, new object[,] { { "F27", 1.0 }, { "H27", 1.0 } }, otc));
+            Assert.Equal("#ERROR _CreateRFQ: ValueError: F27 of row 1 pays on 2027-01-29, expected a day after its last observation, 2027-01-29, when its final price exists", Seam.Call("_CreateRFQ", index, withDays, Row("F27", 100000.0, 46416.0), otc));
             Assert.Equal("#ERROR _QuoteRFQ: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, whose payments it discounts", Seam.Call("_QuoteRFQ", market, saved, ExcelMissing.Value));
             Assert.Equal($"#ERROR _QuoteRFQ: rfq is quote template handle '{otc}', expected rfq handle", Seam.Call("_QuoteRFQ", market, otc, rates));
             var other = Index(schedule, holidays, "OTHER");

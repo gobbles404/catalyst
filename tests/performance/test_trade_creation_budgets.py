@@ -268,7 +268,9 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "schedule_months": 1,
         "month_and_year": 25,
         "_the_periods": 1,  # each row's period chosen, since #172, and resolved to its components
-        "_the_periods.<locals>.<lambda>": distinct,  # each distinct code named for its first row
+        "resolve_periods": 1,  # the rows' periods by the one rule a request shares since
+        # dated-quotes.md
+        "resolve_periods.<locals>.<lambda>": distinct,  # each distinct code named for its first row
         "schedule_rows": 1,
         "_the_contracts": 1,  # each component's row, a month's by its month, a window's by its
         # first day, since the review of onetime-averaging.md's third slice
@@ -309,7 +311,8 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_Fields.has": 23,  # the required fields, the code the first period field found, and
         # since #175 the counterparty's condition and the marketing reserve looked for, since
         # slice 3 the key's condition and the key itself
-        "_Fields.rows": 11,
+        "_Fields.rows": 10,  # the rows asked once less: the periods count their own since
+        # dated-quotes.md, a request's rows resolving through the same rule
         "_Fields.texts": 5,  # the four row fields' columns read once each, the codes apart
         # and the payment day, read through days_or_rules
         "_Fields.period_texts": 1,  # the codes, with which rows supplied one, since #172
@@ -846,13 +849,13 @@ def dated_ledger(contracts: int) -> dict[str, int]:
         "FieldValues.texts",
     ):
         del ledger[name]
-    del ledger["_the_periods.<locals>.<lambda>"]  # no code of any row named: none is read
+    del ledger["resolve_periods.<locals>.<lambda>"]  # no code of any row named: none is read
     return {
         **ledger,
         "_Fields.where": 7,  # the lag and the six batch fields, no code named
         "_Fields.has": 24,  # the three period fields looked for, the two dates found
         "_the_required.<locals>.<genexpr>": 3,
-        "_Fields.rows": 10,
+        "_Fields.rows": 9,  # one less since dated-quotes.md, the periods counting their own rows
         "_Fields.dates": 1,  # the trade dates; the two dates come through the periods' own read
         "FieldValues.has": 17,
         "FieldValues.dates": 3,
@@ -1149,7 +1152,8 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "choice": 9,  # the methods, the bases, the frequency, the route and the settlement
         "_Fields.where": contracts + 12,  # five more distinct texts named
         "_each_distinct.<locals>.<lambda>": 9,  # likewise
-        "_Fields.rows": 8,  # three fewer: the ticket's three columns, no template value repeated
+        "_Fields.rows": 7,  # three fewer than the resolution's: the ticket's three columns, no
+        # template value repeated
         "FieldValues.has": 19,  # three columns more looked for
         "FieldValues.texts": 4,  # and read
         "_the_days": 4,  # the four methods present, once each

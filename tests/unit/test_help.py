@@ -1034,9 +1034,9 @@ def test_the_request_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateRFQ"]
     assert not hidden
     assert description == (
-        "Creates a request for quote on one index from aligned columns of contract months and "
-        "quantities under a quote template's terms, paying on the template's days or on the dates "
-        "given, and shows its handle, the text _QuoteRFQ takes as the request."
+        "Creates a request for quote on one index from a ticket's rows under a quote template's "
+        "terms, a month or two dates and a quantity per row, paying on the template's days or "
+        "the dates given, and shows its handle, the text _QuoteRFQ takes as the request."
     )
     assert arguments == [
         (
@@ -1045,25 +1045,19 @@ def test_the_request_creator_explains_itself() -> None:
             "it, the one index every row of the request is on.",
         ),
         (
-            "contract_codes",
-            "The contract months in one column, such as A2:A4, one month per row, F27 or g27, in "
-            "any order and a month more than once allowed; no strip or balance.",
+            "fields",
+            "The request's header cells in one row, such as A1:D1, from contract_code, "
+            "start_date, end_date, quantity and payment_day, in any order.",
         ),
         (
-            "quantities",
-            "The quantities beside them, such as B2:B4, one per row in one common unit, zero or "
-            "more with at least one positive: a month's total, or per calendar day under the "
-            "template's calday.",
+            "rows",
+            "The rows under the headers, such as A2:D4, each a contract month or two dates with "
+            "its quantity, and a payment date where that column is given.",
         ),
         (
             "template",
             "The quote-template handle: the cell showing _CreateQuoteTemplate's result, such as "
-            "B3, or a name for it, which supplies the request's terms.",
-        ),
-        (
-            "[payment_dates]",
-            "The payment days beside them, such as C2:C4, one date per row taken exactly in place "
-            "of the template's payment_day; left out to pay by the template's day or rule.",
+            "B3, or a name for it, which supplies the request's terms and its frequency.",
         ),
     ]
 

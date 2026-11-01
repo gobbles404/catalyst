@@ -219,10 +219,10 @@ def the_terms(
 
 
 def by_the_month(terms: Terms, who: str) -> None:
-    """A quote by contract code prices by the month, its label naming months, and so does a
-    request for quote until dated-quotes.md's second slice: a template holding onetime is refused
-    by name, since a label's span as one average is not what the label says and _QuoteByDates
-    prices the window two dates name."""
+    """A quote by contract code prices by the month, its label naming months: a template holding
+    onetime is refused by name, since a label's span as one average is not what the label says
+    and _QuoteByDates prices the window two dates name; a request's rows, which take dates since
+    dated-quotes.md, follow the template's frequency instead."""
     if terms.frequency is SettlementFrequency.ONETIME:
         raise ValueError(
             f"settlement_frequency is 'onetime', expected 'monthly'; {who} prices by the month, "
@@ -270,7 +270,7 @@ def _the_conditions(
         if field.name in values or (field.name == "payment_day" and request_dates is True):
             continue
         other = (
-            ", or payment_dates with the request"
+            ", or a payment_day column in the request"
             if field.name == "payment_day" and request_dates is False
             else ""
         )

@@ -603,8 +603,9 @@ def _each_distinct[T](
 
 
 @dataclass(frozen=True, slots=True)
-class _Periods:
-    """What the rows' periods resolved to: per component its occurrence, its schedule row on each
+class RowPeriods:
+    """What the rows' periods resolved to, a booking's and since dated-quotes.md a request's: per
+    component its occurrence, its schedule row on each
     leg's schedule, one array per leg in leg order, a monthly component's the row of its month
     and a onetime component's the row of the contract pricing its first day, the first and the
     last day it covers, and since onetime-averaging.md whether it is a onetime row's window,
@@ -625,13 +626,47 @@ def _the_periods(
     schedules: tuple[tuple[NDArray[np.int64], str], ...],
     onetime_rows: NDArray[np.bool_],
     contract_day: NDArray[np.datetime64],
-) -> _Periods:
-    """Each occurrence's period chosen row by row and resolved to its components, one per
-    calendar month it covers, or since onetime-averaging.md one for the whole of it where the row
-    is onetime, in one pass over the components, since #172. A row with both dates
-    books the days between them, a code beside them kept as entered text and never read; a row
-    with neither books its code; a row with one date and not the other, or with no code and no
-    pair, is refused, the first such row from the top, once every row's three fields are known
+) -> RowPeriods:
+    """The batch's rows' periods, resolve_periods over the three period fields as the template or
+    the ticket supplied them, each named with its row where the ticket did."""
+    code_on, codes = fields.period_texts("contract_code")
+    start_on, starts = fields.period_dates("start_date")
+    end_on, ends = fields.period_dates("end_date")
+    return resolve_periods(
+        code_on,
+        codes,
+        start_on,
+        starts,
+        end_on,
+        ends,
+        fields.where,
+        onetime_rows,
+        schedules,
+        contract_day,
+    )
+
+
+def resolve_periods(
+    code_on: NDArray[np.bool_],
+    codes: tuple[str, ...],
+    start_on: NDArray[np.bool_],
+    starts: NDArray[np.datetime64],
+    end_on: NDArray[np.bool_],
+    ends: NDArray[np.datetime64],
+    where: Callable[[str, int], str],
+    onetime_rows: NDArray[np.bool_],
+    schedules: tuple[tuple[NDArray[np.int64], str], ...],
+    contract_day: NDArray[np.datetime64],
+) -> RowPeriods:
+    """Each row's period chosen row by row and resolved to its components, one per calendar month
+    it covers, or since onetime-averaging.md one for the whole of it where the row is onetime, in
+    one pass over the components, since #172; the rows of a booking and since dated-quotes.md the
+    rows of a request for quote alike, each field named in a refusal by `where`, the field and the
+    row. code_on, start_on and end_on say which rows supplied each of the three period fields,
+    and codes, starts and ends hold the values of those rows alone, in row order. A row with both
+    dates books the days between them, a code beside them kept as entered text and never read; a
+    row with neither books its code; a row with one date and not the other, or with no code and
+    no pair, is refused, the first such row from the top, once every row's three fields are known
     and before any code is read. The dated rows' ends are held on or after their starts, by row.
     The codes of the rows that book by code are read once per distinct text, in the order their
     first rows come, so the first row from the top that breaks the grammar is the one named;
@@ -648,10 +683,7 @@ def _the_periods(
     prices, since onetime-averaging.md and the review of its third slice. The month bounds are one
     conversion each over the components, the clipping one maximum and one minimum over the dated
     components, and the days are the kernel's to count."""
-    rows = fields.rows
-    code_on, codes = fields.period_texts("contract_code")
-    start_on, starts = fields.period_dates("start_date")
-    end_on, ends = fields.period_dates("end_date")
+    rows = code_on.size
     dated = start_on & end_on
     faulty = (start_on ^ end_on) | ~(dated | code_on)
     if faulty.any():
@@ -667,8 +699,8 @@ def _the_periods(
             else ("end_date", "start_date", end_on, ends)
         )
         raise ValueError(
-            f"{fields.where(given, i)} is {values[int(np.count_nonzero(on[:i]))]} without "
-            f"{fields.where(other, i)}, expected both dates, the period's first and last day, or "
+            f"{where(given, i)} is {values[int(np.count_nonzero(on[:i]))]} without "
+            f"{where(other, i)}, expected both dates, the period's first and last day, or "
             "neither and a contract_code"
         )
     # Each row's place among the rows that supplied a field, where that field's values are.
@@ -684,13 +716,13 @@ def _the_periods(
         k = int(backwards.argmax())
         i = int(dated_rows[k])
         raise ValueError(
-            f"{fields.where('end_date', i)} is {dated_ends[k]}, expected a day on or after "
-            f"{fields.where('start_date', i)}, {dated_starts[k]}"
+            f"{where('end_date', i)} is {dated_ends[k]}, expected a day on or after "
+            f"{where('start_date', i)}, {dated_starts[k]}"
         )
     coded_rows = np.flatnonzero(~dated)  # each supplies a code, the rule above having passed
     coded_texts = np.array(codes, dtype=object)[rank_code[coded_rows]]
     spans, inverse = _distinct_texts(
-        coded_texts, coded_rows, lambda i: fields.where("contract_code", i), months_of
+        coded_texts, coded_rows, lambda i: where("contract_code", i), months_of
     )
     bounds = np.array(spans, dtype=np.int64).reshape(-1, 2)[inverse]
     first = np.empty(rows, dtype=np.int64)
@@ -708,10 +740,10 @@ def _the_periods(
         if dated[i]:
             k = int(rank_dated[i])
             return (
-                f"{fields.where('start_date', i)} is {dated_starts[k]} and "
-                f"{fields.where('end_date', i)} {dated_ends[k]}"
+                f"{where('start_date', i)} is {dated_starts[k]} and "
+                f"{where('end_date', i)} {dated_ends[k]}"
             )
-        return f"{fields.where('contract_code', i)} is {codes[int(rank_code[i])]!r}"
+        return f"{where('contract_code', i)} is {codes[int(rank_code[i])]!r}"
 
     start, end = month_bounds(month)
     window = onetime_rows[occurrence]  # a onetime component runs to its row's last month's end
@@ -741,7 +773,7 @@ def _the_periods(
     )
     entered = np.array(code_on, dtype=bool)  # the batch's own copy of which rows entered a code
     entered.setflags(write=False)
-    return _Periods(occurrence, contracts, start, end, window, (entered, codes), len(spans))
+    return RowPeriods(occurrence, contracts, start, end, window, (entered, codes), len(spans))
 
 
 def contract_days(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.datetime64]:

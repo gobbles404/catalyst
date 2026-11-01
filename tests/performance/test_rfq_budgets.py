@@ -8,6 +8,7 @@ twelve under the ticket's bilateral template, paying +1bd or on the first day of
 month."""
 
 from collections.abc import Callable
+from types import MappingProxyType
 
 import numpy as np
 import pytest
@@ -17,6 +18,8 @@ from test_seam_allocation import SLACK, least_peak
 from goosedove.excel import bridge
 from goosedove.excel.utilities import shown
 from goosedove.instrumentation.work_counts import WorkCounter
+from goosedove.instruments.definitions import FIXED_FLOAT
+from goosedove.instruments.fields import DatesOrTexts, FieldValues
 from goosedove.quoting.rfq import Rfq, quote_rfq, rfq
 from goosedove.quoting.template import QuoteTemplate
 
@@ -30,20 +33,35 @@ QUANTITIES = np.arange(1.0, 13.0)
 DATES = np.array([f"2027-{m:02d}-01" for m in range(2, 13)] + ["2028-01-01"], dtype="datetime64[D]")
 
 
+def a_ticket(rows: int, columns: dict[str, object]) -> FieldValues:
+    """A request's ticket of that many rows as the seam hands it over, every cell supplied: the
+    columns typed as the fixed_float's fields are, codes as text, quantities as numbers and
+    payment days as dates."""
+    return FieldValues(FIXED_FLOAT, rows, tuple(columns), columns)
+
+
+_TICKETS: dict[tuple[int, bool], FieldValues] = {}
+
+
+def ticket_of(n: int, dated: bool) -> FieldValues:
+    """The request's ticket of n months at quantities one to n, with the request's own payment
+    days when dated, made once per shape so that no measured call builds its own input."""
+    key = (n, dated)
+    if key not in _TICKETS:
+        columns: dict[str, object] = {"contract_code": CODES[:n], "quantity": QUANTITIES[:n]}
+        if dated:
+            columns["payment_day"] = DatesOrTexts.of_dates(DATES[:n])
+        _TICKETS[key] = a_ticket(n, columns)
+    return _TICKETS[key]
+
+
 def made(
     n: int = 12,
     template: QuoteTemplate = BILATERAL,
     dates: np.ndarray | None = None,
     counter: WorkCounter | None = None,
 ) -> Rfq:
-    return rfq(
-        CAL,
-        CODES[:n],
-        QUANTITIES[:n],
-        template,
-        None if dates is None else dates[:n],
-        counter or WorkCounter(),
-    )
+    return rfq(CAL, ticket_of(n, dates is not None), template, counter or WorkCounter())
 
 
 def counted(fn: Callable[[WorkCounter], object]) -> dict[str, int]:
@@ -67,6 +85,7 @@ def test_creation_resolves_once_and_reads_no_market(n: int, observations: int) -
         "payment_shifts": 1,
         "schedule_codes_read": 13,
         "template_fields_read": 8,
+        "ticket_codes_read": n,  # each distinct code of the rows, read once, since dated-quotes.md
     }
     by_request = counted(lambda c: made(n, BILATERAL, DATES, c))
     assert by_request == {**by_template, "payment_rules_read": 0, "payment_shifts": 0}
@@ -123,13 +142,17 @@ def test_a_month_and_a_year_quote_through_the_same_functions_once(
 def test_creation_runs_the_resolution_once_and_nothing_of_the_pricing(
     call_profile: CallProfile,
 ) -> None:
-    # The terms read, each code read once by the one reader and the schedule's thirteen read for
-    # their months, the observations made by one method, their references, the payments shifted
-    # once; with the request's dates no shift, the two columns' lengths checked; no price, row,
-    # fixing or factor.
+    # The terms read, the ticket's headers checked, each code read once through the period
+    # grammar and the schedule's thirteen for their months, each row's period by the booking's
+    # rule, the observations made by one method, their references, the payments shifted once;
+    # with the request's dates the column read and no shift; no price, row, fixing or factor.
     by_template = call_profile(lambda: made(12, BILATERAL, None, WorkCounter()))
     assert by_template == {
         "rfq": 1,
+        "_the_fields": 1,  # the ticket's headers among the five a request's rows hold, since
+        # dated-quotes.md
+        "FieldValues.has": 5,  # the quantity and the payment column looked for, the three period
+        # fields by their readers
         "the_terms": 1,
         "_the_conditions": 1,
         "_text": 6,
@@ -141,17 +164,30 @@ def test_creation_runs_the_resolution_once_and_nothing_of_the_pricing(
         "choice": 5,
         "payment_rule_of": 1,
         "read_offset": 1,
-        "by_the_month": 1,  # a request's rows are months until dated-quotes.md's second slice
         "the_frequency": 1,  # the kernel's rule over the template's one set of terms
         "frequency_rules": 1,
         "trade_schedule_of": 2,  # the request's own read and the observations'
         "the_method": 1,
-        "_aligned": 1,
-        "_the_months": 1,
-        "month_and_year": 25,  # the twelve codes and the schedule's thirteen
+        "_texts_of": 1,  # the codes with which rows supplied one
+        "FieldValues.supplied_rows": 1,
+        "FieldValues.texts": 1,
+        "_dates_of": 2,  # the two date columns, none in this ticket
         "schedule_months": 1,
-        "schedule_rows": 1,
+        "month_and_year": 13,  # the schedule's thirteen codes; the rows' twelve go through the
+        # period grammar below
+        "contract_days": 1,  # the days the schedule's contracts price on, a window's search key
+        "resolve_periods": 1,  # each row's period by the booking's rule, since dated-quotes.md
+        "resolve_periods.<locals>.<lambda>": 12,  # each distinct code named for its first row
+        "_where": 12,
+        "_distinct_texts": 1,
+        "months_of": 12,  # the twelve codes read once each through the period grammar
+        "period_months": 12,
+        "_period_months": 12,
+        "_label_months": 12,
         "month_bounds": 1,
+        "_the_contracts": 1,  # each component's schedule row, the months' by their month
+        "schedule_rows": 1,
+        "FieldValues.numbers": 1,
         "_the_quantities": 1,
         "_the_component_quantities": 1,
         "observed": 1,
@@ -170,12 +206,12 @@ def test_creation_runs_the_resolution_once_and_nothing_of_the_pricing(
         "shift_days": 1,
         "payments_after_observations": 1,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 7,
+        "WorkCounter.hit": 8,  # since dated-quotes.md the ticket's codes read beside the seven
     }
     by_request = call_profile(lambda: made(12, BILATERAL, DATES, WorkCounter()))
     shifted = ("the_payments", "shift_days", "_business_days_on")  # the rule's work, none
     expected = {k: v for k, v in by_template.items() if k not in shifted}
-    assert by_request == {**expected, "_aligned": 2}
+    assert by_request == {**expected, "_the_dates": 1, "FieldValues.dates_or_texts": 1}
 
 
 def test_the_readback_prices_nothing(call_profile: CallProfile) -> None:
@@ -250,20 +286,22 @@ def on_the_sheet() -> tuple[object, object, object, object, object]:
         ),
     )
     rates = PATH["_CollectDiscountCurves"](curve)
-    codes, quantities = column("F27", "G27"), column(100_000.0, 300_000.0)
-    saved = PATH["_CreateRFQ"](ix, codes, quantities, template, bridge.MISSING)
+    saved = PATH["_CreateRFQ"](ix, HEADERS, TICKET, template)
     return market, saved, rates, ix, template
+
+
+HEADERS = row("contract_code", "quantity")
+TICKET = bridge.Cells.from_rows([["F27", 100_000.0], ["G27", 300_000.0]])
 
 
 def test_the_seam_creates_a_request_binding_its_columns_once_and_publishes_once(
     call_profile: CallProfile,
 ) -> None:
     _, _, _, ix, template = on_the_sheet()
-    codes, quantities = column("F27", "G27"), column(100_000.0, 300_000.0)
     live = bridge.live_handles()
 
     def call() -> object:
-        return PATH["_CreateRFQ"](ix, codes, quantities, template, bridge.MISSING)
+        return PATH["_CreateRFQ"](ix, HEADERS, TICKET, template)
 
     assert str(call()).split(":")[1:3] == ["rfq", "SEAM"]
     ran = call_profile(call)
@@ -298,6 +336,7 @@ def retained(saved: Rfq) -> int:
     references."""
     request = saved.request
     arrays = [
+        saved.occurrence,
         saved.quantity,
         saved.component_quantity,
         request.quantity,
@@ -326,20 +365,98 @@ def test_a_request_retains_its_arrays_and_allocates_within_its_observations(
     n: int, observations: int
 ) -> None:
     # Retained: eight bytes a month for the quantities, the contract rows, the payment days and
-    # since dated-quotes.md the period's first and last days, one for its window mark, and 32 an
-    # observation for its component, day, weight and reference; the component quantities are the
-    # entered ones per month, by reference, and the pricing form's are the component quantities
-    # themselves.
+    # since dated-quotes.md the period's first and last days and the row each component came
+    # from, one for its window mark, and 32 an observation for its component, day, weight and
+    # reference; the component quantities are the entered ones per month, by reference, and the
+    # pricing form's are the component quantities themselves.
     saved = made(n)
     assert saved.request.quantity is saved.component_quantity
-    assert retained(saved) == 8 * 5 * n + n + 32 * observations
-    # Creation's peak, measured on 2026-10-22: 6,568 bytes for a month's 21 observations and
-    # 18,610 for the year's 261, about 50 an observation over a floor of 5,500 for the terms,
-    # the columns and the arrays over the months; quoting the saved request 3,011 and 15,562,
-    # about 52 an observation over 2,000, the rows, prices and masks over the observations.
+    assert retained(saved) == 8 * 6 * n + n + 32 * observations
+    # Creation's peak, measured on 2026-11-01 under the ticket form: 8,540 bytes for a month's 21
+    # observations and 20,122 for the year's 261, about 48 an observation over a floor of 7,500
+    # for the terms, the rows' periods and the arrays over the components; quoting the saved
+    # request 3,011 and 15,562, about 52 an observation over 2,000, the rows, prices and masks
+    # over the observations.
     assert least_peak(lambda: made(n, BILATERAL, None, WorkCounter())) <= (
-        5_500 + 55 * observations + SLACK
+        7_500 + 55 * observations + SLACK
     )
     assert least_peak(lambda: quote_rfq(MARKET, saved, RATES, WorkCounter())) <= (
         2_000 + 55 * observations + SLACK
+    )
+
+
+# --- a request of windows, dated-quotes.md ------------------------------------------------------
+# Twelve windows of 2027, the 11th to the 25th of each month at quantities one to twelve, under the
+# ticket's bilateral template holding onetime and period: a window per row, no code read, each
+# paying +1bd from its own last observation, 128 observations, 57 of them fixed by June.
+
+ONETIME = QuoteTemplate(
+    FIXED_FLOAT,
+    BILATERAL.names,
+    MappingProxyType(
+        {**BILATERAL.values, "quantity_per": "period", "settlement_frequency": "onetime"}
+    ),
+)
+WINDOWS = a_ticket(
+    12,
+    {
+        "start_date": np.array([f"2027-{m:02d}-11" for m in range(1, 13)], dtype="datetime64[D]"),
+        "end_date": np.array([f"2027-{m:02d}-25" for m in range(1, 13)], dtype="datetime64[D]"),
+        "quantity": QUANTITIES,
+    },
+)
+# What the rows by dates run that the rows by code do not, and the other way round: the two date
+# columns read with the rows that supplied them in place of the code column, the windows' last
+# months' ends and their contracts' one search in place of the twelve codes' grammar.
+BY_CODE = (
+    "FieldValues.texts",
+    "_where",
+    "resolve_periods.<locals>.<lambda>",
+    "months_of",
+    "period_months",
+    "_period_months",
+    "_label_months",
+)
+
+
+def test_a_request_of_windows_resolves_each_row_once_and_reprices_resolving_nothing(
+    call_profile: CallProfile,
+) -> None:
+    assert counted(lambda c: rfq(CAL, WINDOWS, ONETIME, c)) == {
+        "observations_made": 128,
+        "payment_days_made": 12,
+        "payment_rules_read": 1,
+        "payment_shifts": 1,
+        "schedule_codes_read": 13,
+        "template_fields_read": 8,
+        "ticket_codes_read": 0,
+        "windows_resolved": 12,
+    }
+    by_code = call_profile(lambda: made(12, BILATERAL, None, WorkCounter()))
+    by_dates = call_profile(lambda: rfq(CAL, WINDOWS, ONETIME, WorkCounter()))
+    assert by_dates == {
+        **{name: count for name, count in by_code.items() if name not in BY_CODE},
+        "FieldValues.dates": 2,
+        "FieldValues.supplied_rows": 2,
+        "month_bounds": 2,  # and the windows' last months' ends
+        "window_rows": 1,  # the windows' contracts, the first pricing each one's first day
+    }
+    saved = rfq(CAL, WINDOWS, ONETIME, WorkCounter())
+    assert counted(lambda c: quote_rfq(MARKET, saved, RATES, c)) == {
+        "curves_selected": 1,
+        "fixings_read": 57,
+        "live_prices_read": 7,
+        "payment_factors_read": 7,
+        "price_reductions": 4,
+    }
+    assert call_profile(lambda: quote_rfq(MARKET, saved, RATES, WorkCounter())) == QUOTE_LEDGER
+    assert retained(saved) == 8 * 6 * 12 + 12 + 32 * 128
+    # Measured on 2026-11-01: creation 12,560 bytes, within the request's own bound; the quote
+    # 10,952, about 70 an observation where the year's is 52, since 70 of the 128 observations are
+    # live and each live one carries its reference and its place among the distinct contracts
+    # beside the fixed one's search, where the year in June has 143 live of 261.
+    assert least_peak(lambda: rfq(CAL, WINDOWS, ONETIME, WorkCounter())) <= 7_500 + 55 * 128 + SLACK
+    assert (
+        least_peak(lambda: quote_rfq(MARKET, saved, RATES, WorkCounter()))
+        <= 3_000 + 55 * 128 + SLACK
     )

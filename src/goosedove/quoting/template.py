@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from goosedove.instruments.definitions import CATALOG, Instrument
-from goosedove.instruments.fields import FieldValues
+from goosedove.instruments.fields import FieldValues, selected
 from goosedove.trades.template import field_value
 
 
@@ -58,3 +58,10 @@ def quote_template(values: FieldValues) -> QuoteTemplate:
             )
     read = {name: field_value(values, name) for name in values.names}
     return QuoteTemplate(instrument, values.names, MappingProxyType(read))
+
+
+@selected.register
+def by_quote_template(selector: QuoteTemplate) -> Instrument:
+    """The instrument a quote template holds, the form _CreateRFQ's rows are bound against since
+    dated-quotes.md, as a trade template's instrument binds a booking's ticket."""
+    return selector.instrument

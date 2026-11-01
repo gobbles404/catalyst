@@ -1,36 +1,39 @@
-"""A request for quote, rfq-quoting.md: a saved quantity and payment schedule for quoting, one
-index and one quote template's terms over aligned columns of contract months and quantities,
-and either the template's payment days or a complete column of the request's own, which takes
-precedence over the template's day for this request alone. Created once: the months resolved
-against the index's schedule, the quantities read and formed by the template's basis, the
-observations made by the template's method with their pricing references, the payment days
-made from the template or taken from the request, exactly and never shifted, and the request's
-pricing form retained, request.py's, with no history, price, factor or valuation day. Priced on
-any market over the request's exact index by the quote's own calculation, each month at its
-quantity, the market supplying the day, the history and the quotes on each call. Read back
-with its entered and resolved facts and the source of its payment days, and nothing priced.
-docs/library/quoting/rfq.md is the page."""
+"""A request for quote, rfq-quoting.md and since dated-quotes.md: a saved quantity and payment
+schedule for quoting, one index and one quote template's terms over a ticket's rows, each row a
+contract month or a strip by its code or the days between two dates, with its quantity, and
+either the template's payment days or a column of the request's own dates, which takes
+precedence over the template's day for this request alone. Created once: each row's period
+chosen and resolved by the booking's own rule, a component per calendar month under monthly and
+the row's whole period as one window under onetime, the quantities read and formed by the
+template's basis, the observations made by the template's method with their pricing references,
+the payment days made from the template or taken from the request, exactly and never shifted,
+and the request's pricing form retained, request.py's, with no history, price, factor or
+valuation day. Priced on any market over the request's exact index by the quote's own
+calculation, each component at its quantity, the market supplying the day, the history and the
+quotes on each call. Read back with its entered and resolved facts and the source of its payment
+days, and nothing priced. docs/library/quoting/rfq.md is the page."""
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import assert_never
+from typing import Final, assert_never
 
 import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.index_definitions.contract_codes import month_and_year, schedule_months
+from goosedove.index_definitions.contract_codes import schedule_months
 from goosedove.index_definitions.index import Index
 from goosedove.instrumentation.work_counts import WorkCounter
+from goosedove.instruments.fields import FieldValues
 from goosedove.market.market import Market
 from goosedove.quoting.request import (
     MONTHS_RESOLVED,
     OBSERVATIONS_MADE,
     PAYMENT_DAYS_MADE,
+    WINDOWS_RESOLVED,
     Period,
     Request,
-    by_the_month,
+    component_words,
     priced,
     the_curve,
     the_frequency,
@@ -45,22 +48,28 @@ from goosedove.trades.resolution import (
     PAYMENT_RULES_READ,
     PAYMENT_SHIFTS,
     SCHEDULE_CODES_READ,
+    TICKET_CODES_READ,
+    contract_days,
     last_days,
-    schedule_rows,
+    resolve_periods,
 )
 from goosedove.trades.schedule_methods import METHODS
 from goosedove.trades.terms import (
     QuantityPer,
     Settlement,
-    month_bounds,
+    SettlementFrequency,
     payments_after_observations,
     trade_schedule_of,
 )
 
+# The fields a request's rows hold, of the fixed_float's definition and bound by its headers as a
+# ticket's are: a period by code or by two dates, a quantity, and a payment day per row.
+REQUEST_FIELDS: Final = ("contract_code", "start_date", "end_date", "quantity", "payment_day")
+
 
 class PaymentSource(Enum):
     """Where a financial request's payment days came from: the template's day or rule applied
-    to each month, or the request's own column taken exactly."""
+    to each component, or the request's own column taken exactly."""
 
     TEMPLATE = "template"
     REQUEST = "request"
@@ -69,116 +78,119 @@ class PaymentSource(Enum):
 @dataclass(frozen=True, slots=True)
 class Rfq:
     """The request as the sheet entered it and as it was resolved, read-only: the template by
-    reference; the contract codes as typed, one month per row, in the order given; quantity[k]
-    the row's entered quantity, finite and zero or more, at least one positive, in one common
-    unit the caller chose; component_quantity[k] the quantity the template's basis gives the
-    month, the entered one per month and the entered one times the month's calendar days per
-    calendar day, formed once; the payment source, the template's or the request's, None for a
-    physical request, which pays on no day; and the pricing form, the index, the terms, the
-    months as schedule rows, the observations and their references, the quantities and the
-    payment days, which every quote of the request reads and nothing rebuilds."""
+    reference; rows, how many the ticket held; occurrence[k] the entered row component k came
+    from, in row order, a row one component or since dated-quotes.md a month each of the months
+    it spans; quantity[i] the row's entered quantity, finite and zero or more, at least one
+    positive, in one common unit the caller chose; component_quantity[k] the quantity the
+    template's basis gives the component, the row's per month or per period and the row's times
+    the component's calendar days per calendar day, formed once; the payment source, the
+    template's or the request's, None for a physical request, which pays on no day; and the
+    pricing form, the index, the terms, the period, the observations and their references, the
+    quantities and the payment days, which every quote of the request reads and nothing
+    rebuilds."""
 
     template: QuoteTemplate
-    contract_codes: tuple[str, ...]
+    rows: int
+    occurrence: NDArray[np.intp]
     quantity: NDArray[np.float64]
     component_quantity: NDArray[np.float64]
     payment_source: PaymentSource | None
     request: Request
 
 
-def rfq(
-    index: Index,
-    contract_codes: Sequence[str],
-    quantities: NDArray[np.float64],
-    template: QuoteTemplate,
-    payment_dates: NDArray[np.datetime64] | None,
-    counter: WorkCounter,
-) -> Rfq:
+def rfq(index: Index, ticket: FieldValues, template: QuoteTemplate, counter: WorkCounter) -> Rfq:
     """The one way to make an Rfq, the rules in this order, the first failure being the message:
-    the template holds every term a completed quote requires, a missing payment_day stood in for
-    by the request's dates and otherwise refused naming both sources; the index takes the terms
-    as a quote's market would; the columns align, one quantity and, when given, one date per
-    contract code, none empty; a physical request takes no dates; each code one month, a letter
-    and two digits in either case, no strip or balance, a contract of the index's schedule, any
-    order and a month more than once allowed; each quantity finite and zero or more, one at
-    least positive, and under calday its product with the month's days finite; the observations
-    by the template's method and their pricing references by the pipeline's rules; the payment
-    days, the template's date or rule on each month, or the request's dates exactly, never
-    shifted, each after its month's last observation. Work: the template's values read, the
-    schedule's codes read, the months resolved, the observations made, the payment rule read and
-    applied or none for the request's dates, and the payment days made; no market, fixing or
-    factor is read."""
-    dated = payment_dates is not None
+    the ticket's headers among the five fields a request's rows hold, a quantity on every row and
+    one row at least; the template holds every term a completed quote requires, a missing
+    payment_day stood in for by the request's dates and otherwise refused naming both sources;
+    the frequency with the terms it stands under, the kernel's rule, since dated-quotes.md a
+    onetime request as a onetime booking; the index takes the terms as a quote's market would; a
+    physical request takes no dates; each row's period by the booking's rule, both dates the
+    days between them, neither the code, a code read once per distinct text through the period
+    grammar, every month a contract of the index's schedule and a window the contract pricing
+    its first day; each quantity finite and zero or more, one at least positive, and under
+    calday its product with each component's days finite; the observations by the template's
+    method and their pricing references by the pipeline's rules; the payment days, the
+    template's date or rule on each component, or the request's dates exactly, a date on every
+    row and never shifted, a row's date on each of its components, each after its component's
+    last observation. Work: the template's values read, the schedule's codes read, the ticket's
+    distinct codes read, the months or the windows resolved, the observations made, the payment
+    rule read and applied or none for the request's dates, and the payment days made; no market,
+    fixing or factor is read."""
+    _the_fields(ticket)
+    dated = ticket.has("payment_day")
     terms = the_terms(template, counter, dated)
-    by_the_month(terms, "a request for quote")
     the_frequency(terms, index.kind, "the request")
     schedule = trade_schedule_of(index)
     the_method(terms, schedule)
-    n = len(contract_codes)
-    if n == 0:
-        raise ValueError("contract_codes has 0 rows, expected one or more, a month per row")
-    _aligned("quantities", quantities.size, n)
-    if payment_dates is not None:
-        _aligned("payment_dates", payment_dates.size, n)
-        if terms.settlement is Settlement.PHYSICAL:
-            raise ValueError(
-                "payment_dates is supplied, expected none with settlement_method = physical; a "
-                "physical delivery pays on no day"
-            )
-    month = _the_months(contract_codes)
-    months = schedule_months(schedule)
-    counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
-    contract = schedule_rows(
-        months,
-        month,
-        np.arange(n, dtype=np.intp),
-        lambda k: f"contract_codes row {k + 1} is {contract_codes[k]!r}",
-    )
-    contract.setflags(write=False)
-    counter.hit(MONTHS_RESOLVED, n)
-    first, last = month_bounds(month)
-    quantity = _the_quantities(quantities)
-    component_quantity = _the_component_quantities(terms.quantity_per, quantity, first, last)
+    if dated and terms.settlement is Settlement.PHYSICAL:
+        raise ValueError(
+            "payment_day is supplied, expected none with settlement_method = physical; a "
+            "physical delivery pays on no day"
+        )
+    n = ticket.rows
+    onetime = terms.frequency is SettlementFrequency.ONETIME
     codes = schedule.codes
+    counter.hit(SCHEDULE_CODES_READ, len(codes))
+    code_on, code_texts = _texts_of(ticket, "contract_code")
+    start_on, starts = _dates_of(ticket, "start_date")
+    end_on, ends = _dates_of(ticket, "end_date")
+    periods = resolve_periods(
+        code_on,
+        code_texts,
+        start_on,
+        starts,
+        end_on,
+        ends,
+        _where,
+        np.full(n, onetime, dtype=np.bool_),
+        ((schedule_months(schedule), "the index's schedule"),),
+        contract_days(schedule),
+    )
+    counter.hit(TICKET_CODES_READ, periods.codes_read)
+    occurrence, contract = periods.occurrence, periods.contracts[0]
+    start, end, window = periods.start, periods.end, periods.window
+    components = occurrence.size
+    counter.hit(WINDOWS_RESOLVED if onetime else MONTHS_RESOLVED, components)
+    for column in (occurrence, contract, start, end, window):
+        column.setflags(write=False)
+    period = Period(contract, start, end, window)
+    quantity = _the_quantities(ticket.numbers("quantity"))
+    component_quantity = _the_component_quantities(
+        terms.quantity_per, quantity, occurrence, start, end
+    )
+
+    def named(k: int) -> str:
+        return f"row {int(occurrence[k]) + 1}"
+
+    def booked(k: int) -> str:
+        return "the window" if window[k] else codes[int(contract[k])]
 
     def component(k: int) -> str:
-        return codes[int(contract[k])]
+        return f"{component_words(codes, period, k)} of row {int(occurrence[k]) + 1}"
 
-    method = np.full(n, METHODS.index(terms.method), dtype=np.intp)
-    observations = observed(method, index, contract, first, last, lambda k: f"row {k + 1}")
+    method = np.full(components, METHODS.index(terms.method), dtype=np.intp)
+    observations = observed(method, index, contract, start, end, named, booked=booked)
     counter.hit(OBSERVATIONS_MADE, observations.component.size)
     references = observation_references(
         schedule, index.holiday_calendar, observations, contract, method, component
     )
     references.setflags(write=False)
-
-    def named(k: int) -> str:
-        return f"{component(k)} of row {k + 1}"
-
-    if payment_dates is None:
-        pays = the_payments(terms, observations, n, named, counter)
+    if not dated:
+        pays = the_payments(terms, observations, components, component, counter)
         source = None if pays is None else PaymentSource.TEMPLATE
     else:
-        pays = np.array(payment_dates, dtype="datetime64[D]")
+        pays = _the_dates(ticket)[occurrence]
         counter.hit(PAYMENT_RULES_READ, 0)
         counter.hit(PAYMENT_SHIFTS, 0)
-        counter.hit(PAYMENT_DAYS_MADE, n)
-        payments_after_observations(pays, last_days(observations, n), named)
+        counter.hit(PAYMENT_DAYS_MADE, components)
+        payments_after_observations(pays, last_days(observations, components), component)
         pays.setflags(write=False)
         source = PaymentSource.REQUEST
-    months = np.zeros(n, dtype=np.bool_)  # every row a month, no window, until the second slice
-    months.setflags(write=False)
     request = Request(
-        index,
-        schedule,
-        terms,
-        Period(contract, first, last, months),
-        observations,
-        references,
-        component_quantity,
-        pays,
+        index, schedule, terms, period, observations, references, component_quantity, pays
     )
-    return Rfq(template, tuple(contract_codes), quantity, component_quantity, source, request)
+    return Rfq(template, n, occurrence, quantity, component_quantity, source, request)
 
 
 def quote_rfq(
@@ -201,48 +213,59 @@ def quote_rfq(
     return priced(request.request, market, curve, counter)
 
 
-# --- the columns -------------------------------------------------------------------------------
+# --- the ticket --------------------------------------------------------------------------------
 
 
-def _aligned(name: str, size: int, rows: int) -> None:
-    if size != rows:
-        raise ValueError(f"{name} has {size} rows, expected {rows}, one per contract code")
-
-
-def _the_months(contract_codes: Sequence[str]) -> NDArray[np.int64]:
-    """Each row's month as numpy counts months, read by the one reader of a contract code, in
-    either case; a strip, a balance or any other text is refused by its row in the reader's
-    words, since a row of a request is one month with its own quantity and payment."""
-    month = np.empty(len(contract_codes), dtype=np.int64)
-    for k, code in enumerate(contract_codes):
-        try:
-            m, year = month_and_year(code)
-        except ValueError as refusal:
-            words = str(refusal)
-            if not words.startswith("contract is "):
-                raise
+def _the_fields(ticket: FieldValues) -> None:
+    """The ticket's headers each one of the five a request's rows hold, the first other named by
+    the field it is; a quantity column, since every row has one; and one row at least."""
+    for name in ticket.names:
+        if name not in REQUEST_FIELDS:
             raise ValueError(
-                f"contract_codes row {k + 1} is {words[len('contract is ') :]}"
-            ) from None
-        month[k] = (year - 1970) * 12 + m - 1
-    return month
+                f"{name} is a field of booking alone, expected one a request's rows hold: "
+                f"{', '.join(REQUEST_FIELDS)}"
+            )
+    if not ticket.has("quantity"):
+        raise ValueError("quantity is missing, expected a column of the request, one per row")
+    if ticket.rows == 0:
+        raise ValueError("rows has 0 rows, expected one or more, a period and a quantity per row")
+
+
+def _where(name: str, row: int) -> str:
+    """A field of a row named in a message, every value a request holds being a row's own."""
+    return f"{name} row {row + 1}"
+
+
+def _texts_of(ticket: FieldValues, name: str) -> tuple[NDArray[np.bool_], tuple[str, ...]]:
+    """A period field's texts and which rows supplied them: the column over the rows whose cells
+    held a value, in row order, or nothing when the ticket has no such column."""
+    if ticket.has(name):
+        return ticket.supplied_rows(name), ticket.texts(name)
+    return np.zeros(ticket.rows, dtype=np.bool_), ()
+
+
+def _dates_of(ticket: FieldValues, name: str) -> tuple[NDArray[np.bool_], NDArray[np.datetime64]]:
+    """A period field's days and which rows supplied them, as _texts_of gives texts."""
+    if ticket.has(name):
+        return ticket.supplied_rows(name), ticket.dates(name)
+    return np.zeros(ticket.rows, dtype=np.bool_), np.empty(0, dtype="datetime64[D]")
 
 
 def _the_quantities(quantities: NDArray[np.float64]) -> NDArray[np.float64]:
-    """Each quantity finite and zero or more, the first that is not refused by its row, and at
-    least one positive, since a request of nothing has no price: a weighted quote, not a spread
-    or a net position; copied once and frozen."""
+    """Each row's quantity finite and zero or more, the first that is not refused by its row, and
+    at least one positive, since a request of nothing has no price: a weighted quote, not a
+    spread or a net position; copied once and frozen."""
     bad = ~np.isfinite(quantities) | (quantities < 0)
     if bad.any():
         k = int(bad.argmax())
         raise ValueError(
-            f"quantities row {k + 1} is {float(quantities[k])!r}, expected a finite number of "
-            "zero or more; a request is a weighted quote, not a spread or a net position"
+            f"quantity row {k + 1} is {float(quantities[k])!r}, expected a finite number of zero "
+            "or more; a request is a weighted quote, not a spread or a net position"
         )
     if not (quantities > 0).any():
         raise ValueError(
-            "quantities are all zero, expected at least one positive; a request of nothing has "
-            "no price"
+            "quantity is zero on every row, expected at least one positive; a request of nothing "
+            "has no price"
         )
     held = np.array(quantities, dtype=np.float64)
     held.setflags(write=False)
@@ -252,30 +275,52 @@ def _the_quantities(quantities: NDArray[np.float64]) -> NDArray[np.float64]:
 def _the_component_quantities(
     quantity_per: QuantityPer,
     quantity: NDArray[np.float64],
-    first: NDArray[np.datetime64],
-    last: NDArray[np.datetime64],
+    occurrence: NDArray[np.intp],
+    start: NDArray[np.datetime64],
+    end: NDArray[np.datetime64],
 ) -> NDArray[np.float64]:
-    """Each month's quantity by the template's basis: the entered quantity per month, or per
-    period, a window's total, by reference, and the entered quantity times the month's calendar
-    days, weekends and holidays included, per calendar day, formed once here and checked finite
-    where it is made, since a finite quantity times its days can outrun the largest number;
-    frozen."""
+    """Each component's quantity by the template's basis: its row's entered quantity per month,
+    or per period, a window's total, the entered column itself by reference where every row is
+    one component and one gather where a row spans months; and the row's quantity times the
+    component's calendar days, weekends and holidays included, per calendar day, formed once
+    here and checked finite where it is made, since a finite quantity times its days can outrun
+    the largest number; frozen."""
     match quantity_per:
         case QuantityPer.MONTH | QuantityPer.PERIOD:
-            return quantity
+            if occurrence.size == quantity.size:  # every row one component: the column itself
+                return quantity
+            held = quantity[occurrence]
+            held.setflags(write=False)
+            return held
         case QuantityPer.CALDAY:
-            days = ((last - first).astype(np.int64) + 1).astype(np.float64)
+            days = ((end - start).astype(np.int64) + 1).astype(np.float64)
             with np.errstate(over="ignore"):  # the overflow is this rule's to catch, below
-                component = quantity * days
+                component = quantity[occurrence] * days
             outrun = ~np.isfinite(component)
             if outrun.any():
                 k = int(outrun.argmax())
+                row = int(occurrence[k])
                 raise ValueError(
-                    f"quantities row {k + 1} is {float(quantity[k])!r} per calendar day, expected "
-                    f"a finite quantity for the month; times its {int(days[k])} days it outruns "
-                    "the largest number"
+                    f"quantity row {row + 1} is {float(quantity[row])!r} per calendar day, "
+                    f"expected a finite quantity for the period; times its {int(days[k])} days it "
+                    "outruns the largest number"
                 )
             component.setflags(write=False)
             return component
         case _:
             assert_never(quantity_per)
+
+
+def _the_dates(ticket: FieldValues) -> NDArray[np.datetime64]:
+    """The request's own payment days, a date on every row: the column as the seam typed it, a
+    date or a text per cell, a text, which would be a rule, refused by its first row, since a
+    request's rows pay on dates and a rule is the template's to hold; copied once."""
+    entered = ticket.dates_or_texts("payment_day")
+    if not entered.is_date.all():
+        k = int(np.flatnonzero(~entered.is_date)[0])
+        text = entered.texts[int(np.count_nonzero(~entered.is_date[:k]))]
+        raise ValueError(
+            f"payment_day row {k + 1} is {text!r}, expected a date; a request's rows pay on "
+            "dates, and a rule is the template's to hold"
+        )
+    return np.array(entered.dates, dtype="datetime64[D]")

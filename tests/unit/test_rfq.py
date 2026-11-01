@@ -1,10 +1,12 @@
-"""A request for quote, rfq-quoting.md: the ticket's worked acceptance by hand on the quote tests'
-strip, a month-matching asian index valued on 31 December 2026 with January at 1.00 and
-February at 1.20, paying +5bd on the weekend calendar or on the request's own dates; the
-quantities' meaning under both bases; equality with _Quote on the whole strip; the rows' order,
-repeats and zeros; the market's states through the request's reuse; a trade booked at the price
-marking zero; the precedence of the request's dates over the template's day; the rules in the
-seam's words and the library's. docs/library/quoting/rfq.md is the page."""
+"""A request for quote, rfq-quoting.md and dated-quotes.md: the ticket's worked acceptance by hand
+on the quote tests' strip, a month-matching asian index valued on 31 December 2026 with January
+at 1.00 and February at 1.20, paying +5bd on the weekend calendar or on the request's own dates;
+the quantities' meaning under both bases; equality with _Quote on the whole strip; the rows'
+order, repeats and zeros; the market's states through the request's reuse; a trade booked at the
+price marking zero; the precedence of the request's dates over the template's day; the rows by
+dates, a window per row under onetime and its months under monthly, a one-row window against
+_QuoteByDates, windows weighed by quantity and factor against the booked portfolio; the rules in
+the seam's words and the library's. docs/library/quoting/rfq.md is the page."""
 
 import os
 import re
@@ -15,6 +17,7 @@ from typing import Any
 import numpy as np
 import pytest
 from test_bilateral_kernel import CLOSE, curve_of, curve_set
+from test_create_trades import a_ticket, created
 from test_quote import (
     DEC_31,
     STRIP,
@@ -38,6 +41,7 @@ from test_trades import (
     an_index,
     bounds_of,
     dates,
+    day,
     ids,
     numbers,
     observed_of,
@@ -57,6 +61,7 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.instruments.fields import DatesOrTexts
 from goosedove.market.market import Market
+from goosedove.quoting.quote import quote_by_dates
 from goosedove.quoting.rfq import PaymentSource, Rfq, quote_rfq, rfq
 from goosedove.quoting.template import QuoteTemplate
 from goosedove.trades.encoding import encoded
@@ -110,21 +115,41 @@ def otc(per: str = "month", method: str = "asian", day: str | None = None) -> Qu
     return bilateral(method=method, per=per, lag="+5bd", day=day)
 
 
+def onetime(per: str = "period", route: str = "bilateral", pay: str | None = None) -> QuoteTemplate:
+    """The ticket's template under onetime, bilateral on SOFR or cleared, paying +5bd or on the
+    date given: the window's terms, period or calendar day."""
+    base = (
+        bilateral(per=per, lag="+5bd", day=pay)
+        if route == "bilateral"
+        else financial(per=per, lag="+5bd", day=pay)
+    )
+    return a_template(**{**dict(base.values), "settlement_frequency": "onetime"})
+
+
 def request(
-    codes: Sequence[str] = CODES,
+    codes: Sequence[str | None] | None = CODES,
     quantities: Sequence[float] = QUANTITIES,
     template: QuoteTemplate | None = None,
     pays: Sequence[str] | None = None,
     ix: Index = STRIP,
     counter: WorkCounter | None = None,
+    starts: Sequence[str | None] | None = None,
+    ends: Sequence[str | None] | None = None,
 ) -> Rfq:
+    """The request from a ticket of the columns given, a None in a period column a cell the row
+    left unsupplied, the payment days typed as dates."""
+    columns: dict[str, list[object]] = {}
+    if codes is not None:
+        columns["contract_code"] = list(codes)
+    if starts is not None:
+        columns["start_date"] = [None if text is None else day(text) for text in starts]
+    if ends is not None:
+        columns["end_date"] = [None if text is None else day(text) for text in ends]
+    columns["quantity"] = list(quantities)
+    if pays is not None:
+        columns["payment_day"] = [day(text) for text in pays]
     return rfq(
-        ix,
-        tuple(codes),
-        np.array(quantities, dtype=np.float64),
-        cleared() if template is None else template,
-        None if pays is None else dates(*pays),
-        counter or WorkCounter(),
+        ix, a_ticket(columns), cleared() if template is None else template, counter or WorkCounter()
     )
 
 
@@ -168,6 +193,24 @@ def under(table: list[list[object]], heading: str) -> list[object]:
     return [line[at] for line in table[2:]]
 
 
+HEADINGS = [
+    "row",
+    "period",
+    "quantity",
+    "quantity_per",
+    "component_quantity",
+    "payment_source",
+    "payment_date",
+    "index",
+    "schedule_method",
+    "route",
+    "settlement_method",
+    "quote_unit",
+    "discount_curve_key",
+    "settlement_frequency",
+]
+
+
 # --- the ticket's worked acceptance --------------------------------------------------------------
 
 
@@ -188,27 +231,13 @@ def test_the_tickets_cases_by_hand() -> None:
     assert price(market_on(DEC_31, 1.0, 1.3), explicit, RATES) == pytest.approx(
         472_400 / 386_000, **CLOSE
     )
-    # The readback shows the effective dates and their source, the entered quantities and the
-    # resolved months, and prices nothing.
+    # The readback shows each row's period, the effective dates and their source, the entered
+    # quantities and the resolved components, and prices nothing.
     table = grid(explicit)
-    assert table[0] == [
-        "row",
-        "contract_code",
-        "quantity",
-        "quantity_per",
-        "component_quantity",
-        "payment_source",
-        "payment_date",
-        "index",
-        "schedule_method",
-        "route",
-        "settlement_method",
-        "quote_unit",
-        "discount_curve_key",
-    ]
+    assert table[0] == HEADINGS
     assert table[1][:7] == ["int64", "str", "float64", "str", "float64", "str", "datetime64[D]"]
     assert under(table, "row") == [1.0, 2.0]
-    assert under(table, "contract_code") == ["F27", "G27"]
+    assert under(table, "period") == ["F27", "G27"]
     assert under(table, "quantity") == [100_000.0, 300_000.0]
     assert under(table, "component_quantity") == [100_000.0, 300_000.0]
     assert under(table, "payment_source") == ["request", "request"]
@@ -216,6 +245,7 @@ def test_the_tickets_cases_by_hand() -> None:
     assert under(table, "index") == ["STRIP", "STRIP"]
     assert under(table, "quote_unit") == ["USD per BBL"] * 2
     assert under(table, "discount_curve_key") == ["SOFR", "SOFR"]
+    assert under(table, "settlement_frequency") == ["monthly", "monthly"]
     by_template = grid(request(template=otc()))
     assert under(by_template, "payment_source") == ["template", "template"]
     assert under(by_template, "payment_date") == [serial("2027-02-05"), serial("2027-03-05")]
@@ -242,7 +272,7 @@ def test_calday_quantities_count_each_months_calendar_days() -> None:
     assert under(grid(per_day), "component_quantity") == [3_100_000.0, 8_400_000.0]
     assert under(grid(per_day), "quantity") == [100_000.0, 300_000.0]
     assert price(MARKET, per_day) == pytest.approx(13_180_000 / 11_500_000, **CLOSE)
-    # Per month the entered quantity is the month's, by reference.
+    # Per month the entered quantity is the month's, by reference, every row one component.
     whole = request()
     assert whole.component_quantity is whole.quantity
 
@@ -261,12 +291,16 @@ def test_an_equal_quantity_request_matches_the_quote_on_the_strip(per: str, meth
         assert price(MARKET, request(CODES, (2.5, 2.5), route_template), curves) == (
             pytest.approx(expected, **CLOSE)
         )
+        # A strip in one row is its months at the row's quantity, as a booking's strip row is.
+        assert price(MARKET, request(("F27-G27",), (2.5,), route_template), curves) == (
+            pytest.approx(expected, **CLOSE)
+        )
 
 
 def test_rows_in_any_order_repeated_and_zero() -> None:
     reversed_rows = request(("G27", "F27"), (300_000.0, 100_000.0), otc(), EXPLICIT[::-1])
     assert price(MARKET, reversed_rows, RATES) == pytest.approx(EXPLICIT_PRICE, **CLOSE)
-    assert under(grid(reversed_rows), "contract_code") == ["G27", "F27"]
+    assert under(grid(reversed_rows), "period") == ["G27", "F27"]
     # A month twice counts twice: F27 at 100,000 twice is F27 at 200,000.
     twice = request(
         ("F27", "F27", "G27"),
@@ -291,7 +325,7 @@ def test_rows_in_any_order_repeated_and_zero() -> None:
     assert price(MARKET, with_zero, RATES) == pytest.approx(1.2, **CLOSE)
     assert under(grid(with_zero), "quantity") == [0.0, 300_000.0]
     refused(
-        "contract_codes row 1 is 'H27', expected months the index's schedule has a contract for; "
+        "contract_code row 1 is 'H27', expected months the index's schedule has a contract for; "
         "it has none for 2027-03",
         codes=("H27", "G27"),
         quantities=(0.0, 1.0),
@@ -436,7 +470,7 @@ def test_the_requests_dates_take_precedence_and_stand_in_for_a_missing_day() -> 
     assert dated.request.terms.payment_day is None and dated.request.terms.payment_rule is None
     refused(
         "payment_day is missing, expected it in the quote template when settlement_method = "
-        "financial, or payment_dates with the request",
+        "financial, or a payment_day column in the request",
         template=no_payment_day(),
     )
     # A template's date that February's last observation outruns serves a request with dates.
@@ -466,9 +500,27 @@ def test_the_requests_dates_take_precedence_and_stand_in_for_a_missing_day() -> 
         template=otc(),
         pays=("2027-01-29", "2027-03-08"),
     )
+    # A rule in the column is refused by its row: a request's rows pay on dates.
+    with pytest.raises(ValueError) as ruled:
+        rfq(
+            STRIP,
+            a_ticket(
+                {
+                    "contract_code": ["F27", "G27"],
+                    "quantity": [1.0, 1.0],
+                    "payment_day": [day("2027-02-08"), "+5bd"],
+                }
+            ),
+            otc(),
+            WorkCounter(),
+        )
+    assert str(ruled.value) == (
+        "payment_day row 2 is '+5bd', expected a date; a request's rows pay on dates, and a rule "
+        "is the template's to hold"
+    )
     # A physical request takes no dates; it pays on no day and reads back dashes.
     refused(
-        "payment_dates is supplied, expected none with settlement_method = physical; a physical "
+        "payment_day is supplied, expected none with settlement_method = physical; a physical "
         "delivery pays on no day",
         template=physical(),
         pays=EXPLICIT,
@@ -484,54 +536,252 @@ def test_the_requests_dates_take_precedence_and_stand_in_for_a_missing_day() -> 
     )
 
 
+# --- the rows by dates, dated-quotes.md ---------------------------------------------------------
+
+# The trade month of the strip: 11 January to 26 February 2027, fifteen F27 days at 1.00 through
+# its expiry and twenty G27 days at 1.20, one average of 35; and a short window, 1 to 12 February,
+# ten G27 days at 1.20.
+WINDOW = ("2027-01-11", "2027-02-26")
+SHORT = ("2027-02-01", "2027-02-12")
+WINDOW_PRICE = (15 * 1.0 + 20 * 1.2) / 35
+WINDOW_WORDS = "2027-01-11 to 2027-02-26"
+PAYS = ("2027-03-08", "2027-03-05")  # the long window's and the short window's, 0.96 and 0.97
+WINDOWS_PRICE = (100_000 * 0.96 * WINDOW_PRICE + 300_000 * 0.97 * 1.2) / (
+    100_000 * 0.96 + 300_000 * 0.97
+)
+
+
+def windows(
+    quantities: Sequence[float] = QUANTITIES,
+    template: QuoteTemplate | None = None,
+    pays: Sequence[str] | None = PAYS,
+    spans: Sequence[tuple[str, str]] = (WINDOW, SHORT),
+) -> Rfq:
+    """A request of windows, one row each, by their two dates."""
+    return request(
+        None,
+        quantities,
+        onetime() if template is None else template,
+        pays,
+        starts=[start for start, _ in spans],
+        ends=[end for _, end in spans],
+    )
+
+
+def test_a_one_row_window_quotes_as_the_quote_by_dates_does() -> None:
+    # One window at any quantity, per period or per calendar day, cleared or bilateral: the
+    # window's average, the price _QuoteByDates gives the same dates under the same template, one
+    # payment's factor cancelling; its readback names it by its dates.
+    for per in ("period", "calday"):
+        for route, curves in (("cleared", None), ("bilateral", RATES)):
+            template = onetime(per, route)
+            saved = request(None, (7.0,), template, starts=[WINDOW[0]], ends=[WINDOW[1]])
+            assert price(MARKET, saved, curves) == pytest.approx(WINDOW_PRICE, **CLOSE)
+            assert price(MARKET, saved, curves) == pytest.approx(
+                quote_by_dates(
+                    MARKET, day(WINDOW[0]), day(WINDOW[1]), template, curves, WorkCounter()
+                ),
+                **CLOSE,
+            )
+    counter = WorkCounter()
+    saved = request(
+        None, (100.0,), onetime("calday"), starts=[WINDOW[0]], ends=[WINDOW[1]], counter=counter
+    )
+    assert saved.component_quantity.tolist() == [4_700.0]  # 47 calendar days
+    counts = counter.freeze().as_dict()
+    assert (counts["windows_resolved"], counts["observations_made"]) == (1, 35)
+    assert "months_resolved" not in counts and counts["ticket_codes_read"] == 0
+    table = grid(saved)
+    assert under(table, "period") == [WINDOW_WORDS]
+    assert under(table, "settlement_frequency") == ["onetime"]
+    assert under(table, "payment_date") == [serial("2027-03-05")]  # +5bd from Friday 26 February
+
+
+def test_windows_weigh_by_quantity_and_factor_and_match_the_booked_portfolio() -> None:
+    # Two windows of unequal quantities, observation counts and payment days: the quantity-and-
+    # factor-weighted mean of their averages, the same in either row order, a window repeated at
+    # half its quantity the same as once, and the portfolio booked at the price marking zero on
+    # either route while every payment is ahead.
+    assert price(MARKET, windows(), RATES) == pytest.approx(WINDOWS_PRICE, **CLOSE)
+    reordered = windows((300_000.0, 100_000.0), pays=PAYS[::-1], spans=(SHORT, WINDOW))
+    assert price(MARKET, reordered, RATES) == pytest.approx(WINDOWS_PRICE, **CLOSE)
+    repeated = windows(
+        (100_000.0, 150_000.0, 150_000.0),
+        pays=(PAYS[0], PAYS[1], PAYS[1]),
+        spans=(WINDOW, SHORT, SHORT),
+    )
+    assert price(MARKET, repeated, RATES) == pytest.approx(WINDOWS_PRICE, **CLOSE)
+    short_words = "2027-02-01 to 2027-02-12"
+    assert under(grid(repeated), "period") == [WINDOW_WORDS, short_words, short_words]
+    cleared_price = (100_000 * WINDOW_PRICE + 300_000 * 1.2) / 400_000
+    assert price(MARKET, windows(template=onetime(route="cleared"))) == pytest.approx(
+        cleared_price, **CLOSE
+    )
+    booking: dict[str, object] = {
+        "quantity_unit": "BBL",
+        "quantity_per": "period",
+        "settlement_frequency": "onetime",
+        "schedule_method": "asian",
+        "settlement_method": "financial",
+        "payment_holiday_calendar": WEEKENDS_ONLY,
+    }
+    ticket: dict[str, list[object]] = {
+        "trade_id": [1, 2],
+        "trade_date": [DEC_31, DEC_31],
+        "start_date": [WINDOW[0], SHORT[0]],
+        "end_date": [WINDOW[1], SHORT[1]],
+        "quantity": list(QUANTITIES),
+        "payment_day": [day(PAYS[0]), day(PAYS[1])],
+    }
+    for k, fields, curves in (
+        (cleared_price, {"route": "cleared", "clearing_house": "CME Clearing"}, None),
+        (
+            WINDOWS_PRICE,
+            {"route": "bilateral", "counterparty": "ACME Trading", "discount_curve_key": "SOFR"},
+            RATES,
+        ),
+    ):
+        batch, _ = created(STRIP, {**ticket, "fixed_price": [k, k]}, {**booking, **fields})
+        prep = prepared_trades(batch.encoded, (MARKET.market_history,), WorkCounter())
+        assert trade_results(prep, (MARKET,), WorkCounter(), curves).mark == pytest.approx(
+            0.0, abs=1e-6
+        )
+
+
+def test_a_dated_row_follows_the_templates_frequency() -> None:
+    # Under monthly a dated row is its months, each at the row's quantity, as a dated booking
+    # row is: 11 January to 26 February at seven is F27 and G27 at seven, its readback two rows
+    # from one, and per calendar day its portions weigh their 21 and 26 days. Under onetime a
+    # code row is one window, the month's dates naming it; a code row and a dated row stand
+    # together, each paying +5bd from its own last observation.
+    dated = request(None, (7.0,), otc(), starts=[WINDOW[0]], ends=[WINDOW[1]])
+    two = request(CODES, (7.0, 7.0), otc())
+    assert price(MARKET, dated, RATES) == pytest.approx(price(MARKET, two, RATES), **CLOSE)
+    table = grid(dated)
+    assert under(table, "row") == [1.0, 1.0]
+    assert under(table, "period") == ["F27", "G27"]
+    assert under(table, "quantity") == [7.0, 7.0]
+    assert under(table, "payment_date") == [serial("2027-02-05"), serial("2027-03-05")]
+    per_day = request(None, (100.0,), otc("calday"), starts=[WINDOW[0]], ends=[WINDOW[1]])
+    assert per_day.component_quantity.tolist() == [2_100.0, 2_600.0]
+    by_code = request(("F27",), (5.0,), onetime())
+    assert price(MARKET, by_code, RATES) == pytest.approx(1.0, **CLOSE)
+    assert under(grid(by_code), "period") == ["2027-01-01 to 2027-01-31"]
+    mixed = request(
+        ("F27", None), QUANTITIES, onetime(), starts=[None, SHORT[0]], ends=[None, SHORT[1]]
+    )
+    first = float(factors_on(SOFR, dates("2027-02-05"))[0])  # +5bd from Friday 29 January
+    second = float(factors_on(SOFR, dates("2027-02-19"))[0])  # +5bd from Friday 12 February
+    assert price(MARKET, mixed, RATES) == pytest.approx(
+        (100_000 * first * 1.0 + 300_000 * second * 1.2) / (100_000 * first + 300_000 * second),
+        **CLOSE,
+    )
+    assert under(grid(mixed), "period") == ["2027-01-01 to 2027-01-31", "2027-02-01 to 2027-02-12"]
+    # Both dates beside a code: the dates book the row and the code is never read.
+    overridden = request(("nonsense",), (7.0,), otc(), starts=[WINDOW[0]], ends=[WINDOW[1]])
+    assert price(MARKET, overridden, RATES) == pytest.approx(price(MARKET, two, RATES), **CLOSE)
+
+
 # --- the rules ---------------------------------------------------------------------------------
 
 
-def test_the_columns_align_and_each_code_is_one_month_of_the_schedule() -> None:
-    refused(
-        "contract_codes has 0 rows, expected one or more, a month per row", codes=(), quantities=()
-    )
-    refused("quantities has 3 rows, expected 2, one per contract code", quantities=(1.0, 2.0, 3.0))
-    refused(
-        "payment_dates has 1 rows, expected 2, one per contract code",
-        template=otc(),
-        pays=EXPLICIT[:1],
-    )
-    for bad in ("F27-G27", "BALF27", "CAL27", "1H27", "F2027", "Z6"):
+def test_each_row_takes_its_period_by_the_bookings_rule() -> None:
+    for bad in ("BALF27", "F2027", "Z6", "x"):
         refused(
-            f"contract_codes row 2 is {bad!r}, expected a month letter and a two-digit year, "
-            "such as F26",
+            f"contract_code row 2 is {bad!r}, expected a contract or strip with two-digit years, "
+            "such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28",
             codes=("F27", bad),
         )
     refused(
-        "contract_codes row 1 is 'X26', expected months the index's schedule has a contract for; "
+        "contract_code row 1 is 'X26', expected months the index's schedule has a contract for; "
         "it has none for 2026-11",
         codes=("X26", "G27"),
     )
     lower = request(("f27", "g27"))
-    assert under(grid(lower), "contract_code") == ["F27", "G27"]
-    assert lower.contract_codes == ("f27", "g27")
+    assert under(grid(lower), "period") == ["F27", "G27"]
+    refused(
+        "start_date row 1 is 2027-01-11 without end_date row 1, expected both dates, the "
+        "period's first and last day, or neither and a contract_code",
+        codes=(None, "G27"),
+        quantities=(1.0, 1.0),
+        starts=[WINDOW[0], None],
+    )
+    refused(
+        "row 2 has no period, expected a contract_code or start_date with end_date on each row; "
+        "contract_code, start_date and end_date are not supplied",
+        codes=("F27", None),
+        quantities=(1.0, 1.0),
+    )
+    refused(
+        "end_date row 1 is 2027-01-11, expected a day on or after start_date row 1, 2027-02-26",
+        codes=None,
+        quantities=(1.0,),
+        template=onetime(),
+        starts=[WINDOW[1]],
+        ends=[WINDOW[0]],
+    )
+    refused(
+        "start_date row 1 is 2027-03-01 and end_date row 1 2027-03-31, expected a window priced "
+        "by the contracts of the index's schedule; it opens on 2027-03-01, after the last day "
+        "they price, 2027-02-26",
+        codes=None,
+        quantities=(1.0,),
+        template=onetime(),
+        starts=["2027-03-01"],
+        ends=["2027-03-31"],
+    )
+    refused(
+        "the window of row 1 has no pricing day from 2027-01-30 to 2027-01-31, expected a Monday "
+        "to Friday of the days it covers the index's market is open on; the asian method averages "
+        "the pricing days a component covers",
+        codes=None,
+        quantities=(1.0,),
+        template=onetime(),
+        starts=["2027-01-30"],
+        ends=["2027-01-31"],
+    )
+    refused(
+        f"{WINDOW_WORDS} of row 1 pays on 2027-02-26, expected a day after its last observation, "
+        "2027-02-26, when its final price exists",
+        codes=None,
+        quantities=(1.0,),
+        template=onetime(),
+        pays=[WINDOW[1]],
+        starts=[WINDOW[0]],
+        ends=[WINDOW[1]],
+    )
+    with pytest.raises(ValueError) as booking_field:
+        rfq(STRIP, a_ticket({"trade_id": [1.0], "quantity": [1.0]}), cleared(), WorkCounter())
+    assert str(booking_field.value) == (
+        "trade_id is a field of booking alone, expected one a request's rows hold: contract_code, "
+        "start_date, end_date, quantity, payment_day"
+    )
+    with pytest.raises(ValueError) as unweighted:
+        rfq(STRIP, a_ticket({"contract_code": ["F27"]}), cleared(), WorkCounter())
+    assert str(unweighted.value) == (
+        "quantity is missing, expected a column of the request, one per row"
+    )
 
 
 def test_quantities_are_finite_nonnegative_and_not_all_zero() -> None:
     refused(
-        "quantities row 2 is -1.0, expected a finite number of zero or more; a request is a "
+        "quantity row 2 is -1.0, expected a finite number of zero or more; a request is a "
         "weighted quote, not a spread or a net position",
         quantities=(1.0, -1.0),
     )
     for bad in (float("inf"), float("nan")):
         refused(
-            f"quantities row 1 is {bad!r}, expected a finite number of zero or more; a request "
+            f"quantity row 1 is {bad!r}, expected a finite number of zero or more; a request "
             "is a weighted quote, not a spread or a net position",
             quantities=(bad, 1.0),
         )
     refused(
-        "quantities are all zero, expected at least one positive; a request of nothing has no "
-        "price",
+        "quantity is zero on every row, expected at least one positive; a request of nothing "
+        "has no price",
         quantities=(0.0, 0.0),
     )
     refused(
-        "quantities row 1 is 1e+308 per calendar day, expected a finite quantity for the month; "
+        "quantity row 1 is 1e+308 per calendar day, expected a finite quantity for the period; "
         "times its 31 days it outruns the largest number",
         quantities=(1e308, 1.0),
         template=cleared("calday"),
@@ -544,6 +794,10 @@ def test_quantities_are_finite_nonnegative_and_not_all_zero() -> None:
         assert scaled.request.quantity is scaled.component_quantity
     tiny_beside_huge = request(CODES, (1e-300, 1e300), otc(), EXPLICIT)
     assert price(MARKET, tiny_beside_huge, RATES) == pytest.approx(1.2, **CLOSE)
+    # Fractions stand: a request's quantities are weights, not a booking's whole counts.
+    assert price(MARKET, request(CODES, (0.5, 1.5), otc(), EXPLICIT), RATES) == pytest.approx(
+        EXPLICIT_PRICE, **CLOSE
+    )
 
 
 def test_the_template_the_index_and_the_market_refuse_as_a_quote_does() -> None:
@@ -552,19 +806,27 @@ def test_the_template_the_index_and_the_market_refuse_as_a_quote_does() -> None:
         "future is cash settled on the average of its month's pricing days",
         template=physical("asian"),
     )
-    # onetime-averaging.md's second slice and dated-quotes.md: a request prices by the month until
-    # its rows take dates, and a template holding onetime is refused in so many words naming
-    # _QuoteByDates; period as its basis is refused under monthly by the kernel's rule.
-    refused(
-        "settlement_frequency is 'onetime', expected 'monthly'; a request for quote prices by "
-        "the month, and _QuoteByDates prices a onetime period across two dates",
-        template=a_template(**{**dict(otc().values), "settlement_frequency": "onetime"}),
-    )
+    # The kernel's rule over the frequency, the request named in the trade's place: period under
+    # monthly and month under onetime, since onetime-averaging.md and dated-quotes.md.
     refused(
         "quantity_per of the request is 'period', expected 'month' or 'calday' under "
         "settlement_frequency = monthly; period is the total of a onetime period and says "
         "nothing of a month",
         template=a_template(**{**dict(otc().values), "quantity_per": "period"}),
+    )
+    refused(
+        "quantity_per of the request is 'month', expected 'period' or 'calday' under "
+        "settlement_frequency = onetime; month says nothing of a window, period is its total and "
+        "calday its days",
+        template=onetime("month"),
+    )
+    refused(
+        "schedule_method of the request is 'lastday', expected 'asian' under settlement_frequency "
+        "= onetime; a onetime period averages every pricing day it covers, and the expiry-based "
+        "methods take their contract's month",
+        template=a_template(
+            **{**dict(otc(method="lastday").values), "settlement_frequency": "onetime"}
+        ),
     )
     refused(
         "discount_curve_key is missing, expected it in the quote template when route = bilateral",
@@ -614,6 +876,14 @@ def test_the_template_the_index_and_the_market_refuse_as_a_quote_does() -> None:
         "the payment of G27 on 2027-03-08 on SOFR is past the discount curve 'SOFR', which runs "
         "from 2026-12-31 to 2027-03-05; expected every payment day after the valuation date "
         "covered",
+        short,
+    )
+    refused_price(
+        MARKET,
+        windows(),
+        f"the payment of {WINDOW_WORDS} on 2027-03-08 on SOFR is past the discount curve 'SOFR', "
+        "which runs from 2026-12-31 to 2027-03-05; expected every payment day after the "
+        "valuation date covered",
         short,
     )
     assert price(MARKET, saved, short) == pytest.approx(DEFAULT_PRICE, **CLOSE)
@@ -677,6 +947,11 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         ),
         row("cleared", "financial", "asian", "month", "+5bd", weekends, "monthly"),
     )
+    onetime_template = ENTRY["_CreateQuoteTemplate"](
+        "fixed_float",
+        fields,
+        row("bilateral", "financial", "asian", "period", "+5bd", weekends, "SOFR", "onetime"),
+    )
     sofr = ENTRY["_CreateDiscountCurve"](
         "SOFR",
         row("date", "discount_factor"),
@@ -689,22 +964,38 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         ),
     )
     rates = ENTRY["_CollectDiscountCurves"](cells_of([sofr]))
-    codes = cells_of(["F27"], ["G27"])
-    quantities = column([100_000.0, 300_000.0])
-    explicit = column([serial("2027-02-08"), serial("2027-03-08")])
-    saved = ENTRY["_CreateRFQ"](ix, codes, quantities, otc_template, bridge.MISSING)
+    by_code = row("contract_code", "quantity")
+    ticket = cells_of(["F27", 100_000.0], ["G27", 300_000.0])
+    saved = ENTRY["_CreateRFQ"](ix, by_code, ticket, otc_template)
     assert re.fullmatch(rf"{os.getpid()}:rfq:SEAM:\d+", str(saved))
-    dated = ENTRY["_CreateRFQ"](ix, codes, quantities, otc_template, explicit)
+    with_days = row("contract_code", "quantity", "payment_day")
+    dated = ENTRY["_CreateRFQ"](
+        ix,
+        with_days,
+        cells_of(
+            ["F27", 100_000.0, serial("2027-02-08")], ["G27", 300_000.0, serial("2027-03-08")]
+        ),
+        otc_template,
+    )
     assert ENTRY["_QuoteRFQ"](market, saved, rates) == pytest.approx(DEFAULT_PRICE, **CLOSE)
     assert ENTRY["_QuoteRFQ"](market, dated, rates) == pytest.approx(EXPLICIT_PRICE, **CLOSE)
-    one_cell = ENTRY["_CreateRFQ"](
-        ix, cells_of(["G27"]), column([5.0]), cleared_template, bridge.MISSING
-    )
+    one_cell = ENTRY["_CreateRFQ"](ix, by_code, cells_of(["G27", 5.0]), cleared_template)
     assert ENTRY["_QuoteRFQ"](market, one_cell, bridge.MISSING) == pytest.approx(1.2, **CLOSE)
+    by_dates = row("start_date", "end_date", "quantity", "payment_day")
+    windowed = ENTRY["_CreateRFQ"](
+        ix,
+        by_dates,
+        cells_of(
+            [serial(WINDOW[0]), serial(WINDOW[1]), 100_000.0, serial(PAYS[0])],
+            [serial(SHORT[0]), serial(SHORT[1]), 300_000.0, serial(PAYS[1])],
+        ),
+        onetime_template,
+    )
+    assert ENTRY["_QuoteRFQ"](market, windowed, rates) == pytest.approx(WINDOWS_PRICE, **CLOSE)
     table = spilled(ENTRY["util_ReadHandle"](dated))
     assert table[0][:7] == [
         "row",
-        "contract_code",
+        "period",
         "quantity",
         "quantity_per",
         "component_quantity",
@@ -725,34 +1016,40 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "financial",
         "USD per BBL",
         "SOFR",
+        "monthly",
     ]
     assert table[3][5:7] == ["request", serial("2027-03-08")]
     assert spilled(ENTRY["util_ReadHandle"](saved))[2][5:7] == ["template", serial("2027-02-05")]
+    assert spilled(ENTRY["util_ReadHandle"](windowed))[2][1] == WINDOW_WORDS
     # The seam's refusals in signature order, then the library's with its prefix.
-    assert ENTRY["_CreateRFQ"](None, codes, quantities, otc_template, bridge.MISSING) == (
+    assert ENTRY["_CreateRFQ"](None, by_code, ticket, otc_template) == (
         "#ERROR _CreateRFQ: index is blank, expected index handle"
     )
-    assert ENTRY["_CreateRFQ"](ix, row("F27", "G27"), quantities, otc_template, bridge.MISSING) == (
-        "#ERROR _CreateRFQ: contract_codes is 1x2 array, expected column of text"
+    assert str(
+        ENTRY["_CreateRFQ"](ix, row("contract_codes", "quantity"), ticket, otc_template)
+    ).startswith(
+        "#ERROR _CreateRFQ: fields cell (1, 1) is text 'contract_codes', expected a field of "
+        "fixed_float: "
     )
     assert ENTRY["_CreateRFQ"](
-        ix, cells_of(["F27"], [1.0]), quantities, otc_template, bridge.MISSING
-    ) == ("#ERROR _CreateRFQ: contract_codes cell (2, 1) is number 1.0, expected text")
+        ix, by_code, cells_of(["F27", 1.0], ["G27", "ten"]), otc_template
+    ) == ("#ERROR _CreateRFQ: rows cell (2, 2) is text 'ten', expected number")
     assert ENTRY["_CreateRFQ"](
-        ix, codes, cells_of([1.0], ["ten"]), otc_template, bridge.MISSING
-    ) == ("#ERROR _CreateRFQ: quantities cell (2, 1) is text 'ten', expected number")
-    assert ENTRY["_CreateRFQ"](ix, codes, quantities, market, bridge.MISSING) == (
+        ix, by_code, cells_of(["F27", 1.0], ["G27", None]), otc_template
+    ) == ("#ERROR _CreateRFQ: rows cell (2, 2) is blank, expected number")
+    assert ENTRY["_CreateRFQ"](ix, by_code, ticket, market) == (
         f"#ERROR _CreateRFQ: template is market handle {market!r}, expected quote template handle"
     )
-    assert ENTRY["_CreateRFQ"](ix, codes, quantities, otc_template, None) == (
-        "#ERROR _CreateRFQ: payment_dates is blank, expected column of dates"
+    assert ENTRY["_CreateRFQ"](
+        ix, row("trade_id", "quantity"), cells_of([1.0, 1.0]), otc_template
+    ) == (
+        "#ERROR _CreateRFQ: ValueError: trade_id is a field of booking alone, expected one a "
+        "request's rows hold: contract_code, start_date, end_date, quantity, payment_day"
     )
-    assert ENTRY["_CreateRFQ"](
-        ix, codes, quantities, otc_template, cells_of([serial("2027-02-08")], [None])
-    ) == ("#ERROR _CreateRFQ: payment_dates cell (2, 1) is blank, expected date")
-    assert ENTRY["_CreateRFQ"](
-        ix, codes, column([1.0, 2.0, 3.0]), otc_template, bridge.MISSING
-    ) == ("#ERROR _CreateRFQ: ValueError: quantities has 3 rows, expected 2, one per contract code")
+    assert ENTRY["_CreateRFQ"](ix, with_days, cells_of(["F27", 1.0, "+5bd"]), otc_template) == (
+        "#ERROR _CreateRFQ: ValueError: payment_day row 1 is '+5bd', expected a date; a request's "
+        "rows pay on dates, and a rule is the template's to hold"
+    )
     assert ENTRY["_QuoteRFQ"](market, saved, bridge.MISSING) == (
         "#ERROR _QuoteRFQ: ValueError: discount_curve_set is missing, expected a collection of "
         "discount curves holding 'SOFR' with route = bilateral, whose payments it discounts"
