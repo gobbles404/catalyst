@@ -3,9 +3,10 @@ numbers before any price or fixing is known. Per component, its signed quantity 
 quote quantity unit, its coefficient, the settlement currency it makes per unit of quote price,
 and its entry-price offset in the settlement currency. Per payment group, the components of one
 calculation period that pay on one day, since onetime-averaging.md the period a component's
-calendar month, a period whose components pay on two days being two groups, or the components of
-one period under a physical settlement, which pays on no day: the contract of the period's month,
-the summed offset and, for a financial settlement, the day it pays. Per slot, the dated market
+calendar month or a onetime row's whole window, a period whose components pay on two days being
+two groups, or the components of one period under a physical settlement, which pays on no day:
+the period's label, a month's contract code or a window's two dates, the summed offset and, for a
+financial settlement, the day it pays. Per slot, the dated market
 input the batch consumes, an observation date within a payment group: the date, the contract
 pricing that date, derived by the calendar's rule and retained, the group's own under the
 expiry-based methods and whichever the calendar gives under asian, and the summed exposure
@@ -39,6 +40,7 @@ from goosedove.trades.terms import (
     LegTerms,
     ResolvedTrades,
     Route,
+    booked_words,
     named_trade,
     payments_after_observations,
 )
@@ -228,7 +230,10 @@ class Encoded:
     groups, two components paying on one day under two keys two groups never netted before
     discounting, and a month under a physical settlement, which pays on no day, one; each
     group's contract on each leg's schedule is the leg's group_contract, the contract of its
-    month; keys, the batch's distinct keys in that
+    month, and group_head[g], since onetime-averaging.md, its head component, the first in
+    component order, from which the group's label is made when a readback or a refusal asks,
+    booked_words over the heads, the contract's code of a month and the two dates of a window,
+    no text kept; keys, the batch's distinct keys in that
     order, and key_of_group[g] each group's place among them, None with no key, a cleared
     batch's; group_of_component[k]; offset_of_group[g], the legs' offsets summed, the trade's
     fixed leg of the group; payment_date[g], the day the group pays, an array for a financial
@@ -251,6 +256,7 @@ class Encoded:
     terms: ResolvedTrades
     legs: tuple[EncodedLeg, ...]
     group_of_component: NDArray[np.intp]
+    group_head: NDArray[np.intp]
     offset_of_group: NDArray[np.float64]
     payment_date: NDArray[np.datetime64] | None
     reserves: Reserves
@@ -378,7 +384,7 @@ def encoded(
         sizes.append(to_quote_unit)
         group_contract = leg.contract[heads]
         offset_of_group = _the_group_offsets(
-            leg, group_of_component, offset, group_contract, payment_date, keys, key_of_group
+            terms, leg, heads, group_of_component, offset, payment_date, keys, key_of_group
         )
         reference = _the_references(terms, leg, observed)
         slot_of_observation, slot_group, slot_date, slot_reference = _the_slots(
@@ -398,7 +404,7 @@ def encoded(
         days = _the_day_axis(slot_date, slot_reference)
         periods = _the_contract_periods(leg.schedule_month[references])
         if payment_date is not None:
-            _payments_after_observations(leg, group_contract, payment_date, slot_group, slot_date)
+            _payments_after_observations(terms, leg, heads, payment_date, slot_group, slot_date)
         counter.hit(ENCODED_COMPONENTS, int(leg.contract.size))
         counter.hit(ENCODED_OBSERVATIONS, int(observed.component.size))
         counter.hit(ENCODED_SLOTS, int(slot_group.size))
@@ -492,14 +498,7 @@ def encoded(
         outrun = ~np.isfinite(offset_of_group)
         if outrun.any():
             g = int(outrun.argmax())
-            group = group_words(
-                terms.legs[0].schedule.codes,
-                legs[0].group_contract,
-                payment_date,
-                g,
-                keys,
-                key_of_group,
-            )
+            group = group_words(terms, terms.legs[0], heads, payment_date, g, keys, key_of_group)
             raise ValueError(
                 f"the fixed leg of {group} is {float(offset_of_group[g])!r}, expected a finite "
                 f"amount of {terms.legs[0].index.conventions.currency_unit}; the legs' fixed legs, "
@@ -511,11 +510,13 @@ def encoded(
     if key_of_group is not None:
         key_of_group.setflags(write=False)
     group_of_component.setflags(write=False)
+    heads.setflags(write=False)
     reserved = reserves(terms, counter)
     return Encoded(
         terms,
         tuple(legs),
         group_of_component,
+        heads,
         offset_of_group,
         payment_date,
         reserved,
@@ -645,10 +646,11 @@ def _the_same_quantity(
 
 
 def _the_group_offsets(
+    terms: ResolvedTrades,
     leg: LegTerms,
+    heads: NDArray[np.intp],
     group_of_component: NDArray[np.intp],
     offset: NDArray[np.float64],
-    group_contract: NDArray[np.intp],
     payment_date: NDArray[np.datetime64] | None,
     keys: tuple[str, ...],
     key_of_group: NDArray[np.intp] | None,
@@ -656,13 +658,11 @@ def _the_group_offsets(
     """A leg's offsets summed by group, one bincount, each finite or the first that is not
     refused by its group, a sum blamed on the group and never on one of its trades."""
     with np.errstate(over="ignore", invalid="ignore"):
-        offset_of_group = np.bincount(
-            group_of_component, weights=offset, minlength=group_contract.size
-        )
+        offset_of_group = np.bincount(group_of_component, weights=offset, minlength=heads.size)
     outrun = ~np.isfinite(offset_of_group)
     if outrun.any():
         g = int(outrun.argmax())
-        group = group_words(leg.schedule.codes, group_contract, payment_date, g, keys, key_of_group)
+        group = group_words(terms, leg, heads, payment_date, g, keys, key_of_group)
         raise ValueError(
             f"the fixed leg of {group} is {float(offset_of_group[g])!r}, expected a finite amount "
             f"of {leg.index.conventions.currency_unit}; its components' fixed legs, each finite, "
@@ -707,21 +707,30 @@ def _the_exposures(
     return slot_exposure
 
 
+def group_label(terms: ResolvedTrades, leg: LegTerms, heads: NDArray[np.intp], g: int) -> str:
+    """One group's label, since onetime-averaging.md, made from its head component when a
+    refusal names the group: the contract's code of a month on that leg's schedule and the two
+    dates of a window, booked_words over the one head."""
+    return str(booked_words(terms, leg, heads[g : g + 1])[0])
+
+
 def group_words(
-    codes: tuple[str, ...],
-    group_contract: NDArray[np.intp],
+    terms: ResolvedTrades,
+    leg: LegTerms,
+    heads: NDArray[np.intp],
     payment_date: NDArray[np.datetime64] | None,
     g: int,
     keys: tuple[str, ...] = (),
     key_of_group: NDArray[np.intp] | None = None,
 ) -> str:
-    """A payment group named in a message, since #190: its contract and, under a financial
-    settlement, the day it pays, `F27 paying on 2027-01-04`, and since named-curves-slice-3.md
-    its key where the batch has keys, `F27 paying on 2027-01-04 on SOFR`; a physical group its
-    contract alone, since it pays on no day. A sum over a group is blamed on the group, never on
-    one of its trades."""
-    code = codes[int(group_contract[g])]
-    words = code if payment_date is None else f"{code} paying on {payment_date[g]}"
+    """A payment group named in a message, since #190: its label, the contract's code of a month
+    and since onetime-averaging.md the two dates of a window, and, under a financial settlement,
+    the day it pays, `F27 paying on 2027-01-04`, `2026-05-26 to 2026-06-25 paying on 2026-06-29`,
+    and since named-curves-slice-3.md its key where the batch has keys, `F27 paying on 2027-01-04
+    on SOFR`; a physical group its label alone, since it pays on no day. A sum over a group is
+    blamed on the group, never on one of its trades."""
+    label = group_label(terms, leg, heads, g)
+    words = label if payment_date is None else f"{label} paying on {payment_date[g]}"
     if key_of_group is None:
         return words
     return f"{words} on {keys[int(key_of_group[g])]}"
@@ -1004,8 +1013,9 @@ def _the_slots(
 
 
 def _payments_after_observations(
+    terms: ResolvedTrades,
     leg: LegTerms,
-    group_contract: NDArray[np.intp],
+    heads: NDArray[np.intp],
     payment_date: NDArray[np.datetime64],
     slot_group: NDArray[np.intp],
     slot_date: NDArray[np.datetime64],
@@ -1013,13 +1023,11 @@ def _payments_after_observations(
     """A financial settlement's rule, the kernel's one owner of it since
     payment-day-date-or-rule.md, applied here to the groups: each group pays after its last
     observation, the day its final price exists; the first group paying on or before it is
-    refused by its contract and the two days. The slots stand in group order and by day, so
-    each group's last slot is its last observation, and every group has one, every component
+    refused by its label and the two days. The slots stand in group order and by day, so each
+    group's last slot is its last observation, and every group has one, every component
     observing at least once."""
     last = np.ones(slot_group.size, dtype=np.bool_)
     last[:-1] = slot_group[1:] != slot_group[:-1]
     payments_after_observations(
-        payment_date,
-        slot_date[last],
-        lambda g: leg.schedule.codes[int(group_contract[g])],
+        payment_date, slot_date[last], lambda g: group_label(terms, leg, heads, g)
     )

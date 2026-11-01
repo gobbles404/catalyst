@@ -34,7 +34,7 @@ from goosedove.instrumentation.work_counts import KERNEL, WorkCounter
 from goosedove.market.market import Market
 from goosedove.trades.contributions import CrossContribution, RateContribution
 from goosedove.trades.display_axes import EarlyRisk, early_risk
-from goosedove.trades.encoding import CurveAxes, Encoded, PaymentAxes
+from goosedove.trades.encoding import CurveAxes, Encoded, PaymentAxes, group_label
 from goosedove.trades.preparation import PreparedLeg, PreparedTrades, UnpaidPayments
 from goosedove.trades.results import LegResults, TradeResults
 from goosedove.trades.terms import Route, Settlement, named_trade
@@ -389,16 +389,15 @@ def _the_curves(
     as_of = leg.history.calendar.valuation_date.as_of
     pays = cast(UnpaidPayments, prepared.unpaid_payments)  # bilateral and financial: made with it
     payment_date = cast(NDArray[np.datetime64], encoded.payment_date)  # financial: the rule above
-    codes = leg.encoded.leg.schedule.codes
     for key, curve, keyed_pays in zip(encoded.keys, curves, pays.by_key, strict=True):
         curve_starts_on(curve, as_of)
         uncovered = keyed_pays.days > curve.max_date
         if uncovered.any():
             d = int(uncovered.argmax())
             g = int(keyed_pays.groups[int((keyed_pays.day_of_group == d).argmax())])
+            label = group_label(encoded.terms, leg.encoded.leg, encoded.group_head, g)
             raise ValueError(
-                f"the payment of {codes[int(leg.encoded.group_contract[g])]} on "
-                f"{payment_date[g]} on "
+                f"the payment of {label} on {payment_date[g]} on "
                 f"{key} is past the discount curve {curve.name!r}, which runs from "
                 f"{curve.start_date} to {curve.max_date}; expected every unpaid payment day covered"
             )
@@ -462,7 +461,6 @@ def _discounted(
     first_terms = first.encoded.leg
     conventions = first_terms.index.conventions  # the pair shares its units, the kernel's rule
     currency = conventions.currency_unit
-    codes = first_terms.schedule.codes
     as_of = first.history.calendar.valuation_date.as_of
     groups = encoded.offset_of_group.size
     payment_date = cast(
@@ -523,8 +521,9 @@ def _discounted(
     unfinished = ~np.isfinite(amount)
     if unfinished.any():
         g = int(unfinished.argmax())
+        label = group_label(encoded.terms, first.encoded.leg, encoded.group_head, g)
         raise ValueError(
-            f"the payment of {codes[int(first.encoded.group_contract[g])]} on {payment_date[g]} on "
+            f"the payment of {label} on {payment_date[g]} on "
             f"{encoded.keys[int(key_of_group[g])]} is {float(amount[g])!r}, expected a finite "
             f"amount of {currency}; its fixed, set and live legs sum past the largest number"
         )
@@ -694,13 +693,13 @@ def _finite_leg_amounts(
     """A pair's legs' amounts by group, each finite or the first that is not refused by its
     group and its index, since two-index-fixed-float.md, before the groups' sums are judged, so
     that a leg's amount past the largest number is named as the leg's."""
-    codes = first.encoded.leg.schedule.codes
     for leg, leg_amount in zip(legs, amounts, strict=True):
         unfinished = ~np.isfinite(leg_amount)
         if unfinished.any():
             g = int(unfinished.argmax())
+            label = group_label(encoded.terms, first.encoded.leg, encoded.group_head, g)
             raise ValueError(
-                f"the payment of {codes[int(first.encoded.group_contract[g])]} on "
+                f"the payment of {label} on "
                 f"{payment_date[g]} on {encoded.keys[int(key_of_group[g])]} is "
                 f"{float(leg_amount[g])!r} on index {leg.encoded.leg.index.name!r}, expected "
                 f"a finite amount of {currency}; its fixed, set and live legs sum past the "

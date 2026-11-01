@@ -618,7 +618,7 @@ def test_a_lag_past_the_sheets_calendar_fails_the_template_or_the_batch_in_the_l
     assert ":trades:" in str(made), made
     table = spilled(ENTRY["util_ReadHandle"](made))
     code, lag, pay = (
-        table[0].index(name) for name in ("contract_code", "payment_day", "payment_date")
+        table[0].index(name) for name in ("booked_period", "payment_day", "payment_date")
     )
     assert pay == lag + 1  # the rule beside the day it made
     assert {line[lag] for line in table[2:]} == {"+0EM-1bd+1BD"}
@@ -754,7 +754,7 @@ def test_the_pens_dates_read_back_from_the_batch_and_the_preparation(phh: dict[s
     assert batch[0][batch[0].index("payment_date")] == "payment_date"
     assert batch[2][batch[0].index("payment_day")] == "+1bd"
     assert batch[2][batch[0].index("payment_date")] == serial("2027-06-28")
-    assert batch[2][batch[0].index("contract_code")] == "N27"
+    assert batch[2][batch[0].index("booked_period")] == "N27"
     assert batch[2][batch[0].index("quote_quantity")] == 5_000.0
     _, prepared, _ = phh_state(phh, "2027-06-25", {}, (3.10, 3.15))
     slots = spilled(ENTRY["util_ReadHandle"](prepared))
@@ -1552,7 +1552,7 @@ def test_a_last3day_strip_marks_42_with_a_delta_of_3_on_each_month_and_its_dupli
         strip = ENTRY["_CreateTrades"](l3d["index"], l3d["headers"], lines, l3d["template"])
         batch = spilled(ENTRY["util_ReadHandle"](strip))
         columns = batch[0]
-        months = [line[columns.index("contract_code")] for line in batch[2:]]
+        months = [line[columns.index("booked_period")] for line in batch[2:]]
         pays = [line[columns.index("payment_date")] for line in batch[2:]]
         assert months == ["Z26", "F27"] * (len(months) // 2)
         assert pays == [serial("2026-12-09"), serial("2027-01-11")] * (len(months) // 2)
@@ -1821,7 +1821,7 @@ def test_an_asian_strip_marks_176_with_2200_on_each_month_and_its_duplicate_twic
         )
         batch = spilled(ENTRY["util_ReadHandle"](strip))
         columns = batch[0]
-        months = [line[columns.index("contract_code")] for line in batch[2:]]
+        months = [line[columns.index("booked_period")] for line in batch[2:]]
         pays = [line[columns.index("payment_date")] for line in batch[2:]]
         assert months == ["Z26", "F27"] * (len(months) // 2)
         assert pays == [serial("2027-01-05"), serial("2027-02-02")] * (len(months) // 2)
@@ -2023,7 +2023,7 @@ def test_the_booked_period_reads_back_its_days_and_a_roll_moves_only_the_states(
     columns = batch[0]
     line = batch[2]
     names = (
-        "contract_code",
+        "booked_period",
         "quantity",
         "quantity_per",
         "start_date",
@@ -2488,7 +2488,7 @@ def test_the_mixed_batch_reads_back_each_rows_own_choices(mixed: dict[str, Any])
         return [line[columns.index(name)] for line in batch[2:]]
 
     assert column_of("row") == [1.0, 2.0, 3.0, 4.0, 5.0, 5.0]
-    assert column_of("contract_code") == ["Z26", "Z26", "Z26", "Z26", "Z26", "F27"]
+    assert column_of("booked_period") == ["Z26", "Z26", "Z26", "Z26", "Z26", "F27"]
     assert column_of("schedule_method") == [
         "lastday",
         "penultimate",
@@ -3614,7 +3614,7 @@ def test_the_waha_batch_reads_back_its_days_and_a_tick_reuses_its_preparation(
     headers = [str(name) for name in table[0]]
     at = dict(zip(headers, table[2], strict=True))
     assert headers[13] == "payment_date"
-    assert (at["contract_code"], at["schedule_method"]) == ("Z26", "lastday")
+    assert (at["booked_period"], at["schedule_method"]) == ("Z26", "lastday")
     assert (at["payment_day"], at["payment_date"]) == ("+2bd", serial("2026-12-03"))
     history, prepared, results = waha_state(waha, "2026-12-01", WAHA_X26, (-0.30, -0.10))
     ticked = str(
@@ -4043,7 +4043,7 @@ def test_the_three_rows_of_the_ticket_value_as_the_page_says_and_sum_their_singl
         return [line[columns.index(name)] for line in table[2:]]
 
     assert column_of("row") == [1.0, 2.0, 3.0]
-    assert column_of("contract_code") == ["V26"] * 3  # the resolved contract on every row
+    assert column_of("booked_period") == ["V26"] * 3  # the resolved contract on every row
     assert column_of("entered_contract_code") == ["V26", "V26", "(not supplied)"]
     assert column_of("start_date") == [
         serial(d) for d in ("2026-10-01", "2026-10-12", "2026-10-12")
@@ -4128,7 +4128,7 @@ def test_a_whole_month_by_dates_is_the_codes_own_and_a_label_beside_dates_moves_
     for batch, entered in ((by_dates, "(not supplied)"), (superseded, "X26"), (balmo, "BALV26")):
         table = spilled(ENTRY["util_ReadHandle"](batch[0]))
         line = table[2]
-        assert line[table[0].index("contract_code")] == "V26"
+        assert line[table[0].index("booked_period")] == "V26"
         assert line[table[0].index("entered_contract_code")] == entered
     for batch in (by_code, by_dates, superseded, balmo):
         slots = spilled(ENTRY["util_ReadHandle"](ENTRY["_PrepareTrades"](batch[0], bbl["history"])))
@@ -5121,7 +5121,7 @@ def test_a_half_year_values_as_its_six_months_do() -> None:
     assert len(half_table) == 8  # two heading rows and six components
     code, entered, pay, exposure = (
         half_table[0].index(name)
-        for name in ("contract_code", "entered_contract_code", "payment_date", "quote_quantity")
+        for name in ("booked_period", "entered_contract_code", "payment_date", "quote_quantity")
     )
     assert [line[code] for line in half_table[2:]] == ["F27", "G27", "H27", "J27", "K27", "M27"]
     assert {str(line[entered]) for line in half_table[2:]} == {"1h27"}

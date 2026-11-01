@@ -121,12 +121,15 @@ def observed(
     end: NDArray[np.datetime64],
     named: Callable[[int], str],
     field: str = "schedule_method",
+    booked: Callable[[int], str] | None = None,
 ) -> Observations:
     """The observations the schedule methods give a batch's components, each component's method
     its occurrence's, a position among METHODS, each component a row of the index's futures
-    schedule covering the days from start to end inclusive, within its contract's calendar month,
-    the components in order, and `named` the words for a component's trade in a refusal, as
-    ResolvedTrades.named gives them, `trade 'B' at row 2`: lastday, the contract's expiry day with
+    schedule covering the days from start to end inclusive, within its contract's calendar month
+    or, since onetime-averaging.md, a onetime row's whole window, the components in order, `named`
+    the words for a component's trade in a refusal, as ResolvedTrades.named gives them, `trade
+    'B' at row 2`, and `booked` the words for what a component is booked under, its contract's
+    code when None and `the window` for a onetime component: lastday, the contract's expiry day with
     the whole weight; penultimate, the business day before it, Monday to Friday less the index's
     holiday calendar, with the whole weight, one business-day offset over the components;
     last3day, the expiry day and the two business days before it, a third each, one business-day
@@ -205,6 +208,7 @@ def observed(
             contract,
             holidays,
             named,
+            booked,
         )
         for code in np.unique(method)
         for on in (np.flatnonzero(method == code),)
@@ -229,10 +233,12 @@ def _the_days(
     contract: NDArray[np.intp],
     holidays: HolidayCalendar,
     named: Callable[[int], str],
+    booked: Callable[[int], str] | None,
 ) -> tuple[NDArray[np.intp], NDArray[np.datetime64], NDArray[np.float64]]:
     """One method's observations for the components that chose it, `on`, in their order: each
     observation's component, its day and its weight by the method's rule, the days of the
-    components given aligned with `on`, a component refused named through `named`."""
+    components given aligned with `on`, a component refused named through `named` and, under
+    asian, by what it is booked under through `booked`, its contract's code when None."""
     count = on.size
     match kind:
         case ScheduleMethod.LASTDAY:
@@ -254,11 +260,16 @@ def _the_days(
             if (days == 0).any():
                 k = int((days == 0).argmax())
                 component = int(on[k])
+                label = (
+                    schedule.codes[int(contract[component])]
+                    if booked is None
+                    else booked(component)
+                )
                 raise ValueError(
-                    f"{schedule.codes[contract[component]]} of {named(component)} has no pricing "
-                    f"day from {start[k]} to {end[k]}, expected a Monday to Friday of the days it "
-                    "covers the index's market is open on; the asian method averages the pricing "
-                    "days a component covers"
+                    f"{label} of {named(component)} has no pricing day from {start[k]} to "
+                    f"{end[k]}, expected a Monday to Friday of the days it covers the index's "
+                    "market is open on; the asian method averages the pricing days a component "
+                    "covers"
                 )
             total = int(days.sum())
             component = np.repeat(on, days)

@@ -678,7 +678,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW3),3,2)" = "lots"
     "=INDEX(util_ReadHandle(EW3),3,7)" = "CME Clearing"
     "=COLUMNS(util_ReadHandle(EW3))"   = "8"
-    "=INDEX(util_ReadHandle(EW8),1,4)" = "contract_code"
+    "=INDEX(util_ReadHandle(EW8),1,4)" = "booked_period"
     "=INDEX(util_ReadHandle(EW8),3,4)" = "u26"
     "=INDEX(util_ReadHandle(EW8),4,4)" = "X26"
     "=INDEX(util_ReadHandle(EW8),5,4)" = "u26"
@@ -1064,6 +1064,36 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(NF8),3,1)"     = "0"
     "=INDEX(_ReportValues(NF8),3,2)"     = "5200"
     '=INDEX(_ReportRisk(NF8,"nominal_delta","year"),4,2)'       = "0"
+    # The whole-period average, onetime-averaging.md: the WTI-like index's window of 18 December
+    # to 15 January as one onetime row in MS6, 1,900 barrels for the period at 70 under the
+    # onetime template in MJ6, paying +2bd from the window's last day, 19 January, 46406; the
+    # batch in MS7 one component, its two dates under booked_period, 29 days, 1,900 barrels,
+    # onetime and period as entered; prepared on the 18th in MS8, nineteen slots of 100 barrels
+    # each labelled by the window, F27's two and G27's seventeen; valued in MS9 at 72 and 75,
+    # 8,900 of mark and 1.9 lots, 0.2 on F27 and 1.7 on G27.
+    "=ROWS(util_ReadHandle(MS7))"        = "3"
+    "=INDEX(util_ReadHandle(MS7),1,4)"   = "booked_period"
+    "=INDEX(util_ReadHandle(MS7),3,4)"   = "2026-12-18 to 2027-01-15"
+    "=INDEX(util_ReadHandle(MS7),3,11)"  = "period"
+    "=INDEX(util_ReadHandle(MS7),3,14)"  = "46406"
+    "=INDEX(util_ReadHandle(MS7),3,18)"  = "29"
+    "=INDEX(util_ReadHandle(MS7),3,19)"  = "1900"
+    "=INDEX(util_ReadHandle(MS7),3,23)"  = "onetime"
+    "=ROWS(util_ReadHandle(MS8))"        = "21"
+    "=INDEX(util_ReadHandle(MS8),3,1)"   = "F27"
+    "=INDEX(util_ReadHandle(MS8),4,1)"   = "F27"
+    "=INDEX(util_ReadHandle(MS8),5,1)"   = "G27"
+    "=INDEX(util_ReadHandle(MS8),21,1)"  = "G27"
+    "=INDEX(util_ReadHandle(MS8),3,2)"   = "2026-12-18 to 2027-01-15"
+    "=INDEX(util_ReadHandle(MS8),21,2)"  = "2026-12-18 to 2027-01-15"
+    "=INDEX(util_ReadHandle(MS8),3,4)"   = "46406"
+    "=INDEX(util_ReadHandle(MS8),3,7)"   = "100"
+    "=INDEX(util_ReadHandle(MS8),3,8)"   = "0.1"
+    "=ROUND(INDEX(_ReportValues(MS9),3,1),6)" = "8900"
+    "=INDEX(_ReportValues(MS9),3,2)"     = "0"
+    '=ROUND(INDEX(_ReportRisk(MS9,"nominal_delta","year"),4,2),6)' = "1.9"
+    "=ROUND(INDEX(util_ReadHandle(MS9),3,11),6)" = "0.2"
+    "=ROUND(INDEX(util_ReadHandle(MS9),5,11),6)" = "1.7"
     # The risk by day, month and year, unified-risk-reporting.md: _ReportRisk on the WTI block's
     # results, the nominal delta by day six rows under the Total, 0.2 a day from 46374, by month one
     # row from 46357 and by year one from 46023, each 1.2; all three on one axis with the DV01
@@ -2693,6 +2723,12 @@ $cells = [ordered]@{
     "NF9" = "=_CreateMarket(NF5,NF6)"
     "NF7" = "=_PrepareTrades(MS4,NF5)"
     "NF8" = "=_EvaluateTrades(NF7,NF9)"
+    "MJ5" = "BBL"; "MK5" = "period"; "ML5" = "asian"; "MM5" = "cleared"; "MN5" = "financial"; "MO5" = "Prototype Clearing"; "MP5" = "+2bd"; "MQ5" = "=MC3"; "MR5" = "onetime"
+    "MJ6" = '=_CreateTradeTemplate("fixed_float",IJ1:IR1,MJ5:MR5)'
+    "MS6" = "24"; "MT6" = "20-Nov-2026"; "MU6" = "18-Dec-2026"; "MV6" = "15-Jan-2027"; "MW6" = "1900"; "MX6" = "70"
+    "MS7" = "=_CreateTrades(MA6,MS1:MX1,MS6:MX6,MJ6)"
+    "MS8" = "=_PrepareTrades(MS7,MY5)"
+    "MS9" = "=_EvaluateTrades(MS8,MY9)"
     "NH1" = "X26"; "NJ1" = "2-Nov-2026"
     "NH2" = "Z26"; "NJ2" = "1-Dec-2026"
     "NH3" = "F27"; "NJ3" = "4-Jan-2027"

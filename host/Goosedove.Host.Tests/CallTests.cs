@@ -862,6 +862,66 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateTrades: ValueError: quantity_unit is 'ICE PHH', expected one of the index's specifications: 'NYMEX NG'", Seam.Call("_CreateTrades", ng, headers, rows, (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("ICE PHH", "month", "monthly", "lastday", "cleared", "physical", "CME Clearing"))));
         }
 
+        // The whole-period average, onetime-averaging.md's third slice: the WTI trade month of 26 May
+        // to 25 June 2026 as one onetime row of 2,200 barrels at 71 paying 29 June, on a CL-like index
+        // whose N26 expires 22 June, closed on Memorial Day, Juneteenth and 3 July, a barrel its one
+        // specification; valued on 23 April, the one fixed day settled, with M26 at 69, N26 at 70 and
+        // Q26 at 72: one component reading back its two dates under booked_period, its 31 days and
+        // 2,200 barrels, onetime and period as entered, paying 29 June; 22 slots each labelled by the
+        // window, N26's nineteen then Q26's three; a mark of -1,600 and no cash, 2,200 barrels of
+        // delta; a lastday row under onetime refused by name before any period is built.
+        [Fact]
+        public void a_onetime_window_is_one_average_one_quantity_and_one_payment()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("K26", "M26", "N26", "Q26", "U26"), Column(46133.0, 46161.0, 46195.0, 46224.0, 46254.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46167.0, 46192.0, 46206.0));
+            var conventions = Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 } });
+            var index = (string)Seam.Call("_CreateIndex", "CL", "CL index", schedule, conventions, specifications, holidays, "BBL");
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("BBL", "period", "onetime", "asian", "cleared", "financial", "CME Clearing", 46202.0, holidays));
+            var headers = Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price");
+            var booking = Row(1.0, 46157.0, 46168.0, 46198.0, 2200.0, 71.0);
+            var trades = (string)Seam.Call("_CreateTrades", index, headers, booking, template);
+            Assert.StartsWith(Pid + ":trades:CL:", trades);
+            var spill = (object[,])Seam.Call("util_ReadHandle", trades);
+            Assert.Equal(3, spill.GetLength(0));
+            Assert.Equal("booked_period", spill[0, 3]);
+            Assert.Equal("2026-05-26 to 2026-06-25", spill[2, 3]);
+            Assert.Equal("period", spill[2, Heading(spill, "quantity_per")]);
+            Assert.Equal("onetime", spill[2, Heading(spill, "settlement_frequency")]);
+            Assert.Equal(46168.0, spill[2, Heading(spill, "start_date")]);
+            Assert.Equal(46198.0, spill[2, Heading(spill, "end_date")]);
+            Assert.Equal(31.0, spill[2, Heading(spill, "covered_days")]);
+            Assert.Equal(2200.0, spill[2, Heading(spill, "component_quantity")]);
+            Assert.Equal(46202.0, spill[2, Heading(spill, "payment_date")]);
+            var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46135.0, 0.5), index);
+            var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46134.0), Column(69.0), index);
+            var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
+            var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "CL", Column(69.0, 70.0, 72.0, 74.0)));
+            var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
+            var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
+            Assert.Equal(24, slots.GetLength(0));
+            Assert.Equal("booked_period", slots[0, 1]);
+            Assert.Equal("2026-05-26 to 2026-06-25", slots[2, 1]);
+            Assert.Equal("2026-05-26 to 2026-06-25", slots[23, 1]);
+            Assert.Equal("N26", slots[2, 0]);
+            Assert.Equal("N26", slots[20, 0]);
+            Assert.Equal("Q26", slots[21, 0]);
+            Assert.Equal(46168.0, slots[2, 2]);
+            Assert.Equal(46198.0, slots[23, 2]);
+            Assert.Equal(46202.0, slots[2, 3]);
+            Assert.Equal(100.0, (double)slots[2, 6], 6);
+            var results = (string)Seam.Call("_EvaluateTrades", prepared, market, ExcelMissing.Value);
+            var values = (object[,])Seam.Call("_ReportValues", results);
+            Assert.Equal(-1600.0, (double)values[2, 0], 6);
+            Assert.Equal(0.0, values[2, 1]);
+            var risk = (object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year");
+            Assert.Equal(2200.0, (double)risk[3, 1], 6);
+            var lastday = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("BBL", "period", "onetime", "lastday", "cleared", "financial", "CME Clearing", 46202.0, holidays));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: schedule_method of trade 1 at row 1 is 'lastday', expected 'asian' under settlement_frequency = onetime; a onetime period averages every pricing day it covers, and the expiry-based methods take their contract's month", Seam.Call("_CreateTrades", index, headers, booking, lastday));
+        }
+
         // The valuation path from the host's side: the market fact's chain, valued on 26 May 2026 with
         // n26 at 72.10 and q26 at 72.80, a batch of two lots of n26 at 70 and one lot sold of q26
         // at 72, prepared, evaluated and reported: a mark of 34,000 and no cash, a total delta of
