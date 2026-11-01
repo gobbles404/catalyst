@@ -276,7 +276,11 @@ def test_a_trade_booked_at_the_quote_marks_zero_on_either_route() -> None:
                 "settlement_frequency": frequency,
                 "payment_day": "+2bd",
             }
-            ticket = {**TMA_TICKET, "quantity": [quantity], "fixed_price": [k]}
+            ticket: dict[str, list[object]] = {
+                **TMA_TICKET,
+                "quantity": [quantity],
+                "fixed_price": [k],
+            }
             assert marked(ticket, booked, MARKET, curves) == pytest.approx(0.0, abs=1e-6)
     fixed = priced(CL, JUNE_26, 69.0, 70.0, 72.0, 74.0)
     assert marked({**TMA_TICKET, "fixed_price": [69.0]}, TMA_TEMPLATE, fixed) == pytest.approx(
