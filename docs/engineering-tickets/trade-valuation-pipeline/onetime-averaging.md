@@ -1,6 +1,6 @@
 # Onetime averaging across calendar months
 
-**Status:** Agreed 1 November 2026 as issue #231, three stacked pull requests from main: the first, the calculation period beside every component and the payment groups keyed by it, is built in #232; the second, the `settlement_frequency` field required of every template and refused by every consumer until priced, is built in #233 on it; the third, the whole-period average, follows. [kernel.md](../../library/trades/kernel.md) owns the groups, [create-trades.md](../../library/trades/create-trades.md) the entry and [show-instrument.md](../../library/instruments/show-instrument.md) the fields.
+**Status:** Agreed 1 November 2026 as issue #231, three stacked pull requests from main: the first, the calculation period beside every component and the payment groups keyed by it, is built in #232; the second, the `settlement_frequency` field required of every template and refused by every consumer until priced, is built in #233 on it; the third, the whole-period average, is built in #234 on it. [kernel.md](../../library/trades/kernel.md) owns the groups, [create-trades.md](../../library/trades/create-trades.md) the entry and [show-instrument.md](../../library/instruments/show-instrument.md) the fields.
 
 ## The issue
 
