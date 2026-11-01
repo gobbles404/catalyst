@@ -56,6 +56,7 @@ from goosedove.trades.terms import (
     Route,
     Settlement,
     marketing_reserves,
+    month_bounds,
     named_trade,
     payments_after_observations,
     reporting_lot_of,
@@ -796,18 +797,6 @@ def schedule_rows(
             f"it has none for {month_label(month[k])}"
         )
     return contract.astype(np.intp)
-
-
-def month_bounds(
-    month: NDArray[np.int64],
-) -> tuple[NDArray[np.datetime64], NDArray[np.datetime64]]:
-    """The first and the last calendar day of each month given, as numpy counts months: the days a
-    whole-month component covers, and the bounds an explicit period's components are clipped to,
-    one conversion each way and one day subtracted."""
-    first = month.astype("datetime64[M]").astype("datetime64[D]")
-    after = (month + 1).astype("datetime64[M]").astype("datetime64[D]")
-    last = cast(NDArray[np.datetime64], after - np.timedelta64(1, "D"))  # a day, not a span
-    return first, last
 
 
 # --- the payment days of a financial settlement ---------------------------------------------

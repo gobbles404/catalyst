@@ -228,7 +228,7 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
     assert spilled(ENTRY["util_ReadHandle"](ng["prepared"])) == [
         [
             "pricing_contract",
-            "booked_contract",
+            "booked_period",
             "observation_date",
             "is_fixed",
             "is_settled",
@@ -243,7 +243,7 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
     assert table[:2] == [
         [
             "pricing_contract",
-            "booked_contract",
+            "booked_period",
             "observation_date",
             "is_fixed",
             "live_coefficient",
@@ -2240,7 +2240,7 @@ def test_two_payment_days_on_one_contract_value_on_the_sheet_as_the_ticket_says(
     slots = spilled(ENTRY["util_ReadHandle"](prepared))
     assert slots[0] == [
         "pricing_contract",
-        "booked_contract",
+        "booked_period",
         "observation_date",
         "payment_date",
         "is_fixed",
@@ -2267,7 +2267,7 @@ def test_two_payment_days_on_one_contract_value_on_the_sheet_as_the_ticket_says(
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert table[0] == [
         "pricing_contract",
-        "booked_contract",
+        "booked_period",
         "observation_date",
         "payment_date",
         "is_fixed",
@@ -3170,7 +3170,7 @@ def test_the_wti_asian_values_on_the_sheet_as_the_ticket_says(
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert table[0][:4] == [
         "pricing_contract",
-        "booked_contract",
+        "booked_period",
         "observation_date",
         "payment_date",
     ]
@@ -3184,7 +3184,7 @@ def test_the_wti_asian_values_on_the_sheet_as_the_ticket_says(
     ] * 4
 
 
-def test_two_groups_on_one_pricing_day_read_back_apart_by_their_booked_contracts(
+def test_two_groups_on_one_pricing_day_read_back_apart_by_their_booked_periods(
     wti: dict[str, Any],
 ) -> None:
     # A December asian booked as Z26 over the 1st to the 21st and a lastday F27 over its own month
@@ -3576,7 +3576,7 @@ def test_the_waha_basis_future_values_on_the_sheet_as_the_ticket_says(
     slots = spilled(ENTRY["util_ReadHandle"](prepared))
     assert slots[0] == [
         "pricing_contract",
-        "booked_contract",
+        "booked_period",
         "observation_date",
         "payment_date",
         "is_fixed",
@@ -4406,7 +4406,7 @@ UNIT_NOMINAL = "UNIT nominal_delta [UNIT]"
 UNIT_DELTA = "UNIT delta [UNIT]"
 RESULT_COLUMNS = [
     "pricing_contract",
-    "booked_contract",
+    "booked_period",
     "observation_date",
     "payment_date",
     "is_fixed",

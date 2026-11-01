@@ -1207,7 +1207,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         return batch
 
     peak = least_peak(created)
-    assert peak <= 280 * rows + 2 * SLACK
+    assert peak <= 296 * rows + 2 * SLACK  # 280 before the period bounds, 16 bytes a component
 
 
 # A combination keeps its distinct days and nothing of its sources: two calendars of the same

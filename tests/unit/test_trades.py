@@ -40,7 +40,6 @@ from goosedove.trades.encoding import encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.observations import Observations, observations, observed
 from goosedove.trades.preparation import PreparedTrades, prepared_trades
-from goosedove.trades.resolution import month_bounds
 from goosedove.trades.results import TradeResults
 from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 from goosedove.trades.terms import (
@@ -51,6 +50,7 @@ from goosedove.trades.terms import (
     Route,
     Settlement,
     marketing_reserves,
+    month_bounds,
     named_trade,
     one_choice,
     resolved_trades,
@@ -1620,7 +1620,7 @@ def test_the_daily_toys_results_read_back_slot_by_slot_with_the_contracts_delta_
     table = shown(result)
     assert table.texts[:12] == (
         "pricing_contract",
-        "booked_contract",
+        "booked_period",
         "observation_date",
         "payment_date",
         "is_fixed",
@@ -4626,7 +4626,7 @@ def test_a_full_december_on_the_wti_like_index_splits_22_days_15_to_f27_and_7_to
     assert result.legs[0].nominal_delta_total == pytest.approx(2.2)
 
 
-def test_two_groups_on_one_pricing_day_stay_apart_by_their_booked_contracts() -> None:
+def test_two_groups_on_one_pricing_day_stay_apart_by_their_booked_periods() -> None:
     # A December asian booked as Z26 over the 1st to the 21st and a lastday F27 both observe
     # Monday 21 December, F27's expiry, off F27, and both pay the 22nd: two groups, Z26's and
     # F27's, two slots on that day, one reference; the pair values as its singletons summed.
@@ -4659,6 +4659,59 @@ def test_two_groups_on_one_pricing_day_stay_apart_by_their_booked_contracts() ->
     assert both.mark == pytest.approx(a.mark + f.mark)
     np.testing.assert_allclose(both.legs[0].price_sensitivity, [1_500.0 + 1_000.0])
     np.testing.assert_allclose(a.legs[0].price_sensitivity + f.legs[0].price_sensitivity, [2_500.0])
+
+
+def test_each_component_carries_its_calendar_month_as_its_calculation_period() -> None:
+    # Since onetime-averaging.md the terms derive each component's calculation period, the
+    # identity its payment group is keyed by: a dated December row's and a whole January's are
+    # their months entire, the covered days clipped within them as they were; both frozen.
+    terms = wti_terms(
+        periods=(("2026-12-18", "2026-12-28"), JANUARY_BOUNDS),
+        quantities=(1_200.0, 1_000.0),
+        contracts=(0, 1),
+        pays=("2026-12-30", "2027-02-02"),
+        methods=(ScheduleMethod.ASIAN, ScheduleMethod.LASTDAY),
+    )
+    assert [str(d) for d in terms.period_start] == ["2026-12-01", "2027-01-01"]
+    assert [str(d) for d in terms.period_end] == ["2026-12-31", "2027-01-31"]
+    assert [str(d) for d in terms.start_date] == ["2026-12-18", "2027-01-01"]
+    assert [str(d) for d in terms.end_date] == ["2026-12-28", "2027-01-31"]
+    assert not terms.period_start.flags.writeable
+    assert not terms.period_end.flags.writeable
+
+
+def test_two_rows_of_one_month_paying_on_one_day_are_one_group_each_with_its_own_days() -> None:
+    # The period identity's rule, onetime-averaging.md: a December asian of 1,000 barrels over the
+    # 1st to the 10th and another of 2,000 over the 15th to the 28th, both booked as Z26 and both
+    # paying 30 December, are one group, their fixed legs summed; and grouping them recomputes
+    # nothing, each keeping its own pricing days, eight at an eighth and nine at a ninth, never
+    # seventeen at a seventeenth, so the pair values as its singletons summed.
+    pair = wti_terms(
+        periods=(("2026-12-01", "2026-12-10"), ("2026-12-15", "2026-12-28")),
+        quantities=(1_000.0, 2_000.0),
+        contracts=(0, 0),
+        pays=("2026-12-30", "2026-12-30"),
+    )
+    observations = observed_of(pair)
+    enc = encoded(pair, (observations,), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.group_of_component, [0, 0])
+    np.testing.assert_array_equal(enc.legs[0].group_contract, [0])
+    first = observations.component == 0
+    assert int(first.sum()) == 8 and int((~first).sum()) == 9
+    np.testing.assert_allclose(observations.weight[first], 1 / 8)
+    np.testing.assert_allclose(observations.weight[~first], 1 / 9)
+    assert enc.legs[0].slot_group.size == 17  # no day shared, every slot the one group's
+    np.testing.assert_allclose(enc.legs[0].offset_of_group, [enc.legs[0].offset.sum()])
+    both, _ = wti_valued("2026-12-01", (72.0, 75.0), pair)
+    early = wti_terms(
+        periods=(("2026-12-01", "2026-12-10"),), quantities=(1_000.0,), pays=("2026-12-30",)
+    )
+    late = wti_terms(
+        periods=(("2026-12-15", "2026-12-28"),), quantities=(2_000.0,), pays=("2026-12-30",)
+    )
+    a, _ = wti_valued("2026-12-01", (72.0, 75.0), early)
+    b, _ = wti_valued("2026-12-01", (72.0, 75.0), late)
+    assert both.mark == pytest.approx(a.mark + b.mark)
 
 
 def test_the_roll_takes_the_calendars_contract_on_each_day_whatever_the_schedule() -> None:

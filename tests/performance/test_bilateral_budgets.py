@@ -48,7 +48,6 @@ from goosedove.market.market import Market
 from goosedove.trades.encoding import PaymentAxes, encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import PreparedTrades, UnpaidPayments, prepared_trades
-from goosedove.trades.resolution import month_bounds
 from goosedove.trades.results import TradeResults, risk_view
 from goosedove.trades.risk_report import Bucket, Risk
 from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
@@ -59,6 +58,7 @@ from goosedove.trades.terms import (
     ResolvedTrades,
     Route,
     Settlement,
+    month_bounds,
     one_choice,
     resolved_trades,
 )

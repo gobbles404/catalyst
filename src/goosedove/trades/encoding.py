@@ -2,8 +2,9 @@
 numbers before any price or fixing is known. Per component, its signed quantity in the index's
 quote quantity unit, its coefficient, the settlement currency it makes per unit of quote price,
 and its entry-price offset in the settlement currency. Per payment group, the components of one
-contract that pay on one day, a contract whose components pay on two days being two groups, or
-the components of one contract under a physical settlement, which pays on no day: the contract,
+calculation period that pay on one day, since onetime-averaging.md the period a component's
+calendar month, a period whose components pay on two days being two groups, or the components of
+one period under a physical settlement, which pays on no day: the contract of the period's month,
 the summed offset and, for a financial settlement, the day it pays. Per slot, the dated market
 input the batch consumes, an observation date within a payment group: the date, the contract
 pricing that date, derived by the calendar's rule and retained, the group's own under the
@@ -121,8 +122,10 @@ class EncodedLeg:
     offset is the component's entry-to-price P&L on this leg.
 
     Per payment group, aligned with the trade's groups: group_contract[g], the schedule row of
-    the g-th group's contract on this leg's schedule, the contract its components were booked on,
-    which owns the fixed leg and, with its payment day, names the group; and offset_of_group[g],
+    the g-th group's contract on this leg's schedule, the contract of the calendar month its
+    components were booked on, which owns the fixed leg and, with its payment day, names the
+    group, the group itself keyed since onetime-averaging.md by its calculation period, that
+    month, and not by the contract; and offset_of_group[g],
     the leg's components' offsets summed by group, the leg's fixed leg of the group, the trade's
     being the legs' summed.
 
@@ -217,13 +220,15 @@ class Encoded:
     the legs, one EncodedLeg per leg of the terms in leg order, one today, each holding what its
     index owns, since two-index-fixed-float.md.
 
-    Per payment group, the components of one contract that pay on one day and, since
-    named-curves-slice-3.md, under one discount_curve_key: the groups in the schedule's order,
-    within a contract by the day they pay and within a day by their key, the keys in the order
-    the rows first name them, so that a contract whose components pay on two days is two groups,
-    two components paying on one day under two keys two groups never netted before discounting,
-    and a contract under a physical settlement, which pays on no day, one; each group's contract
-    on each leg's schedule is the leg's group_contract; keys, the batch's distinct keys in that
+    Per payment group, the components of one calculation period that pay on one day and, since
+    named-curves-slice-3.md, under one discount_curve_key, the period since onetime-averaging.md
+    the terms' period_start and period_end, a component's calendar month: the groups in period
+    order, within a period by the day they pay and within a day by their key, the keys in the
+    order the rows first name them, so that a month whose components pay on two days is two
+    groups, two components paying on one day under two keys two groups never netted before
+    discounting, and a month under a physical settlement, which pays on no day, one; each
+    group's contract on each leg's schedule is the leg's group_contract, the contract of its
+    month; keys, the batch's distinct keys in that
     order, and key_of_group[g] each group's place among them, None with no key, a cleared
     batch's; group_of_component[k]; offset_of_group[g], the legs' offsets summed, the trade's
     fixed leg of the group; payment_date[g], the day the group pays, an array for a financial
@@ -731,28 +736,31 @@ def _the_groups(
     tuple[str, ...],
     NDArray[np.intp] | None,
 ]:
-    """The payment groups: under a financial settlement the distinct pairs of contract and payment
-    day among the components, in the schedule's order and by day within a contract, and since
-    named-curves-slice-3.md the distinct triples with the row's key where the batch has keys, by
-    key within a day, the keys in the order the rows first name them; under a physical settlement,
-    which pays on no day, the distinct contracts. Each group's first component, its head, whose
-    contract row on each leg's schedule is the group's contract there, its payment day or None,
-    each component's group, the batch's distinct keys and each group's key, the keys empty and
-    the key of each group None where the batch has none. The first leg's contract rows name the
-    groups; a second leg's components stand in the same months, so its groups are the same."""
-    contract = terms.legs[0].contract
+    """The payment groups, keyed since onetime-averaging.md by the terms' calculation period, its
+    first and its last day, a component's calendar month, and not by the contract: under a
+    financial settlement the distinct pairs of period and payment day among the components, in
+    period order and by day within a period, and since named-curves-slice-3.md the distinct
+    triples with the row's key where the batch has keys, by key within a day, the keys in the
+    order the rows first name them; under a physical settlement, which pays on no day, the
+    distinct periods; one lexsort either way. Each group's first component, its head, whose
+    contract row on each leg's schedule is the group's contract there, the contract of its month,
+    its payment day or None, each component's group, the batch's distinct keys and each group's
+    key, the keys empty and the key of each group None where the batch has none. The trade's
+    periods name the groups; a second leg's components stand in the same periods, so its groups
+    are the same."""
+    period = (terms.period_start.astype(np.int64), terms.period_end.astype(np.int64))
     if terms.payment is None:
-        _, heads, group_of_component = np.unique(contract, return_index=True, return_inverse=True)
+        group_of_component, heads = _distinct(*period)
         return heads, None, group_of_component, (), None
     day = terms.payment.date.astype(np.int64)
     if terms.discount_curve_key is None:
-        group_of_component, heads = _distinct(contract, day)
+        group_of_component, heads = _distinct(*period, day)
         return heads, terms.payment.date[heads], group_of_component, (), None
     keys = tuple(dict.fromkeys(terms.discount_curve_key))  # distinct, by first appearance
     place = {key: i for i, key in enumerate(keys)}
     key_of_occurrence = np.array([place[key] for key in terms.discount_curve_key], dtype=np.intp)
     key_of_component = key_of_occurrence[terms.occurrence]
-    group_of_component, heads = _distinct(contract, day, key_of_component)
+    group_of_component, heads = _distinct(*period, day, key_of_component)
     return heads, terms.payment.date[heads], group_of_component, keys, key_of_component[heads]
 
 

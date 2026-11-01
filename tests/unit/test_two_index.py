@@ -1008,7 +1008,7 @@ def test_the_prepared_and_valued_pair_read_back_one_row_per_slot_naming_its_leg(
         "leg",
         "index",
         "pricing_contract",
-        "booked_contract",
+        "booked_period",
         "observation_date",
     ]
     assert slots[1][:2] == ["int64", "str"]

@@ -33,9 +33,9 @@ from goosedove.quoting.request import (
 from goosedove.quoting.template import QuoteTemplate
 from goosedove.trades.encoding import observation_references
 from goosedove.trades.observations import observed
-from goosedove.trades.resolution import SCHEDULE_CODES_READ, month_bounds, schedule_rows
+from goosedove.trades.resolution import SCHEDULE_CODES_READ, schedule_rows
 from goosedove.trades.schedule_methods import METHODS
-from goosedove.trades.terms import QuantityPer, trade_schedule_of
+from goosedove.trades.terms import QuantityPer, month_bounds, trade_schedule_of
 
 
 def quote(

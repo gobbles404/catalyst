@@ -599,13 +599,14 @@ def _slot_names(
     encoding: Encoded, leg: EncodedLeg
 ) -> tuple[list[str], list[str], list[NDArray[Any] | tuple[str, ...]]]:
     # The columns that name a slot: the contract pricing the day, whose settle fixes the slot and
-    # whose quote projects it; the contract the slot's group was booked on, which owns the fixed
-    # leg and the payment and under asian may be another; the observation day; and, for a
-    # financial settlement, the day the slot's payment group pays, so that two groups observing
-    # one day read apart whatever contract prices it; a physical settlement pays on no day and
-    # shows none. The slots are the leg's, the payment days the trade's.
+    # whose quote projects it; the period the slot's group was booked on, since
+    # onetime-averaging.md the calendar month named by its contract, which owns the fixed leg and
+    # the payment and under asian may be another than the pricing one; the observation day; and,
+    # for a financial settlement, the day the slot's payment group pays, so that two groups
+    # observing one day read apart whatever contract prices it; a physical settlement pays on no
+    # day and shows none. The slots are the leg's, the payment days the trade's.
     codes = np.array(leg.leg.schedule.codes, dtype=object)
-    names = ["pricing_contract", "booked_contract", "observation_date"]
+    names = ["pricing_contract", "booked_period", "observation_date"]
     types = ["str", "str", "datetime64[D]"]
     columns: list[NDArray[Any] | tuple[str, ...]] = [
         tuple(codes[leg.slot_reference]),

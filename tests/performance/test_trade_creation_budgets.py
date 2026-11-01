@@ -267,7 +267,8 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_periods": 1,  # each row's period chosen, since #172, and resolved to its components
         "_the_periods.<locals>.<lambda>": distinct,  # each distinct code named for its first row
         "schedule_rows": 1,
-        "month_bounds": 1,  # the first and last day of each component's month
+        "month_bounds": 2,  # the first and last day of each component's month, and since
+        # onetime-averaging.md the terms' calculation period of each component, that month
         "_each_distinct": 3,  # the units, the methods and the bases; the rules below
         "_each_distinct.<locals>.<lambda>": 3,  # each distinct text named for its first row
         "_distinct_texts": 5,  # those four, and the codes of the rows that book by code
@@ -335,6 +336,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_frozen_rows": 5,  # the occurrence, the contract and the three selections
         "_frozen_numbers": 2,
         "_the_component_quantity": 1,  # each component's quantity by the basis
+        "_the_calculation_periods": 1,  # each component's period, since onetime-averaging.md
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 6,  # the rows, the components, the schedule's codes and the ticket's,
         # and since #181 the rules read and the shifts applied
@@ -369,7 +371,8 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
         # periods' since #172
         "ndarray.argsort": 13,  # two per distinct read, the texts and their first rows, five reads,
         # and the rule-and-calendar groups' unique, since #181
-        "ndarray.astype": 17,  # the month bounds four, the one-month look two, the days one, the
+        "ndarray.astype": 23,  # the month bounds four, the one-month look two, the days one, the
+        # calculation periods' six since onetime-averaging.md, the
         # three row fields' positions among their distinct texts, the dated rows' months four
         "ndarray.clip": 1,
         "ndarray.cumsum": 12,  # one per distinct read within numpy's unique, five, two more, the
@@ -386,7 +389,8 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
         "ndarray.reshape": 8,  # one more within the groups' unique, since #181
         "ndarray.round": 1,
         "ndarray.searchsorted": 1,  # each component's last observation, its payment's anchor
-        "ndarray.setflags": 18,  # the kernel's twelve copies, the three selections among them, the
+        "ndarray.setflags": 20,  # the kernel's twelve copies, the two period bounds since
+        # onetime-averaging.md, the three selections among them, the
         # schedule's months since #186,
         # rule kept as text since #181 and frozen by no one,
         # the observations' three, the rows that entered a code
@@ -416,7 +420,7 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
 # does, two conversions of its month and one look; the asian method, which takes a part of a
 # month, has no such look.
 WHOLE_MONTHS = {"_whole_months": 1}
-WHOLE_MONTHS_NUMPY = {"ndarray.any": 26, "ndarray.astype": 20, "ufunc.reduce": 29}
+WHOLE_MONTHS_NUMPY = {"ndarray.any": 26, "ndarray.astype": 26, "ufunc.reduce": 29}
 
 
 @pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
@@ -779,7 +783,7 @@ def test_the_calday_basis_counts_the_days_once_over_the_schedule_and_multiplies_
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
         "ndarray.any": 27,  # and whether any product would outrun the largest number
-        "ndarray.setflags": 19,  # the product frozen, the brokered rows since #188
+        "ndarray.setflags": 21,  # the product frozen, the brokered rows since #188, the periods
         "numpy._make_extobj": 1,  # the error state set once, the overflow this rule's to catch
         "ufunc.reduce": 30,
     }
@@ -1039,12 +1043,13 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
         "ndarray.any": 29,  # the open expiries, the asian pricing days and the calday products
-        "ndarray.astype": 21,  # the observations' days as counts, to put them back in order
+        "ndarray.astype": 27,  # the observations' days as counts, to put them back in order,
+        # and the periods' six since onetime-averaging.md
         "ndarray.cumsum": 13,  # where each asian component's observations start
         "ndarray.nonzero": 7,  # the components of each of the four methods
         "ndarray.ravel": 8,  # the same, and the last3day days laid out in one column
         "ndarray.repeat": 6,  # last3day's components, asian's four repeats
-        "ndarray.setflags": 19,  # the calday products frozen, the brokered rows since #188
+        "ndarray.setflags": 21,  # the calday products frozen, the brokered rows, the periods
         "ndarray.sum": 1,  # how many asian observations in all
         "numpy._make_extobj": 1,  # the error state set once for the calday products
         "numpy.arange": 5,  # the place of each asian observation within its component
