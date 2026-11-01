@@ -1,6 +1,6 @@
 # Dated windows in quotes and requests for quote
 
-**Status:** Agreed 1 November 2026 as issue #235, two pull requests stacked on #234, the arc one stack: the first moves the window's shared rules to owners a booking and a quote share and adds `_QuoteByDates`, a quote by two dates beside `_Quote`, which is unchanged, this pull request; the second gives `_CreateRFQ` a ticket with dated rows, the `period` readback and the migration. [quote-by-dates.md](../../library/quoting/quote-by-dates.md), [quote.md](../../library/quoting/quote.md), [rfq.md](../../library/quoting/rfq.md) and [quote-template.md](../../library/quoting/quote-template.md) own the functions; [kernel.md](../../library/trades/kernel.md) the rules they reuse.
+**Status:** Agreed 1 November 2026 as issue #235, two pull requests stacked on #234, the arc one stack: the first moves the window's shared rules to owners a booking and a quote share and adds `_QuoteByDates`, a quote by two dates beside `_Quote`, which is unchanged, is built in #236; the second gives `_CreateRFQ` a ticket with dated rows, the `period` readback and the migration. [quote-by-dates.md](../../library/quoting/quote-by-dates.md), [quote.md](../../library/quoting/quote.md), [rfq.md](../../library/quoting/rfq.md) and [quote-template.md](../../library/quoting/quote-template.md) own the functions; [kernel.md](../../library/trades/kernel.md) the rules they reuse.
 
 ## The issue
 
