@@ -44,11 +44,13 @@ from goosedove.trades.results import TradeResults
 from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 from goosedove.trades.terms import (
     BASES,
+    FREQUENCIES,
     PaymentTerms,
     QuantityPer,
     ResolvedTrades,
     Route,
     Settlement,
+    SettlementFrequency,
     marketing_reserves,
     month_bounds,
     named_trade,
@@ -215,6 +217,7 @@ def terms_of(
         route,
         settlement,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, occurrences),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, occurrences),
         None if trade_ids is None else trade_ids[keep],
         None,
         None,
@@ -275,7 +278,10 @@ def test_the_terms_own_frozen_copies_of_their_columns() -> None:
     lots, pays, lags = LOTS.copy(), TOY_PAYS.copy(), ("+2bd",) * 5
     terms = resolved_trades(
         FIXED_FLOAT, TOY, spec(5), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 5), TRADE_IDS, ("CME Clearing",) * 5,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 5),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 5),
+        TRADE_IDS,
+        ("CME Clearing",) * 5,
         None, TRADE_DATES,
         np.arange(5, dtype=np.intp), CONTRACT, lots, *bounds_of(TOY, CONTRACT), FIXED_PRICE,
         PaymentTerms(DatesOrTexts.of_texts(lags), (PAYMENT_CALENDAR,) * 5, pays),
@@ -445,6 +451,7 @@ def test_terms_that_cannot_be_resolved_say_why(change: dict[str, Any], message: 
         "settlement": Settlement.PHYSICAL,
         "schedule_method": one_choice(METHODS, ScheduleMethod.LASTDAY, 5),
         "quantity_per": one_choice(BASES, QuantityPer.MONTH, 5),
+        "settlement_frequency": one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 5),
         "trade_ids": TRADE_IDS,
         "clearing_house": None,
         "broker": None,
@@ -557,7 +564,11 @@ def one_lot_in_cents(
     counter = WorkCounter()
     terms = resolved_trades(
         FIXED_FLOAT, CENTS, spec(1), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ids(1), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 1),
+        ids(1),
+        None,
+        None,
         dates("2026-09-24"), rows(0), rows(1),
         numbers(1), *bounds_of(CENTS, rows(1)), numbers(300.0), paying(dates("2026-11-30"), 1),
     )  # fmt: skip
@@ -636,7 +647,11 @@ CENT_SETTLED = index(
 def test_a_price_in_dollars_settles_in_cents_with_the_unit_naming_both() -> None:
     terms = resolved_trades(
         FIXED_FLOAT, CENT_SETTLED, spec(4), Route.CLEARED, Settlement.PHYSICAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4), ids(1, 2, 3, 4), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 4),
+        ids(1, 2, 3, 4),
+        None,
+        None,
         dates(*["2026-09-24"] * 4),
         rows(0, 1, 2, 2, 3), rows(1, 2, 2, 3, 1), numbers(3, -2, -1, -1, 3),
         *bounds_of(CENT_SETTLED, rows(1, 2, 2, 3, 1)), numbers(3.10, 3.40, 3.55, 3.55, 3.10), None,
@@ -789,7 +804,11 @@ def test_a_history_over_another_index_is_refused_whatever_its_name() -> None:
 def test_a_trade_on_the_schedules_first_contract_is_refused_since_nothing_prices_it() -> None:
     boundary = resolved_trades(
         FIXED_FLOAT, NG, spec(1), Route.CLEARED, Settlement.PHYSICAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), None, None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 1),
+        None,
+        None,
+        None,
         dates("2026-09-24"), rows(0), rows(0), numbers(1),
         *bounds_of(NG, rows(0)), numbers(3.0), None,
     )  # fmt: skip
@@ -1085,6 +1104,7 @@ def pen_terms(
         Route.CLEARED,
         settlement,
         *picks(method, QuantityPer.MONTH, 1),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 1),
         ids(1),
         ("ICE Clear Europe",),
         None,
@@ -1317,6 +1337,7 @@ def strip_terms(order: tuple[tuple[int, tuple[int, ...], float, float], ...]) ->
     return resolved_trades(
         FIXED_FLOAT, STRIP_INDEX, spec(n), Route.CLEARED, Settlement.FINANCIAL,
         *picks(ScheduleMethod.PENULTIMATE, QuantityPer.MONTH, n),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
         ids(*(label for label, _, _, _ in order)), ("ICE Clear Europe",) * n,
         None, np.repeat(day("2027-06-01"), n), rows(*(i for i, _, _, _ in components)),
         rows(*(c for _, c, _, _ in components)), numbers(*(q for _, _, q, _ in components)),
@@ -1434,7 +1455,11 @@ def daily_terms(
     n = len(lots)
     return resolved_trades(
         FIXED_FLOAT, DAILY, spec(n), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), None, None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
+        None,
+        None,
+        None,
         np.repeat(day("2026-11-20"), n),
         np.arange(n, dtype=np.intp), np.ones(n, dtype=np.intp), numbers(*lots),
         *bounds_of(DAILY, np.ones(n, dtype=np.intp)), numbers(*prices),
@@ -1662,7 +1687,11 @@ def test_an_observation_of_another_contract_than_the_days_is_refused_as_unsuppor
     # settle for it, so it is refused rather than priced off Z26.
     terms = resolved_trades(
         FIXED_FLOAT, DAILY, spec(1), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ids(1), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 1),
+        ids(1),
+        None,
+        None,
         dates("2026-11-20"), rows(0), rows(2), numbers(1),
         *bounds_of(DAILY, rows(2)), numbers(70.0), paying(dates("2027-02-02"), 1),
     )  # fmt: skip
@@ -1797,7 +1826,11 @@ def test_observations_own_frozen_copies_and_a_seventh_shared_seven_times_is_one(
 def entry_terms(quantities: tuple[float, float] = (2.0, 0.0)) -> ResolvedTrades:
     return resolved_trades(
         FIXED_FLOAT, NG, spec(2), Route.CLEARED, Settlement.PHYSICAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ids(1001, 1002), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 2),
+        ids(1001, 1002),
+        None,
+        None,
         dates("2026-10-06", "2026-10-06"),
         rows(0, 1), rows(1, 2), numbers(*quantities), *bounds_of(NG, rows(1, 2)),
         numbers(3.0, 3.3), None,
@@ -1808,7 +1841,11 @@ def zero_toy_terms() -> ResolvedTrades:
     """One row kept ready on the toy: nothing of Z26 at 3.10, financial, paying 30 November."""
     return resolved_trades(
         FIXED_FLOAT, TOY, spec(1), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ids(1000), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 1),
+        ids(1000),
+        None,
+        None,
         dates("2026-10-06"), rows(0), rows(1),
         numbers(0.0), *bounds_of(TOY, rows(1)), numbers(3.1), paying(dates("2026-11-30"), 1),
     )  # fmt: skip
@@ -1889,7 +1926,11 @@ def test_a_row_kept_ready_before_a_held_contract_keeps_its_place_on_the_axis() -
     # per dollar on F27 alone.
     first_nothing = resolved_trades(
         FIXED_FLOAT, NG, spec(2), Route.CLEARED, Settlement.PHYSICAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ids(1002, 1001), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 2),
+        ids(1002, 1001),
+        None,
+        None,
         dates("2026-10-06", "2026-10-06"),
         rows(0, 1), rows(1, 2), numbers(0.0, -1.0), *bounds_of(NG, rows(1, 2)),
         numbers(3.0, 3.3), None,
@@ -1923,7 +1964,11 @@ def test_four_rows_with_two_kept_ready_value_alike_in_every_order() -> None:
         labels, contracts, quantities, prices = zip(*order, strict=True)
         terms = resolved_trades(
             FIXED_FLOAT, NG, spec(4), Route.CLEARED, Settlement.PHYSICAL,
-            *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4), ids(*labels), None, None,
+            *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4),
+            one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 4),
+            ids(*labels),
+            None,
+            None,
             np.repeat(day("2026-10-06"), 4),
             np.arange(4, dtype=np.intp), rows(*contracts), numbers(*quantities),
             *bounds_of(NG, rows(*contracts)), numbers(*prices), None,
@@ -1944,6 +1989,7 @@ def test_adding_rows_kept_ready_changes_no_number_of_the_batch() -> None:
     spares = resolved_trades(
         FIXED_FLOAT, NG, spec(7), Route.CLEARED, Settlement.PHYSICAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 7),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 7),
         np.concatenate([TRADE_IDS, ids(2001, 2002)]),
         None, None,
         np.concatenate([TRADE_DATES, dates("2026-10-06", "2026-10-06")]),
@@ -2049,7 +2095,11 @@ def test_any_batch_equals_its_singletons_summed_with_its_delta_on_its_own_contra
         n = len(selected)
         terms = resolved_trades(
             FIXED_FLOAT, NG, spec(n), Route.CLEARED, Settlement.PHYSICAL,
-            *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), None, None, None,
+            *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n),
+            one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
+            None,
+            None,
+            None,
             np.repeat(day("2026-09-24"), n),
             np.arange(n, dtype=np.intp), rows(*(c for c, _, _ in selected)),
             numbers(*(q for _, q, _ in selected)),
@@ -2145,6 +2195,7 @@ def l3d_terms(
         Route.CLEARED,
         settlement,
         *picks(ScheduleMethod.LAST3DAY, QuantityPer.MONTH, n),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
         np.arange(1, n + 1, dtype=np.int64),
         ("Prototype Clearing",) * n,
         None,
@@ -2467,6 +2518,7 @@ def asian_terms(
         Route.CLEARED,
         settlement,
         *picks(ScheduleMethod.ASIAN, QuantityPer.MONTH, n),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
         np.arange(1, n + 1, dtype=np.int64),
         ("Prototype Clearing",) * n,
         None,
@@ -2759,6 +2811,7 @@ def basis_terms(
         Route.CLEARED,
         Settlement.PHYSICAL,
         *picks(ScheduleMethod.LASTDAY, basis, occurrences),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, occurrences),
         np.arange(1, occurrences + 1, dtype=np.int64),
         None,
         None,
@@ -2930,6 +2983,7 @@ def period_terms(
         Route.CLEARED,
         Settlement.FINANCIAL,
         *picks(ScheduleMethod.ASIAN, basis, n),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
         np.arange(1, n + 1, dtype=np.int64),
         ("Prototype Clearing",) * n,
         None,
@@ -3153,6 +3207,7 @@ def group_terms(
         Route.CLEARED,
         Settlement.FINANCIAL,
         *picks(ScheduleMethod.LAST3DAY, QuantityPer.MONTH, n),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
         np.arange(1, n + 1, dtype=np.int64),
         ("Prototype Clearing",) * n,
         None,
@@ -3602,6 +3657,7 @@ def mixed_terms(
         settlement,
         np.array([METHODS.index(ScheduleMethod(entry.method)) for entry in entries], dtype=np.intp),
         np.array([BASES.index(QuantityPer(entry.basis)) for entry in entries], dtype=np.intp),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, len(entries)),
         ids(*(entry.label for entry in entries)),
         tuple(entry.clearer for entry in entries),
         None,
@@ -4053,7 +4109,11 @@ def test_a_live_lot_that_outruns_the_largest_number_is_refused_at_preparation() 
     assert tiny.reporting_lot.coefficient == pytest.approx(1e-8)
     terms = resolved_trades(
         FIXED_FLOAT, tiny, spec(1, 1), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ids(8), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 1),
+        ids(8),
+        None,
+        None,
         dates("2026-09-24"), rows(0), rows(1),
         numbers(1e303), *bounds_of(tiny, rows(1)), numbers(300.0), paying(dates("2026-11-30"), 1),
     )  # fmt: skip
@@ -4080,7 +4140,11 @@ def test_a_nominal_delta_that_outruns_the_largest_number_is_refused_by_its_contr
     # finite; this is the arithmetic's edge, not a trade anyone books.
     terms = resolved_trades(
         FIXED_FLOAT, NG, spec(2), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ids(1, 2), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 2),
+        ids(1, 2),
+        None,
+        None,
         dates("2026-09-24", "2026-09-24"), rows(0, 1), rows(1, 1),
         numbers(9e303, 9e303), *bounds_of(NG, rows(1, 1)), numbers(0.0, 0.0),
         paying(dates("2026-11-30", "2026-12-01"), 2),
@@ -4102,7 +4166,11 @@ def test_a_nominal_delta_total_that_outruns_the_largest_number_is_refused_for_th
     # meets an infinite total. The sum runs with the overflow flag down and the rule judges.
     terms = resolved_trades(
         FIXED_FLOAT, TINY_LOT, spec(2, 1), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ids(26, 6), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 2),
+        ids(26, 6),
+        None,
+        None,
         dates("2026-09-24", "2026-09-24"), rows(0, 1), rows(1, 2),
         numbers(1e302, 1e302), *bounds_of(TINY_LOT, rows(1, 2)), numbers(300.0, 300.0),
         paying(dates("2026-11-30", "2026-12-31"), 2),
@@ -4127,7 +4195,11 @@ def test_opposing_nominal_deltas_past_the_largest_number_are_refused_by_the_firs
     # invalid flags down, so no warning escapes, and the first contract is refused as before.
     terms = resolved_trades(
         FIXED_FLOAT, TINY_LOT, spec(4, 1), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4), ids(1, 2, 3, 4), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 4),
+        ids(1, 2, 3, 4),
+        None,
+        None,
         dates(*["2026-09-24"] * 4), np.arange(4, dtype=np.intp), rows(1, 1, 2, 2),
         numbers(1e302, 1e302, -1e302, -1e302), *bounds_of(TINY_LOT, rows(1, 1, 2, 2)),
         numbers(300.0, 300.0, 300.0, 300.0),
@@ -4187,7 +4259,11 @@ def extreme_terms(
     )
     return resolved_trades(
         FIXED_FLOAT, ix, spec(n), Route.CLEARED, settlement,
-        *picks(method, QuantityPer.MONTH, n), ids(*range(1, n + 1)), None, None,
+        *picks(method, QuantityPer.MONTH, n),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
+        ids(*range(1, n + 1)),
+        None,
+        None,
         dates(*["2026-09-24"] * n), np.arange(n, dtype=np.intp), contract,
         numbers(*quantities), *bounds_of(ix, contract), numbers(*prices), payment,
     )  # fmt: skip
@@ -4439,12 +4515,19 @@ def wti_terms(
     price: float = 70.0,
     units: tuple[int, ...] | None = None,
     bases: tuple[QuantityPer, ...] | None = None,
+    frequencies: tuple[SettlementFrequency, ...] | None = None,
 ) -> ResolvedTrades:
     """Trades on the WTI-like index, asian unless said, cleared and financial at 70 dollars a
     barrel in barrels, the first specification row, or the rows given, a month's quantity or the
-    bases given, each covering the days given on the contract row given and paying on the day
-    given, two business days after its last observation as the resolution would count."""
+    bases given, monthly or the frequencies given, each covering the days given on the contract
+    row given and paying on the day given, two business days after its last observation as the
+    resolution would count."""
     n = len(periods)
+    frequency = (
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n)
+        if frequencies is None
+        else np.array([FREQUENCIES.index(f) for f in frequencies], dtype=np.intp)
+    )
     method = (
         one_choice(METHODS, ScheduleMethod.ASIAN, n)
         if methods is None
@@ -4463,6 +4546,7 @@ def wti_terms(
         Settlement.FINANCIAL,
         method,
         basis,
+        frequency,
         np.arange(1, n + 1, dtype=np.int64),
         ("Prototype Clearing",) * n,
         None,
@@ -4712,6 +4796,42 @@ def test_two_rows_of_one_month_paying_on_one_day_are_one_group_each_with_its_own
     a, _ = wti_valued("2026-12-01", (72.0, 75.0), early)
     b, _ = wti_valued("2026-12-01", (72.0, 75.0), late)
     assert both.mark == pytest.approx(a.mark + b.mark)
+
+
+def test_a_onetime_frequency_and_a_period_basis_are_refused_by_the_terms_until_built() -> None:
+    # onetime-averaging.md's second slice: the frequency is read and kept per occurrence, monthly
+    # the one selection the kernel prices, and the other refused by its trade in so many words,
+    # never priced as monthly in its place; period, the total of a onetime period, is refused
+    # under monthly with it, the frequency's refusal coming first.
+    monthly = wti_terms()
+    np.testing.assert_array_equal(
+        monthly.settlement_frequency, [FREQUENCIES.index(SettlementFrequency.MONTHLY)]
+    )
+    assert not monthly.settlement_frequency.flags.writeable
+    with pytest.raises(ValueError) as refused:
+        wti_terms(frequencies=(SettlementFrequency.ONETIME,))
+    assert str(refused.value) == (
+        "settlement_frequency of trade 1 at row 1 is 'onetime', expected 'monthly', the one "
+        "selection this version books; a onetime period across the row's dates is not built, "
+        "and nothing prices it as monthly"
+    )
+    with pytest.raises(ValueError) as refused:
+        wti_terms(bases=(QuantityPer.PERIOD,))
+    assert str(refused.value) == (
+        "quantity_per of trade 1 at row 1 is 'period', expected 'month' or 'calday' under "
+        "settlement_frequency = monthly; period is the total of a onetime period and says "
+        "nothing of a month"
+    )
+    with pytest.raises(ValueError) as refused:
+        wti_terms(
+            periods=(("2026-12-18", "2026-12-28"), JANUARY_BOUNDS),
+            quantities=(1_200.0, 1_000.0),
+            contracts=(0, 1),
+            pays=("2026-12-30", "2027-02-02"),
+            bases=(QuantityPer.MONTH, QuantityPer.PERIOD),
+            frequencies=(SettlementFrequency.MONTHLY, SettlementFrequency.ONETIME),
+        )
+    assert str(refused.value).startswith("settlement_frequency of trade 2 at row 2 is 'onetime'")
 
 
 def test_the_roll_takes_the_calendars_contract_on_each_day_whatever_the_schedule() -> None:
@@ -5227,6 +5347,7 @@ def waha_terms(
         settlement,
         method,
         basis,
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, m),
         1000 + np.arange(1, m + 1, dtype=np.int64),
         ("ICE Clear Europe",) * m,
         None,
@@ -5662,7 +5783,9 @@ def fee_terms(
     named = brokers if brokers is not None else None if broker is None else (broker,) * n
     return resolved_trades(
         FIXED_FLOAT, ix, rows(*specs), route, Settlement.PHYSICAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), ids(*trade_ids),
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
+        ids(*trade_ids),
         clearing_house, named,
         dates(*["2026-11-20"] * n), np.arange(n, dtype=np.intp), rows(*([1] * n)),
         numbers(*quantities), *bounds_of(ix, rows(*([1] * n))), numbers(*([70.0] * n)), None,
@@ -5732,7 +5855,11 @@ def test_a_calday_strip_reserves_per_barrel_day_and_the_reporting_lot_changes_no
         ix = a_fee_index(reporting_lot=lot, schedule=schedule)
         terms = resolved_trades(
             FIXED_FLOAT, ix, rows(1), Route.CLEARED, Settlement.PHYSICAL,
-            *picks(ScheduleMethod.LASTDAY, QuantityPer.CALDAY, 1), ids(201), None, ("ION",),
+            *picks(ScheduleMethod.LASTDAY, QuantityPer.CALDAY, 1),
+            one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 1),
+            ids(201),
+            None,
+            ("ION",),
             dates("2026-10-20"), rows(0, 0), rows(1, 2), numbers(2.0, 2.0),
             *bounds_of(ix, rows(1, 2)), numbers(70.0, 70.0), None,
         )  # fmt: skip
@@ -5885,7 +6012,10 @@ def marketed_terms(
     n = len(trade_ids)
     return resolved_trades(
         FIXED_FLOAT, ix, spec(n), Route.CLEARED, Settlement.PHYSICAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), ids(*trade_ids), None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
+        ids(*trade_ids),
+        None,
         ("ION",) * n,
         dates(*["2026-09-24"] * n), rows(*occurrence), rows(*contract), numbers(*quantities),
         *bounds_of(ix, rows(*contract)), numbers(*([70.0] * len(contract))), None,
@@ -5977,7 +6107,9 @@ def test_finite_marketing_amounts_summing_past_the_largest_number_are_refused_fo
     ):
         resolved_trades(
             FIXED_FLOAT, ix, spec(4), Route.BILATERAL, Settlement.PHYSICAL,
-            *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4), ids(1001, 1002, 1003, 1004),
+            *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4),
+            one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 4),
+            ids(1001, 1002, 1003, 1004),
             None, None, dates(*["2026-09-24"] * 4), rows(0, 1, 2, 3), rows(1, 1, 1, 1),
             numbers(2.0, -2.0, 1.0, 0.0), *bounds_of(ix, rows(1, 1, 1, 1)), numbers(*([70.0] * 4)),
             None, counterparty=("ACME Trading", "Beta Energy"),

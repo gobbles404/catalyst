@@ -71,12 +71,25 @@ def sheet() -> dict[str, Any]:
         "clearing_house",
         "payment_day",
         "payment_holiday_calendar",
+        "settlement_frequency",
     ]
     template = PATH["_CreateTradeTemplate"](
         "fixed_float",
         Cells.from_rows([fields]),
         Cells.from_rows(
-            [["lot", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays]]
+            [
+                [
+                    "lot",
+                    "month",
+                    "lastday",
+                    "cleared",
+                    "financial",
+                    "TEST",
+                    "+2bd",
+                    holidays,
+                    "monthly",
+                ]
+            ]
         ),
     )
     days = np.arange(EXPIRIES[0] + np.timedelta64(1, "D"), AS_OF)
@@ -129,6 +142,7 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
         "discount_curve_key",
         "payment_day",
         "payment_holiday_calendar",
+        "settlement_frequency",
     ]
     template = PATH["_CreateTradeTemplate"](
         "fixed_float",
@@ -145,6 +159,7 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
                     "SOFR",
                     "+2bd",
                     holidays,
+                    "monthly",
                 ]
             ]
         ),
@@ -645,6 +660,7 @@ def test_a_combined_payment_calendar_adds_no_work_after_creation(
                 "clearing_house",
                 "payment_day",
                 "payment_holiday_calendar",
+                "settlement_frequency",
             ]
         ]
     )
@@ -652,7 +668,19 @@ def test_a_combined_payment_calendar_adds_no_work_after_creation(
         "fixed_float",
         fields,
         Cells.from_rows(
-            [["lot", "month", "lastday", "cleared", "financial", "TEST", "+2bd", combined]]
+            [
+                [
+                    "lot",
+                    "month",
+                    "lastday",
+                    "cleared",
+                    "financial",
+                    "TEST",
+                    "+2bd",
+                    combined,
+                    "monthly",
+                ]
+            ]
         ),
     )
     rows, contracts = 50, 6

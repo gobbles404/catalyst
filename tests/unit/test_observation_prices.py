@@ -38,6 +38,7 @@ PAYS = holiday_calendar(np.array(["2030-01-01"], dtype="datetime64[D]"))
 CLEARED: dict[str, object] = {
     "quantity_unit": "LB",
     "quantity_per": "month",
+    "settlement_frequency": "monthly",
     "schedule_method": "asian",
     "route": "cleared",
     "settlement_method": "financial",

@@ -32,10 +32,13 @@ from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.schedule_methods import ScheduleMethod
 from goosedove.trades.terms import (
+    FREQUENCIES,
     PaymentTerms,
     QuantityPer,
     Route,
     Settlement,
+    SettlementFrequency,
+    one_choice,
     payments_after_observations,
     resolved_trades,
 )
@@ -96,6 +99,7 @@ WEEKENDS = holiday_calendar(dates(*FAR))
 BILATERAL: dict[str, object] = {
     "quantity_unit": "MMBTU",
     "quantity_per": "month",
+    "settlement_frequency": "monthly",
     "schedule_method": "lastday",
     "route": "bilateral",
     "settlement_method": "financial",
@@ -497,6 +501,7 @@ def test_a_dated_quote_template_prices_the_strip_on_one_factor_that_cancels() ->
             Route.BILATERAL,
             Settlement.FINANCIAL,
             *picks(ScheduleMethod.ASIAN, QuantityPer.MONTH, 2),
+            one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 2),
             ids(1, 2),
             None,
             None,
@@ -540,6 +545,7 @@ def test_a_quote_template_takes_the_date_through_the_seam(syn: dict[str, Any]) -
         "settlement_method": "financial",
         "schedule_method": "lastday",
         "quantity_per": "month",
+        "settlement_frequency": "monthly",
         "payment_day": serial("2027-03-15"),
         "payment_holiday_calendar": syn["calendar"],
     }

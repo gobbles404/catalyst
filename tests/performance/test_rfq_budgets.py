@@ -66,7 +66,7 @@ def test_creation_resolves_once_and_reads_no_market(n: int, observations: int) -
         "payment_rules_read": 1,
         "payment_shifts": 1,
         "schedule_codes_read": 13,
-        "template_fields_read": 7,
+        "template_fields_read": 8,
     }
     by_request = counted(lambda c: made(n, BILATERAL, DATES, c))
     assert by_request == {**by_template, "payment_rules_read": 0, "payment_shifts": 0}
@@ -132,12 +132,13 @@ def test_creation_runs_the_resolution_once_and_nothing_of_the_pricing(
         "rfq": 1,
         "the_terms": 1,
         "_the_conditions": 1,
-        "_text": 5,
+        "_text": 6,
         "route_of": 1,
         "settlement_of": 1,
         "schedule_method_of": 1,
         "quantity_per_of": 1,
-        "choice": 4,
+        "settlement_frequency_of": 1,  # since onetime-averaging.md
+        "choice": 5,
         "payment_rule_of": 1,
         "read_offset": 1,
         "trade_schedule_of": 2,  # the request's own read and the observations'
@@ -230,8 +231,9 @@ def on_the_sheet() -> tuple[object, object, object, object, object]:
             "payment_day",
             "payment_holiday_calendar",
             "discount_curve_key",
+            "settlement_frequency",
         ),
-        row("bilateral", "financial", "asian", "month", "+5bd", weekends, "SOFR"),
+        row("bilateral", "financial", "asian", "month", "+5bd", weekends, "SOFR", "monthly"),
     )
     curve = PATH["_CreateDiscountCurve"](
         "SOFR",

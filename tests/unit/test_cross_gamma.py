@@ -62,11 +62,14 @@ from goosedove.trades.results import TradeResults, risk_view
 from goosedove.trades.risk_report import Bucket, Risk, RiskView
 from goosedove.trades.schedule_methods import ScheduleMethod
 from goosedove.trades.terms import (
+    FREQUENCIES,
     PaymentTerms,
     QuantityPer,
     ResolvedTrades,
     Route,
     Settlement,
+    SettlementFrequency,
+    one_choice,
     resolved_trades,
 )
 
@@ -123,7 +126,9 @@ def trades_on(
     )
     return resolved_trades(
         FIXED_FLOAT, ix, spec(n), route, settlement,
-        *picks(method, QuantityPer.MONTH, n), ids(*range(1001, 1001 + n)),
+        *picks(method, QuantityPer.MONTH, n),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
+        ids(*range(1001, 1001 + n)),
         None, None,
         dates(*[as_of] * n), np.arange(n, dtype=np.intp), contract, numbers(*quantities),
         *bounds_of(ix, contract), numbers(*fixed), payment,

@@ -252,13 +252,15 @@ FIXED_FLOAT = Instrument(
         ),
         Field(
             "quantity_per",
-            "Whether quantity is per month or per calendar day",
+            "Whether quantity is per month, per calendar day or the whole period's",
             True,
             NONE,
             FieldType.CODE,
-            "month, calday",
+            "month, calday, period",
             "The quantity per contract month, or per calendar day of it, weekends and holidays "
-            "included",
+            "included, under settlement_frequency = monthly; period, the total of a onetime "
+            "period, and calday under onetime; period is refused under monthly and, until the "
+            "whole-period average is built, by every consumer",
             quote_allowed=True,
             quote_required=True,
         ),
@@ -333,6 +335,23 @@ FIXED_FLOAT = Instrument(
             "In the index's settlement currency, counted once per ticket row whatever its months, "
             "quantity or days; left out of the template and the ticket, zero; static, never a "
             "contribution to value",
+        ),
+        Field(
+            "settlement_frequency",
+            "How many calculation periods the row's days make, one per calendar month or one "
+            "in all",
+            True,
+            NONE,
+            FieldType.CODE,
+            "monthly, onetime",
+            "Selects independently calculated payoff periods, never the cash day, which "
+            "payment_day decides: monthly makes one period per calendar month the row covers, "
+            "each with its own observations, weights and quantity; onetime makes one period "
+            "across the row's start_date and end_date, its observations averaged together on "
+            "the window's quantity, not yet built and refused by name by every consumer, a "
+            "template holding either word",
+            quote_allowed=True,
+            quote_required=True,
         ),
     ),
 )

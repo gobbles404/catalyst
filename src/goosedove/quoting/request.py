@@ -46,9 +46,16 @@ from goosedove.trades.template import (
     quantity_per_of,
     route_of,
     schedule_method_of,
+    settlement_frequency_of,
     settlement_of,
 )
-from goosedove.trades.terms import QuantityPer, Route, Settlement, payments_after_observations
+from goosedove.trades.terms import (
+    QuantityPer,
+    Route,
+    Settlement,
+    SettlementFrequency,
+    payments_after_observations,
+)
 
 # The work a quote and a request report, beside the pipeline's own names where the fact is the
 # same: the schedule's codes read, the fixings and the live prices read, the payment rules and
@@ -128,6 +135,22 @@ def the_terms(
     settlement = settlement_of("settlement_method", _text(values, "settlement_method"))
     method = schedule_method_of("schedule_method", _text(values, "schedule_method"))
     quantity_per = quantity_per_of("quantity_per", _text(values, "quantity_per"))
+    frequency = settlement_frequency_of(
+        "settlement_frequency", _text(values, "settlement_frequency")
+    )
+    # A quote and a request for quote price by the month, since onetime-averaging.md: a
+    # template may hold onetime, and each consumer refuses it by name rather than quote monthly
+    # economics for a whole-period request; period, the window's total, is refused with it.
+    if frequency is SettlementFrequency.ONETIME:
+        raise ValueError(
+            "settlement_frequency is 'onetime', expected 'monthly'; a quote prices by the month "
+            "and does not price a onetime period across a window's dates as monthly"
+        )
+    if quantity_per is QuantityPer.PERIOD:
+        raise ValueError(
+            "quantity_per is 'period', expected 'month' or 'calday'; period is the total of a "
+            "onetime period, which a quote does not price"
+        )
     if route is Route.BILATERAL and settlement is Settlement.PHYSICAL:
         raise ValueError(
             "settlement_method is 'physical', expected 'financial' with route = bilateral; a "

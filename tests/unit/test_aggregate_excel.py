@@ -31,6 +31,7 @@ from test_trade_valuation import (
     rows,
     serial,
     spilled,
+    templated,
     unit_curve,
 )
 
@@ -97,10 +98,9 @@ def sheet() -> dict[str, Any]:
     wti = one_unit_index("WTI", "2027-01-05")
     payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")])))
     bilateral = str(
-        ENTRY["_CreateTradeTemplate"](
-            "fixed_float",
-            row(*UNIT_FIELDS),
-            row(
+        templated(
+            [*UNIT_FIELDS],
+            [
                 "LOT",
                 "month",
                 "lastday",
@@ -110,14 +110,13 @@ def sheet() -> dict[str, Any]:
                 "SOFR",
                 payments,
                 0.0,
-            ),
+            ],
         )
     )
     cleared = str(
-        ENTRY["_CreateTradeTemplate"](
-            "fixed_float",
-            row(*UNIT_FIELDS[:5], "clearing_house", *UNIT_FIELDS[7:]),
-            row(
+        templated(
+            [*UNIT_FIELDS[:5], "clearing_house", *UNIT_FIELDS[7:]],
+            [
                 "LOT",
                 "month",
                 "lastday",
@@ -126,7 +125,7 @@ def sheet() -> dict[str, Any]:
                 "Prototype Clearing",
                 payments,
                 0.0,
-            ),
+            ],
         )
     )
     hng_history = a_history(hng, "2027-01-01", AS_OF, UNIT_HOLIDAYS, {})

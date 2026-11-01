@@ -102,6 +102,7 @@ SOFR = discount_curve("SOFR", dates(AS_OF, PAY), numbers(1.0, 0.95))
 TEMPLATE: dict[str, object] = {
     "quantity_unit": "MMBTU",
     "quantity_per": "month",
+    "settlement_frequency": "monthly",
     "schedule_method": "lastday",
     "second_schedule_method": "lastday",
     "route": "bilateral",
