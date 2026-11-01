@@ -2449,7 +2449,7 @@ namespace Goosedove.Host.Tests
             var slots = (object[,])Seam.Call("util_ReadHandle", live);
             Assert.Equal(8, slots.GetLength(0));
             Assert.Equal("pricing_contract", slots[0, 0]);
-            Assert.Equal("booked_contract", slots[0, 1]);
+            Assert.Equal("booked_period", slots[0, 1]);
             Assert.Equal("F27", slots[2, 0]);
             Assert.Equal("Z26", slots[2, 1]);
             Assert.Equal("F27", slots[3, 0]);
@@ -2466,7 +2466,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(1.2, (double)risk[3, 1], 6);
             Assert.Equal("WTI nominal_delta [LOT]", risk[1, 1]);
             var contributions = (object[,])Seam.Call("util_ReadHandle", results);
-            Assert.Equal("booked_contract", contributions[0, 1]);
+            Assert.Equal("booked_period", contributions[0, 1]);
             Assert.Equal(0.4, (double)contributions[2, 10], 6);
             Assert.Equal(0.8, (double)contributions[4, 10], 6);
             Assert.Equal(0.4, (double)contributions[2, 11], 6);  // the discounted twin, cleared

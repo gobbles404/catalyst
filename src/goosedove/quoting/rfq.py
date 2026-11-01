@@ -43,13 +43,13 @@ from goosedove.trades.resolution import (
     PAYMENT_SHIFTS,
     SCHEDULE_CODES_READ,
     last_days,
-    month_bounds,
     schedule_rows,
 )
 from goosedove.trades.schedule_methods import METHODS
 from goosedove.trades.terms import (
     QuantityPer,
     Settlement,
+    month_bounds,
     payments_after_observations,
     trade_schedule_of,
 )

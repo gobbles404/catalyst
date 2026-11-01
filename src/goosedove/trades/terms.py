@@ -163,7 +163,11 @@ class ResolvedTrades:
     signed whole count of the specification as entered, per the basis, start_date[k] and
     end_date[k] the first and the last day the component covers, within its contract's calendar
     month, the whole month from a contract code and a booked period's share of it from explicit
-    dates, covered_days[k] the calendar days between them inclusive, weekends and holidays
+    dates, period_start[k] and period_end[k] since onetime-averaging.md the first and the last
+    day of the component's calculation period, the calendar month its days lie in, derived here
+    and the identity the encoding keys its payment groups by, the days clipped within it
+    deciding its observations and its quantity, covered_days[k] the calendar days between the
+    two dates inclusive, weekends and holidays
     included, derived here, and component_quantity[k] the count the component holds, the entered
     quantity under month and the entered quantity times the covered days under calday, formed
     once here, the one quantity the encoding converts and nothing later scales again. Then
@@ -195,6 +199,8 @@ class ResolvedTrades:
     quantity: NDArray[np.float64]
     start_date: NDArray[np.datetime64]
     end_date: NDArray[np.datetime64]
+    period_start: NDArray[np.datetime64]
+    period_end: NDArray[np.datetime64]
     covered_days: NDArray[np.int64]
     component_quantity: NDArray[np.float64]
     marketing_reserve: NDArray[np.float64] | None
@@ -279,7 +285,8 @@ def resolved_trades(
     contract is a row of the schedule; each component covers the days from its start date to its
     end date, the end on or after the start and both in one calendar month, since a component is
     one contract month's and a quantity per day over no day states nothing, the days counted
-    here; each quantity is a whole number, positive, negative or zero, the first profile's
+    here, and that month is its calculation period, derived here since onetime-averaging.md;
+    each quantity is a whole number, positive, negative or zero, the first profile's
     convention, a signed count of the specification, a zero row kept ready for a deal and
     contributing nothing; each fixed price is a finite number, the quantity, the days and the
     price named by the trade they belong to, as the sheet counts its rows. Each component's
@@ -353,6 +360,7 @@ def resolved_trades(
     starts, ends = _frozen_days(start_date), _frozen_days(end_date)
     days = (ends - starts).astype(np.int64) + 1  # made here and owned here: frozen below
     days.setflags(write=False)
+    period_start, period_end = _the_calculation_periods(starts)
     brokered = _the_brokered(broker, occurrences)
     return ResolvedTrades(
         instrument,
@@ -370,6 +378,8 @@ def resolved_trades(
         quantities,
         starts,
         ends,
+        period_start,
+        period_end,
         days,
         _the_component_quantity(quantity_per, quantities, days, trade_ids, occurrence),
         None if marketing_reserve is None else _frozen_numbers(marketing_reserve),
@@ -975,6 +985,35 @@ def _the_payment(
 
 # Each column copied into its type and frozen, so the record owns its data: a Python caller
 # keeps whatever it passed, and a later change to an input never changes a batch.
+
+
+def month_bounds(
+    month: NDArray[np.int64],
+) -> tuple[NDArray[np.datetime64], NDArray[np.datetime64]]:
+    """The first and the last calendar day of each month given, as numpy counts months: the days a
+    whole-month component covers, the bounds an explicit period's components are clipped to, and
+    since onetime-averaging.md a monthly component's calculation period, one conversion each way
+    and one day subtracted."""
+    first = month.astype("datetime64[M]").astype("datetime64[D]")
+    after = (month + 1).astype("datetime64[M]").astype("datetime64[D]")
+    last = cast(NDArray[np.datetime64], after - np.timedelta64(1, "D"))  # a day, not a span
+    return first, last
+
+
+def _the_calculation_periods(
+    start_date: NDArray[np.datetime64],
+) -> tuple[NDArray[np.datetime64], NDArray[np.datetime64]]:
+    """Each component's calculation period, since onetime-averaging.md: under the monthly
+    selection, the one this version books, the calendar month its first day lies in, its last day
+    in the same month by the components' rule, the two bounds made once by month_bounds and
+    frozen. The identity the encoding keys the payment groups by, a part of a month and the whole
+    of it alike, so that two rows of one month paying on one day are one group, each component
+    keeping its own days, weights and quantity; a whole-period average will book its own two
+    dates here."""
+    first, last = month_bounds(start_date.astype("datetime64[M]").astype(np.int64))
+    first.setflags(write=False)
+    last.setflags(write=False)
+    return first, last
 
 
 def _frozen_rows(column: NDArray[np.intp]) -> NDArray[np.intp]:

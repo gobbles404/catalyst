@@ -1042,7 +1042,7 @@ $formulas = [ordered]@{
     # 76, 5,600; on the 30th in NF8, every day fixed and paid, 5,200 of cash.
     "=ROWS(util_ReadHandle(MY7))"        = "8"
     "=INDEX(util_ReadHandle(MY7),1,1)"   = "pricing_contract"
-    "=INDEX(util_ReadHandle(MY7),1,2)"   = "booked_contract"
+    "=INDEX(util_ReadHandle(MY7),1,2)"   = "booked_period"
     "=INDEX(util_ReadHandle(MY7),3,1)"   = "F27"
     "=INDEX(util_ReadHandle(MY7),3,2)"   = "Z26"
     "=INDEX(util_ReadHandle(MY7),4,1)"   = "F27"
