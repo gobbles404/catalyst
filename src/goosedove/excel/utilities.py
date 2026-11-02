@@ -416,7 +416,8 @@ def rfq_table(obj: Rfq) -> MixedArray:
         [
             _numbers_on("row", np.arange(1, n + 1, dtype=np.float64), every, "int64"),
             _words_on(
-                "contract_code", np.array(request.schedule.codes, dtype=object)[request.contract]
+                "contract_code",
+                np.array(request.schedule.codes, dtype=object)[request.period.contract],
             ),
             _numbers_on("quantity", obj.quantity, every),
             _words_on("quantity_per", on_every(terms.quantity_per.value)),

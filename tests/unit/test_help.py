@@ -802,6 +802,41 @@ def test_the_quote_explains_itself() -> None:
     ]
 
 
+def test_the_quote_by_dates_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_QuoteByDates"]
+    assert not hidden
+    assert description == (
+        "Quotes one fixed price from start_date to end_date on one market from a quote "
+        "template's terms, one average over the window under onetime and a strip by the month "
+        "under monthly, fixings for the days passed and the day's quotes for the rest."
+    )
+    assert arguments == [
+        (
+            "market",
+            "The market handle: the cell showing _CreateMarket's result, such as I12, or a name "
+            "for it, with the day's quotes over the history they follow.",
+        ),
+        ("start_date", "The first day the quote covers, such as A2 or DATE(2026,5,26)."),
+        (
+            "end_date",
+            "The last day it covers, inclusive, such as B2 or DATE(2026,6,25), on or after "
+            "start_date.",
+        ),
+        (
+            "template",
+            "The quote-template handle: the cell showing _CreateQuoteTemplate's result, such as "
+            "B3, or a name for it, whose settlement_frequency makes the days one average or a "
+            "strip by the month.",
+        ),
+        (
+            "[discount_curve_set]",
+            "The collection handle for a bilateral quote: the cell showing "
+            "_CollectDiscountCurves's result, such as I13, or a name for it, holding the curve "
+            "the template names; left out for a cleared quote.",
+        ),
+    ]
+
+
 def test_the_cashflow_functions_explain_themselves() -> None:
     description, arguments, hidden = SPECS["_CreateCashflows"]
     assert not hidden

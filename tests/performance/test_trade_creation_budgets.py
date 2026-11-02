@@ -272,7 +272,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "schedule_rows": 1,
         "_the_contracts": 1,  # each component's row, a month's by its month, a window's by its
         # first day, since the review of onetime-averaging.md's third slice
-        "_contract_days": 1,  # the days the schedule's contracts price on, a window's search key
+        "contract_days": 1,  # the days the schedule's contracts price on, a window's search key
         "month_bounds": 2,  # the first and last day of each component's month, and since
         # onetime-averaging.md the terms' calculation period of each component, that month
         "_each_distinct": 4,  # the units, the methods, the bases and the frequencies; the rules
@@ -1007,6 +1007,8 @@ def test_a_onetime_window_is_one_component_across_its_month_end_and_nothing_runs
         **dated_ledger(contracts),
         "with_holiday_calendar": 1,
         "month_bounds": 3,  # and the windows' last months' ends
+        "window_rows": 1,  # the windows' contracts, the first pricing each one's first day, one
+        # search shared with the dated quote since dated-quotes.md
     }
     assert numpy_calls(lambda: resolved((ASIAN_GAS,), ticket, template, WorkCounter())) == {
         **dated_numpy(contracts),

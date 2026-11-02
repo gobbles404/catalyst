@@ -28,9 +28,12 @@ from goosedove.quoting.request import (
     MONTHS_RESOLVED,
     OBSERVATIONS_MADE,
     PAYMENT_DAYS_MADE,
+    Period,
     Request,
+    by_the_month,
     priced,
     the_curve,
+    the_frequency,
     the_method,
     the_payments,
     the_terms,
@@ -107,6 +110,8 @@ def rfq(
     factor is read."""
     dated = payment_dates is not None
     terms = the_terms(template, counter, dated)
+    by_the_month(terms, "a request for quote")
+    the_frequency(terms, index.kind, "the request")
     schedule = trade_schedule_of(index)
     the_method(terms, schedule)
     n = len(contract_codes)
@@ -161,8 +166,17 @@ def rfq(
         payments_after_observations(pays, last_days(observations, n), named)
         pays.setflags(write=False)
         source = PaymentSource.REQUEST
+    months = np.zeros(n, dtype=np.bool_)  # every row a month, no window, until the second slice
+    months.setflags(write=False)
     request = Request(
-        index, schedule, terms, contract, observations, references, component_quantity, pays
+        index,
+        schedule,
+        terms,
+        Period(contract, first, last, months),
+        observations,
+        references,
+        component_quantity,
+        pays,
     )
     return Rfq(template, tuple(contract_codes), quantity, component_quantity, source, request)
 
@@ -241,12 +255,13 @@ def _the_component_quantities(
     first: NDArray[np.datetime64],
     last: NDArray[np.datetime64],
 ) -> NDArray[np.float64]:
-    """Each month's quantity by the template's basis: the entered quantity per month, by
-    reference, and the entered quantity times the month's calendar days, weekends and holidays
-    included, per calendar day, formed once here and checked finite where it is made, since a
-    finite quantity times its days can outrun the largest number; frozen."""
+    """Each month's quantity by the template's basis: the entered quantity per month, or per
+    period, a window's total, by reference, and the entered quantity times the month's calendar
+    days, weekends and holidays included, per calendar day, formed once here and checked finite
+    where it is made, since a finite quantity times its days can outrun the largest number;
+    frozen."""
     match quantity_per:
-        case QuantityPer.MONTH:
+        case QuantityPer.MONTH | QuantityPer.PERIOD:
             return quantity
         case QuantityPer.CALDAY:
             days = ((last - first).astype(np.int64) + 1).astype(np.float64)
@@ -262,10 +277,5 @@ def _the_component_quantities(
                 )
             component.setflags(write=False)
             return component
-        case QuantityPer.PERIOD:  # refused by the terms, since onetime-averaging.md; never monthly
-            raise ValueError(
-                "quantity_per is 'period', expected 'month' or 'calday'; period is the total of "
-                "a onetime period, which a request for quote does not price"
-            )
         case _:
             assert_never(quantity_per)

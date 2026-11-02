@@ -4872,20 +4872,20 @@ def test_the_frequency_is_kept_and_its_rules_name_the_first_row_that_breaks_them
     period = one_choice(BASES, QuantityPer.PERIOD, 1)
     asian = one_choice(METHODS, ScheduleMethod.ASIAN, 1)
     with pytest.raises(ValueError) as refused:
-        frequency_rules(onetime, period, asian, Settlement.FINANCIAL, Kind.IFERC, False, None)
+        frequency_rules(onetime, period, asian, Settlement.FINANCIAL, Kind.IFERC, False, unlabeled)
     assert str(refused.value) == (
         "settlement_frequency of trade at row 1 is 'onetime', expected 'monthly' on an IFERC "
         "index; an IFERC month has one index, published once, and a onetime period averages the "
         "pricing days of a futures index"
     )
     with pytest.raises(ValueError) as refused:
-        frequency_rules(onetime, period, asian, Settlement.FINANCIAL, Kind.FUTURES, True, None)
+        frequency_rules(onetime, period, asian, Settlement.FINANCIAL, Kind.FUTURES, True, unlabeled)
     assert str(refused.value) == (
         "settlement_frequency of trade at row 1 is 'onetime', expected 'monthly' with two "
         "indexes; a onetime period on a pair is not built"
     )
     with pytest.raises(ValueError) as refused:
-        frequency_rules(onetime, period, asian, Settlement.PHYSICAL, Kind.FUTURES, False, None)
+        frequency_rules(onetime, period, asian, Settlement.PHYSICAL, Kind.FUTURES, False, unlabeled)
     assert str(refused.value) == (
         "settlement_method is 'physical', expected 'financial' with settlement_frequency = "
         "onetime of trade at row 1; a onetime period is cash settled on its average"

@@ -15,6 +15,7 @@ day each component pays. docs/library/trades/kernel.md is the page."""
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from functools import partial
 from typing import Final, assert_never, cast
 
 import numpy as np
@@ -370,7 +371,7 @@ def resolved_trades(
         settlement,
         index.kind,
         second_leg is not None,
-        trade_ids,
+        partial(named_trade, trade_ids),
     )
     _the_method(schedule_method, settlement, trade_ids, index.kind)
     _the_components(occurrence, quantity, start_date, end_date, trade_ids, occurrences)
@@ -622,22 +623,24 @@ def frequency_rules(
     settlement: Settlement,
     kind: Kind,
     paired: bool,
-    trade_ids: NDArray[np.int64] | None,
+    named: Callable[[int], str],
 ) -> None:
     """Each occurrence's frequency with the terms it stands under, since onetime-averaging.md,
     the kernel's rule, applied by the resolution before any period is built or observed so that
-    a refused onetime row is refused in these words and never in an observation's. A onetime
-    period, one average over every pricing day of the row's window, is priced on a futures index
-    alone, an IFERC month having one index published once; on one index, a pair's onetime period
-    not being built; under a financial settlement, since it is cash settled on its average; under
-    the asian method, the expiry-based methods taking their contract's month; and in a quantity
-    of period, the window's total, or calday, never month, which says nothing of a window. Under
-    monthly the basis is month or calday, period being a window's total. The first row that
-    breaks a rule is refused by its trade, the rules in this order."""
+    a refused onetime row is refused in these words and never in an observation's, and since
+    dated-quotes.md by a quote and a request for quote over their template's one set of terms.
+    A onetime period, one average over every pricing day of the row's window, is priced on a
+    futures index alone, an IFERC month having one index published once; on one index, a pair's
+    onetime period not being built; under a financial settlement, since it is cash settled on
+    its average; under the asian method, the expiry-based methods taking their contract's month;
+    and in a quantity of period, the window's total, or calday, never month, which says nothing
+    of a window. Under monthly the basis is month or calday, period being a window's total. The
+    first occurrence that breaks a rule is refused in the words `named` gives it, a trade by its
+    row or the quote, the rules in this order."""
 
     def first(rows: NDArray[np.bool_]) -> str:
-        """The words for the first row at fault, found only when a rule refuses."""
-        return named_trade(trade_ids, int(rows.argmax()))
+        """The words for the first occurrence at fault, found only when a rule refuses."""
+        return named(int(rows.argmax()))
 
     onetime = settlement_frequency == FREQUENCIES.index(SettlementFrequency.ONETIME)
     if onetime.any():
@@ -661,7 +664,7 @@ def frequency_rules(
         if unaveraged.any():
             k = int(unaveraged.argmax())
             raise ValueError(
-                f"schedule_method of {named_trade(trade_ids, k)} is "
+                f"schedule_method of {named(k)} is "
                 f"{METHODS[int(schedule_method[k])].value!r}, expected 'asian' under "
                 "settlement_frequency = onetime; a onetime period averages every pricing day it "
                 "covers, and the expiry-based methods take their contract's month"
@@ -1169,19 +1172,37 @@ def booked_words(
 ) -> NDArray[np.object_]:
     """The booked period of each of those components in words, since onetime-averaging.md, the
     one source of the label a readback, a group and a refusal give it, made when asked and kept
-    by nothing: its contract's code on this leg's schedule under monthly, `K26`, and its two
-    dates under onetime, `2026-05-26 to 2026-06-25`, in the form every date in a refusal takes,
-    since a window prices off whichever contracts its days fall on and no one contract names
-    it. One gather of the codes, and over the window components alone two date-to-text
-    conversions and two joins, numpy's over the array; a batch without a window makes no text
-    but the codes'."""
-    words = np.array(leg.schedule.codes, dtype=object)[leg.contract[components]]
-    window = onetime_components(terms)[components]
+    by nothing: period_words over this leg's schedule and the components' contracts, calculation
+    periods and frequency, its contract's code under monthly, `K26`, and its two dates under
+    onetime, `2026-05-26 to 2026-06-25`."""
+    return period_words(
+        leg.schedule.codes,
+        leg.contract[components],
+        onetime_components(terms)[components],
+        terms.period_start[components],
+        terms.period_end[components],
+    )
+
+
+def period_words(
+    codes: tuple[str, ...],
+    contract: NDArray[np.intp],
+    window: NDArray[np.bool_],
+    first: NDArray[np.datetime64],
+    last: NDArray[np.datetime64],
+) -> NDArray[np.object_]:
+    """Each component's period in words from the arrays that hold it, since dated-quotes.md the
+    one form a booking, a quote and a request for quote name a component by: its contract's
+    code from the schedule's codes for a month, and for a window, which prices off whichever
+    contracts its days fall on and no one contract names, its first and last day, `2026-05-26 to
+    2026-06-25`, in the form every date in a refusal takes. One gather of the codes, and over
+    the window components alone two date-to-text conversions and two joins, numpy's over the
+    array; components without a window make no text but the codes'."""
+    words = np.array(codes, dtype=object)[contract]
     if window.any():
-        on = components[window]
         words[window] = np.strings.add(
-            np.strings.add(np.datetime_as_string(terms.period_start[on]), " to "),
-            np.datetime_as_string(terms.period_end[on]),
+            np.strings.add(np.datetime_as_string(first[window]), " to "),
+            np.datetime_as_string(last[window]),
         )
     return words
 

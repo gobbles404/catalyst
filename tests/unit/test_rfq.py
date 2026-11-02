@@ -552,16 +552,18 @@ def test_the_template_the_index_and_the_market_refuse_as_a_quote_does() -> None:
         "future is cash settled on the average of its month's pricing days",
         template=physical("asian"),
     )
-    # onetime-averaging.md's second slice: a request prices by the month, and a template holding
-    # onetime, or period as its basis, is refused in so many words rather than quoted as monthly.
+    # onetime-averaging.md's second slice and dated-quotes.md: a request prices by the month until
+    # its rows take dates, and a template holding onetime is refused in so many words naming
+    # _QuoteByDates; period as its basis is refused under monthly by the kernel's rule.
     refused(
-        "settlement_frequency is 'onetime', expected 'monthly'; a quote prices by the month and "
-        "does not price a onetime period across a window's dates as monthly",
+        "settlement_frequency is 'onetime', expected 'monthly'; a request for quote prices by "
+        "the month, and _QuoteByDates prices a onetime period across two dates",
         template=a_template(**{**dict(otc().values), "settlement_frequency": "onetime"}),
     )
     refused(
-        "quantity_per is 'period', expected 'month' or 'calday'; period is the total of a "
-        "onetime period, which a quote does not price",
+        "quantity_per of the request is 'period', expected 'month' or 'calday' under "
+        "settlement_frequency = monthly; period is the total of a onetime period and says "
+        "nothing of a month",
         template=a_template(**{**dict(otc().values), "quantity_per": "period"}),
     )
     refused(

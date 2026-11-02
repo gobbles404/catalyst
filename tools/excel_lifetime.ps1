@@ -1479,10 +1479,12 @@ $quotes = {
     Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",HSTACK(K26:P26,R26),HSTACK(K27:P27,R27))'
     Put $state $sheet "D27" '=_Quote(D11,"n26-q26",D26)'
     Put $state $sheet "D28" '=TEXT(D27,"0.0000")'
+    Put $state $sheet "D34" '=_QuoteByDates(D11,DATE(2026,7,1),DATE(2026,8,31),D26)'
     $id = Id $state
     $template = Text $state $sheet "D26"
     Check "the template's cell shows its handle, the kind and the count alone" ($template.StartsWith("${id}:quote_template:")) $template
     Check "the strip quotes 72.45, the two live quotes at equal weight, a number and no handle" ((Text $state $sheet "D27") -eq "72.45") (Text $state $sheet "D27")
+    Check "the strip's months by their dates, 1 July to 31 August, quote the same 72.45 and publish nothing" ((Text $state $sheet "D34") -eq "72.45") (Text $state $sheet "D34")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 2) }
     Check "the chain, the calendar and the template: thirteen live, thirteen published, the quote publishing nothing" ($c.Live -eq 13 -and $c.Published -eq 13 -and $c.Released -eq 0) $c.Text
 
