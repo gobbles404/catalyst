@@ -64,7 +64,7 @@ from goosedove.trades.resolution import Trades
 from goosedove.trades.results import LegResults, TradeResults
 from goosedove.trades.schedule_methods import METHOD_NAMES
 from goosedove.trades.template import DayOrRule, TradeTemplate
-from goosedove.trades.terms import BASIS_NAMES, FREQUENCY_NAMES, booked_words
+from goosedove.trades.terms import BASIS_NAMES, FREQUENCY_NAMES, booked_words, period_words
 
 
 @singledispatch
@@ -394,16 +394,20 @@ def quote_template_table(obj: QuoteTemplate) -> MixedArray:
 
 @shown.register
 def rfq_table(obj: Rfq) -> MixedArray:
-    """A request's spill, since rfq-quoting.md: one row per entered row in the order given,
-    `row`, `contract_code` in the schedule's spelling, `quantity` as entered, `quantity_per`,
-    `component_quantity`, the month's quantity by the basis, `payment_source`, template or
-    request, and `payment_date`, the month's effective day, a dash for both on a physical
+    """A request's spill, since rfq-quoting.md and dated-quotes.md: one row per component in row
+    order, `row`, the entered row it came from, `period`, its contract code in the schedule's
+    spelling or a window's two dates, `quantity` as its row entered it, `quantity_per`,
+    `component_quantity`, the component's quantity by the basis, `payment_source`, template or
+    request, and `payment_date`, the component's effective day, a dash for both on a physical
     request; then the request's facts on every row so that a row reads whole, `index`,
-    `schedule_method`, `route`, `settlement_method`, `quote_unit` and `discount_curve_key`, a
-    dash on the cleared route. Saved facts alone: nothing is priced and no factor is shown."""
+    `schedule_method`, `route`, `settlement_method`, `quote_unit`, `discount_curve_key`, a dash
+    on the cleared route, and `settlement_frequency`. Saved facts alone: nothing is priced and no
+    factor is shown."""
     request = obj.request
     terms = request.terms
-    n = obj.quantity.size
+    period = request.period
+    occurrence = obj.occurrence
+    n = occurrence.size
     every = np.ones(n, dtype=np.bool_)
     conventions = request.index.conventions
 
@@ -414,12 +418,18 @@ def rfq_table(obj: Rfq) -> MixedArray:
     pays = request.payment_date
     return _assembled(
         [
-            _numbers_on("row", np.arange(1, n + 1, dtype=np.float64), every, "int64"),
+            _numbers_on("row", (occurrence + 1).astype(np.float64), every, "int64"),
             _words_on(
-                "contract_code",
-                np.array(request.schedule.codes, dtype=object)[request.period.contract],
+                "period",
+                period_words(
+                    request.schedule.codes,
+                    period.contract,
+                    period.window,
+                    period.first,
+                    period.last,
+                ),
             ),
-            _numbers_on("quantity", obj.quantity, every),
+            _numbers_on("quantity", obj.quantity[occurrence], every),
             _words_on("quantity_per", on_every(terms.quantity_per.value)),
             _numbers_on("component_quantity", obj.component_quantity, every),
             _words_on("payment_source", on_every(source)),
@@ -437,6 +447,7 @@ def rfq_table(obj: Rfq) -> MixedArray:
                 ),
             ),
             _words_on("discount_curve_key", on_every("-" if terms.key is None else terms.key)),
+            _words_on("settlement_frequency", on_every(terms.frequency.value)),
         ]
     )
 

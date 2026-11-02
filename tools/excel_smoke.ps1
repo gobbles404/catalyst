@@ -2178,8 +2178,10 @@ $formulas = [ordered]@{
     '=TEXT(_QuoteRFQ(VA7,XD2,VN6),"0.0000")' = "52.4570"
     '=TEXT(_QuoteRFQ(VA7,XD3),"0.0000")'     = "51.9130"
     "=ROWS(util_ReadHandle(XD1))"        = "4"
-    "=COLUMNS(util_ReadHandle(XD1))"     = "13"
+    "=COLUMNS(util_ReadHandle(XD1))"     = "14"
     "=INDEX(util_ReadHandle(XD1),1,1)"   = "row"
+    "=INDEX(util_ReadHandle(XD1),1,2)"   = "period"
+    "=INDEX(util_ReadHandle(XD1),3,14)"  = "monthly"
     "=INDEX(util_ReadHandle(XD1),1,6)"   = "payment_source"
     "=INDEX(util_ReadHandle(XD1),2,7)"   = "datetime64[D]"
     "=INDEX(util_ReadHandle(XD1),3,2)"   = "F27"
@@ -2199,17 +2201,28 @@ $formulas = [ordered]@{
     "=_QuoteRFQ(VA7,XD1)"     = "#ERROR _QuoteRFQ: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, whose payments it discounts"
     "=_QuoteRFQ(VA7,XD3,VN6)" = "#ERROR _QuoteRFQ: ValueError: discount_curve_set is a collection of 1 curve, expected none with route = cleared; a cleared quote discounts nothing"
     "=LEFT(_QuoteRFQ(VA7,VF3,VN6),46)" = "#ERROR _QuoteRFQ: rfq is quote template handle"
-    "=_CreateRFQ(UX5,XA1:XA2,XB1:XB1,VF3)"  = "#ERROR _CreateRFQ: ValueError: quantities has 1 rows, expected 2, one per contract code"
-    "=_CreateRFQ(UX5,XA1:XB2,XB1:XB2,VF3)"  = "#ERROR _CreateRFQ: contract_codes is 2x2 array, expected column of text"
-    "=_CreateRFQ(UX5,XB1:XB2,XB1:XB2,VF3)"  = "#ERROR _CreateRFQ: contract_codes cell (1, 1) is number 100000.0, expected text"
-    '=_CreateRFQ(UX5,{"F27-G27"},XB1,VF3)' = "#ERROR _CreateRFQ: ValueError: contract_codes row 1 is 'F27-G27', expected a month letter and a two-digit year, such as F26"
-    '=_CreateRFQ(UX5,{"H27"},XB1,VF3)'     = "#ERROR _CreateRFQ: ValueError: contract_codes row 1 is 'H27', expected months the index's schedule has a contract for; it has none for 2027-03"
-    "=_CreateRFQ(UX5,XA1:XA2,{0;0},VF3)"   = "#ERROR _CreateRFQ: ValueError: quantities are all zero, expected at least one positive; a request of nothing has no price"
-    "=_CreateRFQ(UX5,XA1:XA2,{1;-1},VF3)"  = "#ERROR _CreateRFQ: ValueError: quantities row 2 is -1.0, expected a finite number of zero or more; a request is a weighted quote, not a spread or a net position"
-    "=_CreateRFQ(UX5,XA1:XA2,XB1:XB2,VF3,XC1:XC1)" = "#ERROR _CreateRFQ: ValueError: payment_dates has 1 rows, expected 2, one per contract code"
-    "=_CreateRFQ(UX5,XA1:XA2,XB1:XB2,VF3,C2)"      = "#ERROR _CreateRFQ: payment_dates is blank, expected column of dates"
-    '=_CreateRFQ(UX5,XA1:XA2,XB1:XB2,VF3,{46416;46447})' = "#ERROR _CreateRFQ: ValueError: F27 of row 1 pays on 2027-01-29, expected a day after its last observation, 2027-01-29, when its final price exists"
-    "=LEFT(_CreateRFQ(UX5,XA1:XA2,XB1:XB2,GP3),52)" = "#ERROR _CreateRFQ: template is trade template handle"
+    # The rows by dates, dated-quotes.md: the two windows in XD5, 11 January to 26 February at
+    # 1650/35 paying 1 March at 0.98 and 1 to 12 February at 60 paying 15 February at 0.985,
+    # 22,350,000 over 393,500, the readback naming each by its dates; a strip row its two months;
+    # a booking header, a text quantity, a rule in the payment column, a month off the schedule,
+    # quantities of nothing or below zero, a date on a month's last observation, a ticket without
+    # a quantity, the dates reversed and a trade template refused in the seam's words and the
+    # library's.
+    '=TEXT(_QuoteRFQ(VA7,XD5,VN6),"0.000000")' = "56.797967"
+    "=INDEX(util_ReadHandle(XD5),3,2)"   = "2027-01-11 to 2027-02-26"
+    "=INDEX(util_ReadHandle(XD5),4,2)"   = "2027-02-01 to 2027-02-12"
+    "=INDEX(util_ReadHandle(XD5),4,14)"  = "onetime"
+    '=INDEX(util_ReadHandle(_CreateRFQ(UX5,XE1:XF1,{"F27-G27",7},VF3)),4,2)' = "G27"
+    '=_CreateRFQ(UX5,{"trade_id","quantity"},{1,100000},VF3)' = "#ERROR _CreateRFQ: ValueError: trade_id is a field of booking alone, expected one a request's rows hold: contract_code, start_date, end_date, quantity, payment_day"
+    '=_CreateRFQ(UX5,XE1:XF1,{"F27","ten"},VF3)' = "#ERROR _CreateRFQ: rows cell (1, 2) is text 'ten', expected number"
+    '=_CreateRFQ(UX5,XE1:XG1,{"F27",100000,"+2bd"},VF3)' = "#ERROR _CreateRFQ: ValueError: payment_day row 1 is '+2bd', expected a date; a request's rows pay on dates, and a rule is the template's to hold"
+    '=_CreateRFQ(UX5,XE1:XF1,{"H27",1},VF3)' = "#ERROR _CreateRFQ: ValueError: contract_code row 1 is 'H27', expected months the index's schedule has a contract for; it has none for 2027-03"
+    '=_CreateRFQ(UX5,XE1:XF1,{"F27",0;"G27",0},VF3)' = "#ERROR _CreateRFQ: ValueError: quantity is zero on every row, expected at least one positive; a request of nothing has no price"
+    '=_CreateRFQ(UX5,XE1:XF1,{"F27",1;"G27",-1},VF3)' = "#ERROR _CreateRFQ: ValueError: quantity row 2 is -1.0, expected a finite number of zero or more; a request is a weighted quote, not a spread or a net position"
+    '=_CreateRFQ(UX5,XE1:XG1,{"F27",100000,46416;"G27",300000,46447},VF3)' = "#ERROR _CreateRFQ: ValueError: F27 of row 1 pays on 2027-01-29, expected a day after its last observation, 2027-01-29, when its final price exists"
+    "=_CreateRFQ(UX5,XE3:XF3,XE4:XF5,XH8)" = "#ERROR _CreateRFQ: ValueError: quantity is missing, expected a column of the request, one per row"
+    "=_CreateRFQ(UX5,XE3:XG3,{46444,46398,1},XH8)" = "#ERROR _CreateRFQ: ValueError: end_date row 1 is 2027-01-11, expected a day on or after start_date row 1, 2027-02-26"
+    "=LEFT(_CreateRFQ(UX5,XE1:XF1,XA1:XB2,GP3),52)" = "#ERROR _CreateRFQ: template is trade template handle"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -3575,18 +3588,29 @@ $cells = [ordered]@{
     "WJ27" = "=_CreateTrades(WK5:WK6,WL4:WQ4,WL5:WQ5,WJ21)"
     "WJ28" = "=_EvaluateTrades(WJ23,WJ17:WJ18,WJ20)"
     "WJ29" = "=_EvaluateTrades(WJ25,WK18:WK19,WJ20)"
-    # The request for quote, rfq-quoting.md, on the quoting block's strip: the two months and their
-    # quantities in XA1:XB2, the request's payment days in XC1:XC3, 8 February, 1 March and 8
-    # March; the bilateral request on the template's +1bd in XD1 and on 8 February and 1 March in
-    # XD2, the cleared calendar-day request in XD3, and a request paying 8 March, past the curve,
-    # in XD4.
+    # The request for quote, rfq-quoting.md and dated-quotes.md, on the quoting block's strip as a
+    # ticket's rows: the two months, their quantities and the request's payment days in XA1:XC2, 8
+    # February and 1 March, and in XA4:XC5 paying 1 March and 8 March, under the headers XE1:XG1;
+    # the bilateral request on the template's +1bd in XD1 and on its own days in XD2, the cleared
+    # calendar-day request in XD3, and a request paying 8 March, past the curve, in XD4; two
+    # windows by their dates in XE4:XH5 under the headers XE3:XH3 and the onetime bilateral template
+    # in XH8, 11 January to 26 February at 100,000 paying 1 March and 1 to 12 February at 300,000
+    # paying 15 February, in XD5.
     "XA1" = "F27"; "XB1" = "100000"; "XC1" = "8-Feb-2027"
     "XA2" = "G27"; "XB2" = "300000"; "XC2" = "1-Mar-2027"
-    "XC3" = "8-Mar-2027"
-    "XD1" = "=_CreateRFQ(UX5,XA1:XA2,XB1:XB2,VF3)"
-    "XD2" = "=_CreateRFQ(UX5,XA1:XA2,XB1:XB2,VF3,XC1:XC2)"
-    "XD3" = "=_CreateRFQ(UX5,XA1:XA2,XB1:XB2,VF7)"
-    "XD4" = "=_CreateRFQ(UX5,XA1:XA2,XB1:XB2,VF3,XC2:XC3)"
+    "XA4" = "F27"; "XB4" = "100000"; "XC4" = "1-Mar-2027"
+    "XA5" = "G27"; "XB5" = "300000"; "XC5" = "8-Mar-2027"
+    "XE1" = "contract_code"; "XF1" = "quantity"; "XG1" = "payment_day"
+    "XD1" = "=_CreateRFQ(UX5,XE1:XF1,XA1:XB2,VF3)"
+    "XD2" = "=_CreateRFQ(UX5,XE1:XG1,XA1:XC2,VF3)"
+    "XD3" = "=_CreateRFQ(UX5,XE1:XF1,XA1:XB2,VF7)"
+    "XD4" = "=_CreateRFQ(UX5,XE1:XG1,XA4:XC5,VF3)"
+    "XE3" = "start_date"; "XF3" = "end_date"; "XG3" = "quantity"; "XH3" = "payment_day"
+    "XE4" = "11-Jan-2027"; "XF4" = "26-Feb-2027"; "XG4" = "100000"; "XH4" = "1-Mar-2027"
+    "XE5" = "1-Feb-2027"; "XF5" = "12-Feb-2027"; "XG5" = "300000"; "XH5" = "15-Feb-2027"
+    "XH7" = "bilateral"; "XI7" = "financial"; "XJ7" = "asian"; "XK7" = "period"; "XL7" = "+1bd"; "XM7" = "=VE1"; "XN7" = "SOFR"; "XO7" = "onetime"
+    "XH8" = '=_CreateQuoteTemplate("fixed_float",VF1:VM1,XH7:XO7)'
+    "XD5" = "=_CreateRFQ(UX5,XE3:XH3,XE4:XH5,XH8)"
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January

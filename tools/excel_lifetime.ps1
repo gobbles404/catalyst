@@ -1704,10 +1704,11 @@ $rfq = {
     Put $state $sheet "K30" "n26"; Put $state $sheet "L30" "1"; Put $state $sheet "M30" "1-Jul-2026"
     Put $state $sheet "K31" "q26"; Put $state $sheet "L31" "3"; Put $state $sheet "M31" "1-Aug-2026"
     Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",K26:Q26,K27:Q27)'
-    Put $state $sheet "D33" "=_CreateRFQ(D5,K30:K31,L30:L31,D26)"
+    Put $state $sheet "K29" "contract_code"; Put $state $sheet "L29" "quantity"; Put $state $sheet "M29" "payment_day"
+    Put $state $sheet "D33" "=_CreateRFQ(D5,K29:L29,K30:L31,D26)"
     Put $state $sheet "D34" "=_QuoteRFQ(D11,D33)"
     Put $state $sheet "D35" "=INDEX(util_ReadHandle(D33),4,5)"
-    Put $state $sheet "D36" "=_CreateRFQ(D5,K30:K31,L30:L31,D26,M30:M31)"
+    Put $state $sheet "D36" "=_CreateRFQ(D5,K29:M29,K30:M31,D26)"
     Put $state $sheet "D37" "=_QuoteRFQ(D11,D36)"
     Put $state $sheet "D38" "=INDEX(util_ReadHandle(D36),3,6)"
     $id = Id $state
@@ -1742,7 +1743,7 @@ $rfq = {
     # reads showing #REF!; typed back, both publish anew and the price again.
     Put $state $sheet "K30" "x"
     $failed = Text $state $sheet "D33"
-    Check "a code naming no month fails the request in the library's words" ($failed -eq "#ERROR _CreateRFQ: ValueError: contract_codes row 1 is 'x', expected a month letter and a two-digit year, such as F26") $failed
+    Check "a code naming no month fails the request in the library's words" ($failed -eq "#ERROR _CreateRFQ: ValueError: contract_code row 1 is 'x', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28") $failed
     Check "and the quote as its consumer, the creator's text carried once" ((Text $state $sheet "D34") -eq "#ERROR _QuoteRFQ: rfq is the creator's failure, expected rfq handle: $failed") (Text $state $sheet "D34")
     Check "and the read shows #REF!, no number" ((Text $state $sheet "D35") -eq "#REF!") (Text $state $sheet "D35")
     $c = Settle $state $sheet { param($c) $c.Live -eq 13 }
