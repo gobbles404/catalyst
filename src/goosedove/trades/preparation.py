@@ -264,8 +264,9 @@ def _the_set_amounts(
     if outrun.any():
         g = int(outrun.argmax())
         group = group_words(
-            leg.leg.schedule.codes,
-            leg.group_contract,
+            encoded.terms,
+            leg.leg,
+            encoded.group_head,
             encoded.payment_date,
             g,
             encoded.keys,
@@ -653,10 +654,10 @@ def _the_summed_set_amounts(
     outrun = ~np.isfinite(set_amount)
     if outrun.any():
         g = int(outrun.argmax())
-        first = encoded.legs[0]
         group = group_words(
-            first.leg.schedule.codes,
-            first.group_contract,
+            encoded.terms,
+            encoded.terms.legs[0],
+            encoded.group_head,
             encoded.payment_date,
             g,
             encoded.keys,

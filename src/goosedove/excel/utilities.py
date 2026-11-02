@@ -64,7 +64,7 @@ from goosedove.trades.resolution import Trades
 from goosedove.trades.results import LegResults, TradeResults
 from goosedove.trades.schedule_methods import METHOD_NAMES
 from goosedove.trades.template import DayOrRule, TradeTemplate
-from goosedove.trades.terms import BASIS_NAMES, FREQUENCY_NAMES
+from goosedove.trades.terms import BASIS_NAMES, FREQUENCY_NAMES, booked_words
 
 
 @singledispatch
@@ -498,10 +498,11 @@ def trades_table(obj: Trades) -> MixedArray:
     # row booked shown on each of its components, the one amount and no allocation among them,
     # so a reader never sums the column down a strip;
     # then what the resolution derived, since #172 entered_contract_code, the code text the row
-    # entered as typed, kept apart from the contract its components resolved to under
-    # contract_code, and the words `(not supplied)` where the row entered none and booked by
+    # entered as typed, kept apart from the period its components resolved to under
+    # booked_period, and the words `(not supplied)` where the row entered none and booked by
     # its dates, display and no value, then start_date and end_date, the days the component
-    # covers, its whole month from a code and its share of a booked period from dates,
+    # covers, its whole month from a code, its share of a booked period from dates and a onetime
+    # row's whole window,
     # covered_days, the calendar days between them, and component_quantity, the quantity the
     # basis gives it, the entered quantity times those days under calday, so that a reader never
     # takes the month's total for the entered daily quantity;
@@ -516,7 +517,10 @@ def trades_table(obj: Trades) -> MixedArray:
     paired = len(terms.legs) > 1
     rows = terms.occurrence
     n = rows.size
-    codes = np.array(leg.schedule.codes, dtype=object)[leg.contract]
+    # Each component's booked period in words, since onetime-averaging.md: the contract's code of
+    # a month, the two dates of a window; the column was contract_code until a window could be
+    # booked, which no one contract names.
+    booked = tuple(booked_words(terms, leg, np.arange(n, dtype=np.intp)))
     headers: list[str] = ["row"]
     types: list[str] = ["int64"]
     columns: list[NDArray[Any] | tuple[str, ...] | DatesOrTexts] = [(rows + 1).astype(np.int64)]
@@ -538,7 +542,7 @@ def trades_table(obj: Trades) -> MixedArray:
     if terms.trade_ids is not None:  # the source system's whole numbers, since #168
         numbers("trade_id", "int64", terms.trade_ids[rows])
     numbers("trade_date", "datetime64[D]", terms.trade_dates[rows])
-    text("contract_code", tuple(codes))
+    text("booked_period", booked)
     text("schedule_method", tuple(METHOD_NAMES[leg.schedule_method[rows]]))
     if paired:
         text("second_schedule_method", tuple(METHOD_NAMES[terms.legs[1].schedule_method[rows]]))
@@ -579,7 +583,7 @@ def trades_table(obj: Trades) -> MixedArray:
         numbers("second_offset", "float64", encoding.legs[1].offset)
     # settlement_frequency last, since onetime-averaging.md, a term of the row shown after the
     # encoding's columns so that no column before it moves, as the observation columns of #229
-    # were appended: monthly on every row this version books, the row's own word once onetime is.
+    # were appended: each row's own word, monthly or onetime.
     text("settlement_frequency", tuple(FREQUENCY_NAMES[terms.settlement_frequency[rows]]))
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
@@ -604,17 +608,19 @@ def _slot_names(
 ) -> tuple[list[str], list[str], list[NDArray[Any] | tuple[str, ...]]]:
     # The columns that name a slot: the contract pricing the day, whose settle fixes the slot and
     # whose quote projects it; the period the slot's group was booked on, since
-    # onetime-averaging.md the calendar month named by its contract, which owns the fixed leg and
-    # the payment and under asian may be another than the pricing one; the observation day; and,
-    # for a financial settlement, the day the slot's payment group pays, so that two groups
-    # observing one day read apart whatever contract prices it; a physical settlement pays on no
-    # day and shows none. The slots are the leg's, the payment days the trade's.
+    # onetime-averaging.md the group's label, a month's contract code or a window's two dates,
+    # which owns the fixed leg and the payment and under asian may be another than the pricing
+    # contract; the observation day; and, for a financial settlement, the day the slot's payment
+    # group pays, so that two groups observing one day read apart whatever contract prices it; a
+    # physical settlement pays on no day and shows none. The slots are the leg's, the payment
+    # days the trade's.
     codes = np.array(leg.leg.schedule.codes, dtype=object)
+    labels = booked_words(encoding.terms, leg.leg, encoding.group_head)  # one per group
     names = ["pricing_contract", "booked_period", "observation_date"]
     types = ["str", "str", "datetime64[D]"]
     columns: list[NDArray[Any] | tuple[str, ...]] = [
         tuple(codes[leg.slot_reference]),
-        tuple(codes[leg.group_contract[leg.slot_group]]),
+        tuple(labels[leg.slot_group]),
         leg.slot_date,
     ]
     if encoding.payment_date is not None:

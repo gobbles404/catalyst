@@ -2158,7 +2158,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "row",
         "trade_id",
         "trade_date",
-        "contract_code",
+        "booked_period",
         "schedule_method",
         "route",
         "settlement_method",
@@ -2258,7 +2258,7 @@ def test_the_spill_shows_the_batchs_facts_wherever_they_came_from(sheet: dict[st
         template,
     )
     table = spilled(handle)
-    assert table[0][:3] == ["row", "trade_date", "contract_code"]
+    assert table[0][:3] == ["row", "trade_date", "booked_period"]
     assert "trade_id" not in table[0] and "clearing_house" not in table[0]
     assert [line[4] for line in table[2:]] == ["bilateral", "bilateral"]
     assert [line[5] for line in table[2:]] == ["physical", "physical"]
@@ -2290,7 +2290,7 @@ def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any
     assert table[0] == [
         "row",
         "trade_date",
-        "contract_code",
+        "booked_period",
         "schedule_method",
         "route",
         "settlement_method",
@@ -2420,7 +2420,7 @@ def test_a_dated_ticket_crosses_the_seam_and_spills_the_days_each_component_cove
             sheet["template"],
         )
     )
-    assert table[0][3] == "contract_code" and table[2][3] == "Z26"
+    assert table[0][3] == "booked_period" and table[2][3] == "Z26"
     assert table[0][12:15] == ["entered_contract_code", "start_date", "end_date"]
     assert table[2][12:18] == ["(not supplied)", 46357.0, 46387.0, 31.0, 10.0, 100_000.0]
     assert str(
@@ -2643,12 +2643,13 @@ def test_a_mixed_tickets_refusals_name_the_first_offending_row() -> None:
     np.testing.assert_array_equal(batch.resolved.component_quantity, [1.0, -62.0, 3.0, 682.0])
 
 
-def test_the_frequency_is_required_read_from_its_list_and_onetime_refused_until_built() -> None:
-    # onetime-averaging.md's second slice: settlement_frequency is a field every batch carries,
-    # from the template's one word or the ticket's column, read from its list as the basis is;
-    # monthly books as before and reads back last, and onetime, which no consumer prices yet, is
-    # refused by name at the row that chose it, never booked as monthly; period, the total of a
-    # onetime period, is refused under monthly in the kernel's words.
+def test_the_frequency_is_required_read_from_its_list_and_its_rules_name_the_row() -> None:
+    # onetime-averaging.md: settlement_frequency is a field every batch carries, from the
+    # template's one word or the ticket's column, read from its list as the basis is; monthly
+    # books as before and reads back last, and a onetime row under terms the kernel does not
+    # average, a physical NG lastday here, is refused by the first of the kernel's frequency
+    # rules it breaks, at the row that chose it, before any period is built; period, the total of
+    # a onetime period, is refused under monthly in the kernel's words.
     without = {name: value for name, value in NG_TEMPLATE.items() if name != "settlement_frequency"}
     assert refused(NG, NG_TICKET, without) == (
         "settlement_frequency is missing, expected a value in the template or a column in the "
@@ -2658,9 +2659,17 @@ def test_the_frequency_is_required_read_from_its_list_and_onetime_refused_until_
         a_template({**NG_TEMPLATE, "settlement_frequency": "yearly"})
     assert str(refusal.value) == "settlement_frequency is 'yearly', expected monthly or onetime"
     assert refused(NG, NG_TICKET, {**NG_TEMPLATE, "settlement_frequency": "onetime"}) == (
-        "settlement_frequency of trade 1001 at row 1 is 'onetime', expected 'monthly', the one "
-        "selection this version books; a onetime period across the row's dates is not built, "
-        "and nothing prices it as monthly"
+        "settlement_method is 'physical', expected 'financial' with settlement_frequency = "
+        "onetime of trade 1001 at row 1; a onetime period is cash settled on its average"
+    )
+    assert refused(
+        NG,
+        NG_TICKET,
+        {**TOY_TEMPLATE, "quantity_unit": "NYMEX NG", "settlement_frequency": "onetime"},
+    ) == (
+        "schedule_method of trade 1001 at row 1 is 'lastday', expected 'asian' under "
+        "settlement_frequency = onetime; a onetime period averages every pricing day it covers, "
+        "and the expiry-based methods take their contract's month"
     )
     assert refused(NG, NG_TICKET, {**NG_TEMPLATE, "quantity_per": "period"}) == (
         "quantity_per of trade 1001 at row 1 is 'period', expected 'month' or 'calday' under "
@@ -2672,7 +2681,8 @@ def test_the_frequency_is_required_read_from_its_list_and_onetime_refused_until_
         "settlement_frequency": ["monthly", "onetime", "monthly", "monthly", "monthly"],
     }
     assert refused(NG, by_column, without).startswith(
-        "settlement_frequency of trade 1002 at row 2 is 'onetime'"
+        "settlement_method is 'physical', expected 'financial' with settlement_frequency = "
+        "onetime of trade 1002 at row 2"
     )
     by_column["settlement_frequency"] = ["monthly"] * 5
     batch, _ = created(NG, by_column, without)

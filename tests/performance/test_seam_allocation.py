@@ -1178,7 +1178,6 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
                 "quantity_per",
                 "payment_day",
                 "payment_holiday_calendar",
-                "settlement_frequency",
                 "discount_curve_key",
                 "settlement_frequency",
             ]
@@ -1210,9 +1209,10 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         return batch
 
     peak = least_peak(created)
-    assert (
-        peak <= 321 * rows + 2 * SLACK
-    )  # 280 before the bounds and the frequency, 40 bytes a row, 801,440 to 802,089 at 2,500 rows
+    # 280 before the bounds and the frequency, 321 with them, and since onetime-averaging.md's
+    # third slice 324, three one-byte masks a row, which rows are a window and which components,
+    # 811,252 at 2,500 rows.
+    assert peak <= 324 * rows + 2 * SLACK
 
 
 # A combination keeps its distinct days and nothing of its sources: two calendars of the same

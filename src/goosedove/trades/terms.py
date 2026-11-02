@@ -142,8 +142,12 @@ class LegTerms:
     the row of the index's specifications the row's quantity counts, the desk's word for a
     quantity of the index that its quantity_unit named, and schedule_method[i] the method, the
     position of the member among METHODS. Per component, aligned with the trade's components:
-    contract[k] the row of the schedule the component's month is, and fixed_price[k] the price
-    agreed for the leg, in the index's quote units. Then schedule_month[i], since #186, the
+    contract[k] the row of the schedule the component's month is, or, for a onetime period since
+    onetime-averaging.md, the row of the contract pricing the window's first day, the first whose
+    expiry is on or after it by the calendar's rule, read for nothing that prices, the calendar
+    giving each of its days its own contract and the window's two dates naming it; and
+    fixed_price[k] the price agreed for the leg, in the
+    index's quote units. Then schedule_month[i], since #186, the
     calendar month of every row of the schedule as numpy counts months from 1970, read once by
     the resolution against the ticket's codes and kept for the encoding's contract-month axes.
     Every array read-only."""
@@ -359,9 +363,19 @@ def resolved_trades(
     _the_selections(
         index, specification, schedule_method, quantity_per, settlement_frequency, occurrences
     )
-    _the_frequency(settlement_frequency, quantity_per, trade_ids)
+    frequency_rules(
+        settlement_frequency,
+        quantity_per,
+        schedule_method,
+        settlement,
+        index.kind,
+        second_leg is not None,
+        trade_ids,
+    )
     _the_method(schedule_method, settlement, trade_ids, index.kind)
     _the_components(occurrence, quantity, start_date, end_date, trade_ids, occurrences)
+    onetime = settlement_frequency[occurrence] == FREQUENCIES.index(SettlementFrequency.ONETIME)
+    _the_monthly_components(start_date, end_date, onetime, trade_ids, occurrence)
     _the_leg_columns(
         contract, fixed_price, occurrence, trade_ids, len(schedule.codes), "contract", "fixed_price"
     )
@@ -387,7 +401,7 @@ def resolved_trades(
     starts, ends = _frozen_days(start_date), _frozen_days(end_date)
     days = (ends - starts).astype(np.int64) + 1  # made here and owned here: frozen below
     days.setflags(write=False)
-    period_start, period_end = _the_calculation_periods(starts)
+    period_start, period_end = _the_calculation_periods(starts, ends, onetime)
     brokered = _the_brokered(broker, occurrences)
     return ResolvedTrades(
         instrument,
@@ -601,31 +615,70 @@ def _the_selections(
     )
 
 
-def _the_frequency(
+def frequency_rules(
     settlement_frequency: NDArray[np.intp],
     quantity_per: NDArray[np.intp],
+    schedule_method: NDArray[np.intp],
+    settlement: Settlement,
+    kind: Kind,
+    paired: bool,
     trade_ids: NDArray[np.int64] | None,
 ) -> None:
-    """Each occurrence's frequency with its basis, since onetime-averaging.md: monthly, the one
-    selection this version books, the first onetime row refused by its row, since a onetime
-    period across a row's dates is not built and nothing prices it as monthly; and under monthly
-    a basis of month or calday, the first row of period refused by its row, since period is the
-    total of a onetime period and says nothing of a month. Two looks over the occurrences."""
+    """Each occurrence's frequency with the terms it stands under, since onetime-averaging.md,
+    the kernel's rule, applied by the resolution before any period is built or observed so that
+    a refused onetime row is refused in these words and never in an observation's. A onetime
+    period, one average over every pricing day of the row's window, is priced on a futures index
+    alone, an IFERC month having one index published once; on one index, a pair's onetime period
+    not being built; under a financial settlement, since it is cash settled on its average; under
+    the asian method, the expiry-based methods taking their contract's month; and in a quantity
+    of period, the window's total, or calday, never month, which says nothing of a window. Under
+    monthly the basis is month or calday, period being a window's total. The first row that
+    breaks a rule is refused by its trade, the rules in this order."""
+
+    def first(rows: NDArray[np.bool_]) -> str:
+        """The words for the first row at fault, found only when a rule refuses."""
+        return named_trade(trade_ids, int(rows.argmax()))
+
     onetime = settlement_frequency == FREQUENCIES.index(SettlementFrequency.ONETIME)
     if onetime.any():
-        i = int(onetime.argmax())
-        raise ValueError(
-            f"settlement_frequency of {named_trade(trade_ids, i)} is 'onetime', expected "
-            "'monthly', the one selection this version books; a onetime period across the row's "
-            "dates is not built, and nothing prices it as monthly"
-        )
-    period = quantity_per == BASES.index(QuantityPer.PERIOD)
+        if kind is Kind.IFERC:
+            raise ValueError(
+                f"settlement_frequency of {first(onetime)} is 'onetime', expected 'monthly' on an "
+                "IFERC index; an IFERC month has one index, published once, and a onetime period "
+                "averages the pricing days of a futures index"
+            )
+        if paired:
+            raise ValueError(
+                f"settlement_frequency of {first(onetime)} is 'onetime', expected 'monthly' with "
+                "two indexes; a onetime period on a pair is not built"
+            )
+        if settlement is Settlement.PHYSICAL:
+            raise ValueError(
+                f"settlement_method is 'physical', expected 'financial' with settlement_frequency "
+                f"= onetime of {first(onetime)}; a onetime period is cash settled on its average"
+            )
+        unaveraged = onetime & (schedule_method != METHODS.index(ScheduleMethod.ASIAN))
+        if unaveraged.any():
+            k = int(unaveraged.argmax())
+            raise ValueError(
+                f"schedule_method of {named_trade(trade_ids, k)} is "
+                f"{METHODS[int(schedule_method[k])].value!r}, expected 'asian' under "
+                "settlement_frequency = onetime; a onetime period averages every pricing day it "
+                "covers, and the expiry-based methods take their contract's month"
+            )
+        by_month = onetime & (quantity_per == BASES.index(QuantityPer.MONTH))
+        if by_month.any():
+            raise ValueError(
+                f"quantity_per of {first(by_month)} is 'month', expected 'period' or 'calday' "
+                "under settlement_frequency = onetime; month says nothing of a window, period is "
+                "its total and calday its days"
+            )
+    period = ~onetime & (quantity_per == BASES.index(QuantityPer.PERIOD))
     if period.any():
-        i = int(period.argmax())
         raise ValueError(
-            f"quantity_per of {named_trade(trade_ids, i)} is 'period', expected 'month' or "
-            "'calday' under settlement_frequency = monthly; period is the total of a onetime "
-            "period and says nothing of a month"
+            f"quantity_per of {first(period)} is 'period', expected 'month' or 'calday' under "
+            "settlement_frequency = monthly; period is the total of a onetime period and says "
+            "nothing of a month"
         )
 
 
@@ -825,9 +878,10 @@ def _the_components(
     occurrences: int,
 ) -> None:
     """The trade's columns, aligned, one or more, each of an occurrence and every occurrence
-    holding one; each component's end on or after its start and both in one calendar month, each
-    quantity whole, zero included, the days or a quantity refused naming the trade it belongs to,
-    since a strip's component is no row of the sheet. A leg's columns are _the_leg_columns'."""
+    holding one; each component's end on or after its start, each quantity whole, zero included,
+    the days or a quantity refused naming the trade it belongs to, since a strip's component is
+    no row of the sheet; a monthly component's one calendar month is _the_monthly_components'
+    rule, once the frequencies are known. A leg's columns are _the_leg_columns'."""
     components = occurrence.size
     if components == 0:
         raise ValueError("occurrence has 0 rows, expected at least 1, one per component")
@@ -858,16 +912,29 @@ def _the_components(
             f"end_date of {named_trade(trade_ids, int(occurrence[k]))} is {end_date[k]}, "
             f"expected a day on or after its start_date, {start_date[k]}"
         )
-    two_months = start_date.astype("datetime64[M]") != end_date.astype("datetime64[M]")
+    whole_quantities(
+        quantity, lambda k: f"quantity of {named_trade(trade_ids, int(occurrence[k]))}"
+    )
+
+
+def _the_monthly_components(
+    start_date: NDArray[np.datetime64],
+    end_date: NDArray[np.datetime64],
+    onetime: NDArray[np.bool_],
+    trade_ids: NDArray[np.int64] | None,
+    occurrence: NDArray[np.intp],
+) -> None:
+    """A monthly component's days lie in one calendar month, since a monthly component is one
+    contract month's and a quantity per day over no day states nothing; a onetime component,
+    since onetime-averaging.md, covers its row's whole window, months and all, and is held to
+    nothing here. The first monthly component in two months is refused by its trade."""
+    two_months = (start_date.astype("datetime64[M]") != end_date.astype("datetime64[M]")) & ~onetime
     if two_months.any():
         k = int(two_months.argmax())
         raise ValueError(
             f"{named_trade(trade_ids, int(occurrence[k]))} covers {start_date[k]} to "
             f"{end_date[k]}, expected one calendar month per component"
         )
-    whole_quantities(
-        quantity, lambda k: f"quantity of {named_trade(trade_ids, int(occurrence[k]))}"
-    )
 
 
 def _the_leg_columns(
@@ -989,8 +1056,10 @@ def _the_component_quantity(
 ) -> NDArray[np.float64]:
     """Each component's quantity by its occurrence's basis, formed once here for the encoding to
     convert and nothing later to scale again. Under month the entered quantity itself, since the
-    entered quantity stands in every month the trade covers, the frozen column shared when no
-    row chose calday; under calday the entered quantity times the component's covered days, one
+    entered quantity stands in every month the trade covers, and under period, since
+    onetime-averaging.md, the entered quantity itself again, the total of the one component a
+    onetime row is, the frozen column shared when no row chose calday; under calday the entered
+    quantity times the component's covered days, a onetime row's whole window's, one
     multiplication and one choice over the components, frozen, and finite: the product itself is
     looked at, since a bound on the entered quantity is a rounded quotient a quantity at it can
     pass and still overflow, the overflow let happen here quietly and the first infinite product
@@ -1068,18 +1137,53 @@ def month_bounds(
 
 def _the_calculation_periods(
     start_date: NDArray[np.datetime64],
+    end_date: NDArray[np.datetime64],
+    onetime: NDArray[np.bool_],
 ) -> tuple[NDArray[np.datetime64], NDArray[np.datetime64]]:
-    """Each component's calculation period, since onetime-averaging.md: under the monthly
-    selection, the one this version books, the calendar month its first day lies in, its last day
-    in the same month by the components' rule, the two bounds made once by month_bounds and
-    frozen. The identity the encoding keys the payment groups by, a part of a month and the whole
-    of it alike, so that two rows of one month paying on one day are one group, each component
-    keeping its own days, weights and quantity; a whole-period average will book its own two
-    dates here."""
+    """Each component's calculation period, since onetime-averaging.md: under monthly the
+    calendar month its first day lies in, its last day in the same month by the monthly
+    components' rule, the two bounds made once by month_bounds; under onetime the component's
+    own two dates, the row's whole window, so that the period is the component. Frozen. The
+    identity the encoding keys the payment groups by, a part of a month and the whole of it
+    alike, so that two rows of one month paying on one day are one group, each component keeping
+    its own days, weights and quantity, and a window its own group."""
     first, last = month_bounds(start_date.astype("datetime64[M]").astype(np.int64))
+    if onetime.any():
+        first = np.where(onetime, start_date, first)
+        last = np.where(onetime, end_date, last)
     first.setflags(write=False)
     last.setflags(write=False)
     return first, last
+
+
+def onetime_components(terms: ResolvedTrades) -> NDArray[np.bool_]:
+    """Which components are a onetime period's, since onetime-averaging.md: their occurrence's
+    frequency gathered, one compare over the components, nothing stored twice."""
+    return terms.settlement_frequency[terms.occurrence] == FREQUENCIES.index(
+        SettlementFrequency.ONETIME
+    )
+
+
+def booked_words(
+    terms: ResolvedTrades, leg: LegTerms, components: NDArray[np.intp]
+) -> NDArray[np.object_]:
+    """The booked period of each of those components in words, since onetime-averaging.md, the
+    one source of the label a readback, a group and a refusal give it, made when asked and kept
+    by nothing: its contract's code on this leg's schedule under monthly, `K26`, and its two
+    dates under onetime, `2026-05-26 to 2026-06-25`, in the form every date in a refusal takes,
+    since a window prices off whichever contracts its days fall on and no one contract names
+    it. One gather of the codes, and over the window components alone two date-to-text
+    conversions and two joins, numpy's over the array; a batch without a window makes no text
+    but the codes'."""
+    words = np.array(leg.schedule.codes, dtype=object)[leg.contract[components]]
+    window = onetime_components(terms)[components]
+    if window.any():
+        on = components[window]
+        words[window] = np.strings.add(
+            np.strings.add(np.datetime_as_string(terms.period_start[on]), " to "),
+            np.datetime_as_string(terms.period_end[on]),
+        )
+    return words
 
 
 def _frozen_rows(column: NDArray[np.intp]) -> NDArray[np.intp]:

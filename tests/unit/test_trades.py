@@ -28,6 +28,7 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holida
 from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
+from goosedove.index_definitions.kind import Kind
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.instruments.fields import DatesOrTexts
@@ -51,6 +52,7 @@ from goosedove.trades.terms import (
     Route,
     Settlement,
     SettlementFrequency,
+    frequency_rules,
     marketing_reserves,
     month_bounds,
     named_trade,
@@ -4798,22 +4800,39 @@ def test_two_rows_of_one_month_paying_on_one_day_are_one_group_each_with_its_own
     assert both.mark == pytest.approx(a.mark + b.mark)
 
 
-def test_a_onetime_frequency_and_a_period_basis_are_refused_by_the_terms_until_built() -> None:
-    # onetime-averaging.md's second slice: the frequency is read and kept per occurrence, monthly
-    # the one selection the kernel prices, and the other refused by its trade in so many words,
-    # never priced as monthly in its place; period, the total of a onetime period, is refused
-    # under monthly with it, the frequency's refusal coming first.
+def test_the_frequency_is_kept_and_its_rules_name_the_first_row_that_breaks_them() -> None:
+    # onetime-averaging.md: the frequency is read and kept per occurrence; a onetime period
+    # books under asian, financial, one futures index and a quantity of period or calday, each
+    # other combination refused by its trade in the kernel's words, and period is refused under
+    # monthly, since it is a window's total.
     monthly = wti_terms()
     np.testing.assert_array_equal(
         monthly.settlement_frequency, [FREQUENCIES.index(SettlementFrequency.MONTHLY)]
     )
     assert not monthly.settlement_frequency.flags.writeable
+    window = wti_terms(
+        periods=(("2026-11-23", "2026-12-04"),),
+        quantities=(2_200.0,),
+        pays=("2026-12-08",),
+        bases=(QuantityPer.PERIOD,),
+        frequencies=(SettlementFrequency.ONETIME,),
+    )
+    assert [str(d) for d in window.period_start] == ["2026-11-23"]
+    assert [str(d) for d in window.period_end] == ["2026-12-04"]
+    # The encoding names a window's group by its two dates, the one label every readback and
+    # refusal gives it: a payment on the window's last observation, refused by the group.
+    early = wti_terms(
+        periods=(("2026-11-23", "2026-12-04"),),
+        quantities=(2_200.0,),
+        pays=("2026-12-04",),
+        bases=(QuantityPer.PERIOD,),
+        frequencies=(SettlementFrequency.ONETIME,),
+    )
     with pytest.raises(ValueError) as refused:
-        wti_terms(frequencies=(SettlementFrequency.ONETIME,))
+        encoded(early, (observed_of(early),), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "settlement_frequency of trade 1 at row 1 is 'onetime', expected 'monthly', the one "
-        "selection this version books; a onetime period across the row's dates is not built, "
-        "and nothing prices it as monthly"
+        "2026-11-23 to 2026-12-04 pays on 2026-12-04, expected a day after its last observation, "
+        "2026-12-04, when its final price exists"
     )
     with pytest.raises(ValueError) as refused:
         wti_terms(bases=(QuantityPer.PERIOD,))
@@ -4824,14 +4843,53 @@ def test_a_onetime_frequency_and_a_period_basis_are_refused_by_the_terms_until_b
     )
     with pytest.raises(ValueError) as refused:
         wti_terms(
-            periods=(("2026-12-18", "2026-12-28"), JANUARY_BOUNDS),
+            periods=(("2026-12-18", "2026-12-28"), ("2026-11-23", "2026-12-04")),
             quantities=(1_200.0, 1_000.0),
-            contracts=(0, 1),
-            pays=("2026-12-30", "2027-02-02"),
-            bases=(QuantityPer.MONTH, QuantityPer.PERIOD),
+            contracts=(0, 0),
+            pays=("2026-12-30", "2026-12-08"),
+            bases=(QuantityPer.MONTH, QuantityPer.MONTH),
             frequencies=(SettlementFrequency.MONTHLY, SettlementFrequency.ONETIME),
         )
-    assert str(refused.value).startswith("settlement_frequency of trade 2 at row 2 is 'onetime'")
+    assert str(refused.value) == (
+        "quantity_per of trade 2 at row 2 is 'month', expected 'period' or 'calday' under "
+        "settlement_frequency = onetime; month says nothing of a window, period is its total and "
+        "calday its days"
+    )
+    with pytest.raises(ValueError) as refused:
+        wti_terms(
+            periods=(("2026-11-23", "2026-12-04"),),
+            pays=("2026-12-08",),
+            methods=(ScheduleMethod.LASTDAY,),
+            bases=(QuantityPer.PERIOD,),
+            frequencies=(SettlementFrequency.ONETIME,),
+        )
+    assert str(refused.value) == (
+        "schedule_method of trade 1 at row 1 is 'lastday', expected 'asian' under "
+        "settlement_frequency = onetime; a onetime period averages every pricing day it covers, "
+        "and the expiry-based methods take their contract's month"
+    )
+    onetime = one_choice(FREQUENCIES, SettlementFrequency.ONETIME, 1)
+    period = one_choice(BASES, QuantityPer.PERIOD, 1)
+    asian = one_choice(METHODS, ScheduleMethod.ASIAN, 1)
+    with pytest.raises(ValueError) as refused:
+        frequency_rules(onetime, period, asian, Settlement.FINANCIAL, Kind.IFERC, False, None)
+    assert str(refused.value) == (
+        "settlement_frequency of trade at row 1 is 'onetime', expected 'monthly' on an IFERC "
+        "index; an IFERC month has one index, published once, and a onetime period averages the "
+        "pricing days of a futures index"
+    )
+    with pytest.raises(ValueError) as refused:
+        frequency_rules(onetime, period, asian, Settlement.FINANCIAL, Kind.FUTURES, True, None)
+    assert str(refused.value) == (
+        "settlement_frequency of trade at row 1 is 'onetime', expected 'monthly' with two "
+        "indexes; a onetime period on a pair is not built"
+    )
+    with pytest.raises(ValueError) as refused:
+        frequency_rules(onetime, period, asian, Settlement.PHYSICAL, Kind.FUTURES, False, None)
+    assert str(refused.value) == (
+        "settlement_method is 'physical', expected 'financial' with settlement_frequency = "
+        "onetime of trade at row 1; a onetime period is cash settled on its average"
+    )
 
 
 def test_the_roll_takes_the_calendars_contract_on_each_day_whatever_the_schedule() -> None:
