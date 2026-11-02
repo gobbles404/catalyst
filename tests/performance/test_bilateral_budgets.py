@@ -53,11 +53,13 @@ from goosedove.trades.risk_report import Bucket, Risk
 from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 from goosedove.trades.terms import (
     BASES,
+    FREQUENCIES,
     PaymentTerms,
     QuantityPer,
     ResolvedTrades,
     Route,
     Settlement,
+    SettlementFrequency,
     month_bounds,
     one_choice,
     resolved_trades,
@@ -129,7 +131,11 @@ def bilateral_terms(
     return resolved_trades(
         FIXED_FLOAT, ASIAN_GAS if asian else GAS, np.zeros(components, dtype=np.intp),
         Route.BILATERAL, Settlement.FINANCIAL, one_choice(METHODS, method, components),
-        one_choice(BASES, QuantityPer.MONTH, components), None, None, None,
+        one_choice(BASES, QuantityPer.MONTH, components),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, components),
+        None,
+        None,
+        None,
         np.repeat(np.datetime64("2026-09-24", "D"), components),
         np.arange(components, dtype=np.intp), rows,
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0), *month_bounds(SCHEDULE_MONTHS[rows]),

@@ -127,13 +127,14 @@ BILATERAL: dict[str, object] = {
     "settlement_method": "financial",
     "schedule_method": "asian",
     "quantity_per": "calday",
+    "settlement_frequency": "monthly",
     "payment_day": "+5bd",
     "payment_holiday_calendar": None,
     "discount_curve_key": "SOFR",
 }
 ALLOWED = (
     "schedule_method, route, settlement_method, discount_curve_key, quantity_per, "
-    "payment_day, payment_holiday_calendar"
+    "payment_day, payment_holiday_calendar, settlement_frequency"
 )
 
 
@@ -167,10 +168,11 @@ def test_a_cleared_financial_template_needs_no_key_and_one_field_takes_the_same_
         settlement_method="financial",
         schedule_method="lastday",
         quantity_per="month",
+        settlement_frequency="monthly",
         payment_day="+2bd",
         payment_holiday_calendar=a_calendar(),
     )
-    assert len(cleared.values) == 6 and cleared.values["route"] == "cleared"
+    assert len(cleared.values) == 7 and cleared.values["route"] == "cleared"
     one = a_quote_template(schedule_method="penultimate")
     assert dict(one.values) == {"schedule_method": "penultimate"}
     # A template is a partial record: what a completed quote requires, and whether its terms
@@ -298,7 +300,7 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
         library + "settlement_method is 'cash', expected physical or financial"
     )
     assert create("fixed_float", row("quantity_per"), row("day")) == (
-        library + "quantity_per is 'day', expected month or calday"
+        library + "quantity_per is 'day', expected month, calday or period"
     )
     assert create("fixed_float", row("payment_day"), row("2bd")) == (
         library + "payment_day is '2bd', expected one or more of a sign, a whole count and "
@@ -344,13 +346,14 @@ def test_the_reader_spills_the_instrument_and_each_value_under_its_field() -> No
     handle = create("fixed_float", row(*BILATERAL), row(*bilateral_values(a_calendar())))
     assert spilled(handle) == [
         ["instrument", *BILATERAL],
-        ["str"] * 8,
+        ["str"] * 9,
         [
             "fixed_float",
             "bilateral",
             "financial",
             "asian",
             "calday",
+            "monthly",
             "+5bd",
             "a holiday calendar",
             "SOFR",

@@ -262,5 +262,10 @@ def _the_component_quantities(
                 )
             component.setflags(write=False)
             return component
+        case QuantityPer.PERIOD:  # refused by the terms, since onetime-averaging.md; never monthly
+            raise ValueError(
+                "quantity_per is 'period', expected 'month' or 'calday'; period is the total of "
+                "a onetime period, which a request for quote does not price"
+            )
         case _:
             assert_never(quantity_per)

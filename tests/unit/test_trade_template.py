@@ -84,18 +84,19 @@ def test_the_page_example_makes_a_template_of_its_two_fields() -> None:
     assert isinstance(template.defaults, MappingProxyType)
 
 
-def test_one_field_and_the_ng_templates_six_take_one_path() -> None:
+def test_one_field_and_the_ng_templates_seven_take_one_path() -> None:
     one = a_template(route="cleared")
     assert dict(one.defaults) == {"route": "cleared"}
     ng = a_template(
         quantity_unit="NYMEX NG",
         quantity_per="month",
+        settlement_frequency="monthly",
         schedule_method="lastday",
         route="cleared",
         settlement_method="physical",
         clearing_house="CME Clearing",
     )
-    assert len(ng.defaults) == 6 and ng.defaults["clearing_house"] == "CME Clearing"
+    assert len(ng.defaults) == 7 and ng.defaults["clearing_house"] == "CME Clearing"
     # The unit is a name the index will be asked for; the template holds it as typed and asks
     # nothing of it, since it has no index.
     assert a_template(quantity_unit="ICE PHH").defaults["quantity_unit"] == "ICE PHH"
@@ -159,7 +160,7 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
             {"settlement_method": "cash"},
             "settlement_method is 'cash', expected physical or financial",
         ),
-        ({"quantity_per": "day"}, "quantity_per is 'day', expected month or calday"),
+        ({"quantity_per": "day"}, "quantity_per is 'day', expected month, calday or period"),
         (  # since #181 the utility's grammar, one or more instructions, read whole
             {"payment_day": "2bd"},
             "payment_day is '2bd', expected one or more of a sign, a whole count and bd, cd "

@@ -59,16 +59,35 @@ class QuantityPer(Enum):
 
     MONTH = "month"
     CALDAY = "calday"
+    # period: the quantity is the total of a onetime calculation period, the whole window's,
+    # since onetime-averaging.md; refused under monthly, which has no window, and not yet priced,
+    # the whole-period average being that ticket's third slice.
+    PERIOD = "period"
 
 
-# The members of the basis choice in the definition's order, and their names as the sheet
-# spells them: a selection holds each occurrence's choice as its position here, so that the
-# kernel gathers and compares positions and never texts, and a reader turns a position back
-# into its name. The schedule methods' members and names are schedule_methods.py's, the same
-# way.
+class SettlementFrequency(Enum):
+    """How many calculation periods a row's days make, since onetime-averaging.md, the
+    independently calculated payoff periods and never the cash day, which payment_day decides.
+    monthly: one period per calendar month the row covers, each with its own observations,
+    weights and quantity, the one selection this version books. onetime: one period across the
+    row's start_date and end_date, its observations averaged together and its quantity the
+    window's; read and refused by every consumer until the third slice prices it."""
+
+    MONTHLY = "monthly"
+    ONETIME = "onetime"
+
+
+# The members of the basis choice and of the frequency choice in the definition's order, and
+# their names as the sheet spells them: a selection holds each occurrence's choice as its
+# position here, so that the kernel gathers and compares positions and never texts, and a
+# reader turns a position back into its name. The schedule methods' members and names are
+# schedule_methods.py's, the same way.
 BASES: Final = tuple(QuantityPer)
 BASIS_NAMES: Final = np.array([member.value for member in BASES], dtype=object)
 BASIS_NAMES.setflags(write=False)
+FREQUENCIES: Final = tuple(SettlementFrequency)
+FREQUENCY_NAMES: Final = np.array([member.value for member in FREQUENCIES], dtype=object)
+FREQUENCY_NAMES.setflags(write=False)
 
 
 def one_choice[E: Enum](members: tuple[E, ...], choice: E, occurrences: int) -> NDArray[np.intp]:
@@ -145,7 +164,10 @@ class ResolvedTrades:
     under; the route and the settlement, one each for the batch. Then two sets of columns
     aligned by position, all read-only. Per occurrence, the ticket's rows in order:
     quantity_per[i] the basis its quantity is stated per, the position of the member among
-    BASES; trade_dates[i] the day the deal was struck, trade_ids[i] its trade_id, the source
+    BASES; settlement_frequency[i] since onetime-averaging.md how many calculation periods its
+    days make, the position among FREQUENCIES, monthly the one this version books, read by the
+    rules here and kept for the readback; trade_dates[i] the day the deal was struck,
+    trade_ids[i] its trade_id, the source
     system's whole number of at most 15 digits held as an int64 since #168, clearing_house[i] its
     clearing organization, counterparty[i] since #175 the counterparty it faces and broker[i] its
     broker, the IDs an array and the three labels tuples, each None as a whole when the field was
@@ -188,6 +210,7 @@ class ResolvedTrades:
     route: Route
     settlement: Settlement
     quantity_per: NDArray[np.intp]
+    settlement_frequency: NDArray[np.intp]
     trade_ids: NDArray[np.int64] | None
     clearing_house: tuple[str, ...] | None
     counterparty: tuple[str, ...] | None
@@ -239,6 +262,7 @@ def resolved_trades(
     settlement: Settlement,
     schedule_method: NDArray[np.intp],
     quantity_per: NDArray[np.intp],
+    settlement_frequency: NDArray[np.intp],
     trade_ids: NDArray[np.int64] | None,
     clearing_house: tuple[str, ...] | None,
     broker: tuple[str, ...] | None,
@@ -332,7 +356,10 @@ def resolved_trades(
         marketing_reserve,
     )
     _the_keys(route, discount_curve_key)
-    _the_selections(index, specification, schedule_method, quantity_per, occurrences)
+    _the_selections(
+        index, specification, schedule_method, quantity_per, settlement_frequency, occurrences
+    )
+    _the_frequency(settlement_frequency, quantity_per, trade_ids)
     _the_method(schedule_method, settlement, trade_ids, index.kind)
     _the_components(occurrence, quantity, start_date, end_date, trade_ids, occurrences)
     _the_leg_columns(
@@ -367,6 +394,7 @@ def resolved_trades(
         route,
         settlement,
         _frozen_rows(quantity_per),
+        _frozen_rows(settlement_frequency),
         None if trade_ids is None else _frozen_ids(trade_ids),
         clearing_house,
         counterparty,
@@ -551,16 +579,54 @@ def _the_selections(
     specification: NDArray[np.intp],
     schedule_method: NDArray[np.intp],
     quantity_per: NDArray[np.intp],
+    settlement_frequency: NDArray[np.intp],
     occurrences: int,
 ) -> None:
-    """Each occurrence's three choices, one per occurrence: its specification a row of the index's
-    specifications, its method a position among METHODS and its basis one among BASES, the first
-    out of range refused by its row."""
+    """Each occurrence's four choices, one per occurrence: its specification a row of the index's
+    specifications, its method a position among METHODS, its basis one among BASES and since
+    onetime-averaging.md its frequency one among FREQUENCIES, the first out of range refused by
+    its row."""
     _the_leg_selections(index, specification, schedule_method, occurrences, "")
     _the_choices(
-        (("quantity_per", quantity_per, len(BASES), "a basis, its position among BASES"),),
+        (
+            ("quantity_per", quantity_per, len(BASES), "a basis, its position among BASES"),
+            (
+                "settlement_frequency",
+                settlement_frequency,
+                len(FREQUENCIES),
+                "a frequency, its position among FREQUENCIES",
+            ),
+        ),
         occurrences,
     )
+
+
+def _the_frequency(
+    settlement_frequency: NDArray[np.intp],
+    quantity_per: NDArray[np.intp],
+    trade_ids: NDArray[np.int64] | None,
+) -> None:
+    """Each occurrence's frequency with its basis, since onetime-averaging.md: monthly, the one
+    selection this version books, the first onetime row refused by its row, since a onetime
+    period across a row's dates is not built and nothing prices it as monthly; and under monthly
+    a basis of month or calday, the first row of period refused by its row, since period is the
+    total of a onetime period and says nothing of a month. Two looks over the occurrences."""
+    onetime = settlement_frequency == FREQUENCIES.index(SettlementFrequency.ONETIME)
+    if onetime.any():
+        i = int(onetime.argmax())
+        raise ValueError(
+            f"settlement_frequency of {named_trade(trade_ids, i)} is 'onetime', expected "
+            "'monthly', the one selection this version books; a onetime period across the row's "
+            "dates is not built, and nothing prices it as monthly"
+        )
+    period = quantity_per == BASES.index(QuantityPer.PERIOD)
+    if period.any():
+        i = int(period.argmax())
+        raise ValueError(
+            f"quantity_per of {named_trade(trade_ids, i)} is 'period', expected 'month' or "
+            "'calday' under settlement_frequency = monthly; period is the total of a onetime "
+            "period and says nothing of a month"
+        )
 
 
 def _the_leg_selections(

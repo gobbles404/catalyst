@@ -59,7 +59,16 @@ from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.schedule_methods import ScheduleMethod
 from goosedove.trades.template import DayOrRule
-from goosedove.trades.terms import PaymentTerms, QuantityPer, Route, Settlement, resolved_trades
+from goosedove.trades.terms import (
+    FREQUENCIES,
+    PaymentTerms,
+    QuantityPer,
+    Route,
+    Settlement,
+    SettlementFrequency,
+    one_choice,
+    resolved_trades,
+)
 
 ENTRY = {
     name: bridge.entry(name)
@@ -117,6 +126,7 @@ def financial(
         "settlement_method": "financial",
         "schedule_method": method,
         "quantity_per": per,
+        "settlement_frequency": "monthly",
         "payment_day": DayOrRule(None, lag)
         if day is None
         else DayOrRule(np.datetime64(day, "D"), None),
@@ -140,7 +150,11 @@ def bilateral(
 
 def physical(method: str = "lastday", per: str = "month") -> QuoteTemplate:
     return a_template(
-        route="cleared", settlement_method="physical", schedule_method=method, quantity_per=per
+        route="cleared",
+        settlement_method="physical",
+        schedule_method=method,
+        quantity_per=per,
+        settlement_frequency="monthly",
     )
 
 
@@ -460,6 +474,29 @@ def test_a_fully_fixed_month_discounts_its_unpaid_payment_and_a_payment_today_ta
     assert counts_of(m, "F27-G27", bilateral(), one)["payment_factors_read"] == 1
 
 
+def test_a_onetime_template_and_a_period_basis_are_refused_by_the_quote_by_name() -> None:
+    # onetime-averaging.md's second slice: a quote template may hold onetime, the field required
+    # of a quote as of a booking, and _Quote refuses it in so many words rather than quote
+    # monthly economics for a whole-period request; period, the window's total, with it.
+    market = priced(STRIP, DEC_31, 3.0, 30.0, 60.0)
+    onetime = a_template(**{**dict(financial().values), "settlement_frequency": "onetime"})
+    refused(
+        market,
+        "F27-G27",
+        onetime,
+        "settlement_frequency is 'onetime', expected 'monthly'; a quote prices by the month and "
+        "does not price a onetime period across a window's dates as monthly",
+    )
+    refused(
+        market,
+        "F27-G27",
+        financial(per="period"),
+        "quantity_per is 'period', expected 'month' or 'calday'; period is the total of a "
+        "onetime period, which a quote does not price",
+    )
+    assert quote_on(market, "F27-G27", financial()) == pytest.approx(MONTH_CLEARED, **CLOSE)
+
+
 def test_a_physical_quote_takes_lastday_before_the_expiry_alone() -> None:
     before = priced(STRIP, DEC_31, 3.0, 30.0, 60.0)
     assert quote_on(before, "F27", physical()) == 30.0
@@ -500,6 +537,7 @@ def test_a_physical_quote_takes_lastday_before_the_expiry_alone() -> None:
             settlement_method="physical",
             schedule_method="lastday",
             quantity_per="month",
+            settlement_frequency="monthly",
             discount_curve_key="SOFR",
         ),
         "settlement_method is 'physical', expected 'financial' with route = bilateral; a physical "
@@ -599,7 +637,12 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
     refused(
         m,
         "F27",
-        a_template(route="cleared", settlement_method="financial", quantity_per="month"),
+        a_template(
+            route="cleared",
+            settlement_method="financial",
+            quantity_per="month",
+            settlement_frequency="monthly",
+        ),
         f"schedule_method is missing, {in_template}",
     )
     refused(
@@ -624,6 +667,7 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             settlement_method="financial",
             schedule_method="asian",
             quantity_per="month",
+            settlement_frequency="monthly",
             payment_day=DayOrRule(None, "+1bd"),
         ),
         f"payment_holiday_calendar is missing, {in_template} when settlement_method = financial",
@@ -636,6 +680,7 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             settlement_method="physical",
             schedule_method="lastday",
             quantity_per="month",
+            settlement_frequency="monthly",
             payment_day=DayOrRule(None, "+1bd"),
         ),
         "payment_day is '+1bd', expected none in the quote template unless "
@@ -649,6 +694,7 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             settlement_method="physical",
             schedule_method="lastday",
             quantity_per="month",
+            settlement_frequency="monthly",
             payment_holiday_calendar=WEEKENDS_ONLY,
         ),
         "payment_holiday_calendar is a holiday calendar, expected none in the quote template "
@@ -795,6 +841,7 @@ def test_an_equivalent_trade_booked_at_the_quote_marks_zero_with_every_payment_a
             route,
             Settlement.FINANCIAL,
             *picks(ScheduleMethod.ASIAN, QuantityPer.MONTH, 2),
+            one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 2),
             ids(1, 2),
             None,
             None,
@@ -958,6 +1005,7 @@ def test_an_equivalent_trade_booked_on_the_balances_dates_marks_zero() -> None:
                 route,
                 Settlement.FINANCIAL,
                 *picks(ScheduleMethod.ASIAN, basis, 2),
+                one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 2),
                 ids(1, 2),
                 None,
                 None,
@@ -1008,11 +1056,12 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "payment_day",
         "payment_holiday_calendar",
         "discount_curve_key",
+        "settlement_frequency",
     )
     otc = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         fields,
-        row("bilateral", "financial", "asian", "calday", "+1bd", weekends, "SOFR"),
+        row("bilateral", "financial", "asian", "calday", "+1bd", weekends, "SOFR", "monthly"),
     )
     cleared = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
@@ -1023,8 +1072,9 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
             "quantity_per",
             "payment_day",
             "payment_holiday_calendar",
+            "settlement_frequency",
         ),
-        row("cleared", "financial", "asian", "calday", "+1bd", weekends),
+        row("cleared", "financial", "asian", "calday", "+1bd", weekends, "monthly"),
     )
     sofr = ENTRY["_CreateDiscountCurve"](
         "SOFR",

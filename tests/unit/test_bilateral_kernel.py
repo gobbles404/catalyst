@@ -55,11 +55,14 @@ from goosedove.trades.risk_report import Bucket, Risk
 from goosedove.trades.schedule_methods import ScheduleMethod
 from goosedove.trades.template import trade_template
 from goosedove.trades.terms import (
+    FREQUENCIES,
     PaymentTerms,
     QuantityPer,
     ResolvedTrades,
     Route,
     Settlement,
+    SettlementFrequency,
+    one_choice,
     resolved_trades,
 )
 
@@ -163,7 +166,9 @@ def terms_of(
     )
     return resolved_trades(
         FIXED_FLOAT, ix, spec(n), route, settlement,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), ids(*range(1001, 1001 + n)),
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
+        ids(*range(1001, 1001 + n)),
         None, None,
         dates(*[AS_OF] * n), np.arange(n, dtype=np.intp), contract, numbers(*quantities),
         *bounds_of(ix, contract), numbers(*[fixed] * n), payment,
@@ -500,6 +505,7 @@ def test_the_two_trades_made_through_the_creators_value_the_same() -> None:
     fields = {
         "quantity_unit": "UNIT",
         "quantity_per": "month",
+        "settlement_frequency": "monthly",
         "schedule_method": "lastday",
         "route": "bilateral",
         "settlement_method": "financial",

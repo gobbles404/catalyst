@@ -142,6 +142,7 @@ SOFR = curve_of((AS_OF, 1.0), (PAY, 0.95))
 SHARED: dict[str, object] = {
     "quantity_unit": "MMBTU",
     "quantity_per": "month",
+    "settlement_frequency": "monthly",
     "schedule_method": "lastday",
     "second_schedule_method": "lastday",
     "settlement_method": "financial",
@@ -1231,6 +1232,7 @@ def sheet() -> dict[str, Any]:
         across(
             "quantity_unit",
             "quantity_per",
+            "settlement_frequency",
             "schedule_method",
             "second_schedule_method",
             "route",
@@ -1243,6 +1245,7 @@ def sheet() -> dict[str, Any]:
         across(
             "NYMEX NG",
             "month",
+            "monthly",
             "lastday",
             "lastday",
             "bilateral",
@@ -1352,6 +1355,7 @@ def test_the_sheet_prepares_and_values_a_pair_from_ranges_in_either_order(
             across(
                 "quantity_unit",
                 "quantity_per",
+                "settlement_frequency",
                 "schedule_method",
                 "route",
                 "settlement_method",
@@ -1363,6 +1367,7 @@ def test_the_sheet_prepares_and_values_a_pair_from_ranges_in_either_order(
             across(
                 "NYMEX NG",
                 "month",
+                "monthly",
                 "lastday",
                 "bilateral",
                 "financial",

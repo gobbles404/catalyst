@@ -45,6 +45,7 @@ TEMPLATE_FIELDS: dict[str, object] = {
     "settlement_method": "financial",
     "schedule_method": "asian",
     "quantity_per": "calday",
+    "settlement_frequency": "monthly",
     "payment_day": "+5bd",
     "payment_holiday_calendar": None,
     "discount_curve_key": "SOFR",
@@ -84,7 +85,7 @@ def test_the_quote_template_creator_reads_each_value_once_and_publishes_once(
         "instrument": 1,
         "_bind_fields": 1,
         "_field_body": 1,  # the cells placed among the texts once
-        "_field_texts": 5,  # five text and code columns
+        "_field_texts": 6,  # six text and code columns
         "_field_dates_or_texts": 1,  # the payment day, a date or a text, since
         # payment-day-date-or-rule.md: its two looks
         "_not_dates": 1,
@@ -94,17 +95,18 @@ def test_the_quote_template_creator_reads_each_value_once_and_publishes_once(
         "_CreateQuoteTemplate": 1,
         "quote_template": 1,
         "quote_template.<locals>.<genexpr>": 7,  # the instrument's fields up to its first quoted
-        "FieldValues.field": 14,  # each field once for its header's rule, once for its value's type
-        "FieldValues.field.<locals>.<genexpr>": 28,
-        "field_value": 7,  # one per field, no mask of supplied cells to read
-        "FieldValues.texts": 5,
+        "FieldValues.field": 16,  # each field once for its header's rule, once for its value's type
+        "FieldValues.field.<locals>.<genexpr>": 32,
+        "field_value": 8,  # one per field, no mask of supplied cells to read
+        "FieldValues.texts": 6,
         "FieldValues.dates_or_texts": 1,
         "FieldValues.objects": 1,
         "route_of": 1,
         "settlement_of": 1,
         "schedule_method_of": 1,
         "quantity_per_of": 1,
-        "choice": 4,
+        "settlement_frequency_of": 1,  # since onetime-averaging.md
+        "choice": 5,
         "payment_rule_of": 1,
         "read_offset": 1,
         "curve_name": 1,
@@ -153,6 +155,7 @@ def a_template(route: str) -> QuoteTemplate:
         "settlement_method": "financial",
         "schedule_method": "asian",
         "quantity_per": "month",
+        "settlement_frequency": "monthly",
         "payment_day": DayOrRule(None, "+1bd"),  # the rule as the template holds it
         "payment_holiday_calendar": WEEKENDS_ONLY,
     }
@@ -194,7 +197,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
         "payment_shifts": 1,
         "price_reductions": 4,
         "schedule_codes_read": 13,
-        "template_fields_read": 7,
+        "template_fields_read": 8,
     }
     # The year: 261 observations, 118 of them fixed, seven live contracts read once each, twelve
     # payment days of which seven are ahead and read off the curve; the cleared quote reads no
@@ -211,11 +214,11 @@ def test_a_month_and_a_strip_report_their_work() -> None:
         "payment_shifts": 1,
         "price_reductions": 4,
         "schedule_codes_read": 13,
-        "template_fields_read": 7,
+        "template_fields_read": 8,
     }
     cleared = counted("CAL27", CLEARED, None)
     assert "curves_selected" not in cleared and "payment_factors_read" not in cleared
-    assert cleared["template_fields_read"] == 6
+    assert cleared["template_fields_read"] == 7
     # The balance of the year: June from its eleven live days and the six months after, no
     # fixing read, every payment ahead.
     assert counted("BALCAL27", BILATERAL, RATES) == {
@@ -230,7 +233,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
         "payment_shifts": 1,
         "price_reductions": 4,
         "schedule_codes_read": 13,
-        "template_fields_read": 7,
+        "template_fields_read": 8,
     }
     paid = counted("F27-K27", BILATERAL, RATES)
     assert (paid["live_prices_read"], paid["payment_factors_read"]) == (0, 0)
@@ -246,12 +249,13 @@ LEDGER = {
     "quote": 1,
     "the_terms": 1,
     "_the_conditions": 1,  # the conditional fields, since rfq-quoting.md
-    "_text": 5,  # the five texts the bilateral template holds beside its payment day
+    "_text": 6,  # the six texts the bilateral template holds beside its payment day
     "route_of": 1,
     "settlement_of": 1,
     "schedule_method_of": 1,
     "quantity_per_of": 1,
-    "choice": 4,
+    "settlement_frequency_of": 1,  # since onetime-averaging.md
+    "choice": 5,
     "payment_rule_of": 1,
     "read_offset": 1,
     "the_curve": 1,

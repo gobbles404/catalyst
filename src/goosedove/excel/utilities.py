@@ -64,7 +64,7 @@ from goosedove.trades.resolution import Trades
 from goosedove.trades.results import LegResults, TradeResults
 from goosedove.trades.schedule_methods import METHOD_NAMES
 from goosedove.trades.template import DayOrRule, TradeTemplate
-from goosedove.trades.terms import BASIS_NAMES
+from goosedove.trades.terms import BASIS_NAMES, FREQUENCY_NAMES
 
 
 @singledispatch
@@ -577,6 +577,10 @@ def trades_table(obj: Trades) -> MixedArray:
     numbers("offset", "float64", leg_encoding.offset)
     if paired:
         numbers("second_offset", "float64", encoding.legs[1].offset)
+    # settlement_frequency last, since onetime-averaging.md, a term of the row shown after the
+    # encoding's columns so that no column before it moves, as the observation columns of #229
+    # were appended: monthly on every row this version books, the row's own word once onetime is.
+    text("settlement_frequency", tuple(FREQUENCY_NAMES[terms.settlement_frequency[rows]]))
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
 

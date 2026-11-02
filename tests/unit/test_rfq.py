@@ -63,7 +63,16 @@ from goosedove.trades.encoding import encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.schedule_methods import ScheduleMethod
-from goosedove.trades.terms import PaymentTerms, QuantityPer, Route, Settlement, resolved_trades
+from goosedove.trades.terms import (
+    FREQUENCIES,
+    PaymentTerms,
+    QuantityPer,
+    Route,
+    Settlement,
+    SettlementFrequency,
+    one_choice,
+    resolved_trades,
+)
 
 # The ticket's curve: 1 on the valuation day and the four listed payment points, +5bd's days 5
 # February and 5 March and the request's 8 February and 8 March, fixture data and no claim about
@@ -374,6 +383,7 @@ def test_a_trade_booked_at_the_request_price_marks_zero_with_every_payment_ahead
             route,
             Settlement.FINANCIAL,
             *picks(ScheduleMethod.ASIAN, QuantityPer.MONTH, 2),
+            one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 2),
             ids(1, 2),
             None,
             None,
@@ -410,6 +420,7 @@ def no_payment_day(route: str = "cleared") -> QuoteTemplate:
         "settlement_method": "financial",
         "schedule_method": "asian",
         "quantity_per": "month",
+        "settlement_frequency": "monthly",
         "payment_holiday_calendar": WEEKENDS_ONLY,
     }
     if route == "bilateral":
@@ -541,6 +552,18 @@ def test_the_template_the_index_and_the_market_refuse_as_a_quote_does() -> None:
         "future is cash settled on the average of its month's pricing days",
         template=physical("asian"),
     )
+    # onetime-averaging.md's second slice: a request prices by the month, and a template holding
+    # onetime, or period as its basis, is refused in so many words rather than quoted as monthly.
+    refused(
+        "settlement_frequency is 'onetime', expected 'monthly'; a quote prices by the month and "
+        "does not price a onetime period across a window's dates as monthly",
+        template=a_template(**{**dict(otc().values), "settlement_frequency": "onetime"}),
+    )
+    refused(
+        "quantity_per is 'period', expected 'month' or 'calday'; period is the total of a "
+        "onetime period, which a quote does not price",
+        template=a_template(**{**dict(otc().values), "quantity_per": "period"}),
+    )
     refused(
         "discount_curve_key is missing, expected it in the quote template when route = bilateral",
         template=a_template(
@@ -548,6 +571,7 @@ def test_the_template_the_index_and_the_market_refuse_as_a_quote_does() -> None:
             settlement_method="financial",
             schedule_method="asian",
             quantity_per="month",
+            settlement_frequency="monthly",
             payment_day=otc().values["payment_day"],
             payment_holiday_calendar=WEEKENDS_ONLY,
         ),
@@ -631,11 +655,12 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "payment_day",
         "payment_holiday_calendar",
         "discount_curve_key",
+        "settlement_frequency",
     )
     otc_template = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         fields,
-        row("bilateral", "financial", "asian", "month", "+5bd", weekends, "SOFR"),
+        row("bilateral", "financial", "asian", "month", "+5bd", weekends, "SOFR", "monthly"),
     )
     cleared_template = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
@@ -646,8 +671,9 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
             "quantity_per",
             "payment_day",
             "payment_holiday_calendar",
+            "settlement_frequency",
         ),
-        row("cleared", "financial", "asian", "month", "+5bd", weekends),
+        row("cleared", "financial", "asian", "month", "+5bd", weekends, "monthly"),
     )
     sofr = ENTRY["_CreateDiscountCurve"](
         "SOFR",

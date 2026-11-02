@@ -615,13 +615,13 @@ $bumps = {
     Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
     Put $state $sheet "K6" "11-May-2026"; Put $state $sheet "L6" "q26"; Put $state $sheet "M6" "2"; Put $state $sheet "N6" "70"
-    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_holiday_calendar"; Put $state $sheet "S26" "discount_curve_key"
-    Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "=D13"; Put $state $sheet "S27" "SOFR"
+    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_holiday_calendar"; Put $state $sheet "S26" "discount_curve_key"; Put $state $sheet "T26" "settlement_frequency"
+    Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "=D13"; Put $state $sheet "S27" "SOFR"; Put $state $sheet "T27" "monthly"
     Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
     Put $state $sheet "W2" "26-May-2026"; Put $state $sheet "X2" "1"
     Put $state $sheet "W3" "23-Jul-2026"; Put $state $sheet "X3" "0.99"
     Put $state $sheet "W4" "31-Dec-2027"; Put $state $sheet "X4" "0.9"
-    Put $state $sheet "D26" '=_CreateTradeTemplate("fixed_float",K26:S26,K27:S27)'
+    Put $state $sheet "D26" '=_CreateTradeTemplate("fixed_float",K26:T26,K27:T27)'
     Put $state $sheet "D27" "=_CreateTrades(D5,K4:N4,K6:N6,D26)"
     Put $state $sheet "D28" "=_PrepareTrades(D27,D9)"
     Put $state $sheet "D29" '=_CreateDiscountCurve("SOFR",W1:X1,W2:X4)'
@@ -722,8 +722,8 @@ $curves = {
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"; Put $state $sheet "O4" "discount_curve_key"
     Put $state $sheet "K6" "11-May-2026"; Put $state $sheet "L6" "q26"; Put $state $sheet "M6" "2"; Put $state $sheet "N6" "70"; Put $state $sheet "O6" "SOFR"
     Put $state $sheet "K7" "11-May-2026"; Put $state $sheet "L7" "q26"; Put $state $sheet "M7" "-1"; Put $state $sheet "N7" "70"; Put $state $sheet "O7" "FFOIS"
-    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_holiday_calendar"
-    Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "=D13"
+    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_holiday_calendar"; Put $state $sheet "S26" "settlement_frequency"
+    Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "=D13"; Put $state $sheet "S27" "monthly"
     Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
     Put $state $sheet "W2" "26-May-2026"; Put $state $sheet "X2" "1"
     Put $state $sheet "W3" "23-Jul-2026"; Put $state $sheet "X3" "0.99"
@@ -732,7 +732,7 @@ $curves = {
     Put $state $sheet "W7" "26-May-2026"; Put $state $sheet "X7" "1"
     Put $state $sheet "W8" "23-Jul-2026"; Put $state $sheet "X8" "0.98"
     Put $state $sheet "W9" "31-Dec-2027"; Put $state $sheet "X9" "0.9"
-    Put $state $sheet "D26" '=_CreateTradeTemplate("fixed_float",K26:R26,K27:R27)'
+    Put $state $sheet "D26" '=_CreateTradeTemplate("fixed_float",K26:S26,K27:S27)'
     Put $state $sheet "D27" "=_CreateTrades(D5,K4:O4,K6:O7,D26)"
     Put $state $sheet "D28" "=_PrepareTrades(D27,D9)"
     Put $state $sheet "D29" '=_CreateDiscountCurve("SOFR",W1:X1,W2:X4)'
@@ -918,12 +918,12 @@ $trades = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
-    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_day"; Put $state $sheet "R1" "payment_holiday_calendar"
-    Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "month"; Put $state $sheet "M2" "lastday"; Put $state $sheet "N2" "cleared"; Put $state $sheet "O2" "financial"; Put $state $sheet "P2" "ICE Clear"; Put $state $sheet "Q2" "+1bd"; Put $state $sheet "R2" "=D13"
+    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_day"; Put $state $sheet "R1" "payment_holiday_calendar"; Put $state $sheet "S1" "settlement_frequency"
+    Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "month"; Put $state $sheet "M2" "lastday"; Put $state $sheet "N2" "cleared"; Put $state $sheet "O2" "financial"; Put $state $sheet "P2" "ICE Clear"; Put $state $sheet "Q2" "+1bd"; Put $state $sheet "R2" "=D13"; Put $state $sheet "S2" "monthly"
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
     Put $state $sheet "K5" "11-May-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
     Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
-    Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",K1:R1,K2:R2)'
+    Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",K1:S1,K2:S2)'
     Put $state $sheet "D15" "=_CreateTrades(D5,K4:N4,K5:N5,D14)"
     Put $state $sheet "D16" "=INDEX(util_ReadHandle(D15),3,13)"
     $id = Id $state
@@ -953,7 +953,7 @@ $trades = {
     Check "a cleared template fails the batch in the seam's words" ($failed -eq "#ERROR _CreateTrades: template is blank, expected trade template handle") $failed
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 1) }
     Check "the template and the batch are released, twelve live" ($c.Live -eq 12 -and $c.Released -eq 5 -and $c.Published -eq 17) $c.Text
-    Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",K1:R1,K2:R2)'
+    Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",K1:S1,K2:S2)'
     Check "the template typed back rebuilds the batch" ((Text $state $sheet "D15").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D15")
     Check "which pays as before" ((Text $state $sheet "D16") -eq "46197") (Text $state $sheet "D16")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 3) }
@@ -1096,12 +1096,12 @@ $valuation = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
-    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_day"; Put $state $sheet "R1" "payment_holiday_calendar"
-    Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "month"; Put $state $sheet "M2" "lastday"; Put $state $sheet "N2" "cleared"; Put $state $sheet "O2" "financial"; Put $state $sheet "P2" "ICE Clear"; Put $state $sheet "Q2" "+1bd"; Put $state $sheet "R2" "=D13"
+    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_day"; Put $state $sheet "R1" "payment_holiday_calendar"; Put $state $sheet "S1" "settlement_frequency"
+    Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "month"; Put $state $sheet "M2" "lastday"; Put $state $sheet "N2" "cleared"; Put $state $sheet "O2" "financial"; Put $state $sheet "P2" "ICE Clear"; Put $state $sheet "Q2" "+1bd"; Put $state $sheet "R2" "=D13"; Put $state $sheet "S2" "monthly"
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
     Put $state $sheet "K5" "11-May-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
     Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
-    Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",K1:R1,K2:R2)'
+    Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",K1:S1,K2:S2)'
     Put $state $sheet "D15" "=_CreateTrades(D5,K4:N4,K5:N5,D14)"
     Put $state $sheet "D17" "=_PrepareTrades(D15,D9)"
     Put $state $sheet "D18" "=_EvaluateTrades(D17,D11)"
@@ -1213,14 +1213,14 @@ $valuation = {
     # curve moves; a curve its creator refuses fails the results as its consumer and publishes
     # nothing until repaired; and a copy holding the results while the curve changes keeps them and
     # their curve alive and readable at the old mark, released when it is cleared.
-    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_holiday_calendar"; Put $state $sheet "S26" "discount_curve_key"
-    Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "=D13"; Put $state $sheet "S27" "SOFR"
+    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_holiday_calendar"; Put $state $sheet "S26" "discount_curve_key"; Put $state $sheet "T26" "settlement_frequency"
+    Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "=D13"; Put $state $sheet "S27" "SOFR"; Put $state $sheet "T27" "monthly"
     Put $state $sheet "K6" "11-May-2026"; Put $state $sheet "L6" "q26"; Put $state $sheet "M6" "2"; Put $state $sheet "N6" "70"
     Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
     Put $state $sheet "W2" "23-Jun-2026"; Put $state $sheet "X2" "1"
     Put $state $sheet "W3" "23-Jul-2026"; Put $state $sheet "X3" "0.99"
     Put $state $sheet "W4" "31-Dec-2027"; Put $state $sheet "X4" "0.9"
-    Put $state $sheet "D26" '=_CreateTradeTemplate("fixed_float",K26:S26,K27:S27)'
+    Put $state $sheet "D26" '=_CreateTradeTemplate("fixed_float",K26:T26,K27:T27)'
     Put $state $sheet "D27" "=_CreateTrades(D5,K4:N4,K6:N6,D26)"
     Put $state $sheet "D28" "=_PrepareTrades(D27,D9)"
     Put $state $sheet "D29" '=_CreateDiscountCurve("SOFR",W1:X1,W2:X4)'
@@ -1469,14 +1469,14 @@ $quotes = {
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
     Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
-    Put $state $sheet "K26" "route"; Put $state $sheet "L26" "settlement_method"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "quantity_per"; Put $state $sheet "O26" "payment_day"; Put $state $sheet "P26" "payment_holiday_calendar"; Put $state $sheet "Q26" "discount_curve_key"
-    Put $state $sheet "K27" "cleared"; Put $state $sheet "L27" "financial"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "month"; Put $state $sheet "O27" "+1bd"; Put $state $sheet "P27" "=D13"
-    Put $state $sheet "K28" "bilateral"; Put $state $sheet "L28" "financial"; Put $state $sheet "M28" "lastday"; Put $state $sheet "N28" "month"; Put $state $sheet "O28" "+1bd"; Put $state $sheet "P28" "=D13"; Put $state $sheet "Q28" "SOFR"
+    Put $state $sheet "K26" "route"; Put $state $sheet "L26" "settlement_method"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "quantity_per"; Put $state $sheet "O26" "payment_day"; Put $state $sheet "P26" "payment_holiday_calendar"; Put $state $sheet "Q26" "discount_curve_key"; Put $state $sheet "R26" "settlement_frequency"
+    Put $state $sheet "K27" "cleared"; Put $state $sheet "L27" "financial"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "month"; Put $state $sheet "O27" "+1bd"; Put $state $sheet "P27" "=D13"; Put $state $sheet "R27" "monthly"
+    Put $state $sheet "K28" "bilateral"; Put $state $sheet "L28" "financial"; Put $state $sheet "M28" "lastday"; Put $state $sheet "N28" "month"; Put $state $sheet "O28" "+1bd"; Put $state $sheet "P28" "=D13"; Put $state $sheet "Q28" "SOFR"; Put $state $sheet "R28" "monthly"
     Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
     Put $state $sheet "W2" "26-May-2026"; Put $state $sheet "X2" "1"
     Put $state $sheet "W3" "23-Jun-2026"; Put $state $sheet "X3" "0.98"
     Put $state $sheet "W4" "22-Jul-2026"; Put $state $sheet "X4" "0.98"
-    Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",K26:P26,K27:P27)'
+    Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",HSTACK(K26:P26,R26),HSTACK(K27:P27,R27))'
     Put $state $sheet "D27" '=_Quote(D11,"n26-q26",D26)'
     Put $state $sheet "D28" '=TEXT(D27,"0.0000")'
     $id = Id $state
@@ -1501,7 +1501,7 @@ $quotes = {
     Check "the template cleared fails the quote in the seam's words" ((Text $state $sheet "D27") -eq "#ERROR _Quote: template is blank, expected quote template handle") (Text $state $sheet "D27")
     $c = Settle $state $sheet { param($c) $c.Live -eq 12 }
     Check "twelve live, the template released" ($c.Live -eq 12 -and $c.Published -eq 14 -and $c.Released -eq 2) $c.Text
-    Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",K26:P26,K27:P27)'
+    Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",HSTACK(K26:P26,R26),HSTACK(K27:P27,R27))'
     Check "restored, a new template and the price again" ((Text $state $sheet "D26") -ne $template -and (Text $state $sheet "D26").StartsWith("${id}:quote_template:") -and (Text $state $sheet "D28") -eq "72.4500") ((Text $state $sheet "D26") + " " + (Text $state $sheet "D28"))
     $c = Settle $state $sheet { param($c) $c.Live -eq 13 }
     Check "thirteen live again, one more published" ($c.Live -eq 13 -and $c.Published -eq 15 -and $c.Released -eq 2) $c.Text
@@ -1509,7 +1509,7 @@ $quotes = {
     # A bilateral template naming SOFR, the curve flat at 0.98 on both payment days and its
     # collection: one factor cancels, the quote is the cleared 72.45; August's factor moved to 0.97,
     # a curve's factors never rising, reprices it.
-    Put $state $sheet "D29" '=_CreateQuoteTemplate("fixed_float",K26:Q26,K28:Q28)'
+    Put $state $sheet "D29" '=_CreateQuoteTemplate("fixed_float",K26:R26,K28:R28)'
     Put $state $sheet "D30" '=_CreateDiscountCurve("SOFR",W1:X1,W2:X4)'
     Put $state $sheet "E30" "=_CollectDiscountCurves(D30)"
     Put $state $sheet "D31" '=_Quote(D11,"n26-q26",D29,E30)'
@@ -1578,8 +1578,8 @@ $pairs = {
     Put $state $sheet "D4" "date"; Put $state $sheet "E4" "discount_factor"
     Put $state $sheet "D5" "4-Jan-2027"; Put $state $sheet "E5" "1"
     Put $state $sheet "D6" "4-Jan-2028"; Put $state $sheet "E6" "0.95"
-    Put $state $sheet "L1" "quantity_unit"; Put $state $sheet "M1" "quantity_per"; Put $state $sheet "N1" "schedule_method"; Put $state $sheet "O1" "second_schedule_method"; Put $state $sheet "P1" "route"; Put $state $sheet "Q1" "settlement_method"; Put $state $sheet "R1" "counterparty"; Put $state $sheet "S1" "discount_curve_key"; Put $state $sheet "T1" "payment_day"; Put $state $sheet "U1" "payment_holiday_calendar"
-    Put $state $sheet "L2" "NYMEX NG"; Put $state $sheet "M2" "month"; Put $state $sheet "N2" "lastday"; Put $state $sheet "O2" "lastday"; Put $state $sheet "P2" "bilateral"; Put $state $sheet "Q2" "financial"; Put $state $sheet "R2" "ACME Trading"; Put $state $sheet "S2" "SOFR"; Put $state $sheet "T2" "4-Jan-2028"; Put $state $sheet "U2" "=J2"
+    Put $state $sheet "L1" "quantity_unit"; Put $state $sheet "M1" "quantity_per"; Put $state $sheet "N1" "schedule_method"; Put $state $sheet "O1" "second_schedule_method"; Put $state $sheet "P1" "route"; Put $state $sheet "Q1" "settlement_method"; Put $state $sheet "R1" "counterparty"; Put $state $sheet "S1" "discount_curve_key"; Put $state $sheet "T1" "payment_day"; Put $state $sheet "U1" "payment_holiday_calendar"; Put $state $sheet "V1" "settlement_frequency"
+    Put $state $sheet "L2" "NYMEX NG"; Put $state $sheet "M2" "month"; Put $state $sheet "N2" "lastday"; Put $state $sheet "O2" "lastday"; Put $state $sheet "P2" "bilateral"; Put $state $sheet "Q2" "financial"; Put $state $sheet "R2" "ACME Trading"; Put $state $sheet "S2" "SOFR"; Put $state $sheet "T2" "4-Jan-2028"; Put $state $sheet "U2" "=J2"; Put $state $sheet "V2" "monthly"
     Put $state $sheet "L4" "trade_id"; Put $state $sheet "M4" "trade_date"; Put $state $sheet "N4" "contract_code"; Put $state $sheet "O4" "quantity"; Put $state $sheet "P4" "fixed_price"; Put $state $sheet "Q4" "second_fixed_price"
     Put $state $sheet "L5" "1"; Put $state $sheet "M5" "15-Dec-2026"; Put $state $sheet "N5" "G27"; Put $state $sheet "O5" "1"; Put $state $sheet "P5" "3.3"; Put $state $sheet "Q5" "-0.3"
     Put $state $sheet "J1" "=_CreateFuturesSchedule(A1:A3,B1:B3)"
@@ -1604,7 +1604,7 @@ $pairs = {
     Put $state $sheet "K17" "=J18"
     Put $state $sheet "J19" '=_CreateDiscountCurve("SOFR",D4:E4,D5:E6)'
     Put $state $sheet "J20" "=_CollectDiscountCurves(J19)"
-    Put $state $sheet "J21" '=_CreateTradeTemplate("fixed_float",L1:U1,L2:U2)'
+    Put $state $sheet "J21" '=_CreateTradeTemplate("fixed_float",L1:V1,L2:V2)'
     Put $state $sheet "J22" "=_CreateTrades(J5:J6,L4:Q4,L5:Q5,J21)"
     Put $state $sheet "J23" "=_PrepareTrades(J22,J13:J14)"
     Put $state $sheet "J24" "=_EvaluateTrades(J23,J17:K17,J20)"
@@ -1697,11 +1697,11 @@ $rfq = {
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
     Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
-    Put $state $sheet "K26" "route"; Put $state $sheet "L26" "settlement_method"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "quantity_per"; Put $state $sheet "O26" "payment_day"; Put $state $sheet "P26" "payment_holiday_calendar"
-    Put $state $sheet "K27" "cleared"; Put $state $sheet "L27" "financial"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "month"; Put $state $sheet "O27" "+1bd"; Put $state $sheet "P27" "=D13"
+    Put $state $sheet "K26" "route"; Put $state $sheet "L26" "settlement_method"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "quantity_per"; Put $state $sheet "O26" "payment_day"; Put $state $sheet "P26" "payment_holiday_calendar"; Put $state $sheet "Q26" "settlement_frequency"
+    Put $state $sheet "K27" "cleared"; Put $state $sheet "L27" "financial"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "month"; Put $state $sheet "O27" "+1bd"; Put $state $sheet "P27" "=D13"; Put $state $sheet "Q27" "monthly"
     Put $state $sheet "K30" "n26"; Put $state $sheet "L30" "1"; Put $state $sheet "M30" "1-Jul-2026"
     Put $state $sheet "K31" "q26"; Put $state $sheet "L31" "3"; Put $state $sheet "M31" "1-Aug-2026"
-    Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",K26:P26,K27:P27)'
+    Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",K26:Q26,K27:Q27)'
     Put $state $sheet "D33" "=_CreateRFQ(D5,K30:K31,L30:L31,D26)"
     Put $state $sheet "D34" "=_QuoteRFQ(D11,D33)"
     Put $state $sheet "D35" "=INDEX(util_ReadHandle(D33),4,5)"

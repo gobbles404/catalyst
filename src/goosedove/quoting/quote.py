@@ -151,5 +151,10 @@ def _the_quantities(
             return np.ones(first.size)
         case QuantityPer.CALDAY:
             return ((last - first).astype(np.int64) + 1).astype(np.float64)
+        case QuantityPer.PERIOD:  # refused by the terms, since onetime-averaging.md; never monthly
+            raise ValueError(
+                "quantity_per is 'period', expected 'month' or 'calday'; period is the total of "
+                "a onetime period, which a quote does not price"
+            )
         case _:
             assert_never(quantity_per)

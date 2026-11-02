@@ -37,7 +37,14 @@ from goosedove.instruments.fields import DatesOrTexts, FieldValues
 from goosedove.trades.resolution import CONDITIONS, PERIOD_FIELDS, Trades, resolved, trades
 from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 from goosedove.trades.template import TradeTemplate, trade_template
-from goosedove.trades.terms import BASES, QuantityPer, Route, Settlement
+from goosedove.trades.terms import (
+    BASES,
+    FREQUENCIES,
+    QuantityPer,
+    Route,
+    Settlement,
+    SettlementFrequency,
+)
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:
@@ -100,6 +107,7 @@ PAYMENT_CALENDAR = holiday_calendar(dates("2026-11-26", "2026-12-25", "2027-01-0
 NG_TEMPLATE: dict[str, object] = {
     "quantity_unit": "NYMEX NG",
     "quantity_per": "month",
+    "settlement_frequency": "monthly",
     "schedule_method": "lastday",
     "route": "cleared",
     "settlement_method": "physical",
@@ -1840,7 +1848,7 @@ def test_the_batch_fields_are_read_in_the_pages_order_the_unit_first() -> None:
     # supplies every batch field wrong at once, every row agreeing, since a template reads its
     # own values when it is made and would name the first wrong one in its row's order. The
     # unit is named, and each field put right names the next, until the batch is made.
-    template = {"clearing_house": "CME Clearing"}
+    template = {"clearing_house": "CME Clearing", "settlement_frequency": "monthly"}
     ticket: dict[str, list[object]] = {
         **NG_TICKET,
         "quantity_unit": ["ICE PHH"] * 5,
@@ -1870,7 +1878,7 @@ def test_the_batch_fields_are_read_in_the_pages_order_the_unit_first() -> None:
         (
             "quantity_per",
             "month",
-            "quantity_per row 1 is 'day', expected month or calday",
+            "quantity_per row 1 is 'day', expected month, calday or period",
         ),
     )
     for name, right, message in in_order:
@@ -2167,6 +2175,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "quote_quantity",
         "coefficient",
         "offset",
+        "settlement_frequency",
     ]
     assert table[1] == [
         "int64",
@@ -2189,6 +2198,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "float64",
         "float64",
         "float64",
+        "str",
     ]
     first = [
         1.0,
@@ -2211,6 +2221,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         100_000.0,
         100_000.0,
         -310_000.0,
+        "monthly",
     ]
     assert table[2] == first
     assert table[3][3] == "Z26"  # the schedule's spelling, where the ticket typed z26
@@ -2225,8 +2236,8 @@ def test_the_spill_shows_the_batchs_facts_wherever_they_came_from(sheet: dict[st
     # three are read back, the counterparty between the clearing house's place and the broker's.
     template = ENTRY["_CreateTradeTemplate"](
         "fixed_float",
-        row("quantity_unit", "quantity_per", "schedule_method"),
-        row("NYMEX NG", "month", "lastday"),
+        row("quantity_unit", "quantity_per", "schedule_method", "settlement_frequency"),
+        row("NYMEX NG", "month", "lastday", "monthly"),
     )
     handle = ENTRY["_CreateTrades"](
         sheet["index"],
@@ -2299,6 +2310,7 @@ def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any
         "quote_quantity",
         "coefficient",
         "offset",
+        "settlement_frequency",
     ]
     assert [line[0] for line in table[2:]] == [1.0, 1.0]
     assert [line[14] for line in table[2:]] == ["Z26-F27", "Z26-F27"]  # the strip as typed
@@ -2321,7 +2333,7 @@ def test_a_row_kept_ready_crosses_the_seam_as_a_number_and_reads_back_at_nothing
     assert len(table) == 4  # two heading rows and both components, the second kept at nothing
     assert table[3][:4] == [2.0, 1002.0, 46301.0, "F27"]
     assert table[3][8] == 0.0
-    assert table[3][12:] == ["F27", 46388.0, 46418.0, 31.0, 0.0, 0.0, 0.0, 0.0]
+    assert table[3][12:] == ["F27", 46388.0, 46418.0, 31.0, 0.0, 0.0, 0.0, 0.0, "monthly"]
     # Zero is a number: the seam's words for anything else stand, and text is never coerced.
     create = ENTRY["_CreateTrades"]
     for cell, words in (
@@ -2369,6 +2381,7 @@ def test_the_spill_keeps_the_entered_quantity_beside_the_days_and_the_months_qua
         "quote_quantity",
         "coefficient",
         "offset",
+        "settlement_frequency",
     ]
     assert table[1][13:17] == ["datetime64[D]", "datetime64[D]", "int64", "float64"]
     assert [line[13] for line in table[2:]] == [46357.0, 46357.0, 46388.0, 46388.0, 46357.0]
@@ -2385,7 +2398,8 @@ def test_the_spill_keeps_the_entered_quantity_beside_the_days_and_the_months_qua
         3_100_000.0,
     ]
     assert str(ENTRY["_CreateTradeTemplate"]("fixed_float", row("quantity_per"), row("day"))) == (
-        "#ERROR _CreateTradeTemplate: ValueError: quantity_per is 'day', expected month or calday"
+        "#ERROR _CreateTradeTemplate: ValueError: quantity_per is 'day', expected month, calday "
+        "or period"
     )
 
 
@@ -2513,6 +2527,7 @@ MIXED_TEMPLATE: dict[str, object] = {
     "fixed_price": 10.0,
     "payment_day": "+1bd",
     "payment_holiday_calendar": holiday_calendar(dates("2027-01-01")),
+    "settlement_frequency": "monthly",
 }
 MIXED_TICKET: dict[str, list[object]] = {
     "trade_id": [1, 2, 3, 4],
@@ -2604,7 +2619,7 @@ def test_a_mixed_tickets_refusals_name_the_first_offending_row() -> None:
     )
     assert refused(
         MIXED, {**MIXED_TICKET, "quantity_per": ["month", "day", "calday", "x"]}, MIXED_TEMPLATE
-    ) == ("quantity_per row 2 is 'day', expected month or calday")
+    ) == ("quantity_per row 2 is 'day', expected month, calday or period")
     # A physical batch takes lastday rows alone: B is named with its method, the first row that
     # is not.
     physical = {
@@ -2612,6 +2627,7 @@ def test_a_mixed_tickets_refusals_name_the_first_offending_row() -> None:
         "settlement_method": "physical",
         "trade_date": day("2026-11-30"),
         "fixed_price": 10.0,
+        "settlement_frequency": "monthly",
     }
     assert refused(MIXED, MIXED_TICKET, physical) == (
         "settlement_method is 'physical', expected 'financial' with the penultimate method of "
@@ -2625,6 +2641,44 @@ def test_a_mixed_tickets_refusals_name_the_first_offending_row() -> None:
     }
     batch, _ = created(MIXED, lastday_rows, physical)
     np.testing.assert_array_equal(batch.resolved.component_quantity, [1.0, -62.0, 3.0, 682.0])
+
+
+def test_the_frequency_is_required_read_from_its_list_and_onetime_refused_until_built() -> None:
+    # onetime-averaging.md's second slice: settlement_frequency is a field every batch carries,
+    # from the template's one word or the ticket's column, read from its list as the basis is;
+    # monthly books as before and reads back last, and onetime, which no consumer prices yet, is
+    # refused by name at the row that chose it, never booked as monthly; period, the total of a
+    # onetime period, is refused under monthly in the kernel's words.
+    without = {name: value for name, value in NG_TEMPLATE.items() if name != "settlement_frequency"}
+    assert refused(NG, NG_TICKET, without) == (
+        "settlement_frequency is missing, expected a value in the template or a column in the "
+        "ticket"
+    )
+    with pytest.raises(ValueError) as refusal:
+        a_template({**NG_TEMPLATE, "settlement_frequency": "yearly"})
+    assert str(refusal.value) == "settlement_frequency is 'yearly', expected monthly or onetime"
+    assert refused(NG, NG_TICKET, {**NG_TEMPLATE, "settlement_frequency": "onetime"}) == (
+        "settlement_frequency of trade 1001 at row 1 is 'onetime', expected 'monthly', the one "
+        "selection this version books; a onetime period across the row's dates is not built, "
+        "and nothing prices it as monthly"
+    )
+    assert refused(NG, NG_TICKET, {**NG_TEMPLATE, "quantity_per": "period"}) == (
+        "quantity_per of trade 1001 at row 1 is 'period', expected 'month' or 'calday' under "
+        "settlement_frequency = monthly; period is the total of a onetime period and says "
+        "nothing of a month"
+    )
+    by_column: dict[str, list[object]] = {
+        **NG_TICKET,
+        "settlement_frequency": ["monthly", "onetime", "monthly", "monthly", "monthly"],
+    }
+    assert refused(NG, by_column, without).startswith(
+        "settlement_frequency of trade 1002 at row 2 is 'onetime'"
+    )
+    by_column["settlement_frequency"] = ["monthly"] * 5
+    batch, _ = created(NG, by_column, without)
+    np.testing.assert_array_equal(
+        batch.resolved.settlement_frequency, [FREQUENCIES.index(SettlementFrequency.MONTHLY)] * 5
+    )
 
 
 def test_an_index_without_a_reporting_lot_refuses_a_batch_before_any_row_is_read() -> None:
@@ -2826,6 +2880,7 @@ WAHA_PAYS = holiday_calendar(dates("2027-01-01"))
 WAHA_TEMPLATE: dict[str, object] = {
     "quantity_unit": "LOT",
     "quantity_per": "month",
+    "settlement_frequency": "monthly",
     "schedule_method": "lastday",
     "route": "cleared",
     "settlement_method": "financial",

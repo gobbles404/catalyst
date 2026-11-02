@@ -32,6 +32,7 @@ from goosedove.trades.terms import (
     QuantityPer,
     Route,
     Settlement,
+    SettlementFrequency,
     finite_prices,
     marketing_reserves,
     whole_quantities,
@@ -158,7 +159,13 @@ def schedule_method_of(where: str, text: str) -> ScheduleMethod:
 
 
 def quantity_per_of(where: str, text: str) -> QuantityPer:
-    return choice(where, text, QuantityPer, "month or calday")
+    return choice(where, text, QuantityPer, "month, calday or period")
+
+
+def settlement_frequency_of(where: str, text: str) -> SettlementFrequency:
+    """The frequency choice, since onetime-averaging.md: both words are read here, in a template
+    as in a ticket, and whether a consumer prices onetime is that consumer's rule."""
+    return choice(where, text, SettlementFrequency, "monthly or onetime")
 
 
 def payment_rule_of(where: str, text: str) -> tuple[Instruction, ...]:
@@ -230,6 +237,7 @@ READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
         "route": route_of,
         "settlement_method": settlement_of,
         "quantity_per": quantity_per_of,
+        "settlement_frequency": settlement_frequency_of,  # onetime-averaging.md
         "payment_day": payment_rule_of,  # the rule form; a date is read by nobody
         "discount_curve_key": curve_name,  # the curve's own name rule, named-curves-slice-3.md
         "currency": currency_of,  # the cashflow instrument's, since #200

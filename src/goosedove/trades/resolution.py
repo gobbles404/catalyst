@@ -46,10 +46,12 @@ from goosedove.trades.template import (
     quantity_per_of,
     route_of,
     schedule_method_of,
+    settlement_frequency_of,
     settlement_of,
 )
 from goosedove.trades.terms import (
     BASES,
+    FREQUENCIES,
     LegInputs,
     PaymentTerms,
     ResolvedTrades,
@@ -238,11 +240,17 @@ def resolved(
         fields.where("settlement_method", 0), fields.one_text("settlement_method")
     )
     bases, by_basis = _each_distinct(fields, "quantity_per", quantity_per_of)
+    frequencies, by_frequency = _each_distinct(
+        fields, "settlement_frequency", settlement_frequency_of
+    )
     _the_conditions(fields, route, settlement)
     _the_leg_fields(fields, paired)
     specification = np.array(specifications, dtype=np.intp)[by_unit]
     schedule_method = np.array([METHODS.index(m) for m in methods], dtype=np.intp)[by_method]
     quantity_per = np.array([BASES.index(b) for b in bases], dtype=np.intp)[by_basis]
+    settlement_frequency = np.array([FREQUENCIES.index(f) for f in frequencies], dtype=np.intp)[
+        by_frequency
+    ]
     schedule = trade_schedule_of(index)
     reporting_lot_of(index)
     months = schedule_months(schedule)
@@ -288,6 +296,7 @@ def resolved(
         settlement,
         schedule_method,
         quantity_per,
+        settlement_frequency,
         trade_ids,
         fields.labels("clearing_house"),
         fields.labels("broker"),

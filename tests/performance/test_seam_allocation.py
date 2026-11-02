@@ -1155,18 +1155,19 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
                 "clearing_house",
                 "payment_day",
                 "payment_holiday_calendar",
+                "settlement_frequency",
             ]
         ]
     )
     values = Cells.from_rows(
-        [["lot", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays]]
+        [["lot", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays, "monthly"]]
     )
     # Since payment-day-date-or-rule.md the payment day's column is typed cell by cell, its two
     # masks, its dates and its record beside the texts: within six slacks, four before.
     assert (
         least_peak(lambda: ENTRY["_CreateTradeTemplate"]("fixed_float", names, values)) <= 6 * SLACK
     )
-    # A quote template of the ticket's seven fields, since template-based-quoting.md, the same
+    # A quote template of the ticket's eight fields, since template-based-quoting.md, the same
     # readers over one fewer field and no mask of supplied cells: within the same six slacks.
     quote_names = Cells.from_rows(
         [
@@ -1177,12 +1178,14 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
                 "quantity_per",
                 "payment_day",
                 "payment_holiday_calendar",
+                "settlement_frequency",
                 "discount_curve_key",
+                "settlement_frequency",
             ]
         ]
     )
     quote_values = Cells.from_rows(
-        [["bilateral", "financial", "asian", "calday", "+5bd", holidays, "SOFR"]]
+        [["bilateral", "financial", "asian", "calday", "+5bd", holidays, "SOFR", "monthly"]]
     )
 
     def a_quote() -> object:
@@ -1207,7 +1210,9 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         return batch
 
     peak = least_peak(created)
-    assert peak <= 296 * rows + 2 * SLACK  # 280 before the period bounds, 16 bytes a component
+    assert (
+        peak <= 321 * rows + 2 * SLACK
+    )  # 280 before the bounds and the frequency, 40 bytes a row, 801,440 to 802,089 at 2,500 rows
 
 
 # A combination keeps its distinct days and nothing of its sources: two calendars of the same
