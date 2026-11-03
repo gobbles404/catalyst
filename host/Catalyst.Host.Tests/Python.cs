@@ -6,7 +6,7 @@ using Xunit;
 
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 
-namespace Goosedove.Host.Tests
+namespace Catalyst.Host.Tests
 {
     /// <summary>Starts Python once for every test, the way the add-in does, minus Excel.</summary>
     public sealed class PythonFixture

@@ -6,7 +6,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.globals.interpolation import interpolate_discount_factors
+from catalyst.globals.interpolation import interpolate_discount_factors
 
 EPOCH = np.datetime64("1899-12-30")
 ONE_DAY = np.timedelta64(1, "D")

@@ -15,7 +15,7 @@ from typing import Literal
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.index_definitions.index import Index, ReportingLot
+from catalyst.index_definitions.index import Index, ReportingLot
 
 
 class Bucket(Enum):

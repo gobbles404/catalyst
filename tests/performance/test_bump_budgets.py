@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 from test_seam_allocation import SLACK, least_peak
 
-from goosedove.globals.discount_curve import DiscountCurve, bump_discount_curve, discount_curve
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.globals.discount_curve import DiscountCurve, bump_discount_curve, discount_curve
+from catalyst.instrumentation.work_counts import WorkCounter
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 FIRST = np.datetime64("2026-09-11", "D")

@@ -14,7 +14,7 @@ docs/library/conventions.md under Excel help; the pages quote the lines.
 
 from typing import Annotated
 
-from goosedove.excel.bridge import (
+from catalyst.excel.bridge import (
     Date,
     FieldRow,
     FieldRows,
@@ -22,13 +22,13 @@ from goosedove.excel.bridge import (
     TextRow,
     excel_function,
 )
-from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.index_definitions.index import Index
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.market.market import Market
-from goosedove.quoting.quote import quote, quote_by_dates
-from goosedove.quoting.rfq import Rfq, quote_rfq, rfq
-from goosedove.quoting.template import QuoteTemplate, quote_template
+from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.index_definitions.index import Index
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.market.market import Market
+from catalyst.quoting.quote import quote, quote_by_dates
+from catalyst.quoting.rfq import Rfq, quote_rfq, rfq
+from catalyst.quoting.template import QuoteTemplate, quote_template
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.

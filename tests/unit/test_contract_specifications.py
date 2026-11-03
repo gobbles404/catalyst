@@ -8,8 +8,8 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.index_definitions.contract_specifications import (
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.index_definitions.contract_specifications import (
     ContractSpecifications,
     contract_specifications,
 )

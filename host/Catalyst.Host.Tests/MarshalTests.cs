@@ -2,7 +2,7 @@ using ExcelDna.Integration;
 using Python.Runtime;
 using Xunit;
 
-namespace Goosedove.Host.Tests
+namespace Catalyst.Host.Tests
 {
     /// <summary>What Python receives for each thing Excel can hand over.</summary>
     [Collection("python")]

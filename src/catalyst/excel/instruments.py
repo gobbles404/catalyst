@@ -11,9 +11,9 @@ docs/library/conventions.md under Excel help; the page quotes the lines.
 
 from typing import Annotated
 
-from goosedove.excel.bridge import MixedArray, excel_function
-from goosedove.instruments import definitions
-from goosedove.instruments.definitions import CATALOG, ROWS, Instrument
+from catalyst.excel.bridge import MixedArray, excel_function
+from catalyst.instruments import definitions
+from catalyst.instruments.definitions import CATALOG, ROWS, Instrument
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.

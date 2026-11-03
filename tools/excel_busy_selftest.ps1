@@ -87,8 +87,8 @@ Check "a COM error that is not busy is not tried again" ($script:tries -eq 1) "$
 Check "and leaves as the same error" ($null -ne $failed -and [object]::ReferenceEquals($failed.Exception, $other)) "$failed"
 
 $script:tries = 0
-$failed = Failure { Invoke-ExcelCall "read the counts" { $script:tries++; throw "GoosedoveHandles showed: nonsense" } "Z1" }
-Check "a failure of the tool's own, a malformed count, leaves at once in its own words" ($script:tries -eq 1 -and "$failed" -eq "GoosedoveHandles showed: nonsense") "$($script:tries) tries; $failed"
+$failed = Failure { Invoke-ExcelCall "read the counts" { $script:tries++; throw "CatalystHandles showed: nonsense" } "Z1" }
+Check "a failure of the tool's own, a malformed count, leaves at once in its own words" ($script:tries -eq 1 -and "$failed" -eq "CatalystHandles showed: nonsense") "$($script:tries) tries; $failed"
 Check "and neither is recorded as a wait" ($ExcelBusyWaits.Count -eq $waits) "$($ExcelBusyWaits.Count - $waits) recorded"
 
 $script:tries = 0
@@ -107,11 +107,11 @@ Check "and false is handed back as false, not as nothing" ($no -is [bool] -and -
 # --- a property read ---------------------------------------------------------------------------
 # A stand-in for an Excel object: a property whose read is refused a number of times and then
 # answered. PowerShell treats a failed read of it as it treats one of a COM object's.
-if (-not ("Goosedove.Tools.BusyStandIn" -as [type])) {
+if (-not ("Catalyst.Tools.BusyStandIn" -as [type])) {
     Add-Type @"
 using System;
 using System.Runtime.InteropServices;
-namespace Goosedove.Tools {
+namespace Catalyst.Tools {
     public class BusyStandIn {
         public int Reads;
         public int Refusals;
@@ -129,7 +129,7 @@ namespace Goosedove.Tools {
 "@
 }
 function StandIn([int]$Refusals, $Answer = "the text", [int]$Result = $Rejected) {
-    $made = New-Object Goosedove.Tools.BusyStandIn
+    $made = New-Object Catalyst.Tools.BusyStandIn
     $made.Refusals = $Refusals
     $made.Answer = $Answer
     $made.Result = $Result

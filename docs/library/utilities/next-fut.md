@@ -2,7 +2,7 @@
 
 Built in #129.
 
-Gives the contract after the one given, the next month in the exchanges' sequence: `G26` after `F26`, `F27` after `Z26`. Text in and text out, no object and no handle: a desk that holds one contract code in a cell gets the following month's code in the next, to label the second column of a strip or to walk a schedule a month at a time. The code is read for its month and its year, which no other function does: the schedules keep their codes as labels and never read them, and so do the fixings, the calendar and the market; this helper and its sibling [util_FutToCme](fut-to-cme.md) are the two places a code's letters mean something, and they take one form only. The code is `src/goosedove/index_definitions/contract_codes.py`, the reading and the two functions over it, and `src/goosedove/excel/utilities.py`, the worksheet function.
+Gives the contract after the one given, the next month in the exchanges' sequence: `G26` after `F26`, `F27` after `Z26`. Text in and text out, no object and no handle: a desk that holds one contract code in a cell gets the following month's code in the next, to label the second column of a strip or to walk a schedule a month at a time. The code is read for its month and its year, which no other function does: the schedules keep their codes as labels and never read them, and so do the fixings, the calendar and the market; this helper and its sibling [util_FutToCme](fut-to-cme.md) are the two places a code's letters mean something, and they take one form only. The code is `src/catalyst/index_definitions/contract_codes.py`, the reading and the two functions over it, and `src/catalyst/excel/utilities.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -21,7 +21,7 @@ One argument, required: a contract code as text, typed in the formula, `=util_Ne
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -41,7 +41,7 @@ Nothing else is checked: the code is not held to any schedule, since no schedule
 
 ## Tests
 
-The library's examples and property are `tests/unit/test_contract_codes.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
+The library's examples and property are `tests/unit/test_contract_codes.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
 
 | Case | Kind |
 |---|---|

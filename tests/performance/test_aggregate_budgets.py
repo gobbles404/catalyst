@@ -17,17 +17,17 @@ from test_cashflow_budgets import a_curve as a_cashflow_curve
 from test_seam_allocation import SLACK, least_peak
 from test_trade_budgets import GAS, CallProfile, a_batch, a_history, a_market, observed_of
 
-from goosedove.cashflows.valuation import cashflow_results
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.globals.valuation_date import valuation_date
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.trades.aggregation import AggregateResults, aggregate_results, aggregate_view
-from goosedove.trades.encoding import PaymentAxes, encoded
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.results import TradeResults
-from goosedove.trades.risk_report import Bucket, Risk
-from goosedove.trades.schedule_methods import ScheduleMethod
+from catalyst.cashflows.valuation import cashflow_results
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.globals.valuation_date import valuation_date
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.trades.aggregation import AggregateResults, aggregate_results, aggregate_view
+from catalyst.trades.encoding import PaymentAxes, encoded
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import prepared_trades
+from catalyst.trades.results import TradeResults
+from catalyst.trades.risk_report import Bucket, Risk
+from catalyst.trades.schedule_methods import ScheduleMethod
 
 COUNTS = [1, 2, 24]
 COUNT_IDS = ["one source", "two sources", "twenty-four sources"]

@@ -5,7 +5,7 @@ library's unit tables. docs/library/index-definitions/index-conventions.md is th
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from goosedove.globals.unit_conversions import UnitConversions
+from catalyst.globals.unit_conversions import UnitConversions
 
 # The tables' one currency category: its units are the currency units an index is quoted and
 # settled in, and it is not a category a quantity measures. Another currency is another category

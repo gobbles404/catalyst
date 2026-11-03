@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Goosedove.Host\Goosedove.Host.csproj" />
+    <ProjectReference Include="..\Catalyst.Host\Catalyst.Host.csproj" />
     <!-- Budgets live under tests/performance, as AGENTS.md says; this one is C#. -->
     <Compile Include="..\..\tests\performance\HostWorkBudgets.cs" Link="HostWorkBudgets.cs" />
   </ItemGroup>

@@ -21,14 +21,14 @@ from typing import Final, assert_never
 
 import numpy as np
 
-from goosedove.cashflows.rules import currency_of, finite_amounts
-from goosedove.globals.discount_curve import curve_name
-from goosedove.index_definitions.date_offsets import Instruction, read_offset
-from goosedove.index_definitions.periods import period_months
-from goosedove.instruments.definitions import FieldType, Instrument
-from goosedove.instruments.fields import FieldValues, selected
-from goosedove.trades.schedule_methods import ScheduleMethod
-from goosedove.trades.terms import (
+from catalyst.cashflows.rules import currency_of, finite_amounts
+from catalyst.globals.discount_curve import curve_name
+from catalyst.index_definitions.date_offsets import Instruction, read_offset
+from catalyst.index_definitions.periods import period_months
+from catalyst.instruments.definitions import FieldType, Instrument
+from catalyst.instruments.fields import FieldValues, selected
+from catalyst.trades.schedule_methods import ScheduleMethod
+from catalyst.trades.terms import (
     QuantityPer,
     Route,
     Settlement,

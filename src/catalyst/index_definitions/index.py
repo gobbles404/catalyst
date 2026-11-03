@@ -9,14 +9,14 @@ from dataclasses import dataclass
 from functools import singledispatch
 from typing import cast
 
-from goosedove.globals.unit_conversions import UnitConversions
-from goosedove.index_definitions.contract_specifications import ContractSpecifications
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.iferc_schedule import IfercSchedule
-from goosedove.index_definitions.index_conventions import CURRENCY, IndexConventions, a_unit_of
-from goosedove.index_definitions.kind import (
+from catalyst.globals.unit_conversions import UnitConversions
+from catalyst.index_definitions.contract_specifications import ContractSpecifications
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.iferc_schedule import IfercSchedule
+from catalyst.index_definitions.index_conventions import CURRENCY, IndexConventions, a_unit_of
+from catalyst.index_definitions.kind import (
     Kind,
     named,
     with_holiday_calendar,

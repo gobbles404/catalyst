@@ -37,8 +37,8 @@ after their text labels; all other cells are nonempty text. There are no spacer 
 placeholders, object handles or additional implementation-type row. This is the default
 layout; no transpose argument is introduced.
 
-The `fixed_float` schema as the sheet sees it, `src/goosedove/instruments/definitions.py` laid out by
-`src/goosedove/excel/instruments.py`. A template supplies defaults for
+The `fixed_float` schema as the sheet sees it, `src/catalyst/instruments/definitions.py` laid out by
+`src/catalyst/excel/instruments.py`. A template supplies defaults for
 recognized trade fields; the selected traded product/agreement constrains the resolved values.
 The index is not among the fields: `_CreateTrades(index, fields, trade_rows, template)` takes
 it as its first argument, once for the whole batch.
@@ -235,7 +235,7 @@ They are not all new inputs to the fixed_float schema above.
 
 `tests/unit/test_instruments.py` holds the examples, `tests/unit/test_help.py` pins the help,
 `tests/performance/test_seam_budgets.py` and `test_seam_allocation.py` the cost, `tools/excel_smoke.ps1`
-the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
+the rows in Excel and `host/Catalyst.Host.Tests/CallTests.cs` their replay.
 
 | Case | Kind |
 |---|---|

@@ -14,7 +14,7 @@ from typing import Annotated, assert_never
 
 import numpy as np
 
-from goosedove.excel.bridge import (
+from catalyst.excel.bridge import (
     EXCEL_EPOCH,
     BooleanColumn,
     DateColumn,
@@ -29,9 +29,9 @@ from goosedove.excel.bridge import (
     TextRow,
     register,
 )
-from goosedove.index_definitions.kind import named
-from goosedove.instruments.definitions import FieldType
-from goosedove.instruments.fields import FieldValues
+from catalyst.index_definitions.kind import named
+from catalyst.instruments.definitions import FieldType
+from catalyst.instruments.fields import FieldValues
 
 
 def probe[F: Callable[..., object]](fn: F) -> F:

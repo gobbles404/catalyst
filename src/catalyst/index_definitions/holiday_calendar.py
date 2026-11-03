@@ -10,7 +10,7 @@ from typing import Final
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.instrumentation.work_counts import WorkCounter
 
 # The work a combination reports, combine-holiday-calendars.md: the calendars taken, the listed
 # days read from them and the distinct days kept.

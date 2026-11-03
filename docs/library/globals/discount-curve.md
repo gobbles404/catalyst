@@ -2,7 +2,7 @@
 
 Built in #53; takes anchors since #70.
 
-A daily discount curve under its name, built from the anchors the desk supplies with the days between them filled by a straight line on the factor, retained and reached by handle. The name is the desk's word for the curve, `SOFR`, what a trade's `discount_curve_key` will select among a [collection](collect-discount-curves.md) and what the reports will show, as the [named-curve arc](../../engineering-tickets/trade-valuation-pipeline/multiple-discount-curves.md) agreed; the handle carries it and the readback shows it. The code is `src/goosedove/globals/discount_curve.py`, the record and its builder, `src/goosedove/globals/interpolation.py`, the filling of the days between, and `src/goosedove/excel/globals.py`, the worksheet function; [util_ReadHandle](../utilities/read-handle.md) spills the daily curve back onto the sheet, which is how a projection is checked.
+A daily discount curve under its name, built from the anchors the desk supplies with the days between them filled by a straight line on the factor, retained and reached by handle. The name is the desk's word for the curve, `SOFR`, what a trade's `discount_curve_key` will select among a [collection](collect-discount-curves.md) and what the reports will show, as the [named-curve arc](../../engineering-tickets/trade-valuation-pipeline/multiple-discount-curves.md) agreed; the handle carries it and the readback shows it. The code is `src/catalyst/globals/discount_curve.py`, the record and its builder, `src/catalyst/globals/interpolation.py`, the filling of the days between, and `src/catalyst/excel/globals.py`, the worksheet function; [util_ReadHandle](../utilities/read-handle.md) spills the daily curve back onto the sheet, which is how a projection is checked.
 
 ## Worksheet contract
 
@@ -30,7 +30,7 @@ The name comes first: text, as the seam checks any text scalar, a number, a blan
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/globals.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/globals.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -58,7 +58,7 @@ Those cover the stated rules: the first factor at 1 with non-increasing already 
 
 ## The interpolation
 
-`interpolate_discount_factors`, in `src/goosedove/globals/interpolation.py`, is the library's and has no worksheet surface: the desk supplies anchors and reads days, and never calls it by name. For adjacent anchors `(date_left, df_left)` and `(date_right, df_right)`, and each whole date `d` between them:
+`interpolate_discount_factors`, in `src/catalyst/globals/interpolation.py`, is the library's and has no worksheet surface: the desk supplies anchors and reads days, and never calls it by name. For adjacent anchors `(date_left, df_left)` and `(date_right, df_right)`, and each whole date `d` between them:
 
 ```text
 weight = calendar_days(d - date_left) / calendar_days(date_right - date_left)
@@ -94,7 +94,7 @@ These are mathematical targets; compare with a stated `float64` tolerance. Ancho
 
 ## Tests
 
-The examples and properties below are `tests/unit/test_discount_curve.py` and `tests/unit/test_interpolation.py`; the seam's texts and the handle are `tests/unit/test_globals.py` and `tests/unit/test_handles.py`; the spill is `tests/unit/test_utilities.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
+The examples and properties below are `tests/unit/test_discount_curve.py` and `tests/unit/test_interpolation.py`; the seam's texts and the handle are `tests/unit/test_globals.py` and `tests/unit/test_handles.py`; the spill is `tests/unit/test_utilities.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
 
 | Case | Kind |
 |---|---|

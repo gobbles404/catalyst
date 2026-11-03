@@ -51,7 +51,7 @@ Document and test this narrow priority rule; do not redesign the seam's other or
 
 ## Implementation boundary
 
-The owner is input marshalling in `host/Goosedove.Host/AddIn.cs`:
+The owner is input marshalling in `host/Catalyst.Host/AddIn.cs`:
 
 - Check strings in the existing `Marshal.Range` cell traversal before adding them to
   the text list, and check scalar strings in `Marshal.ToPython` before conversion.
@@ -63,7 +63,7 @@ The owner is input marshalling in `host/Goosedove.Host/AddIn.cs`:
 - Preserve the reusable buffers and text list. A refused call must not contaminate
   the next call, including a smaller range or one with no text.
 
-Keep `src/goosedove/excel/bridge.py:cells_from_buffers` as a trusted consumer of
+Keep `src/catalyst/excel/bridge.py:cells_from_buffers` as a trusted consumer of
 host-produced buffers. Do not add a second input-validation pass in Python to
 compensate for an unsafe host. Existing result-side NUL rejection remains unchanged.
 Length-prefixed transport, escaping and a general bridge refactor are out of scope.
@@ -126,7 +126,7 @@ traversal order is the one reported and nothing after it is looked at. The count
 `texts_checked`, one per text reached, the refused one included; a range of numbers reports none.
 `cells_from_buffers` and the result side are unchanged.
 
-**The tests.** `host/Goosedove.Host.Tests/NulInputTests.cs`: the shifting-fields example through
+**The tests.** `host/Catalyst.Host.Tests/NulInputTests.cs`: the shifting-fields example through
 the creator's publication, refused naming argument 3 and cell (1, 1) with the live count
 unchanged, and the corrected broker making a template whose `schedule_method` is `lastday`; the
 character at the start, middle and end, twice over and alone, as scalar text, a one-cell array, a

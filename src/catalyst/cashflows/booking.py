@@ -15,12 +15,12 @@ from typing import cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.cashflows.rules import currency_of, finite_amounts
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import CASHFLOW
-from goosedove.instruments.fields import FieldValues
-from goosedove.trades.template import TradeTemplate
-from goosedove.trades.terms import whole_trade_ids
+from catalyst.cashflows.rules import currency_of, finite_amounts
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import CASHFLOW
+from catalyst.instruments.fields import FieldValues
+from catalyst.trades.template import TradeTemplate
+from catalyst.trades.terms import whole_trade_ids
 
 CASHFLOWS_BOOKED = "cashflows_booked"  # ticket rows completed and typed, one per payment booked
 PAYMENT_DAYS_MAPPED = "payment_days_mapped"  # distinct payment days, the amounts summed on each

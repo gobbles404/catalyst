@@ -16,12 +16,12 @@ from test_trade_valuation import ENTRY, column, serial, spilled
 from test_trade_valuation import an_index as seam_index
 from test_trades import WAHA, an_index, dates
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.index import Index
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.market_data.interpolated_contracts import (
+from catalyst.excel import bridge
+from catalyst.excel.bridge import Cells
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.index import Index
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.market_data.interpolated_contracts import (
     InterpolatedContracts,
     interpolate_contracts,
 )

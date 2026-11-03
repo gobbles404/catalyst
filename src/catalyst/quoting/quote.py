@@ -15,11 +15,11 @@ from collections.abc import Callable
 
 import numpy as np
 
-from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.index_definitions.periods import end_date, start_date
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.market.market import Market
-from goosedove.quoting.request import (
+from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.index_definitions.periods import end_date, start_date
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.market.market import Market
+from catalyst.quoting.request import (
     Terms,
     by_the_month,
     priced,
@@ -30,8 +30,8 @@ from goosedove.quoting.request import (
     the_request,
     the_terms,
 )
-from goosedove.quoting.template import QuoteTemplate
-from goosedove.trades.terms import trade_schedule_of
+from catalyst.quoting.template import QuoteTemplate
+from catalyst.trades.terms import trade_schedule_of
 
 Span = tuple[np.datetime64, np.datetime64]
 

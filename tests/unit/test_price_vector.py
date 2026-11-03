@@ -8,7 +8,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from goosedove.market_data.price_vector import price_vector
+from catalyst.market_data.price_vector import price_vector
 
 # The page's sample: the index's name as typed and four prices, a zero and a negative among them
 # and the first repeated.

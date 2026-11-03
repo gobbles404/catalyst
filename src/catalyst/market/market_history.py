@@ -8,12 +8,12 @@ from functools import singledispatch
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import Calendar
-from goosedove.index_definitions.index import Index
-from goosedove.index_definitions.kind import named
-from goosedove.market_data.futures_fixings import FuturesFixings
-from goosedove.market_data.gas_daily_fixings import GasDailyFixings
-from goosedove.market_data.iferc_fixings import IfercFixings
+from catalyst.calendar.calendar import Calendar
+from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.kind import named
+from catalyst.market_data.futures_fixings import FuturesFixings
+from catalyst.market_data.gas_daily_fixings import GasDailyFixings
+from catalyst.market_data.iferc_fixings import IfercFixings
 
 
 @dataclass(frozen=True, slots=True)

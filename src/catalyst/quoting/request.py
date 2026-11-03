@@ -23,26 +23,26 @@ from typing import Final, assert_never, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.globals.discount_curve import DiscountCurve
-from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.globals.payments import curve_starts_on, factors_on
-from goosedove.index_definitions.contract_codes import schedule_months
-from goosedove.index_definitions.date_offsets import Instruction, shift_days
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.iferc_schedule import IfercSchedule
-from goosedove.index_definitions.index import Index
-from goosedove.index_definitions.kind import Kind, named
-from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import NONE
-from goosedove.market.market import Market
-from goosedove.quoting.template import QuoteTemplate
-from goosedove.trades.encoding import observation_references
-from goosedove.trades.evaluation import CURVES_SELECTED, LIVE_PRICES_READ, PAYMENT_FACTORS_READ
-from goosedove.trades.observations import Observations, observed
-from goosedove.trades.preparation import FIXINGS_READ, calendar_rows
-from goosedove.trades.resolution import (
+from catalyst.globals.discount_curve import DiscountCurve
+from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.globals.payments import curve_starts_on, factors_on
+from catalyst.index_definitions.contract_codes import schedule_months
+from catalyst.index_definitions.date_offsets import Instruction, shift_days
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.iferc_schedule import IfercSchedule
+from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.kind import Kind, named
+from catalyst.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import NONE
+from catalyst.market.market import Market
+from catalyst.quoting.template import QuoteTemplate
+from catalyst.trades.encoding import observation_references
+from catalyst.trades.evaluation import CURVES_SELECTED, LIVE_PRICES_READ, PAYMENT_FACTORS_READ
+from catalyst.trades.observations import Observations, observed
+from catalyst.trades.preparation import FIXINGS_READ, calendar_rows
+from catalyst.trades.resolution import (
     PAYMENT_RULES_READ,
     PAYMENT_SHIFTS,
     SCHEDULE_CODES_READ,
@@ -51,8 +51,8 @@ from goosedove.trades.resolution import (
     schedule_rows,
     window_rows,
 )
-from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
-from goosedove.trades.template import (
+from catalyst.trades.schedule_methods import METHODS, ScheduleMethod
+from catalyst.trades.template import (
     DayOrRule,
     payment_rule_of,
     quantity_per_of,
@@ -61,7 +61,7 @@ from goosedove.trades.template import (
     settlement_frequency_of,
     settlement_of,
 )
-from goosedove.trades.terms import (
+from catalyst.trades.terms import (
     BASES,
     FREQUENCIES,
     QuantityPer,

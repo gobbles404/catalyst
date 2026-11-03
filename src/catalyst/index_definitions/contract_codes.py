@@ -10,8 +10,8 @@ from typing import Any, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.iferc_schedule import IfercSchedule
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.iferc_schedule import IfercSchedule
 
 # The exchanges' month letters, January to December, and the same in lowercase, the two
 # spellings a code's letter is read in; the ten digits a year is written with.

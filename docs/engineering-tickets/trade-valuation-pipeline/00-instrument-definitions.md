@@ -13,7 +13,7 @@ contains the seven row labels `field`, `description`, `required`, `required_when
 `options` and `rule`; each field's metadata occupies the corresponding column to its right.
 This keeps field names across columns, matching trade-row entry. Both read the same library-owned definitions
 used by construction. They return tables and create no handles. Built in #137, over the
-definitions in `src/goosedove/instruments/definitions.py`.
+definitions in `src/catalyst/instruments/definitions.py`.
 
 The [field sketch](instrument-field-sketch.md) incorporates the second legacy template:
 conditional requirements, template defaults, option domains and the distinction between
@@ -143,7 +143,7 @@ facts fail with the field, selected definition and expected choice identified.
 ## Storage and surface proposal
 
 Start with small typed, immutable definition records in a source-controlled library package
-such as `src/goosedove/instruments/`. Field contracts and supported instrument identities
+such as `src/catalyst/instruments/`. Field contracts and supported instrument identities
 belong there. Keep encoding/evaluation functions separate and dispatch explicitly on approved
 instrument identity; do not expose kernel names or cache/matrix choices as user fields.
 

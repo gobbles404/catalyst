@@ -16,14 +16,14 @@ from test_trade_valuation import a_market as seam_market
 from test_trade_valuation import an_index as seam_index
 from test_trades import day
 
-from goosedove.excel import bridge
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.resolution import Trades, trades
-from goosedove.trades.results import TradeResults
-from goosedove.trades.terms import FREQUENCIES, SettlementFrequency, booked_words
+from catalyst.excel import bridge
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import prepared_trades
+from catalyst.trades.resolution import Trades, trades
+from catalyst.trades.results import TradeResults
+from catalyst.trades.terms import FREQUENCIES, SettlementFrequency, booked_words
 
 # --- the WTI trade month -------------------------------------------------------------------------
 # CME rule 804101's window for July 2026: 26 May to 25 June, the first business day after the

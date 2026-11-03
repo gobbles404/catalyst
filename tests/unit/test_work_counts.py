@@ -3,7 +3,7 @@
 from hypothesis import given
 from hypothesis import strategies as st
 
-from goosedove.instrumentation.work_counts import KERNEL, WorkCounter
+from catalyst.instrumentation.work_counts import KERNEL, WorkCounter
 
 
 @given(before=st.integers(min_value=0), after=st.integers(min_value=0))

@@ -15,8 +15,8 @@ from typing import Final, assert_never, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 
 # The form an offset takes, in the words a message offers.
 FORMS: Final = (

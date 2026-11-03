@@ -11,14 +11,14 @@ from typing import assert_never, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.globals.discount_curve import MAX_DAYS
-from goosedove.globals.valuation_date import ValuationDate
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.iferc_schedule import IfercSchedule
-from goosedove.index_definitions.index import Index
-from goosedove.index_definitions.kind import Kind, with_holiday_calendar
+from catalyst.globals.discount_curve import MAX_DAYS
+from catalyst.globals.valuation_date import ValuationDate
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.iferc_schedule import IfercSchedule
+from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.kind import Kind, with_holiday_calendar
 
 
 @dataclass(frozen=True, slots=True)

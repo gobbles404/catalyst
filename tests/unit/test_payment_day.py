@@ -21,17 +21,17 @@ from test_trade_valuation import ENTRY, a_history, a_market, curves_of, row, row
 from test_trade_valuation import an_index as seam_index
 from test_trades import bounds_of, ids, numbers, observed_of, picks, spec
 
-from goosedove.excel import bridge
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.index_definitions.holiday_calendar import holiday_calendar
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FIXED_FLOAT
-from goosedove.instruments.fields import DatesOrTexts
-from goosedove.trades.encoding import encoded
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.schedule_methods import ScheduleMethod
-from goosedove.trades.terms import (
+from catalyst.excel import bridge
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import FIXED_FLOAT
+from catalyst.instruments.fields import DatesOrTexts
+from catalyst.trades.encoding import encoded
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import prepared_trades
+from catalyst.trades.schedule_methods import ScheduleMethod
+from catalyst.trades.terms import (
     FREQUENCIES,
     PaymentTerms,
     QuantityPer,

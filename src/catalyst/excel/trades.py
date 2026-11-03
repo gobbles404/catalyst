@@ -17,8 +17,8 @@ from typing import Annotated
 
 import numpy as np
 
-from goosedove.cashflows.valuation import CashflowResults
-from goosedove.excel.bridge import (
+from catalyst.cashflows.valuation import CashflowResults
+from catalyst.excel.bridge import (
     NUMBER_CODE,
     TEXT_CODE,
     FieldRow,
@@ -29,19 +29,19 @@ from goosedove.excel.bridge import (
     TextRow,
     excel_function,
 )
-from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.index_definitions.index import Index
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.market.market import Market
-from goosedove.market.market_history import MarketHistory
-from goosedove.trades.aggregation import AggregateResults, aggregate_results
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import PreparedTrades, prepared_trades
-from goosedove.trades.resolution import Trades, trades
-from goosedove.trades.results import TradeResults
-from goosedove.trades.risk_report import Bucket, Risk, RiskView
-from goosedove.trades.template import TradeTemplate, choice, trade_template
+from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.index_definitions.index import Index
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.market.market import Market
+from catalyst.market.market_history import MarketHistory
+from catalyst.trades.aggregation import AggregateResults, aggregate_results
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import PreparedTrades, prepared_trades
+from catalyst.trades.resolution import Trades, trades
+from catalyst.trades.results import TradeResults
+from catalyst.trades.risk_report import Bucket, Risk, RiskView
+from catalyst.trades.template import TradeTemplate, choice, trade_template
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.

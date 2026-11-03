@@ -46,22 +46,22 @@ from test_trades import (
     spec,
 )
 
-from goosedove.globals.discount_curve import DiscountCurve, discount_curve
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.index_definitions.index import Index
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FIXED_FLOAT
-from goosedove.instruments.fields import DatesOrTexts
-from goosedove.market.market import Market
-from goosedove.market.market_history import MarketHistory
-from goosedove.trades.aggregation import AggregateResults, aggregate_results, aggregate_view
-from goosedove.trades.encoding import encoded
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import PreparedTrades, prepared_trades
-from goosedove.trades.results import TradeResults, risk_view
-from goosedove.trades.risk_report import Bucket, Risk, RiskView
-from goosedove.trades.schedule_methods import ScheduleMethod
-from goosedove.trades.terms import (
+from catalyst.globals.discount_curve import DiscountCurve, discount_curve
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.index_definitions.index import Index
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import FIXED_FLOAT
+from catalyst.instruments.fields import DatesOrTexts
+from catalyst.market.market import Market
+from catalyst.market.market_history import MarketHistory
+from catalyst.trades.aggregation import AggregateResults, aggregate_results, aggregate_view
+from catalyst.trades.encoding import encoded
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import PreparedTrades, prepared_trades
+from catalyst.trades.results import TradeResults, risk_view
+from catalyst.trades.risk_report import Bucket, Risk, RiskView
+from catalyst.trades.schedule_methods import ScheduleMethod
+from catalyst.trades.terms import (
     FREQUENCIES,
     PaymentTerms,
     QuantityPer,

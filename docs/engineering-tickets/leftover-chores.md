@@ -9,7 +9,7 @@ The repository stops carrying two things nothing uses, and the code calls the de
 ## PR 1: the deletions
 
 1. **Drop the scipy dependency.** `pyproject.toml` pins `scipy==1.18.1` and nothing in `src`, `tools`, `tests` or `host` imports it. Remove the pin, regenerate `uv.lock`, and prove the checks pass without it: run `uv sync --locked` after the lockfile is updated and before `./check.ps1`, since an ordinary `uv run` can leave the old package installed and the checks would then prove nothing. `docs/getting-started.md` says the environment holds numpy and scipy; it says numpy.
-2. **Remove `hello()`.** `src/goosedove/__init__.py` holds a two-line `hello()` that returns a greeting, the package skeleton's leftover; nothing calls it and no test covers it. Remove it, leaving the package docstring.
+2. **Remove `hello()`.** `src/catalyst/__init__.py` holds a two-line `hello()` that returns a greeting, the package skeleton's leftover; nothing calls it and no test covers it. Remove it, leaving the package docstring.
 
 No code path changes, no number moves, and the counts the gate reports stay as they were.
 

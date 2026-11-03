@@ -7,10 +7,10 @@ using Python.Runtime;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("Goosedove.Host.Tests")]
-[assembly: InternalsVisibleTo("Goosedove.Host.Measure")]
+[assembly: InternalsVisibleTo("Catalyst.Host.Tests")]
+[assembly: InternalsVisibleTo("Catalyst.Host.Measure")]
 
-namespace Goosedove.Host
+namespace Catalyst.Host
 {
     /// <summary>Runs once when Excel loads the add-in: read config, start Python, import the bridge.</summary>
     public class AddIn : IExcelAddIn
@@ -22,7 +22,7 @@ namespace Goosedove.Host
         {
             try
             {
-                var config = Config.Load(Path.Combine(Path.GetDirectoryName(ExcelDnaUtil.XllPath), "goosedove.cfg"));
+                var config = Config.Load(Path.Combine(Path.GetDirectoryName(ExcelDnaUtil.XllPath), "catalyst.cfg"));
                 Bridge.Start(config["pythondll"], config["pythonpath"].Split(';'));
                 Registration.RegisterAll();
                 // The help beside the formula as a person types it, from what was just registered. Excel's
@@ -58,7 +58,7 @@ namespace Goosedove.Host
         /// its workbooks, then quits Excel; it must make no further calls to the add-in.
         /// </summary>
         [ExcelCommand(Description = "Prepares this Excel process to quit after a hidden automation run.")]
-        public static void GoosedovePrepareToQuit()
+        public static void CatalystPrepareToQuit()
         {
             if (preparedToQuit) return;
             Lifetime.Closing = true;
@@ -102,7 +102,7 @@ namespace Goosedove.Host
                 {
                     sys.path.insert(0, pythonPath[i].Trim());
                 }
-                Module = Py.Import("goosedove.excel.bridge");
+                Module = Py.Import("catalyst.excel.bridge");
                 Missing = Module.GetAttr("MISSING");
                 CellsFromBuffers = Module.GetAttr("cells_from_buffers");
                 EmptyText = new PyString("");  // what a range with no text cells carries as its text
@@ -197,13 +197,13 @@ namespace Goosedove.Host
         {
             if (Lifetime.Closing || Module == null || !PythonEngine.IsInitialized)
             {
-                return Goosedove.Host.Release.Skipped;
+                return Catalyst.Host.Release.Skipped;
             }
             using (Py.GIL())
             using (var pyText = new PyString(text))
             using (var result = Module.InvokeMethod("release", pyText))
             {
-                return result.As<bool>() ? Goosedove.Host.Release.Released : Goosedove.Host.Release.Missing;
+                return result.As<bool>() ? Catalyst.Host.Release.Released : Catalyst.Host.Release.Missing;
             }
         }
 
@@ -760,13 +760,13 @@ namespace Goosedove.Host
     public static class Status
     {
         [ExcelFunction(Description = "Reports whether Python started, and the error if it did not.")]
-        public static string GoosedoveStatus()
+        public static string CatalystStatus()
         {
             return Bridge.StartupError ?? "ok: python started and functions registered";
         }
 
         [ExcelFunction(IsHidden = true, Description = "Reports the handle store's live count and what the observed path did: published, reused, released.")]
-        public static string GoosedoveHandles()
+        public static string CatalystHandles()
         {
             var (live, priceBytes) = Bridge.LiveHandles();
             return Lifetime.Report(live, priceBytes);

@@ -8,8 +8,8 @@ page."""
 
 from dataclasses import dataclass
 
-from goosedove.globals.discount_curve import DiscountCurve
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.globals.discount_curve import DiscountCurve
+from catalyst.instrumentation.work_counts import WorkCounter
 
 CURVES_COLLECTED = "curves_collected"  # one per curve given, its name read once for the rule
 

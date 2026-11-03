@@ -24,23 +24,23 @@ from typing import Any, Final, assert_never, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.globals.discount_curve import curve_name
-from goosedove.globals.unit_conversions import UnitConversions
-from goosedove.index_definitions.contract_codes import month_label, schedule_months
-from goosedove.index_definitions.date_offsets import shift_days
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.iferc_schedule import IfercSchedule
-from goosedove.index_definitions.index import Index
-from goosedove.index_definitions.kind import named
-from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FIXED_FLOAT, FieldType
-from goosedove.instruments.fields import DatesOrTexts, FieldValues
-from goosedove.trades.encoding import Encoded, encoded
-from goosedove.trades.observations import Observations, observed
-from goosedove.trades.schedule_methods import METHODS
-from goosedove.trades.template import (
+from catalyst.globals.discount_curve import curve_name
+from catalyst.globals.unit_conversions import UnitConversions
+from catalyst.index_definitions.contract_codes import month_label, schedule_months
+from catalyst.index_definitions.date_offsets import shift_days
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.iferc_schedule import IfercSchedule
+from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.kind import named
+from catalyst.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import FIXED_FLOAT, FieldType
+from catalyst.instruments.fields import DatesOrTexts, FieldValues
+from catalyst.trades.encoding import Encoded, encoded
+from catalyst.trades.observations import Observations, observed
+from catalyst.trades.schedule_methods import METHODS
+from catalyst.trades.template import (
     DayOrRule,
     TradeTemplate,
     months_of,
@@ -51,7 +51,7 @@ from goosedove.trades.template import (
     settlement_frequency_of,
     settlement_of,
 )
-from goosedove.trades.terms import (
+from catalyst.trades.terms import (
     BASES,
     FREQUENCIES,
     LegInputs,

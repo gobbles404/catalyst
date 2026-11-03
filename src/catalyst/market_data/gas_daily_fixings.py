@@ -8,8 +8,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.index_definitions.index import Index
-from goosedove.index_definitions.kind import Kind, described
+from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.kind import Kind, described
 
 
 @dataclass(frozen=True, slots=True)

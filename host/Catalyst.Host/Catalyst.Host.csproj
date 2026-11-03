@@ -7,6 +7,13 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- Only [ExcelFunction] methods and the functions registered from Python reach the sheet. -->
     <ExcelAddInExplicitExports>true</ExcelAddInExplicitExports>
+    <!-- The add-in is named for the product, not for the assembly: the build makes one 64-bit
+         Catalyst.xll with its Catalyst.dna, loading Catalyst.Host.dll beside them, and Excel's
+         add-in list shows it as Catalyst. There is no 32-bit build: the add-in loads a 64-bit Python. -->
+    <ExcelAddInName>Catalyst</ExcelAddInName>
+    <ExcelAddInFileName>Catalyst</ExcelAddInFileName>
+    <ExcelDnaCreate32BitAddIn>false</ExcelDnaCreate32BitAddIn>
+    <ExcelDna64BitAddInSuffix>%none%</ExcelDna64BitAddInSuffix>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="goosedove.cfg" CopyToOutputDirectory="PreserveNewest" Condition="Exists('goosedove.cfg')" />
+    <None Include="catalyst.cfg" CopyToOutputDirectory="PreserveNewest" Condition="Exists('catalyst.cfg')" />
   </ItemGroup>
 
 </Project>

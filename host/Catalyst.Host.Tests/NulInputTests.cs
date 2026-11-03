@@ -1,7 +1,7 @@
 using ExcelDna.Integration;
 using Xunit;
 
-namespace Goosedove.Host.Tests
+namespace Catalyst.Host.Tests
 {
     /// <summary>
     /// Since #189, reject-nul-input-text.md: a text holding NUL (U+0000) is refused by the host

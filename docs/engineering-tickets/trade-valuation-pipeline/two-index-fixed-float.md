@@ -1,7 +1,7 @@
 # Two index legs on fixed_float
 
 **Status:** Agreed with the owner, 21 October 2026, for
-[issue #212](https://github.com/gobbles404/goosedove/issues/212). Build as three
+[issue #212](https://github.com/gobbles404/catalyst/issues/212). Build as three
 stacked pull requests after the payment-day work in #214, as the delivery section
 sets out. One common net payment per monthly component is the v1 rule, agreed here
 and not checked against a confirmation; separately paying legs are outside this

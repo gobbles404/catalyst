@@ -7,7 +7,7 @@ param([string]$Workbook)
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot "host_build.ps1")
-$pidFile = Join-Path $root "host\Goosedove.Host\bin\excel_dev.pid"
+$pidFile = Join-Path $root "host\Catalyst.Host\bin\excel_dev.pid"
 
 if (Test-Path $pidFile) {
     $previous = Get-Process -Id (Get-Content $pidFile) -ErrorAction SilentlyContinue

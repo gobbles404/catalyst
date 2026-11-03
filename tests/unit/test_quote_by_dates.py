@@ -30,19 +30,19 @@ from test_trade_valuation import an_index as seam_index
 from test_trade_valuation import row, serial
 from test_trades import day, numbers, quoted
 
-from goosedove.calendar.calendar import calendar
-from goosedove.excel import bridge
-from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.globals.valuation_date import valuation_date
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.market.market import Market
-from goosedove.market.market_history import market_history
-from goosedove.market_data.iferc_fixings import iferc_fixings
-from goosedove.quoting.quote import quote, quote_by_dates
-from goosedove.quoting.template import QuoteTemplate
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.template import DayOrRule
+from catalyst.calendar.calendar import calendar
+from catalyst.excel import bridge
+from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.globals.valuation_date import valuation_date
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.market.market import Market
+from catalyst.market.market_history import market_history
+from catalyst.market_data.iferc_fixings import iferc_fixings
+from catalyst.quoting.quote import quote, quote_by_dates
+from catalyst.quoting.template import QuoteTemplate
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import prepared_trades
+from catalyst.trades.template import DayOrRule
 
 ENTRY = {
     name: bridge.entry(name)

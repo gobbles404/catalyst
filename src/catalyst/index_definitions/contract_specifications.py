@@ -9,8 +9,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.globals.unit_conversions import UnitConversions
-from goosedove.index_definitions.index_conventions import listed, measures_of
+from catalyst.globals.unit_conversions import UnitConversions
+from catalyst.index_definitions.index_conventions import listed, measures_of
 
 
 @dataclass(frozen=True, slots=True)

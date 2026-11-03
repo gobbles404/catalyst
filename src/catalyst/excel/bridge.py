@@ -2,7 +2,7 @@
 
 The host imports this module and uses four names: function_specs and entry
 at registration, and cells_from_buffers and the value MISSING, fetched once
-at start. Importing it imports goosedove.excel first, the catalogue of every
+at start. Importing it imports catalyst.excel first, the catalogue of every
 module that registers worksheet functions, so the function list is complete by
 the time the host asks. For each function the host fetches its prepared path,
 entry(name), once, and calls it with each recalculation's inputs. A blank cell
@@ -53,25 +53,25 @@ from typing import (
 import numpy as np
 from numpy.typing import NDArray
 
-import goosedove
-from goosedove.calendar.calendar import Calendar
-from goosedove.cashflows.booking import Cashflows
-from goosedove.cashflows.valuation import CashflowResults
-from goosedove.globals.discount_curve import DiscountCurve
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.index import Index
-from goosedove.instruments.definitions import FieldType, Instrument
-from goosedove.instruments.fields import DatesOrTexts, FieldValues, selected
-from goosedove.market.market import Market
-from goosedove.market.market_history import MarketHistory
-from goosedove.market_data.futures_fixings import FuturesFixings
-from goosedove.market_data.gas_daily_fixings import GasDailyFixings
-from goosedove.market_data.iferc_fixings import IfercFixings
-from goosedove.market_data.price_vector import PriceVector
-from goosedove.quoting.rfq import Rfq
-from goosedove.trades.preparation import PreparedTrades
-from goosedove.trades.resolution import Trades
-from goosedove.trades.results import TradeResults
+import catalyst
+from catalyst.calendar.calendar import Calendar
+from catalyst.cashflows.booking import Cashflows
+from catalyst.cashflows.valuation import CashflowResults
+from catalyst.globals.discount_curve import DiscountCurve
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.index import Index
+from catalyst.instruments.definitions import FieldType, Instrument
+from catalyst.instruments.fields import DatesOrTexts, FieldValues, selected
+from catalyst.market.market import Market
+from catalyst.market.market_history import MarketHistory
+from catalyst.market_data.futures_fixings import FuturesFixings
+from catalyst.market_data.gas_daily_fixings import GasDailyFixings
+from catalyst.market_data.iferc_fixings import IfercFixings
+from catalyst.market_data.price_vector import PriceVector
+from catalyst.quoting.rfq import Rfq
+from catalyst.trades.preparation import PreparedTrades
+from catalyst.trades.resolution import Trades
+from catalyst.trades.results import TradeResults
 
 # --- what a function may declare, beyond float, int, str, and bool ----------
 
@@ -2271,9 +2271,9 @@ def publish(name: str, args: Sequence[object]) -> tuple[object, bool]:
 
 @excel_function
 def Ping() -> str:
-    """Confirm which goosedove Excel is running."""
+    """Confirm which catalyst Excel is running."""
     try:
-        release = version("goosedove")
+        release = version("catalyst")
     except PackageNotFoundError:
         release = "source checkout"
-    return f"goosedove {release} from {goosedove.__file__}"
+    return f"catalyst {release} from {catalyst.__file__}"

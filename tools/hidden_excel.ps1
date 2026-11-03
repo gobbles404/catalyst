@@ -1,9 +1,9 @@
 # Dot-source this file for an Excel automation session that must end before the script returns.
-if (-not ("Goosedove.Tools.ExcelWindow" -as [type])) {
+if (-not ("Catalyst.Tools.ExcelWindow" -as [type])) {
     Add-Type @"
 using System;
 using System.Runtime.InteropServices;
-namespace Goosedove.Tools {
+namespace Catalyst.Tools {
     public static class ExcelWindow {
         [DllImport("user32.dll")]
         public static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
@@ -119,7 +119,7 @@ function Write-ExcelBusyReport {
 # A failed lookup never supplies a process that cleanup could accidentally terminate.
 function Get-HiddenExcelProcess($Excel) {
     $excelProcessId = [uint32]0
-    [void][Goosedove.Tools.ExcelWindow]::GetWindowThreadProcessId([IntPtr](Read-ExcelProperty $Excel "Hwnd"), [ref]$excelProcessId)
+    [void][Catalyst.Tools.ExcelWindow]::GetWindowThreadProcessId([IntPtr](Read-ExcelProperty $Excel "Hwnd"), [ref]$excelProcessId)
     if (-not $excelProcessId) { throw "could not identify the hidden Excel process" }
     $process = [Diagnostics.Process]::GetProcessById($excelProcessId)
     try {
@@ -172,7 +172,7 @@ function Stop-HiddenExcel($Session, $Objects, $Book, [switch]$AddInLoaded, [swit
         try { Close-HiddenExcelWorkbook $Session.Excel $Book } catch { $problems.Add("closing the workbook: $_") }
     }
     if ($AddInLoaded) {
-        try { [void]$Session.Excel.Run("GoosedovePrepareToQuit") }
+        try { [void]$Session.Excel.Run("CatalystPrepareToQuit") }
         catch { $problems.Add("preparing the add-in to quit: $_") }
     }
     try { $Session.Excel.Quit() } catch { $problems.Add("quitting Excel: $_") }

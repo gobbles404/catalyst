@@ -7,17 +7,17 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import Calendar, calendar
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.globals.valuation_date import ValuationDate, valuation_date
-from goosedove.index_definitions.contract_specifications import contract_specifications
-from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
-from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
-from goosedove.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
-from goosedove.index_definitions.index import Index, index
-from goosedove.index_definitions.index_conventions import index_conventions
-from goosedove.index_definitions.kind import Kind
+from catalyst.calendar.calendar import Calendar, calendar
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.globals.valuation_date import ValuationDate, valuation_date
+from catalyst.index_definitions.contract_specifications import contract_specifications
+from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
+from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
+from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.kind import Kind
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:

@@ -154,17 +154,17 @@ function Insert-Row($State, $Sheet, [string]$Address) {
 # handle that Excel publishes.
 function Id($State) { return [string]$State.Session.Process.Id }
 
-# --- the store's counts, read through GoosedoveHandles in a scratch cell ----------------------
+# --- the store's counts, read through CatalystHandles in a scratch cell ----------------------
 
 # Three calls, each made again on its own if Excel refuses it: a refused read is read again,
 # and the formula is not typed a second time for it. A deadline given by a bounded wait is the
 # most any of them may take. A text that is not the counts fails as it always did.
 function Counts($State, $Sheet, [string]$Address = "Z1", $Deadline = $null) {
     $cell = Cell $State $Sheet $Address $Deadline
-    Invoke-ExcelCall "type the counts formula" { $cell.Formula = "=GoosedoveHandles()" } $Address $Deadline
+    Invoke-ExcelCall "type the counts formula" { $cell.Formula = "=CatalystHandles()" } $Address $Deadline
     $text = [string](Read-ExcelProperty $cell "Value2" $Address $Deadline)
     if ($text -notmatch "^live (-?\d+); price bytes (-?\d+); published (\d+); reused (\d+); released (\d+); release misses (\d+); disposal errors (\d+); skipped at close (\d+)") {
-        throw "GoosedoveHandles showed: $text"
+        throw "CatalystHandles showed: $text"
     }
     return [pscustomobject]@{
         Live = [int]$Matches[1]; PriceBytes = [int]$Matches[2]; Published = [int]$Matches[3]; Reused = [int]$Matches[4]
@@ -304,7 +304,7 @@ $core = {
     $c = Settle $state $watch { param($c) $c.Live -eq 0 }
     Check "closing the last workbook releases every publication" ($c.Live -eq 0 -and $c.Released -eq 16) $c.Text
     Check "no release missed, no disposal error, none skipped" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
-    Put $state $watch "A1" "=GoosedoveStatus()"
+    Put $state $watch "A1" "=CatalystStatus()"
     Check "Python is still running" ((Text $state $watch "A1") -eq "ok: python started and functions registered") (Text $state $watch "A1")
 }
 
@@ -415,7 +415,7 @@ $books = {
 
     # A saved workbook, reopened: the supported workflow is a full calculation, then another once
     # the feed is ready; saved text is neither reconnected nor refused.
-    $path = Join-Path ([IO.Path]::GetTempPath()) ("goosedove-lifetime-" + [guid]::NewGuid().ToString("N") + ".xlsx")
+    $path = Join-Path ([IO.Path]::GetTempPath()) ("catalyst-lifetime-" + [guid]::NewGuid().ToString("N") + ".xlsx")
     $saved = New-Book $state
     $savedSheet = Sheet $state $saved
     Build-Chain $state $savedSheet
@@ -501,7 +501,7 @@ $processes = {
         Clear-Cell $state $watch "A1"
         $c = Settle $state $watch { param($c) $c.Live -eq 0 }
         Check "clearing the scratch creator empties the first Excel's store again" ($c.Live -eq 0) $c.Text
-        $path = Join-Path ([IO.Path]::GetTempPath()) ("goosedove-processes-" + [guid]::NewGuid().ToString("N") + ".xlsx")
+        $path = Join-Path ([IO.Path]::GetTempPath()) ("catalyst-processes-" + [guid]::NewGuid().ToString("N") + ".xlsx")
         $saved = New-Book $state
         $savedSheet = Sheet $state $saved
         Build-Chain $state $savedSheet

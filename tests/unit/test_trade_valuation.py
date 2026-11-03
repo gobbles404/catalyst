@@ -13,8 +13,8 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells
+from catalyst.excel import bridge
+from catalyst.excel.bridge import Cells
 
 ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
 FIRST = np.datetime64("1899-12-30", "D")

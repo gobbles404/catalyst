@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using ExcelDna.Integration;
 using Python.Runtime;
 
-namespace Goosedove.Host.Measure
+namespace Catalyst.Host.Measure
 {
     /// <summary>Every timed case through the host, its inputs built before any clock starts.</summary>
     internal static class Scenarios

@@ -1,4 +1,4 @@
-# Goosedove: independent valuation and performance review brief
+# Catalyst: independent valuation and performance review brief
 
 Original assessment: 27 September 2026, code inspected at `6fc6373`. Review scope reconciled with the agreed pipeline on 3 October 2026. Measurements and test counts below remain historical; this revision did not refresh them. Capture the exact commit and working changes again when beginning the review.
 
@@ -10,7 +10,7 @@ If one person does not cover both areas, pair a commodity/rates valuation specia
 
 ## Objective
 
-Assess whether Goosedove's static-trade and array-based market design supports correct, efficient commodity valuation from Excel. Distinguish implemented guarantees, historical measurements and proposed behavior. Reproduce the current baseline before recommending changes. Prioritize small, demonstrated improvements over a framework rewrite.
+Assess whether Catalyst's static-trade and array-based market design supports correct, efficient commodity valuation from Excel. Distinguish implemented guarantees, historical measurements and proposed behavior. Reproduce the current baseline before recommending changes. Prioritize small, demonstrated improvements over a framework rewrite.
 
 The [trade-valuation pipeline](engineering-tickets/trade-valuation-pipeline/README.md) is the current design contract. The [contract survey](futures-trade-field-review.md) preserves supporting exchange research; its former field schema and implementation sequence are superseded. Review implementation against the pipeline and identify remaining decisions explicitly rather than treating historical prototypes as the required API.
 
@@ -109,6 +109,6 @@ Current code can be reviewed now. End-to-end trade-pricing claims require either
 - [Project rules](../AGENTS.md) and [principles](../PRINCIPLES.md).
 - [Measurement method](seam/measuring.md) and [historical baseline](seam/baseline.md).
 - `tests/performance`, `tools/performance` and Excel lifetime/smoke scripts in the repository.
-- [Discount-curve implementation](../src/goosedove/globals/discount_curve.py) and [documented contract](library/globals/discount-curve.md).
+- [Discount-curve implementation](../src/catalyst/globals/discount_curve.py) and [documented contract](library/globals/discount-curve.md).
 
 Run Python through `uv run` and begin with `.\check.ps1`. Inspect the measurement tools' documented scopes before running them. For example, `uv run python tools/performance/measure_python.py` measures the prepared Python seam on already-built inputs and excludes Excel and the host; it cannot answer the end-to-end latency question alone.

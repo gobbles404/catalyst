@@ -1,6 +1,6 @@
 # RFQ: a saved quantity and payment schedule for quoting
 
-**Status:** Agreed 22 October 2026 and built in #218, stacked on #217; [rfq.md](../../library/quoting/rfq.md) is the page, and the shared calculation's home is `src/goosedove/quoting/request.py`.
+**Status:** Agreed 22 October 2026 and built in #218, stacked on #217; [rfq.md](../../library/quoting/rfq.md) is the page, and the shared calculation's home is `src/catalyst/quoting/request.py`.
 
 ## Outcome
 
@@ -128,7 +128,7 @@ dates and their source so the precedence is visible.
 ## Shared quote calculation
 
 Extract the reusable static request resolution and pricing responsibilities from
-`src/goosedove/quoting/quote.py` into the quoting package. Keep the common quote terms and
+`src/catalyst/quoting/quote.py` into the quoting package. Keep the common quote terms and
 their requirements defined once. Reuse the existing observation, payment and market-data
 helpers; do not copy the engine or book zero-strike trades to obtain a quote.
 

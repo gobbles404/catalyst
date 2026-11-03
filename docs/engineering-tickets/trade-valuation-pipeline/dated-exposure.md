@@ -7,7 +7,7 @@
 the same day: the market reference is derived from the observation date by the calendar's own
 rule and retained, and the fixing source is kept once on the shared object. Built in #140:
 [kernel.md](../../library/trades/kernel.md) is the page of the kernel as it stands, the five
-records and the daily toy among them; `src/goosedove/trades/observations.py` is the new module,
+records and the daily toy among them; `src/catalyst/trades/observations.py` is the new module,
 `encoding.py`, `preparation.py` and `evaluation.py` the reshaped ones.
 
 **Placement:** I4 → **I4a** → I5 → I6 → R1. I4 is built, #139, I4a #140, I5 #141 and I6 #142,

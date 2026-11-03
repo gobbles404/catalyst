@@ -17,7 +17,7 @@ from typing import assert_never
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.instrumentation.work_counts import WorkCounter
 
 
 class ObservationKind(StrEnum):

@@ -6,14 +6,14 @@ docs/library/conventions.md says under Excel help; docs/library/cashflows/ holds
 
 from typing import Annotated
 
-from goosedove.cashflows.booking import Cashflows, cashflows
-from goosedove.cashflows.valuation import CashflowResults, cashflow_results
-from goosedove.excel.bridge import FieldRows, Handle, TextRow, excel_function
-from goosedove.excel.trades import values_label
-from goosedove.globals.discount_curve import DiscountCurve
-from goosedove.globals.valuation_date import ValuationDate
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.trades.template import TradeTemplate
+from catalyst.cashflows.booking import Cashflows, cashflows
+from catalyst.cashflows.valuation import CashflowResults, cashflow_results
+from catalyst.excel.bridge import FieldRows, Handle, TextRow, excel_function
+from catalyst.excel.trades import values_label
+from catalyst.globals.discount_curve import DiscountCurve
+from catalyst.globals.valuation_date import ValuationDate
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.trades.template import TradeTemplate
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.

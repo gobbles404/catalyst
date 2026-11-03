@@ -2,7 +2,7 @@
 
 Built in #129.
 
-Gives the first day of a contract's month as a date: 1 January 2026 for `F26`, 1 July 2026 for `n26`. Text in and one date out, no object and no handle: the desk turns a code it holds into a date to count from, to place on an axis or to compare with a day. The first day is the one day a code names on its own; a contract's expiry is its [schedule](../index-definitions/futures-schedule.md)'s to say, and this function knows no schedule. It reads the code through the same reading as [util_NextFut](next-fut.md) and takes the same one form, a month letter and a two-digit year. The code is `src/goosedove/index_definitions/contract_codes.py`, `first_day_of`, and `src/goosedove/excel/utilities.py`, the worksheet function, the first to send one date back to the sheet.
+Gives the first day of a contract's month as a date: 1 January 2026 for `F26`, 1 July 2026 for `n26`. Text in and one date out, no object and no handle: the desk turns a code it holds into a date to count from, to place on an axis or to compare with a day. The first day is the one day a code names on its own; a contract's expiry is its [schedule](../index-definitions/futures-schedule.md)'s to say, and this function knows no schedule. It reads the code through the same reading as [util_NextFut](next-fut.md) and takes the same one form, a month letter and a two-digit year. The code is `src/catalyst/index_definitions/contract_codes.py`, `first_day_of`, and `src/catalyst/excel/utilities.py`, the worksheet function, the first to send one date back to the sheet.
 
 ## Worksheet contract
 
@@ -20,7 +20,7 @@ One argument, required: a contract code as text, typed in the formula or in a ce
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -37,7 +37,7 @@ One rule, the reading's: a code is one month letter and two digits, nothing befo
 
 ## Tests
 
-The library's examples and property are `tests/unit/test_contract_codes.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
+The library's examples and property are `tests/unit/test_contract_codes.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
 
 | Case | Kind |
 |---|---|

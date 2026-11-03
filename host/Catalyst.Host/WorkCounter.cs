@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
-namespace Goosedove.Host
+namespace Catalyst.Host
 {
     /// <summary>
     /// What the host did during one call, by name. An observer supplies one; a worksheet call

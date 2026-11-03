@@ -12,8 +12,8 @@ import numpy as np
 import pytest
 from test_utilities import read, rows
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE, Cells
+from catalyst.excel import bridge
+from catalyst.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE, Cells
 
 PID = os.getpid()  # leads every handle this Python publishes
 

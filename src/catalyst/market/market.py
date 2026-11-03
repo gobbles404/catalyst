@@ -10,8 +10,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.market.market_history import MarketHistory
-from goosedove.market_data.price_vector import PriceVector
+from catalyst.market.market_history import MarketHistory
+from catalyst.market_data.price_vector import PriceVector
 
 
 @dataclass(frozen=True, slots=True)

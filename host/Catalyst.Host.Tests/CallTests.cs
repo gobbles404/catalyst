@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using ExcelDna.Integration;
 using Xunit;
 
-namespace Goosedove.Host.Tests
+namespace Catalyst.Host.Tests
 {
     /// <summary>Whole calls through the host: the cell text or value Excel would show.</summary>
     [Collection("python")]
@@ -2471,9 +2471,9 @@ namespace Goosedove.Host.Tests
         }
 
         [Fact]
-        public void ping_says_which_goosedove_is_running()
+        public void ping_says_which_catalyst_is_running()
         {
-            Assert.Contains("goosedove", (string)Seam.Call("Ping"));
+            Assert.Contains("catalyst", (string)Seam.Call("Ping"));
         }
 
         // Arrays come back as plain doubles: no boxing, and no NaN, because the seam fails the call first.

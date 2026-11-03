@@ -14,19 +14,19 @@ from typing import assert_never, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.globals.discount_curve import DiscountCurve
-from goosedove.market.market import Market
-from goosedove.trades.contributions import (
+from catalyst.globals.discount_curve import DiscountCurve
+from catalyst.market.market import Market
+from catalyst.trades.contributions import (
     CLEARED,
     CrossContribution,
     RateContribution,
     curve_words,
 )
-from goosedove.trades.display_axes import EarlyRisk, PeriodAxis, Unit
-from goosedove.trades.encoding import PairAxes
-from goosedove.trades.preparation import PreparedLeg, PreparedTrades
-from goosedove.trades.reserves import Reserves
-from goosedove.trades.risk_report import (
+from catalyst.trades.display_axes import EarlyRisk, PeriodAxis, Unit
+from catalyst.trades.encoding import PairAxes
+from catalyst.trades.preparation import PreparedLeg, PreparedTrades
+from catalyst.trades.reserves import Reserves
+from catalyst.trades.risk_report import (
     NO_DAYS,
     NOTHING,
     Bucket,
@@ -38,7 +38,7 @@ from goosedove.trades.risk_report import (
     dv01_label,
     placed,
 )
-from goosedove.trades.terms import Route
+from catalyst.trades.terms import Route
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

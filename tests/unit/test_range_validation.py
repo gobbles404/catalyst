@@ -6,8 +6,8 @@ import pytest
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import (
+from catalyst.excel import bridge
+from catalyst.excel.bridge import (
     MISSING,
     BooleanColumn,
     Cells,
@@ -22,7 +22,7 @@ from goosedove.excel.bridge import (
     TextRow,
     register,
 )
-from goosedove.excel.probes import probe
+from catalyst.excel.probes import probe
 
 # --- one function per declared range type and Date, the fixtures of this matrix --------
 # SumArray is a probe and needs no fixture here.

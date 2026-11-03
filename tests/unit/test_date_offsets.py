@@ -10,7 +10,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from goosedove.index_definitions.date_offsets import (
+from catalyst.index_definitions.date_offsets import (
     FORMS,
     MOST_DIGITS,
     Instruction,
@@ -18,8 +18,8 @@ from goosedove.index_definitions.date_offsets import (
     read_offset,
     shift_date,
 )
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
-from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from catalyst.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 
 
 def day(text: str) -> np.datetime64:

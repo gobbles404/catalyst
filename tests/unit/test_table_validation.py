@@ -6,8 +6,8 @@ import pytest
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import (
+from catalyst.excel import bridge
+from catalyst.excel.bridge import (
     MISSING,
     BooleanColumn,
     Cells,
@@ -21,7 +21,7 @@ from goosedove.excel.bridge import (
     excel_function,
     register,
 )
-from goosedove.excel.probes import probe
+from catalyst.excel.probes import probe
 
 cells = Cells.from_rows
 
@@ -458,7 +458,7 @@ def test_a_schema_column_that_is_not_a_column_type_refuses_to_register() -> None
 
     with pytest.raises(
         TypeError,
-        match=r"Grid2: wide column values declares goosedove\.excel\.bridge\.NumberArray, "
+        match=r"Grid2: wide column values declares catalyst\.excel\.bridge\.NumberArray, "
         r"which is not a column type",
     ):
         excel_function(Grid2)
@@ -517,7 +517,7 @@ def test_the_bare_table_class_is_not_a_declared_type() -> None:
         return 0.0
 
     with pytest.raises(
-        TypeError, match=r"Plain: table declares <class 'goosedove\.excel\.bridge\.Table'>"
+        TypeError, match=r"Plain: table declares <class 'catalyst\.excel\.bridge\.Table'>"
     ):
         excel_function(Plain)
 

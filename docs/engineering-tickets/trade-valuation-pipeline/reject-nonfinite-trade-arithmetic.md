@@ -99,7 +99,7 @@ warnings in the focused numerical cases to prove the expected error is the outco
 
 ## Work and implementation scope
 
-Start in `src/goosedove/trades/encoding.py`, `preparation.py` and `evaluation.py`.
+Start in `src/catalyst/trades/encoding.py`, `preparation.py` and `evaluation.py`.
 Current field names such as `offset` are code references, not a naming change request.
 Use the existing tests in `tests/unit/test_trades.py`, `test_create_trades.py`,
 `test_trade_valuation.py` and `test_bilateral_kernel.py`, plus the applicable seam/host
@@ -175,7 +175,7 @@ controls, 5e307 twice as 1e308 of exposure and of unsettled set amount, 1e300 at
 refused by the slot on both routes before either sums; the existing bilateral and aggregation
 overflow tests stand. `tests/unit/test_trade_valuation.py`: `_CreateTrades`, `_PrepareTrades` and
 `_EvaluateTrades` each refusing in the kernel's words after their own, the live count standing
-each time, and the ordinary market valued at 7,000 after. `host/Goosedove.Host.Tests/CallTests.cs`:
+each time, and the ordinary market valued at 7,000 after. `host/Catalyst.Host.Tests/CallTests.cs`:
 the refused batch owns nothing in the host's store and a corrected row publishes and releases.
 `tools/excel_smoke.ps1`: a row of 9E+307 LOT refused as a quote quantity. The work budgets are
 re-pinned; the pull request states the counts before and after.

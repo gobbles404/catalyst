@@ -332,13 +332,13 @@ quantity units and quantity bases in a later PR.
 
 Built as the page says for slice A, on the path every batch takes, with these particulars.
 
-- **The basis.** `QuantityPer` in `src/goosedove/trades/terms.py` gains `CALDAY = "calday"`, the
+- **The basis.** `QuantityPer` in `src/catalyst/trades/terms.py` gains `CALDAY = "calday"`, the
   public spelling; `day` was never built and is gone from the definition's options, `month, calday`,
   its description, `Whether quantity is per month or per calendar day`, and its rule, `The quantity
   per contract month, or per calendar day of it, weekends and holidays included`, the texts kept
   short since the Show spill's allocation pin follows their length. The template's and the ticket's
   choice reads `quantity_per is 'day', expected month or calday`.
-- **The covered days.** The resolution, `covered_days` in `src/goosedove/trades/resolution.py`,
+- **The covered days.** The resolution, `covered_days` in `src/catalyst/trades/resolution.py`,
   counts the calendar days of each component's contract month once over the schedule's months,
   five conversions and a gather, weekends and holidays included, the whole month: a December
   contract expiring in November covers December's 31 days, and no pricing or payment calendar moves
@@ -379,7 +379,7 @@ Built as the page says for slice A, on the path every batch takes, with these pa
 
 Built as the page says for slice B, on the two date utilities, with these particulars.
 
-- **The prefix.** `balance_of` in `src/goosedove/index_definitions/periods.py` strips one `BAL` in
+- **The prefix.** `balance_of` in `src/catalyst/index_definitions/periods.py` strips one `BAL` in
   either case and hands the rest to the grammar's own reader, so `balx27`, `BALCAL26` and
   `BalX26-Z26` read as their labels do, and `BALBALZ26`, `BAL` alone and a malformed or reversed
   label under the prefix are refused with the grammar's words, naming the whole expression as it
@@ -429,7 +429,7 @@ Built as the page says for slice C, on the path every batch takes, with these pa
   period's first and last day, or a contract_code`, `contract_code is missing, expected a value in
   the template or a column in the ticket, or start_date and end_date in its place`; since #172 the
   first two are history, each row choosing its form, [contract-codes-and-dates.md](contract-codes-and-dates.md).
-- **The resolution.** `_the_periods` in `src/goosedove/trades/resolution.py` resolves either form
+- **The resolution.** `_the_periods` in `src/catalyst/trades/resolution.py` resolves either form
   to components in one pass: from a code every month of the code, each covered whole; from dates
   the months from the start's to the end's, each covered whole but the first from the start date
   and the last to the end date, an end before its start refused by its row, `end_date row 1 is

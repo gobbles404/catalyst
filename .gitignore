@@ -16,5 +16,5 @@ wheels/
 bin/
 obj/
 
-host/Goosedove.Host/goosedove.cfg
+host/Catalyst.Host/catalyst.cfg
 TestResults/

@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells
+from catalyst.excel import bridge
+from catalyst.excel.bridge import MISSING, Cells
 
 PID = os.getpid()  # leads every handle this Python publishes
 

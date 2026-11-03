@@ -12,14 +12,14 @@ from typing import assert_never
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.cashflows.booking import Cashflows
-from goosedove.globals.discount_curve import DiscountCurve
-from goosedove.globals.payments import curve_starts_on, discounted, factors_on, time_fractions
-from goosedove.globals.valuation_date import ValuationDate
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.trades.contributions import RateContribution, curve_words
-from goosedove.trades.display_axes import PeriodAxis, early_risk, period_axis
-from goosedove.trades.risk_report import NO_DAYS, Bucket, Risk, RiskView, dv01_label, placed
+from catalyst.cashflows.booking import Cashflows
+from catalyst.globals.discount_curve import DiscountCurve
+from catalyst.globals.payments import curve_starts_on, discounted, factors_on, time_fractions
+from catalyst.globals.valuation_date import ValuationDate
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.trades.contributions import RateContribution, curve_words
+from catalyst.trades.display_axes import PeriodAxis, early_risk, period_axis
+from catalyst.trades.risk_report import NO_DAYS, Bucket, Risk, RiskView, dv01_label, placed
 
 PAYMENT_FACTORS_READ = "payment_factors_read"  # one per distinct unpaid payment day
 PAYMENTS_VALUED = "payments_valued"  # unpaid payment days discounted, each with its DV01

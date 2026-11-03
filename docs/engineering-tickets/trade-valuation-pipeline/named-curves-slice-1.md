@@ -64,7 +64,7 @@ Every creation of a curve supplies a name; no caller is left on the old form and
 | kept workbook, `workbooks/handles.xlsx` | 16, at B6, B16, B79, B2050, B2084, B2087, B2103, B2106, B2118, B2420, B2489, B2746, J2785, J2787, C2860, V2896 | `SOFR` for every one; the cross-gamma block's second curve, J2787, is a second snapshot of the same curve and keeps the name |
 | `tools/excel_smoke.ps1` | 15 | `SOFR`; the two tables that differ in one block are snapshots of one curve |
 | `tools/excel_lifetime.ps1` | 5 | `SOFR` |
-| `host/Goosedove.Host.Tests/CallTests.cs` | the curve facts and rows | `SOFR` |
+| `host/Catalyst.Host.Tests/CallTests.cs` | the curve facts and rows | `SOFR` |
 | the unit and performance tests | 16 files | `SOFR`, and `FFOIS` where a test needs a second name |
 | the pages | 17 mention the creator | the grids and the examples gain the name |
 

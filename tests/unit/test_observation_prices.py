@@ -15,14 +15,14 @@ from test_quote import priced
 from test_trades import an_index, quoted
 from test_two_index import cell, grid
 
-from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.index_definitions.holiday_calendar import holiday_calendar
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.resolution import Trades, trades
-from goosedove.trades.results import TradeResults
+from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import prepared_trades
+from catalyst.trades.resolution import Trades, trades
+from catalyst.trades.results import TradeResults
 
 # A copper-style index quoted in USD per LB: U26 bounding the calendar, V26 the October contract
 # expiring Wednesday 28 October 2026, X26 and Z26 after it, a lot of one pound.

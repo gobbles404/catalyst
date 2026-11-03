@@ -236,7 +236,7 @@ market references and history coverage.
 Built as the page says, on the path the two one-observation methods take, with these
 particulars.
 
-- **The observations.** `observed` in `src/goosedove/trades/observations.py` gives `last3day`
+- **The observations.** `observed` in `src/catalyst/trades/observations.py` gives `last3day`
   three observations per component: the expiry and the two business days before it on the
   index's holiday calendar, one `numpy.busday_offset` over the components and the three offsets
   `-2, -1, 0` at once, a third of the quantity each, the three days of a component increasing.
@@ -270,5 +270,5 @@ particulars.
   `tests/unit/test_trade_valuation.py` through the registered worksheet functions; the work
   counts and the ledgers in `tests/performance/test_trade_creation_budgets.py` and
   `test_trade_budgets.py`; the public path on a sheet in `tools/excel_smoke.ps1`, from the
-  host in `host/Goosedove.Host.Tests/CallTests.cs`, and in the kept workbook's last3day block
+  host in `host/Catalyst.Host.Tests/CallTests.cs`, and in the kept workbook's last3day block
   at the foot of the handles sheet.

@@ -13,10 +13,10 @@ from typing import Annotated, Any, assert_never, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import Calendar
-from goosedove.cashflows.booking import Cashflows
-from goosedove.cashflows.valuation import CashflowResults
-from goosedove.excel.bridge import (
+from catalyst.calendar.calendar import Calendar
+from catalyst.cashflows.booking import Cashflows
+from catalyst.cashflows.valuation import CashflowResults
+from catalyst.excel.bridge import (
     NUMBER_CODE,
     TEXT_CODE,
     Date,
@@ -26,45 +26,45 @@ from goosedove.excel.bridge import (
     TextColumn,
     excel_function,
 )
-from goosedove.globals.discount_curve import DiscountCurve, bump_discount_curve
-from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.globals.valuation_date import ValuationDate
-from goosedove.index_definitions.contract_codes import (
+from catalyst.globals.discount_curve import DiscountCurve, bump_discount_curve
+from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.globals.valuation_date import ValuationDate
+from catalyst.index_definitions.contract_codes import (
     cme_code,
     code_of_month,
     first_day_of,
     next_contract,
 )
-from goosedove.index_definitions.contract_specifications import ContractSpecifications
-from goosedove.index_definitions.date_offsets import shift_date
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.iferc_schedule import IfercSchedule
-from goosedove.index_definitions.index import Index
-from goosedove.index_definitions.index_conventions import IndexConventions
-from goosedove.index_definitions.kind import named
-from goosedove.index_definitions.periods import end_date, start_date
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FieldType, Instrument
-from goosedove.instruments.fields import DatesOrTexts
-from goosedove.market.market import Market
-from goosedove.market.market_history import MarketHistory
-from goosedove.market_data.futures_fixings import FuturesFixings
-from goosedove.market_data.gas_daily_fixings import GasDailyFixings
-from goosedove.market_data.iferc_fixings import IfercFixings
-from goosedove.market_data.interpolated_contracts import interpolate_contracts
-from goosedove.market_data.price_vector import PriceVector
-from goosedove.quoting.rfq import Rfq
-from goosedove.quoting.template import QuoteTemplate
-from goosedove.trades.aggregation import AggregateResults
-from goosedove.trades.encoding import Encoded, EncodedLeg
-from goosedove.trades.preparation import PreparedTrades
-from goosedove.trades.resolution import Trades
-from goosedove.trades.results import LegResults, TradeResults
-from goosedove.trades.schedule_methods import METHOD_NAMES
-from goosedove.trades.template import DayOrRule, TradeTemplate
-from goosedove.trades.terms import BASIS_NAMES, FREQUENCY_NAMES, booked_words, period_words
+from catalyst.index_definitions.contract_specifications import ContractSpecifications
+from catalyst.index_definitions.date_offsets import shift_date
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.iferc_schedule import IfercSchedule
+from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.index_conventions import IndexConventions
+from catalyst.index_definitions.kind import named
+from catalyst.index_definitions.periods import end_date, start_date
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import FieldType, Instrument
+from catalyst.instruments.fields import DatesOrTexts
+from catalyst.market.market import Market
+from catalyst.market.market_history import MarketHistory
+from catalyst.market_data.futures_fixings import FuturesFixings
+from catalyst.market_data.gas_daily_fixings import GasDailyFixings
+from catalyst.market_data.iferc_fixings import IfercFixings
+from catalyst.market_data.interpolated_contracts import interpolate_contracts
+from catalyst.market_data.price_vector import PriceVector
+from catalyst.quoting.rfq import Rfq
+from catalyst.quoting.template import QuoteTemplate
+from catalyst.trades.aggregation import AggregateResults
+from catalyst.trades.encoding import Encoded, EncodedLeg
+from catalyst.trades.preparation import PreparedTrades
+from catalyst.trades.resolution import Trades
+from catalyst.trades.results import LegResults, TradeResults
+from catalyst.trades.schedule_methods import METHOD_NAMES
+from catalyst.trades.template import DayOrRule, TradeTemplate
+from catalyst.trades.terms import BASIS_NAMES, FREQUENCY_NAMES, booked_words, period_words
 
 
 @singledispatch

@@ -27,17 +27,17 @@ from typing import assert_never, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.globals.discount_curve import DiscountCurve
-from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.globals.payments import curve_starts_on, discounted, factors_on
-from goosedove.instrumentation.work_counts import KERNEL, WorkCounter
-from goosedove.market.market import Market
-from goosedove.trades.contributions import CrossContribution, RateContribution
-from goosedove.trades.display_axes import EarlyRisk, early_risk
-from goosedove.trades.encoding import CurveAxes, Encoded, PaymentAxes, group_label
-from goosedove.trades.preparation import PreparedLeg, PreparedTrades, UnpaidPayments
-from goosedove.trades.results import LegResults, TradeResults
-from goosedove.trades.terms import Route, Settlement, named_trade
+from catalyst.globals.discount_curve import DiscountCurve
+from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.globals.payments import curve_starts_on, discounted, factors_on
+from catalyst.instrumentation.work_counts import KERNEL, WorkCounter
+from catalyst.market.market import Market
+from catalyst.trades.contributions import CrossContribution, RateContribution
+from catalyst.trades.display_axes import EarlyRisk, early_risk
+from catalyst.trades.encoding import CurveAxes, Encoded, PaymentAxes, group_label
+from catalyst.trades.preparation import PreparedLeg, PreparedTrades, UnpaidPayments
+from catalyst.trades.results import LegResults, TradeResults
+from catalyst.trades.terms import Route, Settlement, named_trade
 
 LIVE_PRICES_READ = "live_prices_read"  # quotes read off the market, one per live reference
 # The bilateral path's counts, since #176: factors read off the curve, one per distinct unpaid

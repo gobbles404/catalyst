@@ -14,8 +14,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.globals.discount_curve import DiscountCurve
-from goosedove.trades.display_axes import EarlyRisk
+from catalyst.globals.discount_curve import DiscountCurve
+from catalyst.trades.display_axes import EarlyRisk
 
 # The word a heading gives a batch on no curve, `cleared USD dv01 [USD per basis point]` and
 # `HNG cleared cross_gamma [LOT per basis point]`; never a curve's word.

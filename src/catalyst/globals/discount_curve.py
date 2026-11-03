@@ -9,8 +9,8 @@ from typing import Final
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.globals.interpolation import interpolate_discount_factors
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.globals.interpolation import interpolate_discount_factors
+from catalyst.instrumentation.work_counts import WorkCounter
 
 # The most days a curve holds: a sheet's rows less the two heading rows util_ReadHandle spills
 # first, so that whatever a creator keeps can be read back. A curve two thousand years long that

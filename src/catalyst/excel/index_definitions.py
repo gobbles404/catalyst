@@ -9,7 +9,7 @@ docs/library/conventions.md under Excel help; the pages quote the lines.
 
 from typing import Annotated
 
-from goosedove.excel.bridge import (
+from catalyst.excel.bridge import (
     DateColumn,
     Handle,
     Handles,
@@ -19,22 +19,22 @@ from goosedove.excel.bridge import (
     TextRow,
     excel_function,
 )
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.index_definitions.contract_specifications import (
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.index_definitions.contract_specifications import (
     ContractSpecifications,
     contract_specifications,
 )
-from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
-from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
-from goosedove.index_definitions.holiday_calendar import (
+from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
+from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
+from catalyst.index_definitions.holiday_calendar import (
     HolidayCalendar,
     combine_holiday_calendars,
     holiday_calendar,
 )
-from goosedove.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
-from goosedove.index_definitions.index import Index, index
-from goosedove.index_definitions.index_conventions import IndexConventions, index_conventions
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
+from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index_conventions import IndexConventions, index_conventions
+from catalyst.instrumentation.work_counts import WorkCounter
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.

@@ -5,7 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 
-namespace Goosedove.Host.Measure
+namespace Catalyst.Host.Measure
 {
     /// <summary>Warm, calibrate, time in batches, check outside the clock, and remember every batch.</summary>
     internal sealed class Measurements

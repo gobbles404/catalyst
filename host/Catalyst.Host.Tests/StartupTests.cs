@@ -2,7 +2,7 @@ using System.IO;
 using ExcelDna.Integration;
 using Xunit;
 
-namespace Goosedove.Host.Tests
+namespace Catalyst.Host.Tests
 {
     /// <summary>The pieces of AutoOpen that do not need Excel: the config file and the delegates.</summary>
     [Collection("python")]

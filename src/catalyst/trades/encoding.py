@@ -25,18 +25,18 @@ from typing import Any, assert_never
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import contract_on, open_days
-from goosedove.globals.unit_conversions import UnitConversions
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.iferc_schedule import IfercSchedule
-from goosedove.index_definitions.index_conventions import CURRENCY
-from goosedove.index_definitions.kind import with_holiday_calendar
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.trades.observations import Observations
-from goosedove.trades.reserves import Reserves, reserves
-from goosedove.trades.schedule_methods import METHODS, requires_booked_reference
-from goosedove.trades.terms import (
+from catalyst.calendar.calendar import contract_on, open_days
+from catalyst.globals.unit_conversions import UnitConversions
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.iferc_schedule import IfercSchedule
+from catalyst.index_definitions.index_conventions import CURRENCY
+from catalyst.index_definitions.kind import with_holiday_calendar
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.trades.observations import Observations
+from catalyst.trades.reserves import Reserves, reserves
+from catalyst.trades.schedule_methods import METHODS, requires_booked_reference
+from catalyst.trades.terms import (
     LegTerms,
     ResolvedTrades,
     Route,

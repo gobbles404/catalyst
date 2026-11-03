@@ -5,7 +5,7 @@ is complete by the time the host asks for it. A new module of worksheet function
 added here and nowhere else.
 """
 
-from goosedove.excel import (
+from catalyst.excel import (
     bridge,
     calendar,
     cashflows,

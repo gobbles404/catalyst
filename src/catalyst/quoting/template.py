@@ -16,9 +16,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from goosedove.instruments.definitions import CATALOG, Instrument
-from goosedove.instruments.fields import FieldValues, selected
-from goosedove.trades.template import field_value
+from catalyst.instruments.definitions import CATALOG, Instrument
+from catalyst.instruments.fields import FieldValues, selected
+from catalyst.trades.template import field_value
 
 
 @dataclass(frozen=True, slots=True)

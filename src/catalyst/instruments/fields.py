@@ -12,8 +12,8 @@ from typing import Final, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.index_definitions.kind import named
-from goosedove.instruments.definitions import Field, Instrument, instrument
+from catalyst.index_definitions.kind import named
+from catalyst.instruments.definitions import Field, Instrument, instrument
 
 
 @dataclass(frozen=True, slots=True)

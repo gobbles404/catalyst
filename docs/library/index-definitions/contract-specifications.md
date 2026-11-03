@@ -2,7 +2,7 @@
 
 Built in #78; the one-contract form was #69; the lot sizes and the fees checked since #110; the lot's unit since #115.
 
-The contract specifications of one index: the desk's words for a quantity of it, each defined once. A word is a contract, NYMEX lots of gas say, or a bare unit, MMBTU; each row gives the word's name, the quantity in one lot of it, the unit that quantity is in, and the brokerage and clearing charged per lot, each name once, each lot size whole and 1 or more, each lot unit a quantity unit of the unit tables, each fee 0 or more, the rest kept as given, and reached by handle. A trade then says a word and a count, `lots, 10` or `mmbtu, 100000`, and never spells out what the word means: the specifications did, once. Since #107 the [index](index.md) holds the specifications, and since #115 it checks that every lot unit is a unit of its conventions' quantity type, the one fact that lives across two of the definitions, so barrels and gallons stand together under a volume index and MMBTU does not. Two rules held from #78, each name once and each lot size whole; #110 added a lot size of 1 or more and a fee of 0 or more; #115 the unit. A fee is a cost per lot in the index's settlement currency, the `currency_unit` of its [conventions](index-conventions.md): a decision this page states, and nothing here checks, since the specifications hold no conventions. The code is `src/goosedove/index_definitions/contract_specifications.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function. Since #170 a batch of trades books its reserves from the two fees, each row's count of its specification times the row's rates, [_ReportReserves](../trades/report-reserves.md).
+The contract specifications of one index: the desk's words for a quantity of it, each defined once. A word is a contract, NYMEX lots of gas say, or a bare unit, MMBTU; each row gives the word's name, the quantity in one lot of it, the unit that quantity is in, and the brokerage and clearing charged per lot, each name once, each lot size whole and 1 or more, each lot unit a quantity unit of the unit tables, each fee 0 or more, the rest kept as given, and reached by handle. A trade then says a word and a count, `lots, 10` or `mmbtu, 100000`, and never spells out what the word means: the specifications did, once. Since #107 the [index](index.md) holds the specifications, and since #115 it checks that every lot unit is a unit of its conventions' quantity type, the one fact that lives across two of the definitions, so barrels and gallons stand together under a volume index and MMBTU does not. Two rules held from #78, each name once and each lot size whole; #110 added a lot size of 1 or more and a fee of 0 or more; #115 the unit. A fee is a cost per lot in the index's settlement currency, the `currency_unit` of its [conventions](index-conventions.md): a decision this page states, and nothing here checks, since the specifications hold no conventions. The code is `src/catalyst/index_definitions/contract_specifications.py`, the record and its builder, and `src/catalyst/excel/index_definitions.py`, the worksheet function. Since #170 a batch of trades books its reserves from the two fees, each row's count of its specification times the row's rates, [_ReportReserves](../trades/report-reserves.md).
 
 ## Worksheet contract
 
@@ -32,7 +32,7 @@ The input is a table: a header row, then a body with one row per word, its name,
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/index_definitions.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/index_definitions.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -57,7 +57,7 @@ Nothing else is checked. The names and the lot units are kept as typed, the lot 
 
 ## Tests
 
-The examples and properties below are `tests/unit/test_contract_specifications.py`; the seam's texts and the handle are `tests/unit/test_index_definitions.py`, whose hidden reader proves the handle resolves to the specifications, typed; the spill is `tests/unit/test_utilities.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`: the two looks over the lot sizes and one over each fee column, vectorized, no loop, and the lot units looked up in one set of the tables' quantity units, built once per call.
+The examples and properties below are `tests/unit/test_contract_specifications.py`; the seam's texts and the handle are `tests/unit/test_index_definitions.py`, whose hidden reader proves the handle resolves to the specifications, typed; the spill is `tests/unit/test_utilities.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`: the two looks over the lot sizes and one over each fee column, vectorized, no loop, and the lot units looked up in one set of the tables' quantity units, built once per call.
 
 | Case | Kind |
 |---|---|

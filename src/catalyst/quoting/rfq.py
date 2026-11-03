@@ -20,13 +20,13 @@ from typing import Final, assert_never
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.index_definitions.contract_codes import schedule_months
-from goosedove.index_definitions.index import Index
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.fields import FieldValues
-from goosedove.market.market import Market
-from goosedove.quoting.request import (
+from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.index_definitions.contract_codes import schedule_months
+from catalyst.index_definitions.index import Index
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.fields import FieldValues
+from catalyst.market.market import Market
+from catalyst.quoting.request import (
     MONTHS_RESOLVED,
     OBSERVATIONS_MADE,
     PAYMENT_DAYS_MADE,
@@ -41,10 +41,10 @@ from goosedove.quoting.request import (
     the_payments,
     the_terms,
 )
-from goosedove.quoting.template import QuoteTemplate
-from goosedove.trades.encoding import observation_references
-from goosedove.trades.observations import observed
-from goosedove.trades.resolution import (
+from catalyst.quoting.template import QuoteTemplate
+from catalyst.trades.encoding import observation_references
+from catalyst.trades.observations import observed
+from catalyst.trades.resolution import (
     PAYMENT_RULES_READ,
     PAYMENT_SHIFTS,
     SCHEDULE_CODES_READ,
@@ -53,8 +53,8 @@ from goosedove.trades.resolution import (
     last_days,
     resolve_periods,
 )
-from goosedove.trades.schedule_methods import METHODS
-from goosedove.trades.terms import (
+from catalyst.trades.schedule_methods import METHODS
+from catalyst.trades.terms import (
     QuantityPer,
     Settlement,
     SettlementFrequency,

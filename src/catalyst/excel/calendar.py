@@ -9,10 +9,10 @@ docs/library/conventions.md under Excel help; the page quotes the lines.
 
 from typing import Annotated
 
-from goosedove.calendar.calendar import Calendar, calendar
-from goosedove.excel.bridge import Handle, excel_function
-from goosedove.globals.valuation_date import ValuationDate
-from goosedove.index_definitions.index import Index
+from catalyst.calendar.calendar import Calendar, calendar
+from catalyst.excel.bridge import Handle, excel_function
+from catalyst.globals.valuation_date import ValuationDate
+from catalyst.index_definitions.index import Index
 
 # The worksheet function this module registers, named here so that its leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.

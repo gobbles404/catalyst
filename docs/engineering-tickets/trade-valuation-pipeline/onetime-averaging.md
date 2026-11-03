@@ -29,7 +29,7 @@ Thus current entry produces `1000*(A_May-K) + 1000*(A_June-K)`. The requested TM
 
 Crossing a futures expiry within one calendar month already works: June 1–25 gives one 18-observation average, with 15 July WTI settlements and three August settlements.
 
-An explicit common `payment_day` already makes monthly pieces pay together, but preserves their independent quantities and weights. This was intentional in [#213](https://github.com/gobbles404/goosedove/issues/213), implemented by #214. Explicit date entry was also intentional; the [period design](trade-periods-and-bal.md#exact-periods-and-schedule-methods) added no separate `exact` pricing method.
+An explicit common `payment_day` already makes monthly pieces pay together, but preserves their independent quantities and weights. This was intentional in [#213](https://github.com/gobbles404/catalyst/issues/213), implemented by #214. Explicit date entry was also intentional; the [period design](trade-periods-and-bal.md#exact-periods-and-schedule-methods) added no separate `exact` pricing method.
 
 **Proposed entry semantics**
 
@@ -123,7 +123,7 @@ Keep/update `tests/performance` budgets for resolution, encoding, preparation, e
 
 **Boundaries and related work**
 
-Initial new scope is financial, single-index futures-Asian whole-period averaging, alongside unchanged monthly behavior and the NG deferred-payment regression. No new `exact` method, options/volatility engine, automatic WTI date generator, Argus data integration, physical settlement changes, general recurrence/custom schedule framework, or automatic fractional allocation workaround. Gas Daily trade support remains [#211](https://github.com/gobbles404/goosedove/issues/211), LME remains [#230](https://github.com/gobbles404/goosedove/issues/230), and fixed-price curve-shape allocation remains [#219](https://github.com/gobbles404/goosedove/issues/219).
+Initial new scope is financial, single-index futures-Asian whole-period averaging, alongside unchanged monthly behavior and the NG deferred-payment regression. No new `exact` method, options/volatility engine, automatic WTI date generator, Argus data integration, physical settlement changes, general recurrence/custom schedule framework, or automatic fractional allocation workaround. Gas Daily trade support remains [#211](https://github.com/gobbles404/catalyst/issues/211), LME remains [#230](https://github.com/gobbles404/catalyst/issues/230), and fixed-price curve-shape allocation remains [#219](https://github.com/gobbles404/catalyst/issues/219).
 
 Documentation owners to update with implementation: `docs/library/instruments/show-instrument.md`, `docs/library/trades/create-trades.md`, `kernel.md`, affected reserves/risk/readback pages, and the relevant quote/template/RFQ owners. Resolve the period once and consume it downstream, keep trade economics as data, and reuse the common engine in line with PRINCIPLES.md.
 

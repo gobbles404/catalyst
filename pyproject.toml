@@ -1,5 +1,5 @@
 [project]
-name = "goosedove"
+name = "catalyst"
 version = "0.1.0"
 description = "A commodities derivatives pricing library exposed to Excel through Excel-DNA."
 readme = "README.md"

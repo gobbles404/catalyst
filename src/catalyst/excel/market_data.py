@@ -11,18 +11,18 @@ docs/library/conventions.md under Excel help; the pages quote the lines.
 
 from typing import Annotated
 
-from goosedove.excel.bridge import (
+from catalyst.excel.bridge import (
     DateColumn,
     Handle,
     NumberColumn,
     TextColumn,
     excel_function,
 )
-from goosedove.index_definitions.index import Index
-from goosedove.market_data.futures_fixings import FuturesFixings, futures_fixings
-from goosedove.market_data.gas_daily_fixings import GasDailyFixings, gas_daily_fixings
-from goosedove.market_data.iferc_fixings import IfercFixings, iferc_fixings
-from goosedove.market_data.price_vector import PriceVector, price_vector
+from catalyst.index_definitions.index import Index
+from catalyst.market_data.futures_fixings import FuturesFixings, futures_fixings
+from catalyst.market_data.gas_daily_fixings import GasDailyFixings, gas_daily_fixings
+from catalyst.market_data.iferc_fixings import IfercFixings, iferc_fixings
+from catalyst.market_data.price_vector import PriceVector, price_vector
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.

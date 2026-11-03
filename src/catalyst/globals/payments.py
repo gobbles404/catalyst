@@ -11,7 +11,7 @@ market."""
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.globals.discount_curve import DiscountCurve
+from catalyst.globals.discount_curve import DiscountCurve
 
 
 def time_fractions(as_of: np.datetime64, days: NDArray[np.datetime64]) -> NDArray[np.float64]:

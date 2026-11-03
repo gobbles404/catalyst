@@ -7,7 +7,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
+from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
 
 EPOCH = np.datetime64("1899-12-30")
 

@@ -237,7 +237,7 @@ Engineering's record of what landed, in the ticket's terms.
 [prepare-trades.md](../../library/trades/prepare-trades.md) and
 [show-instrument.md](../../library/instruments/show-instrument.md) are the pages.
 
-- **The guard.** `trade_schedule_of` in `src/goosedove/trades/terms.py` replaces
+- **The guard.** `trade_schedule_of` in `src/catalyst/trades/terms.py` replaces
   `futures_schedule_of`: a futures index gives its futures schedule, an IFERC index its IFERC
   schedule, and a Gas Daily index is refused, `index is a Gas Daily index, expected a futures or
   an IFERC index for a future`. `ResolvedTrades.schedule` is one or the other, and the four steps

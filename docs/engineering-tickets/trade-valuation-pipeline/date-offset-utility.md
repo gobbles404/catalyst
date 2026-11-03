@@ -142,7 +142,7 @@ with explicit start/end dates; it does not change how a trade obtains its booked
 ## As built
 
 Built in #171. The page is [shift-date.md](../../library/utilities/shift-date.md). The library
-helper is `shift_date(date, offset, holidays)` in `src/goosedove/index_definitions/date_offsets.py`,
+helper is `shift_date(date, offset, holidays)` in `src/catalyst/index_definitions/date_offsets.py`,
 beside the period grammar: one full match of a sign, ASCII digits and two letters, the suffix
 looked up among `bd`, `cd` and `em` in either case, the digits counted before the count is read,
 more than seven significant digits refused by their digits, since the sheet's calendar is seven

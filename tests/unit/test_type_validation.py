@@ -6,8 +6,8 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import (
+from catalyst.excel import bridge
+from catalyst.excel.bridge import (
     MISSING,
     Cells,
     DateColumn,
@@ -17,7 +17,7 @@ from goosedove.excel.bridge import (
     TextRow,
     excel_function,
 )
-from goosedove.excel.probes import probe
+from catalyst.excel.probes import probe
 
 
 @probe

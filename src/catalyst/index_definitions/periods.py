@@ -13,7 +13,7 @@ docs/library/utilities/start-date.md holds the grammar."""
 
 import numpy as np
 
-from goosedove.index_definitions.contract_codes import DIGITS, LOWER_LETTERS, MONTH_LETTERS
+from catalyst.index_definitions.contract_codes import DIGITS, LOWER_LETTERS, MONTH_LETTERS
 
 # The forms a message offers, in the words the pages use.
 FORMS = (

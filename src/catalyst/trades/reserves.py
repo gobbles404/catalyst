@@ -13,8 +13,8 @@ from typing import assert_never
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.trades.terms import ResolvedTrades, Route
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.trades.terms import ResolvedTrades, Route
 
 # Components charged a fee, once per fee they incur, since #188: the brokered rows' components for
 # brokerage and every component for clearing on a cleared route, so nothing for a bilateral batch

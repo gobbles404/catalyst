@@ -14,16 +14,16 @@ from typing import assert_never, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import Calendar
-from goosedove.globals.payments import time_fractions
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.iferc_schedule import IfercSchedule
-from goosedove.index_definitions.index_conventions import IndexConventions
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.market.market_history import MarketHistory
-from goosedove.trades.display_axes import EarlyRisk, PeriodAxis, early_risk, period_axis
-from goosedove.trades.encoding import Encoded, EncodedLeg, PaymentAxes, group_words
-from goosedove.trades.terms import Route
+from catalyst.calendar.calendar import Calendar
+from catalyst.globals.payments import time_fractions
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.iferc_schedule import IfercSchedule
+from catalyst.index_definitions.index_conventions import IndexConventions
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.market.market_history import MarketHistory
+from catalyst.trades.display_axes import EarlyRisk, PeriodAxis, early_risk, period_axis
+from catalyst.trades.encoding import Encoded, EncodedLeg, PaymentAxes, group_words
+from catalyst.trades.terms import Route
 
 PREPARED_SLOTS = "prepared_slots"  # slots placed on the calendar and told live from fixed
 FIXINGS_READ = "fixings_read"  # settles read off the history, one per fixed slot

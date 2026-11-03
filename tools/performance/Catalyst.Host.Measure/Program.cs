@@ -1,6 +1,6 @@
 // Warm timings through the host, one probe at a time, with Python started the way the
 // add-in starts it and no Excel. Run:
-//   dotnet run --project tools/performance/Goosedove.Host.Measure -c Release
+//   dotnet run --project tools/performance/Catalyst.Host.Measure -c Release
 // The clock includes the registered delegate: argument marshaling, the trip into Python,
 // validation, the probe, result conversion, and the way back to a .NET value. It excludes
 // Excel and Excel-DNA. Two stage scenarios time the way in and the way out alone, with the
@@ -17,7 +17,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Python.Runtime;
 
-namespace Goosedove.Host.Measure
+namespace Catalyst.Host.Measure
 {
     internal static class Program
     {
@@ -27,7 +27,7 @@ namespace Goosedove.Host.Measure
             {
                 if (args.Length != 0 && (args.Length != 2 || args[0] != "--output"))
                 {
-                    Console.Error.WriteLine("usage: Goosedove.Host.Measure [--output DIRECTORY]   (default: profiles/host-measure)");
+                    Console.Error.WriteLine("usage: Catalyst.Host.Measure [--output DIRECTORY]   (default: profiles/host-measure)");
                     return 2;
                 }
                 var root = RepoRoot();
@@ -63,8 +63,8 @@ namespace Goosedove.Host.Measure
                 Pair("timestamp_utc", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)),
                 Pair("revision", Git(root, "rev-parse HEAD")),
                 Pair("host_sha256", Sha256(typeof(Bridge).Assembly.Location)),
-                Pair("bridge_sha256", Sha256(Path.Combine(root, "src", "goosedove", "excel", "bridge.py"))),
-                Pair("probes_sha256", Sha256(Path.Combine(root, "src", "goosedove", "excel", "probes.py"))),
+                Pair("bridge_sha256", Sha256(Path.Combine(root, "src", "catalyst", "excel", "bridge.py"))),
+                Pair("probes_sha256", Sha256(Path.Combine(root, "src", "catalyst", "excel", "probes.py"))),
                 Pair("configuration", Configuration()),
                 Pair("python", pythonVersion),
                 Pair("numpy", numpyVersion),

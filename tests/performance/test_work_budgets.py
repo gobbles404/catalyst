@@ -7,7 +7,7 @@ from collections.abc import Callable
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.instrumentation.work_counts import (
+from catalyst.instrumentation.work_counts import (
     CACHE_HIT,
     CACHE_MISS,
     HASH,

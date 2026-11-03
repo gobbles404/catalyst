@@ -1,6 +1,6 @@
 # _CreateCashflows
 
-A batch of cashflows: known signed amounts in one currency, each on its own explicit payment day, booked from a template of the `cashflow` instrument and a ticket's rows as a batch of trades is booked from its template and ticket, with no index, schedule, quantity, market or preparation. A row is one payment: an unwind or termination payment, a fee, a broker's or an exchange's rebate, positive received and negative paid. The batch retains the rows as booked and sums the amounts once per distinct payment day, and [_EvaluateCashflows](evaluate-cashflows.md) values it. The instrument's fields are [show-instrument.md](../instruments/show-instrument.md)'s and the template [trade-template.md](../trades/trade-template.md)'s. The code is `src/goosedove/cashflows/booking.py`, the record and its builder, `src/goosedove/cashflows/rules.py`, the two rules of its own fields, and `src/goosedove/excel/cashflows.py`, the worksheet function. [The ticket](../../engineering-tickets/trade-valuation-pipeline/cashflow-instrument.md) has the decisions.
+A batch of cashflows: known signed amounts in one currency, each on its own explicit payment day, booked from a template of the `cashflow` instrument and a ticket's rows as a batch of trades is booked from its template and ticket, with no index, schedule, quantity, market or preparation. A row is one payment: an unwind or termination payment, a fee, a broker's or an exchange's rebate, positive received and negative paid. The batch retains the rows as booked and sums the amounts once per distinct payment day, and [_EvaluateCashflows](evaluate-cashflows.md) values it. The instrument's fields are [show-instrument.md](../instruments/show-instrument.md)'s and the template [trade-template.md](../trades/trade-template.md)'s. The code is `src/catalyst/cashflows/booking.py`, the record and its builder, `src/catalyst/cashflows/rules.py`, the two rules of its own fields, and `src/catalyst/excel/cashflows.py`, the worksheet function. [The ticket](../../engineering-tickets/trade-valuation-pipeline/cashflow-instrument.md) has the decisions.
 
 ## Worksheet contract
 
@@ -25,7 +25,7 @@ Three arguments, every one required and none with a default. The header row and 
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/cashflows.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/cashflows.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -60,7 +60,7 @@ Per row, in the ticket's order: the trade ID where the batch has it, the trade d
 
 ## Tests
 
-The worked example, the rules in order, the summing by day and the seam's handle, readback and refusals are `tests/unit/test_cashflows.py`; the instrument's grid is `tests/unit/test_instruments.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`; the handle's life is the `cashflows` group of `tools/excel_lifetime.ps1`. What a call costs is `tests/performance/test_cashflow_budgets.py`, the rows booked and the days mapped, the same functions at three rows and at two thousand, the peaks by rows and days and the columns kept.
+The worked example, the rules in order, the summing by day and the seam's handle, readback and refusals are `tests/unit/test_cashflows.py`; the instrument's grid is `tests/unit/test_instruments.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`; the handle's life is the `cashflows` group of `tools/excel_lifetime.ps1`. What a call costs is `tests/performance/test_cashflow_budgets.py`, the rows booked and the days mapped, the same functions at three rows and at two thousand, the peaks by rows and days and the columns kept.
 
 ## Not here
 

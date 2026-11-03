@@ -2,7 +2,7 @@
 
 Built in #129; the balance of a period, a `BAL` label, in #160, from a reference date, and since #173 from a valuation-date handle, the later of its day and the label's first; the ticket is [date-helper-inputs.md](../../engineering-tickets/trade-valuation-pipeline/date-helper-inputs.md).
 
-Gives the first calendar day of a contract or strip from its label: 1 January 2026 for `F26`, 1 January 2027 for `1Q27`, 1 November 2029 for `W29`, and the first day of the left label of `F26-Z28`; since #160, the first day of the balance of any of these, `BALZ26`, which since #173 is the later of the valuation day, read off the valuation-date handle given, and the label's first day, so that a future period is the whole period and a current one runs from the day itself, and a period that ended before the day is refused. Text and a handle in and one date out, no object made; the cell holds a date the sheet formats, as every date the seam sends. It derives a date from a label and reads the handle for its day alone, making nothing, so it is no `util_Read*` function, as [conventions.md](../conventions.md) divides them. These are period boundaries, the days a label covers from and to: a contract's expiry, an index's publication day and a payment day are facts the [schedules](../index-definitions/futures-schedule.md) supply, and nothing here is one. This page holds the grammar the two functions share; [util_EndDate](end-date.md) gives the last day through the same reading. The code is `src/goosedove/index_definitions/periods.py`, the reading and the two days, which take the day and never the handle, and `src/goosedove/excel/utilities.py`, the worksheet functions, which read the day off the handle the seam resolved.
+Gives the first calendar day of a contract or strip from its label: 1 January 2026 for `F26`, 1 January 2027 for `1Q27`, 1 November 2029 for `W29`, and the first day of the left label of `F26-Z28`; since #160, the first day of the balance of any of these, `BALZ26`, which since #173 is the later of the valuation day, read off the valuation-date handle given, and the label's first day, so that a future period is the whole period and a current one runs from the day itself, and a period that ended before the day is refused. Text and a handle in and one date out, no object made; the cell holds a date the sheet formats, as every date the seam sends. It derives a date from a label and reads the handle for its day alone, making nothing, so it is no `util_Read*` function, as [conventions.md](../conventions.md) divides them. These are period boundaries, the days a label covers from and to: a contract's expiry, an index's publication day and a payment day are facts the [schedules](../index-definitions/futures-schedule.md) supply, and nothing here is one. This page holds the grammar the two functions share; [util_EndDate](end-date.md) gives the last day through the same reading. The code is `src/catalyst/index_definitions/periods.py`, the reading and the two days, which take the day and never the handle, and `src/catalyst/excel/utilities.py`, the worksheet functions, which read the day off the handle the seam resolved.
 
 ## Worksheet contract
 
@@ -28,7 +28,7 @@ Two arguments. The label, required, as text, typed in the formula, `=util_StartD
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -92,7 +92,7 @@ Each label is read for two months, numpy's month unit: its first month and the m
 
 ## Tests
 
-The library's examples and properties are `tests/unit/test_periods.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
+The library's examples and properties are `tests/unit/test_periods.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
 
 | Case | Kind |
 |---|---|

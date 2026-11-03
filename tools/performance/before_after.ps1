@@ -50,14 +50,14 @@ $beforeLabel = "base $baseSha"
 $afterLabel = "this tree at $headSha" + $(if ($dirty) { " with uncommitted changes" } else { "" })
 $before = Join-Path $root "profiles\before"
 $after = Join-Path $root "profiles\after"
-$side = Join-Path ([IO.Path]::GetTempPath()) "goosedove-base-$baseSha"
+$side = Join-Path ([IO.Path]::GetTempPath()) "catalyst-base-$baseSha"
 
 if (Test-Path $side) { Invoke-Git worktree remove --force $side | Out-Host }
 Invoke-Git worktree add --detach $side $Base | Out-Host
 try {
     $runners = @(
         @{ Name = "python"; Run = { & uv run python tools/performance/measure_python.py } },
-        @{ Name = "host"; Run = { & dotnet run --project tools\performance\Goosedove.Host.Measure -c Release } },
+        @{ Name = "host"; Run = { & dotnet run --project tools\performance\Catalyst.Host.Measure -c Release } },
         @{ Name = "excel"; Run = { & .\tools\performance\measure_excel.ps1 } }
     )
     # The side that goes first alternates by runner, so whatever a first run pays lands on both.

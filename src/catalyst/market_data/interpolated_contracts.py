@@ -13,16 +13,16 @@ from typing import Final, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.index_definitions.contract_codes import (
+from catalyst.index_definitions.contract_codes import (
     MONTH_LETTERS,
     month_and_year,
     month_label,
     schedule_months,
 )
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.index import Index
-from goosedove.index_definitions.kind import Kind, described
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.kind import Kind, described
+from catalyst.instrumentation.work_counts import WorkCounter
 
 ANCHORS_READ = "anchors_read"  # anchor labels read and paired with their prices, one per row
 SCHEDULE_ROWS_READ = "schedule_rows_read"  # the schedule's codes read for their months, every row

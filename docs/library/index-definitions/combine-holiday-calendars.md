@@ -46,7 +46,7 @@ The listed days of every calendar are taken together and the distinct days kept 
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/index_definitions.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/index_definitions.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -74,13 +74,13 @@ A `HolidayCalendar`, as [holiday-calendar.md](holiday-calendar.md) describes it:
 
 ## Work
 
-`combine_holiday_calendars` in `src/goosedove/index_definitions/holiday_calendar.py` counts what it did on the `WorkCounter` it is given: `calendars_combined`, the calendars taken; `holidays_read`, the listed days read from them; `holidays_kept`, the distinct days kept. The ticket's two calendars count 2, 5 and 3.
+`combine_holiday_calendars` in `src/catalyst/index_definitions/holiday_calendar.py` counts what it did on the `WorkCounter` it is given: `calendars_combined`, the calendars taken; `holidays_read`, the listed days read from them; `holidays_kept`, the distinct days kept. The ticket's two calendars count 2, 5 and 3.
 
 The numpy, the same at two calendars and at twenty-four, pinned in `tests/performance/test_seam_budgets.py`: one concatenation of the sources, which runs in C unseen by the ledger, one `unique`, which the ledger sees as its flatten, sort and hash over two `asanyarray` views, then the builder's one copy and its freeze. The seam's calls grow with the handles and nothing else does: the vector's shape checked once, the cells decoded in one pass, each resolved once, one publication. A combination keeps its distinct days and nothing of its sources, 800 bytes for a hundred distinct days, freed on release, `tests/performance/test_seam_allocation.py`. A trade paying on a combined calendar does the plain calendar's work, call for call, at creation, preparation, evaluation and reporting, `tests/performance/test_trade_valuation_budgets.py`: the union ran once, when the combination was made, and no step after it reads a calendar again.
 
 ## Tests
 
-The examples and property are `tests/unit/test_holiday_calendar.py`; the seam's texts and handles `tests/unit/test_index_definitions.py`; the shifted dates `tests/unit/test_utilities.py`; the payment `tests/unit/test_create_trades.py`; the help lines `tests/unit/test_help.py`; the smoke rows `tools/excel_smoke.ps1`, the TA block; the lifetime group `calendars` in `tools/excel_lifetime.ps1`; the host's fact `host/Goosedove.Host.Tests/CallTests.cs`; the kept workbook from row 2624 of the handles sheet.
+The examples and property are `tests/unit/test_holiday_calendar.py`; the seam's texts and handles `tests/unit/test_index_definitions.py`; the shifted dates `tests/unit/test_utilities.py`; the payment `tests/unit/test_create_trades.py`; the help lines `tests/unit/test_help.py`; the smoke rows `tools/excel_smoke.ps1`, the TA block; the lifetime group `calendars` in `tools/excel_lifetime.ps1`; the host's fact `host/Catalyst.Host.Tests/CallTests.cs`; the kept workbook from row 2624 of the handles sheet.
 
 | Case | Kind |
 |---|---|

@@ -2,7 +2,7 @@
 
 Built in #85; named for its index since #112. Unchanged by #127, which lets the market take a vector that stops before the schedule's last contract.
 
-An ordered snapshot of futures prices from one numeric column, stored as a vector and reached by handle: the hot market data, a column a vendor's feed rewrites about once a second, taken as it stands each time the sheet recalculates and kept as given. From #112 the vector also carries the name of the index it prices, ordinary text typed once, so that the [market](../market/market.md) can refuse a vector labelled for another index whatever its length: a name is a label the sheet keeps, compared by the market with the name its index was created with, and no index object is looked up or held here, so the vector depends on its prices and its name cell and never on the index cell. It uses the existing `NumberColumn` seam and host transport; the typed Excel-DNA transport considered during design is deferred, with the decision recorded below. The code is `src/goosedove/market_data/price_vector.py`, the record and its builder, and `src/goosedove/excel/market_data.py`, the worksheet function.
+An ordered snapshot of futures prices from one numeric column, stored as a vector and reached by handle: the hot market data, a column a vendor's feed rewrites about once a second, taken as it stands each time the sheet recalculates and kept as given. From #112 the vector also carries the name of the index it prices, ordinary text typed once, so that the [market](../market/market.md) can refuse a vector labelled for another index whatever its length: a name is a label the sheet keeps, compared by the market with the name its index was created with, and no index object is looked up or held here, so the vector depends on its prices and its name cell and never on the index cell. It uses the existing `NumberColumn` seam and host transport; the typed Excel-DNA transport considered during design is deferred, with the decision recorded below. The code is `src/catalyst/market_data/price_vector.py`, the record and its builder, and `src/catalyst/excel/market_data.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -25,7 +25,7 @@ A successful call publishes a vector. A recalculation with the same name and pri
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/market_data.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/market_data.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -57,7 +57,7 @@ The creator's work budget is one library ownership copy, one freeze and one publ
 
 ## Tests
 
-The record and its builder are `src/goosedove/market_data/price_vector.py`, the creator is registered in `src/goosedove/excel/market_data.py`, and the handle reader shows the kind in `src/goosedove/excel/utilities.py`, following the [worksheet-function build process](../../seam/working.md#2-adding-a-worksheet-function). The examples and the property below are `tests/unit/test_price_vector.py`; the seam's texts and the handle are `tests/unit/test_market_data.py`; the spill is `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`; the ledger and the ceiling are `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`. The market's tests build their vectors through this creator and move with it, naming each vector for its history's index.
+The record and its builder are `src/catalyst/market_data/price_vector.py`, the creator is registered in `src/catalyst/excel/market_data.py`, and the handle reader shows the kind in `src/catalyst/excel/utilities.py`, following the [worksheet-function build process](../../seam/working.md#2-adding-a-worksheet-function). The examples and the property below are `tests/unit/test_price_vector.py`; the seam's texts and the handle are `tests/unit/test_market_data.py`; the spill is `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`; the ledger and the ceiling are `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`. The market's tests build their vectors through this creator and move with it, naming each vector for its history's index.
 
 | Case | Kind |
 |---|---|

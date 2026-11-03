@@ -21,9 +21,9 @@ from collections.abc import Callable
 import numpy as np
 import pytest
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells
-from goosedove.index_definitions.contract_codes import code_of_month
+from catalyst.excel import bridge
+from catalyst.excel.bridge import MISSING, Cells
+from catalyst.index_definitions.contract_codes import code_of_month
 
 # Each function's prepared path, fetched once as the host does at registration.
 ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}

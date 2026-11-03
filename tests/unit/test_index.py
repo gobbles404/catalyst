@@ -9,21 +9,21 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import calendar
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.globals.valuation_date import valuation_date
-from goosedove.index_definitions.contract_specifications import (
+from catalyst.calendar.calendar import calendar
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.globals.valuation_date import valuation_date
+from catalyst.index_definitions.contract_specifications import (
     ContractSpecifications,
     contract_specifications,
 )
-from goosedove.index_definitions.futures_schedule import futures_schedule
-from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
-from goosedove.index_definitions.iferc_schedule import iferc_schedule
-from goosedove.index_definitions.index import Index, index
-from goosedove.index_definitions.index_conventions import index_conventions
-from goosedove.index_definitions.kind import Kind
-from goosedove.market_data.futures_fixings import futures_fixings
+from catalyst.index_definitions.futures_schedule import futures_schedule
+from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from catalyst.index_definitions.iferc_schedule import iferc_schedule
+from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.kind import Kind
+from catalyst.market_data.futures_fixings import futures_fixings
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:

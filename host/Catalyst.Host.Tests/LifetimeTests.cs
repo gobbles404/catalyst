@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using ExcelDna.Integration;
 using Xunit;
 
-namespace Goosedove.Host.Tests
+namespace Catalyst.Host.Tests
 {
     /// <summary>
     /// The handle lifetime without Excel: the publisher's combined result, release of one entry,
@@ -223,7 +223,7 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void the_report_names_every_count()
         {
-            var report = Status.GoosedoveHandles();
+            var report = Status.CatalystHandles();
             Assert.StartsWith("live ", report);
             foreach (var word in new[] { "; price bytes ", "; published ", "; reused ", "; released ", "; release misses ", "; disposal errors ", "; skipped at close " })
             {

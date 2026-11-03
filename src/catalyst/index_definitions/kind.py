@@ -7,7 +7,7 @@ docs/library/calendar/calendar.md are the pages."""
 import re
 from enum import Enum
 
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 
 
 class Kind(Enum):

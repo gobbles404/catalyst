@@ -9,8 +9,8 @@ from datetime import date
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.index_definitions.index import Index
-from goosedove.index_definitions.kind import Kind, described, with_holiday_calendar
+from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.kind import Kind, described, with_holiday_calendar
 
 # The days of the week as Python's calendar numbers them, Monday first.
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")

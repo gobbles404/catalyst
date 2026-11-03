@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using ExcelDna.Integration;
 
-namespace Goosedove.Host
+namespace Catalyst.Host
 {
     /// <summary>
     /// A creator's publication owned by Excel's live-data subscription. Excel-DNA asks for one
@@ -121,7 +121,7 @@ namespace Goosedove.Host
     /// <summary>
     /// The observed path every creator takes, and the counts of what it did: calls observed,
     /// factories run (a call observed and no factory run is a reuse), publications owned,
-    /// releases made, releases that found nothing, and disposal failures. GoosedoveHandles
+    /// releases made, releases that found nothing, and disposal failures. CatalystHandles
     /// reports them beside the store's live count.
     /// </summary>
     internal static class Lifetime

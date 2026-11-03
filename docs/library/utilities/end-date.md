@@ -2,7 +2,7 @@
 
 Built in #129; the balance of a period, a `BAL` label, in #160, from a reference date, and since #173 from a valuation-date handle, the period held to end on or after its day; the ticket is [date-helper-inputs.md](../../engineering-tickets/trade-valuation-pipeline/date-helper-inputs.md).
 
-Gives the last calendar day of a contract or strip from its label, inclusive: 31 January 2026 for `F26`, 31 March 2027 for `1Q27`, 31 March 2030 for `W29`, and the last day of the right label of `F26-Z28`; since #160, the last day of the balance of any of these too, `BALZ26` with its valuation-date handle since #173, the same last day, the period checked here as well to end on or after the valuation day, though the end it would give is the label's own. Text and a handle in and one date out, no object made, a derivation and no `util_Read*` function, as [conventions.md](../conventions.md) divides them. It is the twin of [util_StartDate](start-date.md), through the same reading of the same grammar, which that page holds in full: the forms, the case rule, the two-digit year, what a range covers and the order its ends must keep, and the valuation-day rule of a balance. The code is `src/goosedove/index_definitions/periods.py`, `end_date`, and `src/goosedove/excel/utilities.py`, the worksheet function.
+Gives the last calendar day of a contract or strip from its label, inclusive: 31 January 2026 for `F26`, 31 March 2027 for `1Q27`, 31 March 2030 for `W29`, and the last day of the right label of `F26-Z28`; since #160, the last day of the balance of any of these too, `BALZ26` with its valuation-date handle since #173, the same last day, the period checked here as well to end on or after the valuation day, though the end it would give is the label's own. Text and a handle in and one date out, no object made, a derivation and no `util_Read*` function, as [conventions.md](../conventions.md) divides them. It is the twin of [util_StartDate](start-date.md), through the same reading of the same grammar, which that page holds in full: the forms, the case rule, the two-digit year, what a range covers and the order its ends must keep, and the valuation-day rule of a balance. The code is `src/catalyst/index_definitions/periods.py`, `end_date`, and `src/catalyst/excel/utilities.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -26,7 +26,7 @@ Two arguments, the label required and, since #160, the second, which may be left
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -49,7 +49,7 @@ The last day is the day before the month after the period begins, one conversion
 
 ## Tests
 
-The tests are the start function's, each case asking for both days: `tests/unit/test_periods.py` for the library, `tests/unit/test_utilities.py` for the seam, `tests/unit/test_help.py` for the help, `tools/excel_smoke.ps1` and `host/Goosedove.Host.Tests/CallTests.cs` for a real workbook and its replay, `workbooks/handles.xlsx` for the kept examples, and the two performance files for the ledger, fourteen calls across thirteen functions for one label and fifteen for a range, the balance of a month sixteen across fourteen and of a strip seventeen, and the peak, 1,264 bytes for a month and for the whole century alike and the balance within the same bound.
+The tests are the start function's, each case asking for both days: `tests/unit/test_periods.py` for the library, `tests/unit/test_utilities.py` for the seam, `tests/unit/test_help.py` for the help, `tools/excel_smoke.ps1` and `host/Catalyst.Host.Tests/CallTests.cs` for a real workbook and its replay, `workbooks/handles.xlsx` for the kept examples, and the two performance files for the ledger, fourteen calls across thirteen functions for one label and fifteen for a range, the balance of a month sixteen across fourteen and of a strip seventeen, and the peak, 1,264 bytes for a month and for the whole century alike and the balance within the same bound.
 
 | Case | Kind |
 |---|---|

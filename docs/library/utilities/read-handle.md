@@ -2,7 +2,7 @@
 
 Built in #66.
 
-Reads the object a handle stands for onto the sheet as a table, a header row, a row of types, then one row per element: the table its creator took, or, for a curve, the daily table the creator built from the anchors it took, every day between them. It is how a person sees what is in memory, checks a block before stacking the next one on it, and hands an engineer the exact thing a formula holds. `util_ReadDiscountFactor` went with it: it existed only to prove that a handle resolves, and reading a whole curve proves that better than reading one day of it. The code is `src/goosedove/excel/utilities.py`, the function and the table each kind shows.
+Reads the object a handle stands for onto the sheet as a table, a header row, a row of types, then one row per element: the table its creator took, or, for a curve, the daily table the creator built from the anchors it took, every day between them. It is how a person sees what is in memory, checks a block before stacking the next one on it, and hands an engineer the exact thing a formula holds. `util_ReadDiscountFactor` went with it: it existed only to prove that a handle resolves, and reading a whole curve proves that better than reading one day of it. The code is `src/catalyst/excel/utilities.py`, the function and the table each kind shows.
 
 ## Worksheet contract
 
@@ -33,7 +33,7 @@ One argument, required: any live handle, the cell showing a creator's result or 
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -100,11 +100,11 @@ What each kind shows:
 
 `=util_ReadHandle(A12)` on the ten-day calendar of [holiday-calendar.md](../index-definitions/holiday-calendar.md) shows one column, `holiday` over `datetime64[D]`, then the ten days as given.
 
-A new kind adds its row to this table on the pull request that builds its creator, and the same row in code: each kind registers how it shows in `src/goosedove/excel/utilities.py`, and a kind nobody registered fails in the cell, `#ERROR util_ReadHandle: TypeError: no table for a Widget`, rather than guessing its columns.
+A new kind adds its row to this table on the pull request that builds its creator, and the same row in code: each kind registers how it shows in `src/catalyst/excel/utilities.py`, and a kind nobody registered fails in the cell, `#ERROR util_ReadHandle: TypeError: no table for a Widget`, rather than guessing its columns.
 
 ## Tests
 
-The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1`, reading each spill with `INDEX`, and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
+The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1`, reading each spill with `INDEX`, and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
 
 | Case | Kind |
 |---|---|

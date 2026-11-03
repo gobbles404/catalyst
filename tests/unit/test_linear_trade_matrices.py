@@ -14,7 +14,7 @@ from hypothesis import strategies as st
 # add the repository root to sys.path as ``python -m`` does.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.instrumentation.work_counts import WorkCounter
 from tools.examples.linear_trade_matrices import (
     MarketPoint,
     ObservationKind,

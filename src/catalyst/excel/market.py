@@ -11,11 +11,11 @@ docs/library/conventions.md under Excel help; the page quotes the lines.
 
 from typing import Annotated
 
-from goosedove.calendar.calendar import Calendar
-from goosedove.excel.bridge import Handle, excel_function
-from goosedove.market.market import Market, market
-from goosedove.market.market_history import MarketHistory, market_history
-from goosedove.market_data.price_vector import PriceVector
+from catalyst.calendar.calendar import Calendar
+from catalyst.excel.bridge import Handle, excel_function
+from catalyst.market.market import Market, market
+from catalyst.market.market_history import MarketHistory, market_history
+from catalyst.market_data.price_vector import PriceVector
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.

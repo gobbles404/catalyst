@@ -22,7 +22,7 @@ os.environ["BLIS_NUM_THREADS"] = "1"
 
 import numpy as np
 
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.instrumentation.work_counts import WorkCounter
 
 SIZES = (100, 1_000, 10_000, 100_000)
 MARKETS = 24

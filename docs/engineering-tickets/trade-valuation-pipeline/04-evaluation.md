@@ -2,7 +2,7 @@
 
 [Pipeline overview](README.md) · [Previous](03-market-binding.md) · [Next: results](05-results.md)
 
-Built in #136 as the evaluation of the trade kernel, `src/goosedove/trades/evaluation.py`, on the NG example, its
+Built in #136 as the evaluation of the trade kernel, `src/catalyst/trades/evaluation.py`, on the NG example, its
 worksheet functions built in #139 and #141; [kernel.md](../../library/trades/kernel.md) is the page.
 
 ## Responsibility

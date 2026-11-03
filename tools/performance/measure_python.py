@@ -29,8 +29,8 @@ from typing import Any, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells
+from catalyst.excel import bridge
+from catalyst.excel.bridge import MISSING, Cells
 
 # Each function's prepared path, fetched once as the host does at registration.
 ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
@@ -482,8 +482,8 @@ def environment() -> dict[str, object]:
     return {
         "timestamp_utc": datetime.now(UTC).isoformat(),
         "revision": revision,
-        "bridge_sha256": sha256(ROOT / "src" / "goosedove" / "excel" / "bridge.py"),
-        "probes_sha256": sha256(ROOT / "src" / "goosedove" / "excel" / "probes.py"),
+        "bridge_sha256": sha256(ROOT / "src" / "catalyst" / "excel" / "bridge.py"),
+        "probes_sha256": sha256(ROOT / "src" / "catalyst" / "excel" / "probes.py"),
         "python": sys.version,
         "numpy": np.__version__,
         "machine": platform.machine(),

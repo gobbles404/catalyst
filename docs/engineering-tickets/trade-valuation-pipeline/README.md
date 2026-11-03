@@ -349,7 +349,7 @@ prerequisites. Do not feed live prices into the preparation formula.
 
 ## What PR119 contributes
 
-[PR119](https://github.com/gobbles404/goosedove/pull/119), last checked at `60ae5d2`, is an
+[PR119](https://github.com/gobbles404/catalyst/pull/119), last checked at `60ae5d2`, is an
 experiment we can retain, change or replace. It does not define the pipeline's domain model.
 
 | Existing piece | Evidence/useful role | Missing surrounding contract |

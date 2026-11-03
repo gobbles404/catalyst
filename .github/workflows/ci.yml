@@ -58,7 +58,7 @@ jobs:
           enable-cache: true
       - run: uv python install
       - run: uv sync --locked
-      - run: dotnet build host\Goosedove.Host -c Release --nologo
-      - run: dotnet test host\Goosedove.Host.Tests -c Release --nologo
+      - run: dotnet build host\Catalyst.Host -c Release --nologo
+      - run: dotnet test host\Catalyst.Host.Tests -c Release --nologo
       # The host runner must keep compiling; nobody runs timings in CI.
-      - run: dotnet build tools\performance\Goosedove.Host.Measure -c Release --nologo
+      - run: dotnet build tools\performance\Catalyst.Host.Measure -c Release --nologo

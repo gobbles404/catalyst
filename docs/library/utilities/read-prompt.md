@@ -2,7 +2,7 @@
 
 Built in #129.
 
-Reads the prompt of a calendar onto the sheet as text: the code of the contract on the calendar's first unfixed period, which is the contract the first price of a market over that calendar is for, as [_CreateMarket](../market/market.md) has read it since #86. The desk shows it beside each index so that a sheet holding several markets says, in one cell each, which contract each price vector starts at; nothing is made, no handle is published, and the valuation date is the calendar's own. Prompt here means that one contract and nothing more: on a futures calendar the contract prompt on the valuation day, on a Gas Daily calendar the month of the first unfixed flow day and on an IFERC calendar the first month whose index has not published. The code is `src/goosedove/calendar/calendar.py`, where `Calendar.prompt_code` reads it off the calendar's own columns, and `src/goosedove/excel/utilities.py`, the worksheet function.
+Reads the prompt of a calendar onto the sheet as text: the code of the contract on the calendar's first unfixed period, which is the contract the first price of a market over that calendar is for, as [_CreateMarket](../market/market.md) has read it since #86. The desk shows it beside each index so that a sheet holding several markets says, in one cell each, which contract each price vector starts at; nothing is made, no handle is published, and the valuation date is the calendar's own. Prompt here means that one contract and nothing more: on a futures calendar the contract prompt on the valuation day, on a Gas Daily calendar the month of the first unfixed flow day and on an IFERC calendar the first month whose index has not published. The code is `src/catalyst/calendar/calendar.py`, where `Calendar.prompt_code` reads it off the calendar's own columns, and `src/catalyst/excel/utilities.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -21,7 +21,7 @@ One argument, required: the calendar's handle, the cell showing `_CreateCalendar
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -60,7 +60,7 @@ Three reads and no array: the row of the first unfixed period, which the calenda
 
 ## Tests
 
-The library's examples are `tests/unit/test_calendar.py` under the prompt code; the agreement with the market, that the prompt is the code of `first_contract` on every kind and for any history, is `tests/unit/test_market.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
+The library's examples are `tests/unit/test_calendar.py` under the prompt code; the agreement with the market, that the prompt is the code of `first_contract` on every kind and for any history, is `tests/unit/test_market.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
 
 | Case | Kind |
 |---|---|

@@ -46,19 +46,19 @@ from typing import Any, assert_never
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.cashflows.valuation import CashflowResults
-from goosedove.globals.discount_curve import DiscountCurve
-from goosedove.index_definitions.index import Index, ReportingLot
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.market.market_history import MarketHistory
-from goosedove.market_data.price_vector import PriceVector
-from goosedove.trades.contributions import (
+from catalyst.cashflows.valuation import CashflowResults
+from catalyst.globals.discount_curve import DiscountCurve
+from catalyst.index_definitions.index import Index, ReportingLot
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.market.market_history import MarketHistory
+from catalyst.market_data.price_vector import PriceVector
+from catalyst.trades.contributions import (
     CLEARED,
     CrossContribution,
     RateContribution,
     curve_words,
 )
-from goosedove.trades.display_axes import (
+from catalyst.trades.display_axes import (
     NONE_EARLY,
     EarlyRisk,
     Unit,
@@ -68,8 +68,8 @@ from goosedove.trades.display_axes import (
     places_from,
     rows_through,
 )
-from goosedove.trades.results import LegResults, TradeResults
-from goosedove.trades.risk_report import (
+from catalyst.trades.results import LegResults, TradeResults
+from catalyst.trades.risk_report import (
     NO_DAYS,
     NOTHING,
     Bucket,

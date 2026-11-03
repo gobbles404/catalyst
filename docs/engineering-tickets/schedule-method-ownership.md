@@ -2,7 +2,7 @@
 
 **Status:** Agreed 17 October 2026 and built the same day from PR 195's head `ffd34a9` on the branch `refactor/schedule-methods`; the pull request that carries this page is the record. Kept as the plan as it was: the code, the module map and the kernel page are maintained, not this page.
 **Suggested PR title:** `refactor(trades): centralize schedule method rules`
-**Base:** Stack on [PR 195](https://github.com/gobbles404/goosedove/pull/195), branch `refactor/risk-report`, reviewed at `ffd34a9`. Target that branch while it is open; use its accepted successor or main if it lands first. Record the actual base in the PR.
+**Base:** Stack on [PR 195](https://github.com/gobbles404/catalyst/pull/195), branch `refactor/risk-report`, reviewed at `ffd34a9`. Target that branch while it is open; use its accepted successor or main if it lands first. Record the actual base in the PR.
 **Scope:** One behavior-preserving PR with two reviewable commits. Include this ticket as the plan in the implementation PR.
 
 ## Outcome
@@ -51,7 +51,7 @@ Keep these facts distinct even when their answers coincide today. Whole-month co
 
 ## Shared module and implementation boundary
 
-Create `src/goosedove/trades/schedule_methods.py`. Move the enum, member tuple and display-name array without changing their values, order, dtype or read-only behavior. Preserve encoded positions exactly:
+Create `src/catalyst/trades/schedule_methods.py`. Move the enum, member tuple and display-name array without changing their values, order, dtype or read-only behavior. Preserve encoded positions exactly:
 
 ```text
 0 lastday    1 penultimate    2 last3day    3 asian

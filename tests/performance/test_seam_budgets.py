@@ -6,8 +6,8 @@ from collections.abc import Callable
 import numpy as np
 import pytest
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells
+from catalyst.excel import bridge
+from catalyst.excel.bridge import MISSING, Cells
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 

@@ -9,7 +9,7 @@ hold, is docs/library/conventions.md under Excel help; the pages quote the lines
 
 from typing import Annotated
 
-from goosedove.excel.bridge import (
+from catalyst.excel.bridge import (
     Date,
     DateColumn,
     Handle,
@@ -19,10 +19,10 @@ from goosedove.excel.bridge import (
     TextRow,
     excel_function,
 )
-from goosedove.globals.discount_curve import DiscountCurve, discount_curve
-from goosedove.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
-from goosedove.globals.valuation_date import ValuationDate, valuation_date
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.globals.discount_curve import DiscountCurve, discount_curve
+from catalyst.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
+from catalyst.globals.valuation_date import ValuationDate, valuation_date
+from catalyst.instrumentation.work_counts import WorkCounter
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.

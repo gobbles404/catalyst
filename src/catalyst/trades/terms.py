@@ -21,15 +21,15 @@ from typing import Final, assert_never, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.index_definitions.contract_codes import schedule_months
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.iferc_schedule import IfercSchedule
-from goosedove.index_definitions.index import Index, ReportingLot
-from goosedove.index_definitions.kind import Kind, described
-from goosedove.instruments.definitions import Instrument
-from goosedove.instruments.fields import DatesOrTexts
-from goosedove.trades.schedule_methods import (
+from catalyst.index_definitions.contract_codes import schedule_months
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.iferc_schedule import IfercSchedule
+from catalyst.index_definitions.index import Index, ReportingLot
+from catalyst.index_definitions.kind import Kind, described
+from catalyst.instruments.definitions import Instrument
+from catalyst.instruments.fields import DatesOrTexts
+from catalyst.trades.schedule_methods import (
     METHODS,
     ScheduleMethod,
     permits_physical_settlement,

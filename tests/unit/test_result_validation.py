@@ -11,8 +11,8 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import (
+from catalyst.excel import bridge
+from catalyst.excel.bridge import (
     Cells,
     Date,
     DateColumn,
@@ -23,7 +23,7 @@ from goosedove.excel.bridge import (
     NumberRow,
     excel_function,
 )
-from goosedove.excel.probes import probe
+from catalyst.excel.probes import probe
 
 # One function per declared result type. Each returns whatever the test put in _returns.
 _returns: dict[str, object] = {}
@@ -412,7 +412,7 @@ def test_a_column_of_booleans_may_be_taken_but_not_returned() -> None:
         raise AssertionError("never called")
 
     with pytest.raises(
-        TypeError, match=r"OutFlags declares goosedove\.excel\.bridge\.BooleanColumn as its result"
+        TypeError, match=r"OutFlags declares catalyst\.excel\.bridge\.BooleanColumn as its result"
     ):
         excel_function(OutFlags)
 
