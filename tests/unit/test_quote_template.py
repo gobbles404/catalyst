@@ -13,13 +13,13 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells, Handle, register
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.instruments.definitions import FIXED_FLOAT
-from goosedove.instruments.fields import FieldValues
-from goosedove.quoting.template import QuoteTemplate, quote_template
-from goosedove.trades.template import DayOrRule
+from catalyst.excel import bridge
+from catalyst.excel.bridge import Cells, Handle, register
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.instruments.definitions import FIXED_FLOAT
+from catalyst.instruments.fields import FieldValues
+from catalyst.quoting.template import QuoteTemplate, quote_template
+from catalyst.trades.template import DayOrRule
 
 ENTRY = {
     name: bridge.entry(name)

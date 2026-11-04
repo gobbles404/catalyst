@@ -1,6 +1,6 @@
 # Named discount curves within one trade batch
 
-**Status:** Agreed feature direction, updated after engineering feedback on 18 October 2026. The collector is `_CollectDiscountCurves`; every bilateral trade keeps an explicit curve key, including the one-curve case. [Cashflow PR200](https://github.com/gobbles404/goosedove/pull/200), including its mapping-array fix, is merged; its cashflow collection follow-up is folded into slice 2, [named-curves-slice-2.md](named-curves-slice-2.md), as decided on 18 October. This arc precedes [template-based quoting](template-based-quoting.md).
+**Status:** Agreed feature direction, updated after engineering feedback on 18 October 2026. The collector is `_CollectDiscountCurves`; every bilateral trade keeps an explicit curve key, including the one-curve case. [Cashflow PR200](https://github.com/gobbles404/catalyst/pull/200), including its mapping-array fix, is merged; its cashflow collection follow-up is folded into slice 2, [named-curves-slice-2.md](named-curves-slice-2.md), as decided on 18 October. This arc precedes [template-based quoting](template-based-quoting.md).
 
 **Starting point:** Main after the single-curve cross-gamma, contract interpolation, curve-bump and cashflow work. Record the actual base and any subsequent cashflow dependency when implementation starts. Use a feature branch and a short sequence of independently reviewable PRs.
 

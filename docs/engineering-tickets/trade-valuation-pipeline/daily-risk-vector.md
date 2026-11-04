@@ -329,7 +329,7 @@ Engineering's record of what landed, in the ticket's terms.
 [prepare-trades.md](../../library/trades/prepare-trades.md) and
 [evaluate-trades.md](../../library/trades/evaluate-trades.md) are the pages.
 
-- **The axes.** `_the_buckets` in `src/goosedove/trades/encoding.py` gives `Encoded` seven arrays
+- **The axes.** `_the_buckets` in `src/catalyst/trades/encoding.py` gives `Encoded` seven arrays
   more, static for the batch: `days`, the distinct observation days, `day_of_slot` and
   `day_reference`, each day's pricing contract, its first slot's; `months`, the first day of each
   calendar month those days fall in, and `month_of_day`; `years`, the first day of each
@@ -344,7 +344,7 @@ Engineering's record of what landed, in the ticket's terms.
   a month's sum able to outrun what the contract's sum, taken in slot order, did not; a year's
   check stands beside them though no construction found reaches it before the total's. A tick
   shares all three; a new history makes them again with the rest.
-- **The reader.** `_ReportDelta(results, [bucket = "day"])` in `src/goosedove/excel/trades.py`:
+- **The reader.** `_ReportDelta(results, [bucket = "day"])` in `src/catalyst/excel/trades.py`:
   the bucket read by the templates' `choice` into the kernel's `Bucket`, one match over its three
   members, `bucket is 'quarter', expected day, month or year` for any other word, a blank, empty
   text and a number the seam's refusals, and only an omitted argument `day`; `bucketed` hands

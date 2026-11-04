@@ -10,15 +10,15 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE, MixedArray
-from goosedove.excel.instruments import (
+from catalyst.excel import bridge
+from catalyst.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE, MixedArray
+from catalyst.excel.instruments import (
     _ListInstruments,
     _ShowInstrument,
     catalog_cells,
     schema_cells,
 )
-from goosedove.instruments.definitions import (
+from catalyst.instruments.definitions import (
     CASHFLOW,
     CATALOG,
     FIXED_FLOAT,

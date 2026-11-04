@@ -5,7 +5,7 @@ using ExcelDna.Integration;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Goosedove.Host.Tests
+namespace Catalyst.Host.Tests
 {
     /// <summary>
     /// What the host does for one call, counted at its boundaries: trips into Python, objects

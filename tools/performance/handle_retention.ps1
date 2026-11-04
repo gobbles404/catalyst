@@ -20,10 +20,10 @@ $failures = [Collections.Generic.List[string]]::new()
 function Fail([string]$What) { $failures.Add($What); Write-Host "FAIL $What" }
 
 function Counts($Cell) {
-    $Cell.Formula = "=GoosedoveHandles()"
+    $Cell.Formula = "=CatalystHandles()"
     $text = [string]$Cell.Value2
     if ($text -notmatch "^live (-?\d+); price bytes (-?\d+); published (\d+); reused (\d+); released (\d+); release misses (\d+); disposal errors (\d+)") {
-        throw "GoosedoveHandles showed: $text"
+        throw "CatalystHandles showed: $text"
     }
     return [pscustomobject]@{ Live = [int]$Matches[1]; PriceBytes = [int]$Matches[2]; Published = [int]$Matches[3]; Reused = [int]$Matches[4]; Released = [int]$Matches[5]; Misses = [int]$Matches[6]; DisposalErrors = [int]$Matches[7]; Text = $text }
 }

@@ -4,7 +4,7 @@
 [Quantity unit selection](quantity-unit-selection.md) · [Create trades](../../library/trades/create-trades.md)
 
 **Status:** Built in #146, stacked on #145. Requested 6 October 2026 following UAT of
-[PR #145](https://github.com/gobbles404/goosedove/pull/145), reviewed at `df7f4d7`; it
+[PR #145](https://github.com/gobbles404/catalyst/pull/145), reviewed at `df7f4d7`; it
 supersedes the earlier requirement that a trade quantity be nonzero, the other quantity and
 entry rules standing. The section at the end records what the build settled.
 
@@ -79,10 +79,10 @@ an inactive-trade flag.
 
 ## Implementation scope
 
-- Remove the zero rejection from `whole_quantities` in `src/goosedove/trades/terms.py`,
+- Remove the zero rejection from `whole_quantities` in `src/catalyst/trades/terms.py`,
   retaining its finite and whole-number checks. Both template `quantity_of` and resolved
   trade validation must accept zero through that same rule.
-- Update `src/goosedove/instruments/definitions.py` and the generated `_ShowInstrument`
+- Update `src/catalyst/instruments/definitions.py` and the generated `_ShowInstrument`
   table to describe a signed whole quantity including zero. Remove current claims of
   "nonzero" from the affected template, resolution, kernel and trade-entry documentation.
   Mark the earlier quantity-selection ticket's nonzero rule as superseded without

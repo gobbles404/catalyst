@@ -4,8 +4,8 @@ from typing import Annotated, cast
 
 import pytest
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import (
+from catalyst.excel import bridge
+from catalyst.excel.bridge import (
     Date,
     DateColumn,
     MixedArray,
@@ -13,7 +13,7 @@ from goosedove.excel.bridge import (
     excel_function,
     register,
 )
-from goosedove.excel.probes import probe
+from catalyst.excel.probes import probe
 
 SPECS = {
     name: (description, arguments, hidden)

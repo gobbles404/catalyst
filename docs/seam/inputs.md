@@ -233,7 +233,7 @@ more, each after a `TextRow` holding the headers, and `S` naming the type of the
 whose value selects the instrument, `str` for an instrument named as `_CreateTradeTemplate`
 names it, or a class whose handle holds one, as `_CreateTrades`'s template does since #139; registration
 refuses a function with none or two such parameters, and the library says which kinds select,
-through `goosedove.instruments.fields.selected`. Any subset of the instrument's fields, in any
+through `catalyst.instruments.fields.selected`. Any subset of the instrument's fields, in any
 order; the headers match the field names exactly, case and all, decision 29 standing for the
 tables declared beside a function, so that `Quantity` is unknown where `quantity` is a field
 and `quantity ` is another header, and the message lists the instrument's fields. Each column

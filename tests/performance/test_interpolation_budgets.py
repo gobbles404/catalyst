@@ -11,15 +11,15 @@ import numpy as np
 import pytest
 from test_seam_allocation import SLACK, least_peak
 
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.index_definitions.contract_codes import code_of_month
-from goosedove.index_definitions.contract_specifications import contract_specifications
-from goosedove.index_definitions.futures_schedule import futures_schedule
-from goosedove.index_definitions.holiday_calendar import holiday_calendar
-from goosedove.index_definitions.index import Index, index
-from goosedove.index_definitions.index_conventions import index_conventions
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.market_data.interpolated_contracts import interpolate_contracts
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.index_definitions.contract_codes import code_of_month
+from catalyst.index_definitions.contract_specifications import contract_specifications
+from catalyst.index_definitions.futures_schedule import futures_schedule
+from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.market_data.interpolated_contracts import interpolate_contracts
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 

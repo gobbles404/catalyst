@@ -51,11 +51,11 @@ handling is outside scope; payment-date resolution is built, #139 and #144.
 Proposed library homes, not files implemented by this refinement:
 
 ```text
-src/goosedove/instruments/future.py
+src/catalyst/instruments/future.py
     future field schema; schedule_method and quantity_per fields
-src/goosedove/instruments/schedule_methods.py
+src/catalyst/instruments/schedule_methods.py
     closed method identifiers and immutable descriptive definitions
-src/goosedove/trades/observation_schedule.py
+src/catalyst/trades/observation_schedule.py
     private expansion of a selected rule with static reference dates/calendars
 ```
 

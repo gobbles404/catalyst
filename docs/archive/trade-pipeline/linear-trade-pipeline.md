@@ -400,7 +400,7 @@ tests. Previous-project benchmark claims are background, not Goosedove performan
 - [Runnable NumPy specimen](../../../tools/examples/linear_trade_matrices.py)
 - [Current trade creation contract](../../engineering-tickets/trade-valuation-pipeline/create-trade.md)
 - [Self-contained NG acceptance example](../../engineering-tickets/trade-valuation-pipeline/ng-creation-preparation-example.md)
-- [Existing Market implementation](../../../src/goosedove/market/market.py)
+- [Existing Market implementation](../../../src/catalyst/market/market.py)
 - [Contract field survey and prior-engineer assessment](../../futures-trade-field-review.md)
 - [Independent review scope and measurement questions](../../independent-review-brief.md)
 

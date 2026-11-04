@@ -35,8 +35,8 @@ from test_trade_valuation import (
     unit_curve,
 )
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells
+from catalyst.excel import bridge
+from catalyst.excel.bridge import Cells
 
 AS_OF = UNIT_AS_OF
 JAN_27, JAN_28 = "2027-01-01", "2028-01-01"

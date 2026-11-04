@@ -22,31 +22,31 @@ from test_create_trades import a_template, a_ticket
 from test_trades import dates, day, history_on, numbers, quoted, waha_history
 from test_utilities import rows
 
-from goosedove.cashflows.booking import cashflows
-from goosedove.cashflows.valuation import cashflow_results
-from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells
-from goosedove.excel.utilities import shown
-from goosedove.globals.discount_curve import DiscountCurve, bump_discount_curve
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.globals.valuation_date import valuation_date
-from goosedove.index_definitions.contract_specifications import contract_specifications
-from goosedove.index_definitions.futures_schedule import futures_schedule
-from goosedove.index_definitions.holiday_calendar import holiday_calendar
-from goosedove.index_definitions.iferc_schedule import iferc_schedule
-from goosedove.index_definitions.index import Index, index
-from goosedove.index_definitions.index_conventions import index_conventions
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import CASHFLOW
-from goosedove.market.market import Market
-from goosedove.market.market_history import MarketHistory
-from goosedove.quoting.template import quote_template
-from goosedove.trades.aggregation import aggregate_results
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import PreparedTrades, prepared_trades
-from goosedove.trades.resolution import Trades, trades
-from goosedove.trades.results import TradeResults
-from goosedove.trades.risk_report import Bucket, Risk
+from catalyst.cashflows.booking import cashflows
+from catalyst.cashflows.valuation import cashflow_results
+from catalyst.excel import bridge
+from catalyst.excel.bridge import Cells
+from catalyst.excel.utilities import shown
+from catalyst.globals.discount_curve import DiscountCurve, bump_discount_curve
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.globals.valuation_date import valuation_date
+from catalyst.index_definitions.contract_specifications import contract_specifications
+from catalyst.index_definitions.futures_schedule import futures_schedule
+from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.index_definitions.iferc_schedule import iferc_schedule
+from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import CASHFLOW
+from catalyst.market.market import Market
+from catalyst.market.market_history import MarketHistory
+from catalyst.quoting.template import quote_template
+from catalyst.trades.aggregation import aggregate_results
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import PreparedTrades, prepared_trades
+from catalyst.trades.resolution import Trades, trades
+from catalyst.trades.results import TradeResults
+from catalyst.trades.risk_report import Bucket, Risk
 
 CLOSE: dict[str, Any] = {"rel": 1e-12, "abs": 1e-12}
 

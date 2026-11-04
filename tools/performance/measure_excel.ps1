@@ -179,7 +179,7 @@ try {
     $sheets = Own $book.Worksheets
     $sheet = Own $sheets.Item(1)
     $status = Own $sheet.Range("A1")
-    $status.Formula = "=GoosedoveStatus()"
+    $status.Formula = "=CatalystStatus()"
     [void]$status.Calculate()
     if ($status.Value2 -ne "ok: python started and functions registered") { throw $status.Text }
     Close-HiddenExcelWorkbook $excel $book
@@ -328,9 +328,9 @@ try {
     [ordered]@{
         timestamp_utc = [DateTime]::UtcNow.ToString("o")
         revision = (git -C $root rev-parse HEAD).Trim()
-        host_sha256 = (Get-FileHash -LiteralPath (Join-Path (Split-Path $xll -Parent) "Goosedove.Host.dll") -Algorithm SHA256).Hash.ToLower()
-        bridge_sha256 = (Get-FileHash -LiteralPath (Join-Path $root "src/goosedove/excel/bridge.py") -Algorithm SHA256).Hash.ToLower()
-        probes_sha256 = (Get-FileHash -LiteralPath (Join-Path $root "src/goosedove/excel/probes.py") -Algorithm SHA256).Hash.ToLower()
+        host_sha256 = (Get-FileHash -LiteralPath (Join-Path (Split-Path $xll -Parent) "Catalyst.Host.dll") -Algorithm SHA256).Hash.ToLower()
+        bridge_sha256 = (Get-FileHash -LiteralPath (Join-Path $root "src/catalyst/excel/bridge.py") -Algorithm SHA256).Hash.ToLower()
+        probes_sha256 = (Get-FileHash -LiteralPath (Join-Path $root "src/catalyst/excel/probes.py") -Algorithm SHA256).Hash.ToLower()
         excel_version = $excel.Version
         excel_build = $excel.Build
         excel_multithreaded_calculation = $threads.Enabled

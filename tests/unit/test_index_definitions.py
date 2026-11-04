@@ -12,15 +12,15 @@ from hypothesis import strategies as st
 from numpy.typing import NDArray
 from test_utilities import read, rows
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE, Cells, Handle
-from goosedove.excel.probes import probe
-from goosedove.index_definitions.contract_specifications import ContractSpecifications
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.iferc_schedule import IfercSchedule
-from goosedove.index_definitions.index_conventions import IndexConventions
+from catalyst.excel import bridge
+from catalyst.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE, Cells, Handle
+from catalyst.excel.probes import probe
+from catalyst.index_definitions.contract_specifications import ContractSpecifications
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.iferc_schedule import IfercSchedule
+from catalyst.index_definitions.index_conventions import IndexConventions
 
 PID = os.getpid()  # leads every handle this Python publishes
 

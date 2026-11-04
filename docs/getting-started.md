@@ -55,7 +55,7 @@ This creates `.venv` in the repository with Python 3.13.13 and the exact version
 Check it:
 
 ```powershell
-uv run python -c "import goosedove, numpy; print('ok')"
+uv run python -c "import catalyst, numpy; print('ok')"
 uv run pytest -n auto
 ```
 
@@ -77,14 +77,14 @@ It shows the 8.0.4xx version the repository will use.
 .\tools\excel_dev.ps1
 ```
 
-This builds the add-in in Release, writes `goosedove.cfg` beside it so that Excel finds this clone's `src` and this environment's Python, and opens a fresh, visible Excel with the add-in loaded. The first run takes a minute or two while NuGet restores packages; later runs take seconds. Run it again after a change: it closes the Excel it opened last time, offers to save, and opens a new one.
+This builds the add-in in Release, writes `catalyst.cfg` beside it so that Excel finds this clone's `src` and this environment's Python, and opens a fresh, visible Excel with the add-in loaded. The first run takes a minute or two while NuGet restores packages; later runs take seconds. Run it again after a change: it closes the Excel it opened last time, offers to save, and opens a new one.
 
 In the sheet, type each of these in a cell:
 
 | Formula | Shows | Which proves |
 |---|---|---|
-| `=GoosedoveStatus()` | `ok: python started and functions registered` | the add-in loaded and started Python |
-| `=Ping()` | `goosedove` and a version, then `from` and a path inside this clone's `src\goosedove` | this clone's code is the one running |
+| `=CatalystStatus()` | `ok: python started and functions registered` | the add-in loaded and started Python |
+| `=Ping()` | `catalyst` and a version, then `from` and a path inside this clone's `src\catalyst` | this clone's code is the one running |
 | `=Add(1,2)` | `3` | a call crosses to Python and comes back |
 | `=_CreateValuationDate(DATE(2026,9,11),0.5)` | `valuation_date:` followed by two numbers | the library's first creator works |
 | `=util_ReadHandle(A4)`, with the creator in A4 | the object spilled as a small table | a handle resolves and spills |
@@ -97,15 +97,15 @@ In the sheet, type each of these in a cell:
 
 ## 6. Load the add-in in your own Excel, permanently
 
-Step 5 loads the add-in for one session. To have it in every Excel you open: File > Options > Add-ins, set Manage to Excel Add-ins, Go, Browse, pick `host\Goosedove.Host\bin\Release\net48\Goosedove.Host-AddIn64.xll`, OK. It loads at every start until you clear its tick in that list. Pick the `AddIn64` file: the `Goosedove.Host-AddIn.xll` beside it is the 32-bit build, which cannot load a 64-bit Python.
+Step 5 loads the add-in for one session. To have it in every Excel you open: File > Options > Add-ins, set Manage to Excel Add-ins, Go, Browse, pick `host\Catalyst.Host\bin\Release\net48\Catalyst.xll`, OK. It loads at every start until you clear its tick in that list. The add-in is 64-bit only, since it loads a 64-bit Python into Excel's process, and the build makes no 32-bit file.
 
-Two things to know. `goosedove.cfg` holds absolute paths, so keep the clone where it is; after moving it or recreating `.venv`, run `.\tools\excel_dev.ps1` once to rewrite the file. And Excel holds the `.xll` while it is open, so close every Excel before rebuilding.
+Two things to know. `catalyst.cfg` holds absolute paths, so keep the clone where it is; after moving it or recreating `.venv`, run `.\tools\excel_dev.ps1` once to rewrite the file. And Excel holds the `.xll` while it is open, so close every Excel before rebuilding.
 
 After every `git pull`:
 
 ```powershell
 uv sync --locked
-dotnet build host\Goosedove.Host -c Release
+dotnet build host\Catalyst.Host -c Release
 ```
 
 The second line rebuilds the add-in; `.\tools\excel_dev.ps1` does the same and opens Excel.
@@ -126,10 +126,10 @@ Eight steps in order, stopping at the first failure: formatting, lint, types, th
 | `dotnet` is not recognized | not installed, or the terminal was opened before the install | install it, or close and reopen the terminal |
 | `uv sync --locked` says the lock file needs updating | `pyproject.toml` or `uv.lock` differs from `main` | `git status`, then `git pull`; never edit the lock by hand |
 | `dotnet` says a compatible SDK was not found, requested 8.0.423 | only another major version of the SDK is installed | install the .NET 8.0 SDK |
-| the build says the reference assemblies for .NETFramework v4.8 were not found | the first restore could not reach NuGet | check the network or proxy, then `dotnet restore host\Goosedove.Host` |
+| the build says the reference assemblies for .NETFramework v4.8 were not found | the first restore could not reach NuGet | check the network or proxy, then `dotnet restore host\Catalyst.Host` |
 | `running scripts is disabled on this system` | the execution policy of step 1 | set it, or use the `-ExecutionPolicy Bypass` form |
-| `=GoosedoveStatus()` shows `#NAME?` | the add-in is not loaded in this Excel, or this Excel is 32-bit | check File > Account > About Excel; load it by step 5 or 6 |
-| `=GoosedoveStatus()` shows an error naming Python or the config | `goosedove.cfg` is missing or stale, after a move or a new `.venv` | run `.\tools\excel_dev.ps1` once |
+| `=CatalystStatus()` shows `#NAME?` | the add-in is not loaded in this Excel, or this Excel is 32-bit | check File > Account > About Excel; load it by step 5 or 6 |
+| `=CatalystStatus()` shows an error naming Python or the config | `catalyst.cfg` is missing or stale, after a move or a new `.venv` | run `.\tools\excel_dev.ps1` once |
 | the build says the `.xll` is in use | an Excel still has it loaded | close every Excel, including any hidden one in Task Manager, and build again |
 | Excel warns of a potential security concern when loading the `.xll` | it is a file built on this machine, unsigned | Enable |
 | `tests\test_smoke.py` fails about 64-bit | the environment's Python is 32-bit | install the 64-bit 3.13.13, delete `.venv`, run `uv sync --locked` again |
@@ -138,4 +138,4 @@ Eight steps in order, stopping at the first failure: formatting, lint, types, th
 
 ## Where to read next
 
-[architecture.md](architecture.md) says how the pieces fit together and where each responsibility lives. [README.md](../README.md) lists the daily commands. [docs/seam/working.md](seam/working.md) says how a change is checked and, in its section 8, how the add-in is loaded by hand and what `goosedove.cfg` holds. [docs/library/README.md](library/README.md) is one page per worksheet function, and [docs/seam/README.md](seam/README.md) is the way into everything written about the seam, the one place Excel and Python meet.
+[architecture.md](architecture.md) says how the pieces fit together and where each responsibility lives. [README.md](../README.md) lists the daily commands. [docs/seam/working.md](seam/working.md) says how a change is checked and, in its section 8, how the add-in is loaded by hand and what `catalyst.cfg` holds. [docs/library/README.md](library/README.md) is one page per worksheet function, and [docs/seam/README.md](seam/README.md) is the way into everything written about the seam, the one place Excel and Python meet.

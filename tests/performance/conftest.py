@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 
-import goosedove
-from goosedove.excel.bridge import DateColumn, NumberColumn, TextColumn
-from goosedove.excel.probes import probe
+import catalyst
+from catalyst.excel.bridge import DateColumn, NumberColumn, TextColumn
+from catalyst.excel.probes import probe
 
-PACKAGE_DIR = str(Path(goosedove.__file__).parent)
+PACKAGE_DIR = str(Path(catalyst.__file__).parent)
 
 
 # The column, date, and text looks have no probe, because the host cannot tell those ranges

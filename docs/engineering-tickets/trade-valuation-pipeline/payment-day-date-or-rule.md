@@ -1,7 +1,7 @@
 # Payment day as a date or a rule
 
 **Status:** Built in #214, 21 October 2026, one feature PR against main implementing
-[issue #213](https://github.com/gobbles404/goosedove/issues/213) in four commits: the
+[issue #213](https://github.com/gobbles404/catalyst/issues/213) in four commits: the
 shared validation first, then the field, then the host, the smoke, the lifetime and the
 kept workbook, then the pages. The quoting and named-curve stack is merged. This work is
 independent of issues #211 and #212.

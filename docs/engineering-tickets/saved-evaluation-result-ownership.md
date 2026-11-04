@@ -14,7 +14,7 @@ The current result already retains the economic information we need. The concret
 
 ## Baseline and placement
 
-The inspected baseline is `bd89df4` on [PR 193](https://github.com/gobbles404/goosedove/pull/193), the fresh documentation-link checker above [PR 191](https://github.com/gobbles404/goosedove/pull/191). PR 192 is the closed prototype; do not branch from it. PR 193 still has a review correction outstanding in its separate decision-number test. Stack this implementation on PR 193's accepted head, or current `main` once the documentation PRs merge, and record the actual base in the PR.
+The inspected baseline is `bd89df4` on [PR 193](https://github.com/gobbles404/catalyst/pull/193), the fresh documentation-link checker above [PR 191](https://github.com/gobbles404/catalyst/pull/191). PR 192 is the closed prototype; do not branch from it. PR 193 still has a review correction outstanding in its separate decision-number test. Stack this implementation on PR 193's accepted head, or current `main` once the documentation PRs merge, and record the actual base in the PR.
 
 Include this ticket in the implementation PR. The current/proposed tables below describe this refactor at its starting point; once built, keep them as the historical plan and maintain the current module map and owning code instead.
 

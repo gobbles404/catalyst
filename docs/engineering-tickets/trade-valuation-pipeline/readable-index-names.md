@@ -58,8 +58,8 @@ cache mechanism is part of this change.
 ## Delivery
 
 Update the Index record and builder, `_CreateIndex`, index readback and Excel help. The
-current locations are `src/goosedove/index_definitions/index.py`,
-`src/goosedove/excel/index_definitions.py` and `src/goosedove/excel/utilities.py`.
+current locations are `src/catalyst/index_definitions/index.py`,
+`src/catalyst/excel/index_definitions.py` and `src/catalyst/excel/utilities.py`.
 
 Migrate every kept `_CreateIndex` formula and internal caller to the new argument order,
 including tests, host replay, smoke/lifetime scripts, workbook examples and documentation.
@@ -84,11 +84,11 @@ fields. This PR supplies, stores and exposes one descriptive field.
 Engineering's record of what landed, in the ticket's terms.
 [index.md](../../library/index-definitions/index.md) is the page.
 
-- **The field.** `Index.display_name` sits after `name` in `src/goosedove/index_definitions/index.py`,
+- **The field.** `Index.display_name` sits after `name` in `src/catalyst/index_definitions/index.py`,
   kept as given, read by nothing but the readback; `index(name, display_name, schedule, ...)` takes
   it second. `_CreateIndex(name, display_name, schedule, index_conventions,
   contract_specifications, [holiday_calendar], [reporting_lot])` in
-  `src/goosedove/excel/index_definitions.py` declares it as required text, so the seam's own rules
+  `src/catalyst/excel/index_definitions.py` declares it as required text, so the seam's own rules
   refuse a missing, blank, numeric, empty or array value in its words, `display_name is blank,
   expected text`; nothing is trimmed, re-cased, defaulted or compared with the name, and the two
   may say the same thing. Its help: `A description a reader who does not know the desk's short

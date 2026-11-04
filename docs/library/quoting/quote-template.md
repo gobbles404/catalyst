@@ -1,6 +1,6 @@
 # _CreateQuoteTemplate
 
-Built from [template-based-quoting.md](../../engineering-tickets/trade-valuation-pipeline/template-based-quoting.md), with [_Quote](quote.md). The static terms of a quote under the `fixed_float`'s definition, created once and taken by every quote made under it beside the market and the contract code the quote prices: the fields a quote reads, held as a trade template holds its defaults, and none of the booking facts, so a quote template books nothing and a trade template quotes nothing. The code is `src/goosedove/quoting/template.py`, the record and its builder, and `src/goosedove/excel/quoting.py`, the worksheet function.
+Built from [template-based-quoting.md](../../engineering-tickets/trade-valuation-pipeline/template-based-quoting.md), with [_Quote](quote.md). The static terms of a quote under the `fixed_float`'s definition, created once and taken by every quote made under it beside the market and the contract code the quote prices: the fields a quote reads, held as a trade template holds its defaults, and none of the booking facts, so a quote template books nothing and a trade template quotes nothing. The code is `src/catalyst/quoting/template.py`, the record and its builder, and `src/catalyst/excel/quoting.py`, the worksheet function.
 
 ## Worksheet contract
 

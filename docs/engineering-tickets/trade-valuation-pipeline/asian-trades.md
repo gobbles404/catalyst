@@ -283,11 +283,11 @@ Broader pricing references and conversion from whole-month quotes remain explici
 Built as the page says, on the path the other methods take, with these particulars.
 
 - **The month.** The resolution reads each schedule code for its month once, as it did, through
-  `schedule_months` in `src/goosedove/trades/resolution.py`, now a public reader, and hands the
+  `schedule_months` in `src/catalyst/trades/resolution.py`, now a public reader, and hands the
   months to `observed` as a fourth argument, one per schedule row as numpy counts months; the
   asian method takes each component's month from them and reads no code again. The three
   one-day and three-day methods ignore the months.
-- **The observations.** `observed` in `src/goosedove/trades/observations.py` gives `asian` every
+- **The observations.** `observed` in `src/catalyst/trades/observations.py` gives `asian` every
   Monday to Friday of the component's calendar month the index's market is open on, an equal
   share each: one `numpy.busday_count` over the components for the days of each month, and one
   `numpy.busday_offset` over the observations, the month's first day rolled forward and counted
@@ -325,5 +325,5 @@ Built as the page says, on the path the other methods take, with these particula
   counts and the ledgers in `tests/performance/test_trade_creation_budgets.py` and
   `test_trade_budgets.py`, over an index whose contracts price their whole months; the public
   path on a sheet in `tools/excel_smoke.ps1`, from the host in
-  `host/Goosedove.Host.Tests/CallTests.cs`, and in the kept workbook's asian block at the foot
+  `host/Catalyst.Host.Tests/CallTests.cs`, and in the kept workbook's asian block at the foot
   of the handles sheet.

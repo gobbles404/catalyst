@@ -224,12 +224,12 @@ and zero rows' existing behavior, rather than adding a new pruning rule in this 
 
 ## Implementation map and work budgets
 
-At the reviewed baseline, the change starts in `src/goosedove/trades/encoding.py`:
+At the reviewed baseline, the change starts in `src/catalyst/trades/encoding.py`:
 contract-only grouping and `_one_payment_day_per_group` currently enforce the restriction.
 Separate construction of groups from the validation that each group's payment follows
 its observations. Review `preparation.py` consumers of the group axis, `evaluation.py`
 consumers of the reference axis, and the prepared/result spills in
-`src/goosedove/excel/utilities.py`. Resolution already supplies component payment dates.
+`src/catalyst/excel/utilities.py`. Resolution already supplies component payment dates.
 
 Track components, payment groups, observations, compressed slots and distinct live
 references separately in the relevant work/allocation tests. State changed counts and

@@ -4,8 +4,8 @@ The stages' own checks, with their refusals and their order, are pinned where th
 
 import numpy as np
 
-from goosedove.instruments.definitions import FIXED_FLOAT
-from goosedove.trades.schedule_methods import (
+from catalyst.instruments.definitions import FIXED_FLOAT
+from catalyst.trades.schedule_methods import (
     METHOD_NAMES,
     METHODS,
     ScheduleMethod,

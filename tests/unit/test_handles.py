@@ -6,9 +6,9 @@ from typing import cast
 
 import pytest
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells, Handle, Handles, Table, TextRow, excel_function
-from goosedove.excel.probes import probe
+from catalyst.excel import bridge
+from catalyst.excel.bridge import MISSING, Cells, Handle, Handles, Table, TextRow, excel_function
+from catalyst.excel.probes import probe
 
 PID = os.getpid()  # leads every handle this Python publishes
 

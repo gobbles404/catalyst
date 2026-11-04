@@ -8,7 +8,7 @@ import pytest
 # The specimen is deliberately outside the installed production package.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.instrumentation.work_counts import WorkCounter
 from tools.examples.linear_trade_matrices import (
     compact,
     compact_amounts,

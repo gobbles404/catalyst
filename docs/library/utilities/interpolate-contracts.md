@@ -1,6 +1,6 @@
 # util_InterpolateContracts
 
-Infers every monthly contract from the first anchor's month through the last's on a futures index's schedule, and gives each with the index's futures expiry and the price on the straight line between its anchors, weighted by the calendar days between the expiries: `J27` at 70 and `M27` at 76, expiring 22 March and 20 May 2027, put `K27`, expiring 20 April, 29 of 59 days along, at 72.94915254237289. Codes or the months as CME spells them and their prices in, a three-column table out, no handle: the desk types the few outright quotes it has and reads the monthly list it needs, the contract, the date and the price paired in view, and chooses the rows its price vector takes. The straight line between dated points is the library's one rule for interpolation, [conventions.md](../conventions.md#what-holds-everywhere), here with the futures expiries as the dates. The code is `src/goosedove/market_data/interpolated_contracts.py`, the rules and the interpolation, `src/goosedove/index_definitions/contract_codes.py`, the codes' reading and the schedule's monthly reading the trades share, and `src/goosedove/excel/utilities.py`, the worksheet function. [The ticket](../../engineering-tickets/trade-valuation-pipeline/interpolate-contract-prices.md) has the decisions.
+Infers every monthly contract from the first anchor's month through the last's on a futures index's schedule, and gives each with the index's futures expiry and the price on the straight line between its anchors, weighted by the calendar days between the expiries: `J27` at 70 and `M27` at 76, expiring 22 March and 20 May 2027, put `K27`, expiring 20 April, 29 of 59 days along, at 72.94915254237289. Codes or the months as CME spells them and their prices in, a three-column table out, no handle: the desk types the few outright quotes it has and reads the monthly list it needs, the contract, the date and the price paired in view, and chooses the rows its price vector takes. The straight line between dated points is the library's one rule for interpolation, [conventions.md](../conventions.md#what-holds-everywhere), here with the futures expiries as the dates. The code is `src/catalyst/market_data/interpolated_contracts.py`, the rules and the interpolation, `src/catalyst/index_definitions/contract_codes.py`, the codes' reading and the schedule's monthly reading the trades share, and `src/catalyst/excel/utilities.py`, the worksheet function. [The ticket](../../engineering-tickets/trade-valuation-pipeline/interpolate-contract-prices.md) has the decisions.
 
 ## Worksheet contract
 
@@ -28,7 +28,7 @@ The spill is the monthly list; the sheet chooses the rows a market takes. [`_Cre
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -60,7 +60,7 @@ The exact words are pinned in `tests/unit/test_interpolate_contracts.py`.
 
 ## Tests
 
-The hand answers, the rules and the seam's columns are `tests/unit/test_interpolate_contracts.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_interpolation_budgets.py`, the library's anchors, schedule rows, months and one interpolation at three months and at a hundred and twenty, and in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py` through the seam.
+The hand answers, the rules and the seam's columns are `tests/unit/test_interpolate_contracts.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_interpolation_budgets.py`, the library's anchors, schedule rows, months and one interpolation at three months and at a hundred and twenty, and in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py` through the seam.
 
 ## Not here
 

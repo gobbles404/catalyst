@@ -141,7 +141,7 @@ aggregation is included. Marketing follows bilateral as a separate ticket.
 Engineering's record of what landed, in the ticket's terms.
 [report-reserves.md](../../library/trades/report-reserves.md) is the page.
 
-- **The record.** `Reserves` in `src/goosedove/trades/reserves.py` holds the batch's
+- **The record.** `Reserves` in `src/catalyst/trades/reserves.py` holds the batch's
   `brokerage`, `clearing`, `marketing` and `currency`, the conventions' `currency_unit`.
   `encoded` makes it once, when `_CreateTrades` makes the batch: each component's count is its
   component quantity without its sign, after the `month` or `calday` rule, and its rates are its
@@ -158,7 +158,7 @@ Engineering's record of what landed, in the ticket's terms.
   past the largest number`. The specifications' rule of zero or more is unchanged. A sheet cell
   holds no NaN or infinity and takes no number above 9.99999999999999E+307 typed, so on a sheet
   only the overflow reaches these rules.
-- **Reader.** `_ReportReserves(results)` in `src/goosedove/excel/trades.py`: one required
+- **Reader.** `_ReportReserves(results)` in `src/catalyst/excel/trades.py`: one required
   results handle, validated by the seam; headers `brokerage_reserve`, `clearing_reserve`,
   `marketing_reserve`, `currency`, types `float64` three times and `str`, and one row of the
   stored values, formatted and nothing else. Its help: `Reports the batch's reserves from its

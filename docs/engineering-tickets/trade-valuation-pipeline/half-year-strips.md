@@ -24,7 +24,7 @@ The two-digit year retains the parser's existing 2000–2099 interpretation.
 
 ## Shared parsing and surface
 
-Extend `src/goosedove/index_definitions/periods.py`; do not introduce a second
+Extend `src/catalyst/index_definitions/periods.py`; do not introduce a second
 trade-only parser. The accepted form is `1Hyy` or `2Hyy`, with `H` in either case.
 Existing range syntax also accepts these endpoints: `1H27-2H27` covers all of 2027,
 and `2H27-1H28` covers July 2027 through June 2028. Preserve the existing ordering

@@ -91,8 +91,8 @@ gaps, not implementation decisions; how the build answered each is
 
 | Behavior on 2026-09-12 | Question to resolve |
 |---|---|
-| [Registration](../../host/Goosedove.Host/AddIn.cs) builds all-`object` delegates and calls `ExcelIntegration.RegisterDelegates`. | Supply declared object argument/result metadata and apply native handle processing during prepared registration. The current low-level call does not activate it. |
-| [The bridge](../../src/goosedove/excel/bridge.py) declares `Handle[Kind]` since #53 and keeps the objects in one Python store, keyed by the handle's text, with the host carrying only that text. | A C# store would have to take over owned Python references from the store that already holds them; the Python store needs the host's lifecycle notifications and nothing else. |
+| [Registration](../../host/Catalyst.Host/AddIn.cs) builds all-`object` delegates and calls `ExcelIntegration.RegisterDelegates`. | Supply declared object argument/result metadata and apply native handle processing during prepared registration. The current low-level call does not activate it. |
+| [The bridge](../../src/catalyst/excel/bridge.py) declares `Handle[Kind]` since #53 and keeps the objects in one Python store, keyed by the handle's text, with the host carrying only that text. | A C# store would have to take over owned Python references from the store that already holds them; the Python store needs the host's lifecycle notifications and nothing else. |
 | The host disposes the returned `PyObject` wrapper after scalar/array conversion. | An owner retained by Excel-DNA must acquire its own Python reference or explicitly receive ownership. It cannot retain the wrapper that the existing path disposes. |
 | Incoming arguments are temporary Python references released after each call. | Resolve and unwrap a retained owner to a temporary reference to the actual Python object, instead of passing a CLR proxy or disposing the owner's retained reference. |
 | Errors currently travel as visible `#ERROR ...` strings. | Failed construction must remain an error and publish no object. Blindly marking an all-`object` result as a handle could retain an error string. |
@@ -107,7 +107,7 @@ lock while the runtime is alive. See [the pinned Python.NET implementation][pyob
 and [embedding guidance][pythonnet]. A second Python dictionary mapping handle
 strings to objects has not been shown necessary.
 
-The current [buffer input path](../../src/goosedove/excel/bridge.py) already
+The current [buffer input path](../../src/catalyst/excel/bridge.py) already
 copies the host's reusable buffers into Python-owned NumPy arrays. Existing
 [ownership tests](../../tests/unit/test_bridge.py) verify that overwriting the
 host buffers does not change those arrays, and the
@@ -146,12 +146,12 @@ recalculation therefore is not a guaranteed repair while that state survives.
 Normal RTD disconnection removes the call state and key as well as unsubscribing;
 that permits a later call to construct again. See [object removal][store] and
 [the lookup/disconnection paths][observer]. This is source-derived, not a live
-recovery test in Goosedove.
+recovery test in Catalyst.
 
 ## Lessons considered from an earlier handle system
 
 Two engineer retrospectives from an earlier handle system were read during planning; their
-timing and soak figures are that project's, not Goosedove measurements, and are not kept
+timing and soak figures are that project's, not Catalyst measurements, and are not kept
 here, and the mechanisms they recommend are not instructions.
 
 Their useful distinction is between object references, equivalent economic

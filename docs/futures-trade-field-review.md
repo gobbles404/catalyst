@@ -1,6 +1,6 @@
 # Futures trade representation: contract research
 
-Research collected 27 September 2026; design reconciliation 3 October 2026 · Goosedove
+Research collected 27 September 2026; design reconciliation 3 October 2026 · Catalyst
 
 This report preserves research on Henry Hub, Waha, crude oil, refined products, ethane, carbon allowances and COMEX copper. Exchange facts are linked to primary sources; they have not been reverified during this documentation reconciliation. Sample trades and firm/account names are fictional.
 
@@ -219,9 +219,9 @@ No currently offered true cleared CL/Henry Hub swap was verified for this report
 
 ## 8. Current authority and remaining product research
 
-The current project already has an `Index` holding schedule, conventions and specification references; price and position quantity units can differ. `FuturesSchedule.codes` already stores contract codes alongside expiry dates; explicit trade binding and strip expansion are proposed uses/extensions, not functionality established by the presence of those codes. Existing specifications contain lot sizes and brokerage/clearing fee arrays. Their names, and index display names, are not a canonical product registry. [Index implementation](../src/goosedove/index_definitions/index.py), [specifications](../src/goosedove/index_definitions/contract_specifications.py).
+The current project already has an `Index` holding schedule, conventions and specification references; price and position quantity units can differ. `FuturesSchedule.codes` already stores contract codes alongside expiry dates; explicit trade binding and strip expansion are proposed uses/extensions, not functionality established by the presence of those codes. Existing specifications contain lot sizes and brokerage/clearing fee arrays. Their names, and index display names, are not a canonical product registry. [Index implementation](../src/catalyst/index_definitions/index.py), [specifications](../src/catalyst/index_definitions/contract_specifications.py).
 
-This report proposes richer settlement, venue, delivery and fixing definitions. It does not imply they already exist. EUR requires changes to the current USD/CENT conventions, and allowances need a suitable asset/quantity representation. The current futures schedule stores expiry information, not the full generic observation/notice/delivery/payment model above. [Conventions](../src/goosedove/index_definitions/index_conventions.py), [futures schedule](../src/goosedove/index_definitions/futures_schedule.py), [unit definitions](../src/goosedove/globals/unit_conversions.py).
+This report proposes richer settlement, venue, delivery and fixing definitions. It does not imply they already exist. EUR requires changes to the current USD/CENT conventions, and allowances need a suitable asset/quantity representation. The current futures schedule stores expiry information, not the full generic observation/notice/delivery/payment model above. [Conventions](../src/catalyst/index_definitions/index_conventions.py), [futures schedule](../src/catalyst/index_definitions/futures_schedule.py), [unit definitions](../src/catalyst/globals/unit_conversions.py).
 
 The [pipeline overview](engineering-tickets/trade-valuation-pipeline/README.md) supplies the current implementation sequence and open decisions. The [NG creation/preparation example](engineering-tickets/trade-valuation-pipeline/ng-creation-preparation-example.md) already supplies the initial hand calculations and array sketch. Begin with that bounded path; implementing or resolving every product in this survey is not a prerequisite.
 
@@ -285,7 +285,7 @@ The field survey contributes product meaning. The current pipeline packet now es
 | First engineer: 5,000 swaps, 5.16 seconds to 0.38 seconds | Python evaluation, publication and aggregate readers; excludes Excel | Batching and removing repeated work can materially improve a meaningful refresh boundary |
 | Second engineer: 5,000 swaps, 2.2 milliseconds build and 0.4 milliseconds price | NumPy demonstration excluding calendar/date construction | Prepared arithmetic can be cheap; this is not a comparable end-to-end result |
 
-These are different workloads/boundaries and cannot establish a relative speedup between the proposed designs. The first account's rejected representation with roughly 30 times as many intermediate rows remains a relevant warning. For Goosedove, use work counts and representation sizes: preparation builds, calendar work, market points gathered, components evaluated and temporary allocation size. Timings can supplement those observations, not replace correctness or work-budget checks.
+These are different workloads/boundaries and cannot establish a relative speedup between the proposed designs. The first account's rejected representation with roughly 30 times as many intermediate rows remains a relevant warning. For Catalyst, use work counts and representation sizes: preparation builds, calendar work, market points gathered, components evaluated and temporary allocation size. Timings can supplement those observations, not replace correctness or work-budget checks.
 
 ### How to use the advice now
 
@@ -332,7 +332,7 @@ For an exchange future, the same USD 2,000 difference relative to original execu
 
 ### Existing support and remaining work
 
-Goosedove already has an immutable daily `DiscountCurve` of dates and factors, built from supplied anchors with linear interpolation in factors. It starts at factor 1, rejects extrapolation in its construction, and enforces positive, non-increasing factors. The latter is an already accepted limitation on negative-rate curves. It is a useful array building block, not a complete curve-selection or trade-valuation system. [Current curve implementation](../src/goosedove/globals/discount_curve.py), [curve contract and deferred pricing work](library/globals/discount-curve.md).
+Catalyst already has an immutable daily `DiscountCurve` of dates and factors, built from supplied anchors with linear interpolation in factors. It starts at factor 1, rejects extrapolation in its construction, and enforces positive, non-increasing factors. The latter is an already accepted limitation on negative-rate curves. It is a useful array building block, not a complete curve-selection or trade-valuation system. [Current curve implementation](../src/catalyst/globals/discount_curve.py), [curve contract and deferred pricing work](library/globals/discount-curve.md).
 
 The later rates slice must establish curve selection, valuation-date alignment and payment-date coverage; no silent extension or reuse of yesterday's anchored factors. For an initial implementation, requiring curve start to equal valuation date is a proposed explicit policy, not existing consumer behavior. Building curves from rate instruments can remain outside the first instrument implementation: supplied discount factors are sufficient to establish the interface.
 

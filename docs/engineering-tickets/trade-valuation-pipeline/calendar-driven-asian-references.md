@@ -285,7 +285,7 @@ Engineering's record of what landed, in the ticket's terms.
 [evaluate-trades.md](../../library/trades/evaluate-trades.md) and
 [read-handle.md](../../library/utilities/read-handle.md) are the pages.
 
-- **The rule.** `_the_references` in `src/goosedove/trades/encoding.py` keeps deriving every
+- **The rule.** `_the_references` in `src/catalyst/trades/encoding.py` keeps deriving every
   observation's reference from the calendar's rule, `contract_on`, the first contract whose
   expiry is on or after the day, and keeps the own-contract equality for `lastday`,
   `penultimate` and `last3day`, each refused by its method, `trade 'A' at row 1 observes Z26
@@ -334,7 +334,7 @@ Engineering's record of what landed, in the ticket's terms.
 - **Where it is proved.** `tests/unit/test_trades.py` at the kernel,
   `tests/unit/test_create_trades.py` through resolution, `tests/unit/test_trade_valuation.py`
   through the registered functions, `tests/performance/test_trade_budgets.py` for the work,
-  `tools/excel_smoke.ps1` on a sheet, `host/Goosedove.Host.Tests/CallTests.cs` from the host,
+  `tools/excel_smoke.ps1` on a sheet, `host/Catalyst.Host.Tests/CallTests.cs` from the host,
   and the kept workbook's WTI block at the foot of the handles sheet, rows 1695 to 1737, with
   the booking's three states and its two readbacks.
 - **Not in this slice.** No roll convention but the calendar's: no second-nearby or

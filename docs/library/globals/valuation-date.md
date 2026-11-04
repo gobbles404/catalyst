@@ -2,7 +2,7 @@
 
 Built in #53.
 
-The date and progress through that date at which a calculation is evaluated. What is still open about it, the fraction nothing uses yet, is under Not here. The code is `src/goosedove/globals/valuation_date.py`, the record and its builder, and `src/goosedove/excel/globals.py`, the worksheet function.
+The date and progress through that date at which a calculation is evaluated. What is still open about it, the fraction nothing uses yet, is under Not here. The code is `src/catalyst/globals/valuation_date.py`, the record and its builder, and `src/catalyst/excel/globals.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -18,7 +18,7 @@ Two scalars, both required, neither with a default. A single-cell reference is a
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/globals.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/globals.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -37,7 +37,7 @@ No rounding, no clamping, no advancing the date. A value just outside the interv
 
 ## Tests
 
-The examples and properties below are `tests/unit/test_valuation_date.py`; the seam's texts and the handle are `tests/unit/test_globals.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`.
+The examples and properties below are `tests/unit/test_valuation_date.py`; the seam's texts and the handle are `tests/unit/test_globals.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`.
 
 | Case | Kind |
 |---|---|

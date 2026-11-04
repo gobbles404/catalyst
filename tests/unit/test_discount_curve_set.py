@@ -7,9 +7,9 @@ from hypothesis import given
 from hypothesis import strategies as st
 from test_bilateral_kernel import A_YEAR, AS_OF, TWO_YEARS, curve_of
 
-from goosedove.globals.discount_curve import DiscountCurve
-from goosedove.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.globals.discount_curve import DiscountCurve
+from catalyst.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
+from catalyst.instrumentation.work_counts import WorkCounter
 
 SOFR = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))
 FFOIS = curve_of((AS_OF, 1.0), (A_YEAR, 0.96), (TWO_YEARS, 0.92), name="FFOIS")

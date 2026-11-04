@@ -2,7 +2,7 @@
 
 **Status:** Agreed 17 October 2026 and built the same day from PR 194's head `58d63b5` on the branch `refactor/risk-report`; the pull request that carries this page is the record. Kept as the plan as it was: the report page, the module map and the code are maintained, not this page.
 **Suggested PR title:** `refactor(trades): centralize shared risk reporting rules`
-**Base:** Stack on [PR 194](https://github.com/gobbles404/goosedove/pull/194), branch `refactor/saved-results`, reviewed at `58d63b5`. Target that branch while it is open; use its accepted successor or main if it lands first. Record the actual base in the PR.
+**Base:** Stack on [PR 194](https://github.com/gobbles404/catalyst/pull/194), branch `refactor/saved-results`, reviewed at `58d63b5`. Target that branch while it is open; use its accepted successor or main if it lands first. Record the actual base in the PR.
 **Scope:** One behavior-preserving PR. Include this ticket in that PR as the plan; current behavior remains owned by the report page and code.
 
 ## Outcome
@@ -35,7 +35,7 @@ Keep `TradeResults.report`, `risk_view`, `_day_view`, `_period_view` and `_saved
 
 ## Shared module
 
-Create `src/goosedove/trades/risk_report.py`. Move the existing definitions, type alias, placement function and empty arrays directly. Preserve enum values, record fields and types, and the empty arrays' dtypes and read-only flags. Both consumers must use the same shared definitions and constants.
+Create `src/catalyst/trades/risk_report.py`. Move the existing definitions, type alias, placement function and empty arrays directly. Preserve enum values, record fields and types, and the empty arrays' dtypes and read-only flags. Both consumers must use the same shared definitions and constants.
 
 Add two small label functions with this responsibility:
 

@@ -15,30 +15,30 @@ import pytest
 from numpy.typing import NDArray
 from test_seam_allocation import SLACK, least_peak
 
-from goosedove.calendar.calendar import calendar
-from goosedove.globals.discount_curve import DiscountCurve, discount_curve
-from goosedove.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.globals.valuation_date import valuation_date
-from goosedove.index_definitions.contract_specifications import contract_specifications
-from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
-from goosedove.index_definitions.holiday_calendar import holiday_calendar
-from goosedove.index_definitions.iferc_schedule import iferc_schedule
-from goosedove.index_definitions.index import Index, index
-from goosedove.index_definitions.index_conventions import index_conventions
-from goosedove.instrumentation.work_counts import WorkCounter, WorkCounts
-from goosedove.instruments.definitions import FIXED_FLOAT, FieldType, Instrument
-from goosedove.instruments.fields import DatesOrTexts, FieldValues
-from goosedove.market.market import Market, market
-from goosedove.market.market_history import MarketHistory, market_history
-from goosedove.market_data.futures_fixings import futures_fixings
-from goosedove.market_data.iferc_fixings import iferc_fixings
-from goosedove.market_data.price_vector import price_vector
-from goosedove.trades.aggregation import aggregate_results
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.resolution import Trades, trades
-from goosedove.trades.template import trade_template
+from catalyst.calendar.calendar import calendar
+from catalyst.globals.discount_curve import DiscountCurve, discount_curve
+from catalyst.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.globals.valuation_date import valuation_date
+from catalyst.index_definitions.contract_specifications import contract_specifications
+from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
+from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.index_definitions.iferc_schedule import iferc_schedule
+from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.instrumentation.work_counts import WorkCounter, WorkCounts
+from catalyst.instruments.definitions import FIXED_FLOAT, FieldType, Instrument
+from catalyst.instruments.fields import DatesOrTexts, FieldValues
+from catalyst.market.market import Market, market
+from catalyst.market.market_history import MarketHistory, market_history
+from catalyst.market_data.futures_fixings import futures_fixings
+from catalyst.market_data.iferc_fixings import iferc_fixings
+from catalyst.market_data.price_vector import price_vector
+from catalyst.trades.aggregation import aggregate_results
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import prepared_trades
+from catalyst.trades.resolution import Trades, trades
+from catalyst.trades.template import trade_template
 
 ROWS = [pytest.param(1, id="one row"), pytest.param(500, id="500 rows")]
 AS_OF = "2027-01-04"

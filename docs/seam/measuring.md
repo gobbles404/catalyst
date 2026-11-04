@@ -6,7 +6,7 @@ The rule from AGENTS.md holds throughout: work is measured by counts, and counts
 
 ## The probes
 
-Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden worksheet functions, one per thing the host can tell apart or one rule the bridge applies to what it cannot, each doing no work beyond proving its fact, so its cost is the seam's cost. Where a rule needs a control to be read against, the control is a probe too. The knobs are how many calls, how many cells in, and how many cells out.
+Every measurement drives the probes in `src/catalyst/excel/probes.py`: hidden worksheet functions, one per thing the host can tell apart or one rule the bridge applies to what it cannot, each doing no work beyond proving its fact, so its cost is the seam's cost. Where a rule needs a control to be read against, the control is a probe too. The knobs are how many calls, how many cells in, and how many cells out.
 
 | Probe | Knob |
 |---|---|
@@ -56,7 +56,7 @@ Each runner warms once, checks the answer, calibrates the number of calls until 
 | Command | Clock | Includes | Leaves out |
 |---|---|---|---|
 | `uv run python tools/performance/measure_python.py` | each function's prepared path, held once, on `Cells` built before the clock | validation, the probe, result conversion; `cells_from_buffers` from buffers as its own scenario | the host, Excel, building the inputs |
-| `dotnet run --project tools/performance/Goosedove.Host.Measure -c Release` | the registered delegate | marshaling, the trip into Python, validation, the probe, result conversion, the way back to a .NET value; plus two stage rows, `way in` (`Marshal.ToPython` alone) and `way out` (`Marshal.FromPython` alone), with the GIL held outside the clock | Excel and Excel-DNA |
+| `dotnet run --project tools/performance/Catalyst.Host.Measure -c Release` | the registered delegate | marshaling, the trip into Python, validation, the probe, result conversion, the way back to a .NET value; plus two stage rows, `way in` (`Marshal.ToPython` alone) and `way out` (`Marshal.FromPython` alone), with the GIL held outside the clock | Excel and Excel-DNA |
 | `.\tools\performance\measure_excel.ps1` | `Range.Calculate` or `Application.Calculate` over COM in a hidden Excel | everything a user feels: Excel, Excel-DNA, the host, Python, and the COM round trips | startup, building the sheets, checking answers |
 | `uv run python tools/performance/summarize.py` | none | reads whatever CSVs exist under `profiles/` and writes `profiles/summary.md`, one table, a column per layer | |
 | `.\tools\performance\before_after.ps1` | the three runners above, on the base of the change and on this tree, one runner at a time on each | every row of every layer, side by side, in `profiles/compare.md` | nothing; a row that moved where the change did not aim is the finding |

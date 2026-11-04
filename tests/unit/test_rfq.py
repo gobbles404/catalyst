@@ -51,24 +51,24 @@ from test_trades import (
     spec,
 )
 
-from goosedove.excel import bridge
-from goosedove.excel.utilities import shown
-from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.globals.payments import factors_on
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.index_definitions.index import Index
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FIXED_FLOAT
-from goosedove.instruments.fields import DatesOrTexts
-from goosedove.market.market import Market
-from goosedove.quoting.quote import quote_by_dates
-from goosedove.quoting.rfq import PaymentSource, Rfq, quote_rfq, rfq
-from goosedove.quoting.template import QuoteTemplate
-from goosedove.trades.encoding import encoded
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.schedule_methods import ScheduleMethod
-from goosedove.trades.terms import (
+from catalyst.excel import bridge
+from catalyst.excel.utilities import shown
+from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.globals.payments import factors_on
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.index_definitions.index import Index
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import FIXED_FLOAT
+from catalyst.instruments.fields import DatesOrTexts
+from catalyst.market.market import Market
+from catalyst.quoting.quote import quote_by_dates
+from catalyst.quoting.rfq import PaymentSource, Rfq, quote_rfq, rfq
+from catalyst.quoting.template import QuoteTemplate
+from catalyst.trades.encoding import encoded
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import prepared_trades
+from catalyst.trades.schedule_methods import ScheduleMethod
+from catalyst.trades.terms import (
     FREQUENCIES,
     PaymentTerms,
     QuantityPer,

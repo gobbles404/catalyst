@@ -7,7 +7,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.index_definitions.holiday_calendar import (
+from catalyst.index_definitions.holiday_calendar import (
     CALENDARS_COMBINED,
     HOLIDAYS_KEPT,
     HOLIDAYS_READ,
@@ -15,7 +15,7 @@ from goosedove.index_definitions.holiday_calendar import (
     combine_holiday_calendars,
     holiday_calendar,
 )
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.instrumentation.work_counts import WorkCounter
 
 EPOCH = np.datetime64("1899-12-30")
 

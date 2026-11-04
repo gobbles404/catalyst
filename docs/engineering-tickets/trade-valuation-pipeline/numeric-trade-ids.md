@@ -135,14 +135,14 @@ Engineering's record of what landed, in the ticket's terms.
 [kernel.md](../../library/trades/kernel.md) and
 [show-instrument.md](../../library/instruments/show-instrument.md) are the pages.
 
-- **The field.** `trade_id` is `FieldType.NUMBER` in `src/goosedove/instruments/definitions.py`:
+- **The field.** `trade_id` is `FieldType.NUMBER` in `src/catalyst/instruments/definitions.py`:
   the description `External numeric identifier of the executed deal`, the options `a whole number
   of at most 15 digits` and the rule `The source system's deal number, whole, -999999999999999 to
   999999999999999, never text; duplicates keep separate occurrences`; the headers, the creator
   signatures and the field's optionality are as they were. The seam binds the column as float64
   and refuses text, a boolean, a blank and empty text in its own words, `trade_rows cell (1, 1)
   is text 'NG-001', expected number`; nothing is coerced.
-- **The rule.** `whole_trade_ids(values, where)` in `src/goosedove/trades/terms.py`, beside
+- **The rule.** `whole_trade_ids(values, where)` in `src/catalyst/trades/terms.py`, beside
   `whole_quantities` and `finite_prices`: finite, whole and within the 15 digits either side of
   zero, the first bad value named in the caller's words and shown without a fraction when whole,
   `trade_id row 2 is 123456.5, expected a whole number of at most 15 digits`, `trade_id is

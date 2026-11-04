@@ -2,7 +2,7 @@
 
 Built in #129.
 
-Gives the contract month as CME's data feeds spell it, the year then the month, two digits for the month: `202601` for `F26`, `202612` for `Z26`. Text in and text out, no object and no handle: the desk builds the symbols its RTD formulas take from the codes it already holds, instead of typing each month twice. It reads a code for its month and year as [util_NextFut](next-fut.md) does, through the same reading and the same rules, and takes the same one form, a month letter and a two-digit year. The code is `src/goosedove/index_definitions/contract_codes.py`, the reading and the function over it, and `src/goosedove/excel/utilities.py`, the worksheet function.
+Gives the contract month as CME's data feeds spell it, the year then the month, two digits for the month: `202601` for `F26`, `202612` for `Z26`. Text in and text out, no object and no handle: the desk builds the symbols its RTD formulas take from the codes it already holds, instead of typing each month twice. It reads a code for its month and year as [util_NextFut](next-fut.md) does, through the same reading and the same rules, and takes the same one form, a month letter and a two-digit year. The code is `src/catalyst/index_definitions/contract_codes.py`, the reading and the function over it, and `src/catalyst/excel/utilities.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -21,7 +21,7 @@ One argument, required: a contract code as text, typed in the formula or in a ce
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -40,7 +40,7 @@ One rule, the reading's: a code is one month letter and two digits, nothing befo
 
 ## Tests
 
-The library's examples and property are `tests/unit/test_contract_codes.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
+The library's examples and property are `tests/unit/test_contract_codes.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
 
 | Case | Kind |
 |---|---|

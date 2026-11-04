@@ -1,4 +1,4 @@
-# goosedove
+# Catalyst
 
 A commodities derivatives pricing library exposed to Excel through Excel-DNA.
 Python 3.13.13, managed with uv. Run everything through `uv run`.

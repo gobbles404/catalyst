@@ -5,7 +5,7 @@ import sys
 def test_imports() -> None:
     from importlib import import_module
 
-    import_module("goosedove")
+    import_module("catalyst")
 
 
 def test_python_is_64_bit() -> None:

@@ -11,7 +11,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from goosedove.globals.unit_conversions import (
+from catalyst.globals.unit_conversions import (
     UNITS,
     Category,
     UnitDefinition,

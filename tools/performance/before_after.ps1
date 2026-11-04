@@ -50,14 +50,21 @@ $beforeLabel = "base $baseSha"
 $afterLabel = "this tree at $headSha" + $(if ($dirty) { " with uncommitted changes" } else { "" })
 $before = Join-Path $root "profiles\before"
 $after = Join-Path $root "profiles\after"
-$side = Join-Path ([IO.Path]::GetTempPath()) "goosedove-base-$baseSha"
+$side = Join-Path ([IO.Path]::GetTempPath()) "catalyst-base-$baseSha"
 
 if (Test-Path $side) { Invoke-Git worktree remove --force $side | Out-Host }
 Invoke-Git worktree add --detach $side $Base | Out-Host
 try {
+    # Each runner is a path in the side it runs in, so a base from before a rename runs its own
+    # scripts and its own measurement project: the one *.Host.Measure.csproj a folder under its
+    # tools\performance holds. A folder an earlier build left behind, bin and obj alone, holds none.
     $runners = @(
         @{ Name = "python"; Run = { & uv run python tools/performance/measure_python.py } },
-        @{ Name = "host"; Run = { & dotnet run --project tools\performance\Goosedove.Host.Measure -c Release } },
+        @{ Name = "host"; Run = {
+            $projects = @(Get-ChildItem tools\performance\*\*.Host.Measure.csproj -File)
+            if ($projects.Count -ne 1) { throw "expected one *.Host.Measure.csproj under tools\performance, found $($projects.Count)" }
+            & dotnet run --project $projects[0].FullName -c Release
+        } },
         @{ Name = "excel"; Run = { & .\tools\performance\measure_excel.ps1 } }
     )
     # The side that goes first alternates by runner, so whatever a first run pays lands on both.

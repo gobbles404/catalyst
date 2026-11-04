@@ -9,8 +9,8 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from goosedove.index_definitions.contract_codes import MONTH_LETTERS
-from goosedove.index_definitions.periods import (
+from catalyst.index_definitions.contract_codes import MONTH_LETTERS
+from catalyst.index_definitions.periods import (
     FORMS,
     balance_of,
     end_date,

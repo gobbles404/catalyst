@@ -17,10 +17,10 @@ from test_bilateral_kernel import A_YEAR, AS_OF, CLOSE, TIGHT, curve_of, prepare
 from test_cross_gamma import CURVE, HNG, LAGS, PAYS, QUOTES, ticket_batch, trades_on
 from test_trade_valuation import ENTRY, serial, spilled
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells
-from goosedove.globals.discount_curve import DiscountCurve, bump_discount_curve
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.excel import bridge
+from catalyst.excel.bridge import MISSING, Cells
+from catalyst.globals.discount_curve import DiscountCurve, bump_discount_curve
+from catalyst.instrumentation.work_counts import WorkCounter
 
 SOURCE = curve_of((AS_OF, 1.0), (A_YEAR, 0.95))  # 366 days, the ticket's worked anchors
 UP_ONE, DOWN_ONE = 0.9499050047498416, 0.9500950047501583  # the ticket's targets a year out

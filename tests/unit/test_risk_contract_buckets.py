@@ -20,8 +20,8 @@ from test_trade_valuation import (
     unit_curve,
 )
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells
+from catalyst.excel import bridge
+from catalyst.excel.bridge import Cells
 
 NO_HOLIDAYS = ["2030-01-01"]
 AS_OF = "2026-10-14"

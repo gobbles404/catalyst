@@ -2,7 +2,7 @@
 
 Built in #171, UAT item 9 of the trade surface; the ticket is [date-offset-utility.md](../../engineering-tickets/trade-valuation-pipeline/date-offset-utility.md). Since #181 an offset is one or more instructions, [compound-date-offsets.md](../../engineering-tickets/trade-valuation-pipeline/compound-date-offsets.md): `+3em+25cd-1bd+1bd`, each applied to the result of the one before, left to right, and the same reading and arithmetic serve a trade's `payment_day` where it holds a rule and not a date, [payment-day-date-or-rule.md](../../engineering-tickets/trade-valuation-pipeline/payment-day-date-or-rule.md), [create-trades.md](../trades/create-trades.md).
 
-Shifts a date by a text offset as the desk writes one: `+1bd` the next business day, `-1bd` the one before, `+7cd` a week of calendar days on, `+0em` the last day of the date's own month and `+1em` the next month's, and a chain of these in turn. One date and one offset in, one date out, no object and no handle; the cell holds a date the sheet formats, as every date the seam sends. Business days are Monday to Friday less the holidays of a calendar the formula may name, the existing [holiday calendar](../index-definitions/holiday-calendar.md)'s handle; left out, they are Monday to Friday and nothing else. It derives a date and reads no object but the calendar it is given, so it is no `util_Read*` function, as [conventions.md](../conventions.md) divides them. The code is `src/goosedove/index_definitions/date_offsets.py`, beside the period grammar, and the wrapper `src/goosedove/excel/utilities.py`.
+Shifts a date by a text offset as the desk writes one: `+1bd` the next business day, `-1bd` the one before, `+7cd` a week of calendar days on, `+0em` the last day of the date's own month and `+1em` the next month's, and a chain of these in turn. One date and one offset in, one date out, no object and no handle; the cell holds a date the sheet formats, as every date the seam sends. Business days are Monday to Friday less the holidays of a calendar the formula may name, the existing [holiday calendar](../index-definitions/holiday-calendar.md)'s handle; left out, they are Monday to Friday and nothing else. It derives a date and reads no object but the calendar it is given, so it is no `util_Read*` function, as [conventions.md](../conventions.md) divides them. The code is `src/catalyst/index_definitions/date_offsets.py`, beside the period grammar, and the wrapper `src/catalyst/excel/utilities.py`.
 
 ## Worksheet contract
 
@@ -28,7 +28,7 @@ Three arguments. The date, required: a date, `DATE(2026,10,9)` or a cell holding
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -70,7 +70,7 @@ Four rules, the first failure being the message, after the seam's own checks of 
 | each count has at most seven significant digits, checked before any arithmetic, so that no count ever runs over the day arithmetic or Python's own conversion; the instruction named when the offset has more than one | `offset has a count of 8 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31`; `offset has a count of 8 digits in instruction 2, '+99999999cd', expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31` |
 | the day each instruction makes lies within the sheet's calendar, 1 March 1900 to 31 December 9999, named with the date and the offset that left it and the instruction when the offset has more than one, whatever a later instruction would have made of it | `date 9999-12-31 shifted by '+1cd' is 10000-01-01, outside the sheet's calendar, 1900-03-01 to 9999-12-31`; `date 9999-12-31 shifted by '+1cd-1cd' is 10000-01-01 at instruction 1, '+1cd', outside the sheet's calendar, 1900-03-01 to 9999-12-31` |
 
-The sheet's two days are the library's in `src/goosedove/index_definitions/sheet_days.py`, the same two a trade's payment rule is held to; `9999-12-31` with `+0em` is its own month's end and stands, since the month after is reached and a day subtracted before the rule is applied to what is made. Nothing is clamped, filled in or rolled to make a result fit.
+The sheet's two days are the library's in `src/catalyst/index_definitions/sheet_days.py`, the same two a trade's payment rule is held to; `9999-12-31` with `+0em` is its own month's end and stands, since the month after is reached and a day subtracted before the rule is applied to what is made. Nothing is clamped, filled in or rolled to make a result fit.
 
 ## The reading
 
@@ -78,7 +78,7 @@ The offset is read once, `read_offset`, one instruction at a time from the start
 
 ## Tests
 
-The library's examples and properties are `tests/unit/test_date_offsets.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`, with a fact on a calendar the host makes. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
+The library's examples and properties are `tests/unit/test_date_offsets.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`, with a fact on a calendar the host makes. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
 
 | Case | Kind |
 |---|---|

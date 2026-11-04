@@ -1,4 +1,4 @@
-# goosedove
+# Catalyst
 
 A commodities derivatives pricing library for Excel.
 
@@ -28,9 +28,9 @@ How the pieces fit together, from an index to a risk report, and where each resp
 
 ## The add-in
 
-The host finds Python through `goosedove.cfg` beside the `.xll`, two lines:
+The host finds Python through `catalyst.cfg` beside the `.xll`, two lines:
 
     pythondll=C:\...\python313.dll
-    pythonpath=C:\...\goosedove\src;C:\...\site-packages
+    pythonpath=C:\...\catalyst\src;C:\...\site-packages
 
 `tools\excel_dev.ps1` and `tools\excel_smoke.ps1` write it from the project's own environment. An add-in deployed elsewhere needs one written by hand.

@@ -1,6 +1,6 @@
 # util_BumpDiscountCurve
 
-Bumps a discount curve: a parallel shift of its continuously compounded zero rates by a signed number of basis points, the move the DV01 and the cross-gamma measure, applied to every stored day's factor from the curve's own start, ACT/365F, and shows the handle of the new curve, an ordinary curve that [util_ReadHandle](read-handle.md) spills and [_EvaluateTrades](../trades/evaluate-trades.md) takes. The desk bumps a curve a basis point up and a basis point down, re-evaluates the same prepared trades on each, and checks the reported DV01 and cross-gamma against the centered change in the NPV and in the discounted delta: a scenario tool over the existing evaluator, not a second risk model. The code is `src/goosedove/globals/discount_curve.py`, the shift beside the curve's own builder, and `src/goosedove/excel/utilities.py`, the worksheet function. [The ticket](../../engineering-tickets/trade-valuation-pipeline/bump-discount-curve.md) has the decisions.
+Bumps a discount curve: a parallel shift of its continuously compounded zero rates by a signed number of basis points, the move the DV01 and the cross-gamma measure, applied to every stored day's factor from the curve's own start, ACT/365F, and shows the handle of the new curve, an ordinary curve that [util_ReadHandle](read-handle.md) spills and [_EvaluateTrades](../trades/evaluate-trades.md) takes. The desk bumps a curve a basis point up and a basis point down, re-evaluates the same prepared trades on each, and checks the reported DV01 and cross-gamma against the centered change in the NPV and in the discounted delta: a scenario tool over the existing evaluator, not a second risk model. The code is `src/catalyst/globals/discount_curve.py`, the shift beside the curve's own builder, and `src/catalyst/excel/utilities.py`, the worksheet function. [The ticket](../../engineering-tickets/trade-valuation-pipeline/bump-discount-curve.md) has the decisions.
 
 ## Worksheet contract
 
@@ -51,7 +51,7 @@ The ticket's checks: one live lot paid a year out at 0.95 is 0.95 of discounted 
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -61,7 +61,7 @@ Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/
 
 ## Tests
 
-The worked bumps, the rules, the centered checks against the evaluator's saved risks and the seam's words are `tests/unit/test_bump_discount_curve.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`; the handle's life through a tick and a change of the source or the bump is the `bumps` group of `tools/excel_lifetime.ps1`. What a call costs is pinned in `tests/performance/test_bump_budgets.py`, the factors shifted and the constructor's work by the curve's length, and in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py` through the seam, one publication and its release.
+The worked bumps, the rules, the centered checks against the evaluator's saved risks and the seam's words are `tests/unit/test_bump_discount_curve.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`; the handle's life through a tick and a change of the source or the bump is the `bumps` group of `tools/excel_lifetime.ps1`. What a call costs is pinned in `tests/performance/test_bump_budgets.py`, the factors shifted and the constructor's work by the curve's length, and in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py` through the seam, one publication and its release.
 
 ## Not here
 

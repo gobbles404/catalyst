@@ -2,7 +2,7 @@
 
 Built in #129.
 
-Gives the contract code of the month a day falls in: `F26` for any day of January 2026, `K26` for 19 May 2026. One date in and text out, no object and no handle: the desk turns a date it holds, a valuation day, an expiry, a flow day, into the code of that month, to label a column or to feed [util_FutToCme](fut-to-cme.md) and [util_NextFut](next-fut.md). It is the day's own month and nothing more: 19 May 2026 is the day WTI's June contract expires, and this function says `K26`, May's code, since it reads a day and knows no schedule; which contract expires or is prompt on a day is the [calendar](../calendar/calendar.md)'s to say. The code is `src/goosedove/index_definitions/contract_codes.py`, `code_of_month`, and `src/goosedove/excel/utilities.py`, the worksheet function.
+Gives the contract code of the month a day falls in: `F26` for any day of January 2026, `K26` for 19 May 2026. One date in and text out, no object and no handle: the desk turns a date it holds, a valuation day, an expiry, a flow day, into the code of that month, to label a column or to feed [util_FutToCme](fut-to-cme.md) and [util_NextFut](next-fut.md). It is the day's own month and nothing more: 19 May 2026 is the day WTI's June contract expires, and this function says `K26`, May's code, since it reads a day and knows no schedule; which contract expires or is prompt on a day is the [calendar](../calendar/calendar.md)'s to say. The code is `src/catalyst/index_definitions/contract_codes.py`, `code_of_month`, and `src/catalyst/excel/utilities.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -21,7 +21,7 @@ One argument, required: one day, a cell holding a date or `DATE(2026,1,15)`, whi
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -40,7 +40,7 @@ Every other day of the century has a code, a leap day and a year's last day incl
 
 ## Tests
 
-The library's examples and property are `tests/unit/test_contract_codes.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
+The library's examples and property are `tests/unit/test_contract_codes.py`; the seam's texts are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
 
 | Case | Kind |
 |---|---|

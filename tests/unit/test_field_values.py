@@ -10,11 +10,11 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells, FieldRow, FieldRows, Handle, TextRow, register
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.instruments.definitions import FIXED_FLOAT, FieldType, Instrument
-from goosedove.instruments.fields import FieldValues, selected
+from catalyst.excel import bridge
+from catalyst.excel.bridge import Cells, FieldRow, FieldRows, Handle, TextRow, register
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.instruments.definitions import FIXED_FLOAT, FieldType, Instrument
+from catalyst.instruments.fields import FieldValues, selected
 
 ENTRY = {
     name: bridge.entry(name)

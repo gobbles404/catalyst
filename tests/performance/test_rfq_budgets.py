@@ -15,13 +15,13 @@ import pytest
 from test_quote_budgets import BILATERAL, CAL, CLEARED, MARKET, RATES
 from test_seam_allocation import SLACK, least_peak
 
-from goosedove.excel import bridge
-from goosedove.excel.utilities import shown
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FIXED_FLOAT
-from goosedove.instruments.fields import DatesOrTexts, FieldValues
-from goosedove.quoting.rfq import Rfq, quote_rfq, rfq
-from goosedove.quoting.template import QuoteTemplate
+from catalyst.excel import bridge
+from catalyst.excel.utilities import shown
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import FIXED_FLOAT
+from catalyst.instruments.fields import DatesOrTexts, FieldValues
+from catalyst.quoting.rfq import Rfq, quote_rfq, rfq
+from catalyst.quoting.template import QuoteTemplate
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 PATH = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}

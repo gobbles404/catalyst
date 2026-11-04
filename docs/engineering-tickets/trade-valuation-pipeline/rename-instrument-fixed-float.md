@@ -48,9 +48,9 @@ branch; preserve existing identifier case/whitespace validation.
 - Rename the definition constant `FUTURE` to `FIXED_FLOAT`, its catalog entry and the
   imports/identity checks referring to this instrument. Preserve one definition object
   and the existing resolution path. Current locations include
-  `src/goosedove/instruments/definitions.py` and `src/goosedove/trades/resolution.py`.
+  `src/catalyst/instruments/definitions.py` and `src/catalyst/trades/resolution.py`.
 - Update instrument-specific descriptions, errors, help and readback text. For example,
-  the index-kind refusal in `src/goosedove/trades/terms.py` should name `fixed_float`
+  the index-kind refusal in `src/catalyst/trades/terms.py` should name `fixed_float`
   while retaining its current accepted index kinds.
 - Migrate executable callers: tests, registered-function fixtures, host replay,
   smoke/lifetime scripts and the kept `workbooks/handles.xlsx`. Include literal selector

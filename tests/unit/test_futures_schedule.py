@@ -6,7 +6,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.index_definitions.futures_schedule import futures_schedule
+from catalyst.index_definitions.futures_schedule import futures_schedule
 
 EPOCH = np.datetime64("1899-12-30")
 

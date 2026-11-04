@@ -69,8 +69,8 @@ Return the price in exactly the index's existing quote currency and quote quanti
 Give quoting its own small home:
 
 ```text
-src/goosedove/quoting/quote.py      Quote-specific resolution and fair-price calculation
-src/goosedove/excel/quoting.py      Thin _Quote worksheet adapter
+src/catalyst/quoting/quote.py      Quote-specific resolution and fair-price calculation
+src/catalyst/excel/quoting.py      Thin _Quote worksheet adapter
 docs/library/quoting/quote.md       Maintained worksheet contract when implemented
 ```
 

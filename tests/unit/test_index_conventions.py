@@ -7,8 +7,8 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.index_definitions.index_conventions import IndexConventions, index_conventions
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.index_definitions.index_conventions import IndexConventions, index_conventions
 
 # The page's samples: WTI quoted in dollars per barrel, settled in dollars, its quantity a volume
 # stated in barrels; gasoline quoted in cents per gallon and settled in dollars per barrel; gas

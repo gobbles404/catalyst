@@ -19,17 +19,17 @@ from test_bilateral_kernel import A_YEAR, AS_OF, CLOSE, TIGHT, TWO_YEARS, curve_
 from test_trade_valuation import ENTRY, row, serial, spilled
 from test_trades import dates
 
-from goosedove.cashflows.booking import Cashflows, cashflows
-from goosedove.cashflows.valuation import CashflowResults, cashflow_results
-from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells
-from goosedove.globals.discount_curve import DiscountCurve, bump_discount_curve
-from goosedove.globals.valuation_date import valuation_date
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import CASHFLOW, FIXED_FLOAT, FieldType
-from goosedove.instruments.fields import FieldValues
-from goosedove.trades.risk_report import Bucket, Risk
-from goosedove.trades.template import TradeTemplate, trade_template
+from catalyst.cashflows.booking import Cashflows, cashflows
+from catalyst.cashflows.valuation import CashflowResults, cashflow_results
+from catalyst.excel import bridge
+from catalyst.excel.bridge import MISSING, Cells
+from catalyst.globals.discount_curve import DiscountCurve, bump_discount_curve
+from catalyst.globals.valuation_date import valuation_date
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import CASHFLOW, FIXED_FLOAT, FieldType
+from catalyst.instruments.fields import FieldValues
+from catalyst.trades.risk_report import Bucket, Risk
+from catalyst.trades.template import TradeTemplate, trade_template
 
 DAY_BEFORE = "2027-01-03"
 CURVE = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))

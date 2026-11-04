@@ -7,7 +7,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from goosedove.index_definitions.contract_codes import (
+from catalyst.index_definitions.contract_codes import (
     MONTH_LETTERS,
     cme_code,
     code_of_month,

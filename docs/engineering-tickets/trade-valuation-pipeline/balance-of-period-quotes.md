@@ -55,7 +55,7 @@ Refusals, each in words that exist today: `BALF27` valued 1 February, after the 
 
 ## Implementation and work
 
-`src/goosedove/quoting/quote.py` alone in the library, its `_the_months` step becoming the period step; a shared month-splitting helper beside the resolution's if one is extracted. No new counter: `months_resolved` counts the balance's components and the label is read as the utilities read it. The `contract_code` help line says the balance is from the market's valuation day, within its 253 characters. Pin the table above by hand, the refusals, the counters, a host fact, smoke rows and one row of the kept workbook beside the CAL27 block; `docs/library/quoting/quote.md` owns the words, and the packet and UAT notes move the balance from deferred to built.
+`src/catalyst/quoting/quote.py` alone in the library, its `_the_months` step becoming the period step; a shared month-splitting helper beside the resolution's if one is extracted. No new counter: `months_resolved` counts the balance's components and the label is read as the utilities read it. The `contract_code` help line says the balance is from the market's valuation day, within its 253 characters. Pin the table above by hand, the refusals, the counters, a host fact, smoke rows and one row of the kept workbook beside the CAL27 block; `docs/library/quoting/quote.md` owns the words, and the packet and UAT notes move the balance from deferred to built.
 
 ## Not here
 

@@ -1,6 +1,6 @@
 # _CollectDiscountCurves
 
-A collection of named discount curves: the curves a batch of trades will select among by name, gathered as they are and held by reference, nothing of their factors constructed or combined, each name once. It is the first worksheet piece of the [named-curve arc](../../engineering-tickets/trade-valuation-pipeline/multiple-discount-curves.md), built as [slice 1](../../engineering-tickets/trade-valuation-pipeline/named-curves-slice-1.md): today a collection is made, read back and refused, and nothing takes one yet; `_EvaluateTrades` takes a collection in the arc's third slice, when every bilateral trade names its curve by `discount_curve_key`. The code is `src/goosedove/globals/discount_curve_set.py`, the record and its builder, and `src/goosedove/excel/globals.py`, the worksheet function.
+A collection of named discount curves: the curves a batch of trades will select among by name, gathered as they are and held by reference, nothing of their factors constructed or combined, each name once. It is the first worksheet piece of the [named-curve arc](../../engineering-tickets/trade-valuation-pipeline/multiple-discount-curves.md), built as [slice 1](../../engineering-tickets/trade-valuation-pipeline/named-curves-slice-1.md): today a collection is made, read back and refused, and nothing takes one yet; `_EvaluateTrades` takes a collection in the arc's third slice, when every bilateral trade names its curve by `discount_curve_key`. The code is `src/catalyst/globals/discount_curve_set.py`, the record and its builder, and `src/catalyst/excel/globals.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -59,7 +59,7 @@ Nothing is published by a refusal.
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/globals.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/globals.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -68,11 +68,11 @@ Quoted from the declaration in `src/goosedove/excel/globals.py`, which `tests/un
 
 ## Work
 
-`collect_discount_curves` in `src/goosedove/globals/discount_curve_set.py` counts what it did on the `WorkCounter` it is given: `curves_collected`, one per curve given, the names read once each for the rule. No numpy runs, whatever the curves' lengths, and the peak follows the curves and never their days, about 48 bytes a curve beyond a slack of small objects; the collection keeps no array of its own, so nothing is freed on release but the references, `tests/performance/test_discount_curve_set_budgets.py`. Through the seam the vector's shape is checked once, the cells decoded in one pass and each resolved once, then one publication; the readback lays out one row per curve.
+`collect_discount_curves` in `src/catalyst/globals/discount_curve_set.py` counts what it did on the `WorkCounter` it is given: `curves_collected`, one per curve given, the names read once each for the rule. No numpy runs, whatever the curves' lengths, and the peak follows the curves and never their days, about 48 bytes a curve beyond a slack of small objects; the collection keeps no array of its own, so nothing is freed on release but the references, `tests/performance/test_discount_curve_set_budgets.py`. Through the seam the vector's shape is checked once, the cells decoded in one pass and each resolved once, then one publication; the readback lays out one row per curve.
 
 ## Tests
 
-The record and the rule are `tests/unit/test_discount_curve_set.py`; the seam's texts and handles `tests/unit/test_globals.py`; the readback `tests/unit/test_utilities.py`; the help `tests/unit/test_help.py`; the smoke rows `tools/excel_smoke.ps1`, the UQ block, and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is `tests/performance/test_discount_curve_set_budgets.py`.
+The record and the rule are `tests/unit/test_discount_curve_set.py`; the seam's texts and handles `tests/unit/test_globals.py`; the readback `tests/unit/test_utilities.py`; the help `tests/unit/test_help.py`; the smoke rows `tools/excel_smoke.ps1`, the UQ block, and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is `tests/performance/test_discount_curve_set_budgets.py`.
 
 | Case | Kind |
 |---|---|

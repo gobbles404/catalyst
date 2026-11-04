@@ -10,7 +10,7 @@ Start from what the cell shows. The first column is the text, the second who put
 
 | The cell shows | Who said it | What to do |
 |---|---|---|
-| `#NAME?` | Excel, which does not know that name | Four causes. First, look at the inputs: an input cell holding `#NAME?` is passed through unchanged, like any Excel error (the row below), and nothing is wrong with the formula. Then type `=GoosedoveStatus()`: if that shows `#NAME?` too, the add-in is not loaded, so load it (section 8). If it answers with an error instead of `ok`, Python did not start, so nothing was registered and no Python function exists yet; the error text says why, usually `goosedove.cfg` naming a Python that is not there. If `=GoosedoveStatus()` says `ok`, the name is misspelt: a probe, a hidden worksheet function that does no work beyond crossing the seam, is absent from Excel's function wizard, so there is no list to pick from, and the spelling to match is the function's own name in its module under `src/goosedove/excel/`. `=RegisterAll()` shows `#NAME?` on purpose, and the smoke test checks that it does. |
+| `#NAME?` | Excel, which does not know that name | Four causes. First, look at the inputs: an input cell holding `#NAME?` is passed through unchanged, like any Excel error (the row below), and nothing is wrong with the formula. Then type `=CatalystStatus()`: if that shows `#NAME?` too, the add-in is not loaded, so load it (section 8). If it answers with an error instead of `ok`, Python did not start, so nothing was registered and no Python function exists yet; the error text says why, usually `catalyst.cfg` naming a Python that is not there. If `=CatalystStatus()` says `ok`, the name is misspelt: a probe, a hidden worksheet function that does no work beyond crossing the seam, is absent from Excel's function wizard, so there is no list to pick from, and the spelling to match is the function's own name in its module under `src/catalyst/excel/`. `=RegisterAll()` shows `#NAME?` on purpose, and the smoke test checks that it does. |
 | An Excel error: `#N/A`, `#DIV/0!`, `#REF!`, `#NAME?`, `#NUM!`, `#NULL!`, `#GETTING_DATA` | Excel, passed through by the host unchanged | One of the inputs holds that error. The host returns the first one it meets, arguments left to right and, inside a range, in sheet order; a range is an argument that arrives as a rectangle of cells, such as `A1:A8`. The function is never called. A trip is one crossing from the host into Python and back, and the only trip such a call makes is for a range the host reached before the error and had already handed over. Nothing is wrong with the seam: find the input cell and fix it. |
 | `#VALUE!`, with no error anywhere in the inputs | Excel, in place of a value it will not hand over | Excel sends `#VALUE!` for a rich data type, an in-cell image, a LAMBDA value, a multi-area reference such as `(A1:B2,D1:D2)`, a 3-D reference, and for its own newer errors `#SPILL!` and `#CALC!`. Put plain cells in that argument. The full list of what Excel can send is in [inputs.md](inputs.md). |
 | `#ERROR Forward: price is text 'Brent', expected number`, or `#ERROR Strip: values cell (3, 1) is blank, expected number` | the bridge, rejecting an argument | Read it literally: the function, the argument, what arrived, what was declared. Reject means a call-time failure. Inside a range the cell is counted the way `INDEX` counts, row then column from 1 within the range that was passed, because no sheet address ever crosses. The words are [inputs.md](inputs.md)'s, and so is the rule behind each: a boolean is not a number, text is never a number, empty text is not text, and a blank cell is not a missing argument. |
@@ -21,7 +21,7 @@ Start from what the cell shows. The first column is the text, the second who put
 Two functions to type first, in this order.
 
 ```
-=GoosedoveStatus()
+=CatalystStatus()
 ```
 
 Shows `ok: python started and functions registered`, or the start-up error. It is written in C# and registered whatever happens, so it answers even when Python never started.
@@ -30,17 +30,17 @@ Shows `ok: python started and functions registered`, or the start-up error. It i
 =Ping()
 ```
 
-Shows `goosedove 0.1.0 from C:\...\src\goosedove\__init__.py`, with `source checkout` in place of the version when the package is not installed. It answers the question after a rebuild: which copy of the code is this Excel running.
+Shows `catalyst 0.1.0 from C:\...\src\catalyst\__init__.py`, with `source checkout` in place of the version when the package is not installed. It answers the question after a rebuild: which copy of the code is this Excel running.
 
 ## 2. Adding a worksheet function
 
-The library's functions are one module per group under `src/goosedove/excel/`: `globals.py`, two creators that return handles; `index_definitions.py`, seven creators, one of three columns whose third may be left out, one of a single column of dates, one of five text scalars, one of a header row and a table of contracts, two of a column of codes and two columns of dates, and one of text and four handles, the last of which may be left out; `market_data.py`, four creators, one of a column of dates, a column of settles and the index's handle, one of a column of codes, a column of prices and the index's handle, one of a column of flow days, a column of prices and the index's handle, and one of the index's name and a single column of prices; `calendar.py`, one creator of a valuation date's handle and the index's; `market.py`, two creators of two handles each, one of the calendar's and its market's fixings', any of the three kinds, one of the history's and the price vector's; and `utilities.py`, a reader that takes any handle and spills a table. Beside them are `Ping` in `src/goosedove/excel/bridge.py` and the sixteen probes in `src/goosedove/excel/probes.py`, whose cost is the seam's cost and nothing more; those are the examples to copy. Before writing one, read [baseline.md](baseline.md)'s standing recommendation, which the numbers have now supported twice: declare pricing functions over arrays, one call for a column of trades, and never read a range once per row, which is the most expensive shape there is.
+The library's functions are one module per group under `src/catalyst/excel/`: `globals.py`, two creators that return handles; `index_definitions.py`, seven creators, one of three columns whose third may be left out, one of a single column of dates, one of five text scalars, one of a header row and a table of contracts, two of a column of codes and two columns of dates, and one of text and four handles, the last of which may be left out; `market_data.py`, four creators, one of a column of dates, a column of settles and the index's handle, one of a column of codes, a column of prices and the index's handle, one of a column of flow days, a column of prices and the index's handle, and one of the index's name and a single column of prices; `calendar.py`, one creator of a valuation date's handle and the index's; `market.py`, two creators of two handles each, one of the calendar's and its market's fixings', any of the three kinds, one of the history's and the price vector's; and `utilities.py`, a reader that takes any handle and spills a table. Beside them are `Ping` in `src/catalyst/excel/bridge.py` and the sixteen probes in `src/catalyst/excel/probes.py`, whose cost is the seam's cost and nothing more; those are the examples to copy. Before writing one, read [baseline.md](baseline.md)'s standing recommendation, which the numbers have now supported twice: declare pricing functions over arrays, one call for a column of trades, and never read a range once per row, which is the most expensive shape there is.
 
-1. Put the module under `src/goosedove/excel/`, beside `bridge.py` and `probes.py`. It may import the pricing code; the pricing code never imports it. That one-way rule is why pricing can be tested without Excel.
+1. Put the module under `src/catalyst/excel/`, beside `bridge.py` and `probes.py`. It may import the pricing code; the pricing code never imports it. That one-way rule is why pricing can be tested without Excel.
 2. Write a plain function with `@excel_function` above it. Annotate every parameter and the return with a declared type: the annotation that decides which one rule checks the value and which words its messages use, `float` for a number, `NumberColumn` for a column of numbers. It must be one of the fourteen the seam can receive, or a table schema, or `Handle[Kind]` around a class the library defines, and one of the eleven it can send, or a handle, listed in [inputs.md](inputs.md) and [outputs.md](outputs.md). A mixed range crosses in only as a table: a function Excel lists never declares `MixedArray` as a parameter on its own ([inputs.md](inputs.md) decision 38); as a result it is the rectangle of three kinds a function spills, built with `MixedArray.table` from rows of headings over columns of one kind each ([outputs.md](outputs.md) decision 13), or, for a column that holds a number on one row and a word on another, composed from the record's three fields, as the market history's and the market's tables in `utilities.py` do through one helper, or, for a small descriptive grid whose columns hold more than one kind, such as the shown instrument's schema, with `MixedArray.cells` cell by cell, since #137. The function's own name becomes the worksheet name, and its parameter names become the argument names Excel shows. Name it as the library's [conventions.md](../library/conventions.md#names) says, `_` then a verb, `_Scale`, or `util_` for a utility, and list it in the module's own `__all__`: the underscore is Excel's filter, and without that entry pyright reads it as Python's privacy and reports the function unused.
 3. Write the docstring as the wizard text. The whole docstring, with the surrounding spaces removed, is the description Excel shows, so keep it to one sentence a user of the sheet would read. Beside each parameter, write the one line Excel shows about that argument, `x: Annotated[float, "One number to multiply."]`; the type checker reads the type and ignores the words. The shape of a line, what to select, an example, and at most one thing that must hold, is in the library's [conventions.md](../library/conventions.md#excel-help), with the optional form. A function Excel lists is refused without either, with more than the 253 characters Excel shows, or with a line that does not end with a period. Registration adds what the signature already says: an optional argument's name in brackets and what it takes when omitted, so write neither.
 4. Give an optional argument a default in the signature. The default goes through the same accept rule as a real argument at registration, once, and is stored already converted, so only a missing argument takes it and a blank cell still fails. `None` is never an ordinary default, since every accept rule calls it blank; an argument that may be left out with nothing in its place is declared with its type written `X | None` and `None` as its default, `option_expiry: DateColumn | None = None`, and the function receives `None` only when the formula left the argument out, a blank cell in the slot still failing as a blank. Excel shows such an argument in brackets with its line alone, so again write neither. A table and a handle take no default at all and may not be left out; registration refuses both.
-5. Import the module in the catalogue, `src/goosedove/excel/__init__.py`, and add its name to the `__all__` list beside the two that are there, or the lint step reports the import as unused. The catalogue is the list of modules whose functions Excel sees, and it is the only place a new module is named.
+5. Import the module in the catalogue, `src/catalyst/excel/__init__.py`, and add its name to the `__all__` list beside the two that are there, or the lint step reports the import as unused. The catalogue is the list of modules whose functions Excel sees, and it is the only place a new module is named.
 6. Pin its messages in a unit test under `tests/unit/`. Reach the function the way the tests do, `bridge.call("_Scale", [...])`, and assert the exact `#ERROR` text for one wrong argument and the value it hands back for a right one. A pin is a test that holds a fact still, so a change that moves it fails.
 7. Add a row to `tools/excel_smoke.ps1`: the formula exactly as a person would type it, and the exact text the cell must display. Put any input cells the formula needs in the `$cells` list below it. The count it prints at the end follows the list of formulas.
 8. Try it by hand with `.\tools\excel_dev.ps1`, which builds the add-in and opens it in a fresh Excel of its own, then run `.\check.ps1` (section 7).
@@ -50,7 +50,7 @@ The host needs no change. It asks the bridge for the list of functions at start-
 One function, whole:
 
 ```python
-from goosedove.excel.bridge import NumberColumn, excel_function
+from catalyst.excel.bridge import NumberColumn, excel_function
 
 __all__ = ["_Scale"]
 
@@ -66,7 +66,7 @@ def _Scale(values: NumberColumn, factor: float = 1.0) -> NumberColumn:
 A function that takes a table, a header row and a body, declares a schema beside it: a class deriving from `Table`, one line per column, the header name and its column type, and takes the header row as a `TextRow` in the parameter just before the table. Nothing else changes: the schema is read at registration as the signature is, the columns bind by name whatever their order, and the function receives one record with a typed attribute per column.
 
 ```python
-from goosedove.excel.bridge import (
+from catalyst.excel.bridge import (
     BooleanColumn,
     DateColumn,
     NumberColumn,
@@ -100,7 +100,7 @@ A function that creates an object the sheet reaches by handle declares `Handle[K
 
 Registration refuses a function whose annotation is not one of the declared types, so the type comes first and the function second. [inputs.md](inputs.md) names one that is wanted and not built, `ContractMonth`, a whole serial falling on the first of a month; the steps below use a month type as the example.
 
-1. Add the label in `src/goosedove/excel/bridge.py`, beside the others: `Month = NewType("Month", np.datetime64)`. `NewType` gives a name to a shape that already exists, so the seam can tell a month from a plain date though both are numpy days.
+1. Add the label in `src/catalyst/excel/bridge.py`, beside the others: `Month = NewType("Month", np.datetime64)`. `NewType` gives a name to a shape that already exists, so the seam can tell a month from a plain date though both are numpy days.
 2. Write the accept rule beside the rules of its kind: one function that takes what arrived and returns the typed value, or raises `_Rejected`. For a scalar, one value such as the number in `B2`, build on `_number`, `_whole` and `_date`, which already reject in the right order. For a range, one look and no walk: a look is one pass over every cell at once, the way `=SUM` reads a range; a walk is visiting cells one at a time, which the seam avoids. `_first_bad` turns the look's first flag into the cell a message can name.
 3. Add its row to `_DECLARED`: the label is the key, and the row holds two things, the plain name every message uses and the rule. Pick a name a user of the sheet would say, in the words of the sheet: `"month"` for `Month`, `"column of months"` for `MonthColumn`. A column type also gets a row in `_COLUMNS`, with the rule for one column of a table, so a schema may name it.
 4. Add a rule to `_RESULTS` if a function may return the type. If it may not, a function declaring it as a result is refused at registration, which is what happens today for a column of text.
@@ -108,7 +108,7 @@ Registration refuses a function whose annotation is not one of the declared type
 6. Add the type to its owners, section 10: a row in [inputs.md](inputs.md)'s table of declared types, what it accepts and refuses, and in [outputs.md](outputs.md)'s if it can be returned, striking it from inputs.md's table of what is wanted next; and a row in [bridge.md](bridge.md)'s table naming its rule and what the function receives, the mechanism and not a second copy of the contract. A question decided on the way gets its own named section in inputs.md, as the NUL rule has, dated where the date tells a reader something; no new number.
 7. Pin the message texts in the three unit test files: the scalar words in `tests/unit/test_type_validation.py`, the range words and the property that the first bad cell is named in `tests/unit/test_range_validation.py`, the result words in `tests/unit/test_result_validation.py`. Each file registers its own small functions at the top; add one per new type and put your cases in the tables of exact texts.
 8. Add a look-counting function to `tests/performance/conftest.py` when a probe would earn no place, which is whenever the host cannot tell the new range from one it already carries. `FirstOfNumbers`, `FirstOfDates` and `FirstOfNames` are there for exactly that reason: they are registered outside the package, so they are not themselves counted, and they exist only to count the Python side of each look. Then give it a ledger in `tests/performance/test_seam_budgets.py`, the exact list of which of the seam's functions ran and how many times, and a ceiling in `tests/performance/test_seam_allocation.py`, the most memory one warm call may hold at its peak, written as the measured figure plus the file's slack; warm means measured after a first call has set everything up.
-9. A new cell kind needs the host as well. A cell's kind is which of five things a cell holds, number, text, boolean, blank or missing, and the codes are shared: the `Kind` list in `bridge.py` and the byte constants and summary bits in `host/Goosedove.Host/AddIn.cs` are two halves of one agreement. A sixth kind means the host's scan, its summary of kinds, `cells_from_buffers`, and the counts in `tests/performance/HostWorkBudgets.cs`. A month is not a new kind: it arrives as a number, like every date.
+9. A new cell kind needs the host as well. A cell's kind is which of five things a cell holds, number, text, boolean, blank or missing, and the codes are shared: the `Kind` list in `bridge.py` and the byte constants and summary bits in `host/Catalyst.Host/AddIn.cs` are two halves of one agreement. A sixth kind means the host's scan, its summary of kinds, `cells_from_buffers`, and the counts in `tests/performance/HostWorkBudgets.cs`. A month is not a new kind: it arrives as a number, like every date.
 
 A form of declaration rather than a type, such as `X | None = None` for an argument that may be left out with nothing in its place, follows the same steps without a rule of its own: registration and what it refuses, a row and a named section in [inputs.md](inputs.md), the pins in the unit tests, and the paragraphs of [bridge.md](bridge.md) that describe declaring a function. Nothing crosses the host differently, so it needs no probe and no runner row.
 
@@ -116,12 +116,12 @@ A form of declaration rather than a type, such as `X | None = None` for an argum
 
 The record asks for two next, and until they exist no runner has a row for a text range or a date range, so the before-and-after tool is blind to those paths: a text probe and a date probe, with rows in all three runners. [history.md](history.md) lists both as open.
 
-1. Write it in `src/goosedove/excel/probes.py` with `@probe`, which registers it hidden, so Excel's function wizard never lists it and it still ships in the build everyone loads. Begin the docstring with `Probe:` and name the one thing it proves. It must do no work beyond proving it, or its cost stops being the seam's cost.
+1. Write it in `src/catalyst/excel/probes.py` with `@probe`, which registers it hidden, so Excel's function wizard never lists it and it still ships in the build everyone loads. Begin the docstring with `Probe:` and name the one thing it proves. It must do no work beyond proving it, or its cost stops being the seam's cost.
 2. Add a scenario to `tools/performance/measure_python.py`, in `scenarios()`, with its inputs built there, before any clock starts, and a check of the answer. Put it inside the size loop if it has a cells knob.
 3. Add a row to `workloads()` in `tools/performance/profile_workload.py`, one representative call at a size a sheet might send, or `.\measure.ps1` writes no profile for the new probe and nothing says so.
-4. Add a scenario to `tools/performance/Goosedove.Host.Measure/Scenarios.cs`: a delegate from `Registration.MakeDelegate(Bridge.Prepare("Name"), n)`, then one `measurements.Run` with the same shape as its neighbours, a check, and `Counted(...)` so the host's counters are recorded beside the timing; a counter is a named tally of one thing the host did during a call, such as the trips it made into Python or the cells it scanned.
+4. Add a scenario to `tools/performance/Catalyst.Host.Measure/Scenarios.cs`: a delegate from `Registration.MakeDelegate(Bridge.Prepare("Name"), n)`, then one `measurements.Run` with the same shape as its neighbours, a check, and `Counted(...)` so the host's counters are recorded beside the timing; a counter is a named tally of one thing the host did during a call, such as the trips it made into Python or the cells it scanned.
 5. Add a case to `tools/performance/measure_excel.ps1` if Excel should time it, with a native formula beside it as its floor, the way `=SUM` sits beside `SumArray`. A probe that only proves correctness needs no Excel case.
-6. Add a row to `tools/excel_smoke.ps1`, so the probe is checked in a real Excel with the exact text it must show, and the same row to `host/Goosedove.Host.Tests/CallTests.cs`, which replays the smoke rows without Excel. Add the name to the set of hidden probes in `tests/unit/test_bridge.py`: that test asks only that the set contains them, so a missing name never fails, which is why it has to be done on purpose.
+6. Add a row to `tools/excel_smoke.ps1`, so the probe is checked in a real Excel with the exact text it must show, and the same row to `host/Catalyst.Host.Tests/CallTests.cs`, which replays the smoke rows without Excel. Add the name to the set of hidden probes in `tests/unit/test_bridge.py`: that test asks only that the set contains them, so a missing name never fails, which is why it has to be done on purpose.
 7. Give it a ledger in `tests/performance/test_seam_budgets.py`, both lists where numpy is asked anything, and a ceiling in `tests/performance/test_seam_allocation.py`.
 8. Add a counts test to `tests/performance/HostWorkBudgets.cs`, which is compiled into the host's test project: what the host did for one warm call, as an exact table of counters.
 9. Add it to the probe tables in [measuring.md](measuring.md), with its knob, and [bridge.md](bridge.md), with what it proves. The tables are the list; a page that states a count of probes drops the count when it is next touched, as [AGENTS.md](../../AGENTS.md) asks.
@@ -139,7 +139,7 @@ The record asks for two next, and until they exist no runner has a row for a tex
    .\tools\performance\before_after.ps1 -SkipExcel
    ```
 
-   With no parameters the base is where this branch left `origin/main`; `-Base` names another; `-SkipExcel` runs the Python and host runners only. The base is checked out into a temporary worktree, a second copy of the code in Windows' temp folder under the name `goosedove-base-<the base's short revision>`, so this tree is never touched, and "after" is this tree as it stands, uncommitted changes included. The runners alternate sides so drift lands on both. The results land in `profiles\before` and `profiles\after`, and the report in `profiles\compare.md`: every timed row of every layer, every host counter that differs, and the allocation figures. Paste that report whole into the pull request. Read it as [measuring.md](measuring.md) says: a row counts as moved only when its two batch spreads do not overlap, and a move is real when it is large, consistent across sizes, and where the change aimed; a large move where it did not aim is the finding.
+   With no parameters the base is where this branch left `origin/main`; `-Base` names another; `-SkipExcel` runs the Python and host runners only. The base is checked out into a temporary worktree, a second copy of the code in Windows' temp folder under the name `catalyst-base-<the base's short revision>`, so this tree is never touched, and "after" is this tree as it stands, uncommitted changes included. The runners alternate sides so drift lands on both. The results land in `profiles\before` and `profiles\after`, and the report in `profiles\compare.md`: every timed row of every layer, every host counter that differs, and the allocation figures. Paste that report whole into the pull request. Read it as [measuring.md](measuring.md) says: a row counts as moved only when its two batch spreads do not overlap, and a move is real when it is large, consistent across sizes, and where the change aimed; a large move where it did not aim is the finding.
 5. Move the pages that own what changed, section 10: [host.md](host.md) and the steps in [walk.md](walk.md) for the host, [bridge.md](bridge.md) for the bridge, [inputs.md](inputs.md) or [outputs.md](outputs.md) when a rule changed; and a row in [history.md](history.md) when the change declined something, settled a question or set a new baseline, not for a routine change.
 6. Run `.\check.ps1` and fix what it reports (section 7).
 7. Open the pull request with the template's six headings in order: What; Counts, with the counters before and after; Tenets; Conflicts; Checked in Excel; Not done. One purpose, and a title that names kind and scope first, `feat(seam):`, `feat(host):`, `chore(tools):` or `docs:`. The counts are the evidence. No timing gates a merge; the timings are the record that says whether the counts mattered.
@@ -155,7 +155,7 @@ A baseline is one session's numbers at a named revision; a session is one sittin
 
    ```powershell
    .\measure.ps1
-   dotnet run --project tools\performance\Goosedove.Host.Measure -c Release
+   dotnet run --project tools\performance\Catalyst.Host.Measure -c Release
    .\tools\performance\measure_excel.ps1
    .\tools\performance\measure_excel.ps1 -Rows 10000
    ```
@@ -199,7 +199,7 @@ A baseline is one session's numbers at a named revision; a session is one sittin
 2. `uv run ruff check --fix .`
 3. `uv run pyright`
 4. `uv run pytest -n auto`
-5. `dotnet test host\Goosedove.Host.Tests -c Release --nologo -v q`
+5. `dotnet test host\Catalyst.Host.Tests -c Release --nologo -v q`
 6. `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_busy_selftest.ps1`
 7. `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_session_selftest.ps1`
 8. `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_smoke.ps1`
@@ -219,7 +219,7 @@ uv run ruff check --fix .                         # lint
 uv run pyright                                    # types
 uv run pytest -n auto                             # every Python test
 uv run pytest tests\performance                   # the pins alone
-dotnet test host\Goosedove.Host.Tests -c Release  # the host's tests, no Excel needed
+dotnet test host\Catalyst.Host.Tests -c Release  # the host's tests, no Excel needed
 .\tools\excel_busy_selftest.ps1                   # how the Excel tools wait for a busy Excel, no Excel needed
 .\tools\excel_session_selftest.ps1                # a hidden Excel whose start fails is still ended, no Excel needed
 .\tools\excel_smoke.ps1                           # the add-in in a hidden Excel
@@ -237,16 +237,16 @@ uv sync --locked
 
 `.\tools\excel_dev.ps1` does all of this for you and is the way to try formulas day to day, on a new workbook; `.\tools\excel_dev.ps1 workbooks\handles.xlsx` opens a saved one instead, fully recalculated so that every handle in it belongs to this session and not to the one that saved it. `workbooks/` holds the workbooks we keep, one per topic, the shared object for talking about a function on a real sheet: open it, try things, write a line in its `notes` column, save, commit. `.\tools\excel_show.ps1 workbooks\handles.xlsx` prints a workbook as its cells show, in a hidden Excel with the add-in loaded, one line per cell with its formula and its text, so two people read the same thing and a review can quote it. Do the steps below by hand when the add-in must live somewhere else, or run against a Python that is not the project's.
 
-1. Build it. Either `dotnet build host\Goosedove.Host -c Release`, or dot-source `tools\host_build.ps1` and call `Build-HostAddIn -Root <the repository>`, which builds Release, writes the config beside the result, and returns the path.
-2. Load `host\Goosedove.Host\bin\Release\net48\Goosedove.Host-AddIn64.xll`. 64-bit Excel only: the add-in loads Python's own DLL into Excel's process, and the project's Python is 64-bit, which `tests\test_smoke.py` checks. The `Goosedove.Host-AddIn.xll` beside it is the 32-bit build and cannot load that Python.
-3. Put `goosedove.cfg` beside the `.xll`. Two keys, one per line:
+1. Build it. Either `dotnet build host\Catalyst.Host -c Release`, or dot-source `tools\host_build.ps1` and call `Build-HostAddIn -Root <the repository>`, which builds Release, writes the config beside the result, and returns the path.
+2. Load `host\Catalyst.Host\bin\Release\net48\Catalyst.xll`. 64-bit Excel only: the add-in loads Python's own DLL into Excel's process, and the project's Python is 64-bit, which `tests\test_smoke.py` checks; the build makes no 32-bit file. To run the add-in from another folder, copy the five files the build leaves together, `Catalyst.xll`, `Catalyst.dna`, `Catalyst.Host.dll`, `Python.Runtime.dll` and `ExcelDna.IntelliSense.dll`, and a folder holding the `catalyst` package, which `pythonpath` then names in place of `src`.
+3. Put `catalyst.cfg` beside the `.xll`. Two keys, one per line:
 
    ```
    pythondll=C:\...\python313.dll
-   pythonpath=C:\...\goosedove\src;C:\...\site-packages
+   pythonpath=C:\...\catalyst\src;C:\...\site-packages
    ```
 
-   `pythondll` is the path of the file that is Python itself. `pythonpath` is the folders Python looks in, separated by semicolons: the repository's `src`, so `goosedove` is importable, and the folder holding the installed packages, so numpy is. The reader trims each line, skips blank lines and lines starting with `#`, and takes the last value when a key appears twice. Every other line needs an `=`, or start-up fails and `=GoosedoveStatus()` says so.
+   `pythondll` is the path of the file that is Python itself. `pythonpath` is the folders Python looks in, separated by semicolons: the repository's `src`, so `catalyst` is importable, and the folder holding the installed packages, so numpy is. The reader trims each line, skips blank lines and lines starting with `#`, and takes the last value when a key appears twice. Every other line needs an `=`, or start-up fails and `=CatalystStatus()` says so.
 4. `tools\host_build.ps1` writes that file from the project's own Python. It asks the environment for three things and joins them:
 
    ```powershell
@@ -256,21 +256,21 @@ uv sync --locked
    The first line and the third, joined with a backslash, are `pythondll`; the repository's `src` and the second line, a semicolon between them, are `pythonpath`. The file is written as plain ASCII and git ignores it, so an add-in deployed anywhere else needs one of its own.
 5. For a Python elsewhere, run that same command with that Python and write the two lines by hand. That Python needs the package's dependencies importable from the folders `pythonpath` names, and it must be 64-bit.
 6. Tell Excel to load the file. File > Options > Add-ins, Manage: Excel Add-ins, Go, Browse, pick the `.xll`, OK: it loads now and every time Excel starts until you clear the tick. Double-clicking the `.xll` loads it for that one session instead.
-7. Type `=GoosedoveStatus()`, then `=Ping()`, then `=Add(1,2)`. The first says whether Python started, the second which copy of the code is running, the third that a call crosses the seam and comes back. `Add` is a probe, so the function wizard will not offer it; type it in full.
+7. Type `=CatalystStatus()`, then `=Ping()`, then `=Add(1,2)`. The first says whether Python started, the second which copy of the code is running, the third that a call crosses the seam and comes back. `Add` is a probe, so the function wizard will not offer it; type it in full.
 
 ## 9. Where to look
 
 | What | Where |
 |---|---|
-| the bridge: the declared types, the accept and result rules, registration, the prepared path, `describe`, `Ping` | `src/goosedove/excel/bridge.py` |
-| the probes | `src/goosedove/excel/probes.py` |
-| the catalogue, the one place a new module of worksheet functions is named | `src/goosedove/excel/__init__.py` |
-| the host: start-up, the config reader, registration, the scan, the way out, `GoosedoveStatus`, `HostAdd` | `host/Goosedove.Host/AddIn.cs`, with the counter in `WorkCounter.cs` |
-| the host's own tests, which need no Excel | `host/Goosedove.Host.Tests/` |
+| the bridge: the declared types, the accept and result rules, registration, the prepared path, `describe`, `Ping` | `src/catalyst/excel/bridge.py` |
+| the probes | `src/catalyst/excel/probes.py` |
+| the catalogue, the one place a new module of worksheet functions is named | `src/catalyst/excel/__init__.py` |
+| the host: start-up, the config reader, registration, the scan, the way out, `CatalystStatus`, `HostAdd` | `host/Catalyst.Host/AddIn.cs`, with the counter in `WorkCounter.cs` |
+| the host's own tests, which need no Excel | `host/Catalyst.Host.Tests/` |
 | the check that the project's Python is the 64-bit one the host needs | `tests/test_smoke.py` |
 | the exact messages, pinned | `tests/unit/test_type_validation.py`, `test_range_validation.py`, `test_result_validation.py`, `test_bridge.py` |
 | the pins: the ledgers, the ceilings, the three test-only looks, the host's counts | `tests/performance/test_seam_budgets.py`, `test_seam_allocation.py`, `conftest.py`, `HostWorkBudgets.cs` |
-| the profiler, the three runners, the summary, the before-and-after tool and its comparison | `tools/performance/measure_python.py`, `profile_workload.py`, `Goosedove.Host.Measure/`, `measure_excel.ps1`, `summarize.py`, `before_after.ps1`, `compare.py` |
+| the profiler, the three runners, the summary, the before-and-after tool and its comparison | `tools/performance/measure_python.py`, `profile_workload.py`, `Catalyst.Host.Measure/`, `measure_excel.ps1`, `summarize.py`, `before_after.ps1`, `compare.py` |
 | the smoke test in a hidden Excel, Excel by hand, the build and the config it writes | `tools/excel_smoke.ps1`, `tools/excel_dev.ps1`, `tools/host_build.ps1` |
 | the whole check, and the Python-side measurement | `check.ps1`, `measure.ps1` |
 | the pull request template | `.github/PULL_REQUEST_TEMPLATE.md` |
@@ -284,7 +284,7 @@ One owner per fact. A page says what the code does today, and for anything else 
 
 | The fact | The owner |
 |---|---|
-| an instrument's fields: names, meanings, types, choices and rules | `src/goosedove/instruments/definitions.py`; `_ShowInstrument` spills it, and `tests/unit/test_instruments.py` holds the grid on its page equal to the spill |
+| an instrument's fields: names, meanings, types, choices and rules | `src/catalyst/instruments/definitions.py`; `_ShowInstrument` spills it, and `tests/unit/test_instruments.py` holds the grid on its page equal to the spill |
 | a worksheet function's signature and its Excel help | its declaration, the annotations and the docstring, which registration reads; `tests/unit/test_help.py` pins the words |
 | what a function does today: its behaviour, units, limitations and a worked example | its page under `docs/library/` |
 | what may cross into Python, and the order refusals come in | [inputs.md](inputs.md) |

@@ -46,7 +46,7 @@ fields. In particular, a ticket `none` cannot override a broker supplied by its 
 ## Calculation and ownership
 
 Make the change in static reserve creation, currently
-`src/goosedove/trades/reserves.py`, using the resolved per-trade brokerage applicability
+`src/catalyst/trades/reserves.py`, using the resolved per-trade brokerage applicability
 and route. No new lookup or repeated interpretation of the ticket is needed.
 
 ```text

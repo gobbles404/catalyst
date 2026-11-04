@@ -13,23 +13,23 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.index_definitions.contract_specifications import contract_specifications
-from goosedove.index_definitions.futures_schedule import futures_schedule
-from goosedove.index_definitions.holiday_calendar import holiday_calendar
-from goosedove.index_definitions.iferc_schedule import iferc_schedule
-from goosedove.index_definitions.index import index
-from goosedove.index_definitions.index_conventions import index_conventions
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FIXED_FLOAT
-from goosedove.instruments.fields import DatesOrTexts, FieldValues
-from goosedove.trades.encoding import encoded
-from goosedove.trades.resolution import resolved, trades
-from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
-from goosedove.trades.template import TradeTemplate, trade_template
-from goosedove.trades.terms import BASES, QuantityPer
+from catalyst.excel import bridge
+from catalyst.excel.bridge import Cells
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.index_definitions.contract_specifications import contract_specifications
+from catalyst.index_definitions.futures_schedule import futures_schedule
+from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.index_definitions.iferc_schedule import iferc_schedule
+from catalyst.index_definitions.index import index
+from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import FIXED_FLOAT
+from catalyst.instruments.fields import DatesOrTexts, FieldValues
+from catalyst.trades.encoding import encoded
+from catalyst.trades.resolution import resolved, trades
+from catalyst.trades.schedule_methods import METHODS, ScheduleMethod
+from catalyst.trades.template import TradeTemplate, trade_template
+from catalyst.trades.terms import BASES, QuantityPer
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 SIZES = [(5, 2), (2_000, 24)]

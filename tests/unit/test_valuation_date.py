@@ -5,7 +5,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from goosedove.globals.valuation_date import ValuationDate, valuation_date
+from catalyst.globals.valuation_date import ValuationDate, valuation_date
 
 FRIDAY = np.datetime64("2026-09-11")
 EPOCH = np.datetime64("1899-12-30")

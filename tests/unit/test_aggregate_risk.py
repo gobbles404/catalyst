@@ -29,29 +29,29 @@ from test_cashflows import DAY_BEFORE, booked
 from test_cashflows import valued as cashflows_valued
 from test_trades import an_index, dates, history_on, numbers, observed_of, quoted
 
-from goosedove.cashflows.valuation import CashflowResults
-from goosedove.globals.discount_curve import DiscountCurve
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.index_definitions.contract_specifications import contract_specifications
-from goosedove.index_definitions.futures_schedule import futures_schedule
-from goosedove.index_definitions.holiday_calendar import holiday_calendar
-from goosedove.index_definitions.index import index
-from goosedove.index_definitions.index_conventions import index_conventions
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.market.market import Market, market
-from goosedove.market.market_history import MarketHistory
-from goosedove.trades.aggregation import (
+from catalyst.cashflows.valuation import CashflowResults
+from catalyst.globals.discount_curve import DiscountCurve
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.index_definitions.contract_specifications import contract_specifications
+from catalyst.index_definitions.futures_schedule import futures_schedule
+from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.index_definitions.index import index
+from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.market.market import Market, market
+from catalyst.market.market_history import MarketHistory
+from catalyst.trades.aggregation import (
     AggregateResults,
     aggregate_results,
     aggregate_view,
 )
-from goosedove.trades.contributions import RateContribution
-from goosedove.trades.encoding import encoded
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.resolution import ResolvedTrades
-from goosedove.trades.results import TradeResults, risk_view
-from goosedove.trades.risk_report import (
+from catalyst.trades.contributions import RateContribution
+from catalyst.trades.encoding import encoded
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import prepared_trades
+from catalyst.trades.resolution import ResolvedTrades
+from catalyst.trades.results import TradeResults, risk_view
+from catalyst.trades.risk_report import (
     Bucket,
     Risk,
     RiskView,
@@ -60,7 +60,7 @@ from goosedove.trades.risk_report import (
     dv01_label,
     placed,
 )
-from goosedove.trades.terms import Route
+from catalyst.trades.terms import Route
 
 MONTHS = (("Z26", "2026-12-31"), ("F27", "2027-01-04"), ("F29", "2029-01-05"))
 HNG = an_index(

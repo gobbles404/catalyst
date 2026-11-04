@@ -7,7 +7,7 @@ from collections.abc import Callable
 import numpy as np
 from test_seam_allocation import SLACK, least_peak
 
-from goosedove.globals.unit_conversions import UNITS
+from catalyst.globals.unit_conversions import UNITS
 
 N = 10_000
 

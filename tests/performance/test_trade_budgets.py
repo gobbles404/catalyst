@@ -16,31 +16,31 @@ import pytest
 from numpy.typing import NDArray
 from test_seam_allocation import KEYWORD_CALL, SLACK, least_peak
 
-from goosedove.calendar.calendar import calendar
-from goosedove.excel.utilities import shown
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.globals.valuation_date import valuation_date
-from goosedove.index_definitions.contract_codes import schedule_months
-from goosedove.index_definitions.contract_specifications import contract_specifications
-from goosedove.index_definitions.futures_schedule import futures_schedule
-from goosedove.index_definitions.holiday_calendar import holiday_calendar
-from goosedove.index_definitions.iferc_schedule import iferc_schedule
-from goosedove.index_definitions.index import Index, index
-from goosedove.index_definitions.index_conventions import index_conventions
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FIXED_FLOAT
-from goosedove.instruments.fields import DatesOrTexts
-from goosedove.market.market import Market, market
-from goosedove.market.market_history import MarketHistory, market_history
-from goosedove.market_data.futures_fixings import futures_fixings
-from goosedove.market_data.iferc_fixings import iferc_fixings
-from goosedove.market_data.price_vector import price_vector
-from goosedove.trades.encoding import Encoded, encoded
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.observations import Observations, observations, observed
-from goosedove.trades.preparation import PreparedTrades, prepared_trades
-from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
-from goosedove.trades.terms import (
+from catalyst.calendar.calendar import calendar
+from catalyst.excel.utilities import shown
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.globals.valuation_date import valuation_date
+from catalyst.index_definitions.contract_codes import schedule_months
+from catalyst.index_definitions.contract_specifications import contract_specifications
+from catalyst.index_definitions.futures_schedule import futures_schedule
+from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.index_definitions.iferc_schedule import iferc_schedule
+from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import FIXED_FLOAT
+from catalyst.instruments.fields import DatesOrTexts
+from catalyst.market.market import Market, market
+from catalyst.market.market_history import MarketHistory, market_history
+from catalyst.market_data.futures_fixings import futures_fixings
+from catalyst.market_data.iferc_fixings import iferc_fixings
+from catalyst.market_data.price_vector import price_vector
+from catalyst.trades.encoding import Encoded, encoded
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.observations import Observations, observations, observed
+from catalyst.trades.preparation import PreparedTrades, prepared_trades
+from catalyst.trades.schedule_methods import METHODS, ScheduleMethod
+from catalyst.trades.terms import (
     BASES,
     FREQUENCIES,
     PaymentTerms,

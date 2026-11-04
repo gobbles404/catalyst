@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Resolution](01-trade-representation.md) ·
 [Encoding](02-static-encoding.md) · [Next: market binding](03-market-binding.md)
 
-Agreed responsibility boundary, 3 October 2026, built in #139 as ticket I4: [create-trades.md](../../library/trades/create-trades.md) is the function's page, `src/goosedove/trades/resolution.py` the two children and the batch. This page is the design contract.
+Agreed responsibility boundary, 3 October 2026, built in #139 as ticket I4: [create-trades.md](../../library/trades/create-trades.md) is the function's page, `src/catalyst/trades/resolution.py` the two children and the batch. This page is the design contract.
 
 ## The public wrapper and its two children
 

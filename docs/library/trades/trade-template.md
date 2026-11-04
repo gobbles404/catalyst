@@ -2,7 +2,7 @@
 
 Built in #139 as ticket I4 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_CreateTrades](create-trades.md); the seam's part, `FieldRow[str]` and the `FieldValues` it hands over, in #138 as [inputs.md](../../seam/inputs.md) decision 42.
 
-Shared trade fields under a library-owned instrument definition, created once and taken by every batch whose ticket supplies the rest, so a ticket of many rows types each shared fact once. The template may be incomplete, has no market-state dependency, and retains no index: the index is the first argument of `_CreateTrades`, so one template serves a CL index and an NG index alike. The code is `src/goosedove/trades/template.py`, the record, its builder and the readers of each field's value, and `src/goosedove/excel/trades.py`, the worksheet function.
+Shared trade fields under a library-owned instrument definition, created once and taken by every batch whose ticket supplies the rest, so a ticket of many rows types each shared fact once. The template may be incomplete, has no market-state dependency, and retains no index: the index is the first argument of `_CreateTrades`, so one template serves a CL index and an NG index alike. The code is `src/catalyst/trades/template.py`, the record, its builder and the readers of each field's value, and `src/catalyst/excel/trades.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -65,7 +65,7 @@ TradeTemplate
                  since #172 a period field may stand in names with no default, its cell having held nothing
 ```
 
-Each default is the one value the row held, owned: a number as a float, a date as a day, text and a code as text, a payment day as the day or the rule text it held, and a holiday calendar as the object its handle stood for, the same object the calendar's own cell publishes, held by reference so that a batch resolved under the template counts its payment days on it. No duplicate instrument schema is authored by the workbook, no per-field permission list exists, and no trade encoding, history binding or evaluation is performed. The template is the one kind whose handle selects an instrument for the seam, through `goosedove.instruments.fields.selected`, so `_CreateTrades` binds its ticket against the template's definition.
+Each default is the one value the row held, owned: a number as a float, a date as a day, text and a code as text, a payment day as the day or the rule text it held, and a holiday calendar as the object its handle stood for, the same object the calendar's own cell publishes, held by reference so that a batch resolved under the template counts its payment days on it. No duplicate instrument schema is authored by the workbook, no per-field permission list exists, and no trade encoding, history binding or evaluation is performed. The template is the one kind whose handle selects an instrument for the seam, through `catalyst.instruments.fields.selected`, so `_CreateTrades` binds its ticket against the template's definition.
 
 ## Template plus ticket
 

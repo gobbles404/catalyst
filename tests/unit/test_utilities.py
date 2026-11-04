@@ -12,9 +12,9 @@ from hypothesis import strategies as st
 from numpy.typing import NDArray
 from test_market import a_vector, any_gas_daily_history, any_history, any_iferc_history
 
-from goosedove.calendar.calendar import Calendar
-from goosedove.excel import bridge
-from goosedove.excel.bridge import (
+from catalyst.calendar.calendar import Calendar
+from catalyst.excel import bridge
+from catalyst.excel.bridge import (
     BOOLEAN_CODE,
     MISSING,
     NUMBER_CODE,
@@ -22,24 +22,24 @@ from goosedove.excel.bridge import (
     Cells,
     Handle,
 )
-from goosedove.excel.probes import probe
-from goosedove.excel.utilities import shown
-from goosedove.globals.discount_curve import DiscountCurve
-from goosedove.globals.valuation_date import ValuationDate
-from goosedove.index_definitions.contract_specifications import ContractSpecifications
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
-from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.iferc_schedule import IfercSchedule
-from goosedove.index_definitions.index import Index
-from goosedove.index_definitions.index_conventions import IndexConventions
-from goosedove.market.market import Market, market
-from goosedove.market.market_history import MarketHistory
-from goosedove.market_data.futures_fixings import FuturesFixings
-from goosedove.market_data.gas_daily_fixings import GasDailyFixings
-from goosedove.market_data.iferc_fixings import IfercFixings
-from goosedove.market_data.price_vector import PriceVector
-from goosedove.quoting.rfq import Rfq
+from catalyst.excel.probes import probe
+from catalyst.excel.utilities import shown
+from catalyst.globals.discount_curve import DiscountCurve
+from catalyst.globals.valuation_date import ValuationDate
+from catalyst.index_definitions.contract_specifications import ContractSpecifications
+from catalyst.index_definitions.futures_schedule import FuturesSchedule
+from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.iferc_schedule import IfercSchedule
+from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.index_conventions import IndexConventions
+from catalyst.market.market import Market, market
+from catalyst.market.market_history import MarketHistory
+from catalyst.market_data.futures_fixings import FuturesFixings
+from catalyst.market_data.gas_daily_fixings import GasDailyFixings
+from catalyst.market_data.iferc_fixings import IfercFixings
+from catalyst.market_data.price_vector import PriceVector
+from catalyst.quoting.rfq import Rfq
 
 PID = os.getpid()  # leads every handle this Python publishes
 

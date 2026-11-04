@@ -27,9 +27,9 @@ It spills a header and one row per inspectable definition, with exactly these tw
 
 Two rows since #200, the cashflow's beside the fixed_float's; another row comes when an
 instrument's field contract is defined and inspectable. Being listed establishes schema availability, not support for
-every product or valuation measure. The definitions are `src/goosedove/instruments/definitions.py`,
+every product or valuation measure. The definitions are `src/catalyst/instruments/definitions.py`,
 frozen library data authored and checked there, each name once and nonempty, each description
-nonempty; the function is `src/goosedove/excel/instruments.py`, which lays them out as one table
+nonempty; the function is `src/catalyst/excel/instruments.py`, which lays them out as one table
 of two text columns through the seam's table builder.
 
 The order is the explicit library declaration order. Every identifier is unique and can be
@@ -82,7 +82,7 @@ records the distinction between the reference contract and the actual trade's te
 
 `tests/unit/test_instruments.py` holds the examples, `tests/unit/test_help.py` pins the help,
 `tests/performance/test_seam_budgets.py` and `test_seam_allocation.py` the cost, `tools/excel_smoke.ps1`
-the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
+the rows in Excel and `host/Catalyst.Host.Tests/CallTests.cs` their replay.
 
 | Case | Kind |
 |---|---|

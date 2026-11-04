@@ -2,7 +2,7 @@
 
 [Pipeline overview](README.md) · [Previous](02-static-encoding.md) · [Next: evaluation](04-evaluation.md)
 
-Built in #136 as the preparation of the trade kernel, `src/goosedove/trades/preparation.py`, on the NG example, its
+Built in #136 as the preparation of the trade kernel, `src/catalyst/trades/preparation.py`, on the NG example, its
 worksheet functions built in #139 and #141; [kernel.md](../../library/trades/kernel.md) is the page.
 
 ## Responsibility

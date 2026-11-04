@@ -6,7 +6,7 @@ engineering backlog; no implementation is delivered by this document.\
 **Current authority:** [Trade valuation pipeline handoff](../../engineering-tickets/trade-valuation-pipeline/README.md).\
 **Related research:** [Archived linear trade pipeline](linear-trade-pipeline.md),
 [financial validation and golden harness](../../engineering-tickets/ethane-golden-validation-harness.md),
-and [PR119](https://github.com/gobbles404/goosedove/pull/119), reviewed at `60ae5d2`.
+and [PR119](https://github.com/gobbles404/catalyst/pull/119), reviewed at `60ae5d2`.
 
 The hidden history store, two-call worksheet API, signatures and delivery sequence below
 were considered and superseded. They must not be implemented alongside the agreed pipeline.

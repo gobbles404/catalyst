@@ -2,7 +2,7 @@
 
 Built in #68; the codes checked since #110; the quantity type in capitals since #129.
 
-The index conventions of one index: the currency unit and the quantity unit its price is quoted in, the currency unit it settles in, and what its quantity measures with the unit it is stated in, five codes kept as typed and reached by handle, and from #110 checked against the library's unit tables. Since #107 the [index](index.md) holds the conventions. The codes were kept unchecked from #68, the check noted at the builder for the first consumer's arrival; the [follow-ups](../follow-ups.md) pinned it on 26 September 2026, this build does it once, in the creator, so that pricing reads codes that mean something, and that page marks the item resolved. The code is `src/goosedove/index_definitions/index_conventions.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function, which hands the builder the library's unit collection, `UNITS`, as [unit-conversions.md](../globals/unit-conversions.md) says a reader receives it.
+The index conventions of one index: the currency unit and the quantity unit its price is quoted in, the currency unit it settles in, and what its quantity measures with the unit it is stated in, five codes kept as typed and reached by handle, and from #110 checked against the library's unit tables. Since #107 the [index](index.md) holds the conventions. The codes were kept unchecked from #68, the check noted at the builder for the first consumer's arrival; the [follow-ups](../follow-ups.md) pinned it on 26 September 2026, this build does it once, in the creator, so that pricing reads codes that mean something, and that page marks the item resolved. The code is `src/catalyst/index_definitions/index_conventions.py`, the record and its builder, and `src/catalyst/excel/index_definitions.py`, the worksheet function, which hands the builder the library's unit collection, `UNITS`, as [unit-conversions.md](../globals/unit-conversions.md) says a reader receives it.
 
 ## Worksheet contract
 
@@ -39,7 +39,7 @@ Five text scalars, all required, in this order, which is fixed: the sheet passes
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/index_definitions.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog. Where an argument takes a code, its help lists the codes, as [conventions.md](../conventions.md) asks.
+Quoted from the declaration in `src/catalyst/excel/index_definitions.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog. Where an argument takes a code, its help lists the codes, as [conventions.md](../conventions.md) asks.
 
 | Item | Text |
 |---|---|
@@ -66,7 +66,7 @@ The two quantity units may differ, as may the two currency units, so long as eac
 
 ## Tests
 
-The examples and properties below are `tests/unit/test_index_conventions.py`; the seam's texts and the handle are `tests/unit/test_index_definitions.py`, whose hidden reader proves the handle resolves to the conventions; the spill is `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`: the five lookups, and not one numpy call.
+The examples and properties below are `tests/unit/test_index_conventions.py`; the seam's texts and the handle are `tests/unit/test_index_definitions.py`, whose hidden reader proves the handle resolves to the conventions; the spill is `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`: the five lookups, and not one numpy call.
 
 | Case | Kind |
 |---|---|

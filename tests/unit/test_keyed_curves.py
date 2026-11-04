@@ -28,24 +28,24 @@ from test_bilateral_kernel import (
 from test_cross_gamma import trades_on
 from test_trades import an_index, dates, day, history_on, observed_of, quoted
 
-from goosedove.calendar.calendar import calendar
-from goosedove.globals.discount_curve import DiscountCurve, bump_discount_curve, discount_curve
-from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.globals.valuation_date import valuation_date
-from goosedove.index_definitions.index import Index
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.market.market import Market
-from goosedove.market.market_history import MarketHistory, market_history
-from goosedove.market_data.futures_fixings import futures_fixings
-from goosedove.trades.aggregation import aggregate_view
-from goosedove.trades.encoding import Encoded, encoded
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import PreparedTrades, prepared_trades
-from goosedove.trades.results import TradeResults, risk_view
-from goosedove.trades.risk_report import Bucket, Risk
-from goosedove.trades.schedule_methods import ScheduleMethod
-from goosedove.trades.terms import ResolvedTrades
+from catalyst.calendar.calendar import calendar
+from catalyst.globals.discount_curve import DiscountCurve, bump_discount_curve, discount_curve
+from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.globals.valuation_date import valuation_date
+from catalyst.index_definitions.index import Index
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.market.market import Market
+from catalyst.market.market_history import MarketHistory, market_history
+from catalyst.market_data.futures_fixings import futures_fixings
+from catalyst.trades.aggregation import aggregate_view
+from catalyst.trades.encoding import Encoded, encoded
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import PreparedTrades, prepared_trades
+from catalyst.trades.results import TradeResults, risk_view
+from catalyst.trades.risk_report import Bucket, Risk
+from catalyst.trades.schedule_methods import ScheduleMethod
+from catalyst.trades.terms import ResolvedTrades
 
 # The parent's index: a reporting lot of 10,000 barrels, G27 expiring 1 February 2027 so that its
 # lastday observation is live on the valuation day, and F29 keeping a quote in every market.

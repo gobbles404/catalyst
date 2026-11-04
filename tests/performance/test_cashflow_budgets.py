@@ -13,17 +13,17 @@ import numpy as np
 import pytest
 from test_seam_allocation import ENTRY, SLACK, least_peak, retained_numpy_bytes
 
-from goosedove.cashflows.booking import Cashflows, cashflows
-from goosedove.cashflows.valuation import cashflow_results
-from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells
-from goosedove.globals.discount_curve import DiscountCurve, discount_curve
-from goosedove.globals.valuation_date import ValuationDate, valuation_date
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import CASHFLOW
-from goosedove.instruments.fields import FieldValues
-from goosedove.trades.risk_report import Bucket, Risk
-from goosedove.trades.template import trade_template
+from catalyst.cashflows.booking import Cashflows, cashflows
+from catalyst.cashflows.valuation import cashflow_results
+from catalyst.excel import bridge
+from catalyst.excel.bridge import Cells
+from catalyst.globals.discount_curve import DiscountCurve, discount_curve
+from catalyst.globals.valuation_date import ValuationDate, valuation_date
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import CASHFLOW
+from catalyst.instruments.fields import FieldValues
+from catalyst.trades.risk_report import Bucket, Risk
+from catalyst.trades.template import trade_template
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 AS_OF = np.datetime64("2027-01-04", "D")

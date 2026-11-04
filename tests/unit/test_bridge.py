@@ -3,7 +3,7 @@ import ctypes
 import numpy as np
 import pytest
 
-from goosedove.excel import bridge
+from catalyst.excel import bridge
 
 
 def test_ping_is_registered() -> None:
@@ -14,7 +14,7 @@ def test_ping_is_registered() -> None:
 def test_call_ping_reports_version_and_location() -> None:
     result = bridge.call("Ping", [])
     assert isinstance(result, str)
-    assert "goosedove" in result
+    assert "catalyst" in result
 
 
 def test_specs_carry_name_description_parameters_and_hidden() -> None:
@@ -26,7 +26,7 @@ def test_specs_carry_name_description_parameters_and_hidden() -> None:
         [("a", ""), ("b", "")],  # a hidden probe says nothing of its arguments
         True,
     )
-    assert specs["Ping"] == ("Confirm which goosedove Excel is running.", [], False)
+    assert specs["Ping"] == ("Confirm which catalyst Excel is running.", [], False)
 
 
 _kept: dict[str, bridge.MixedArray] = {}

@@ -9,11 +9,11 @@ import numpy as np
 import pytest
 from test_seam_allocation import ENTRY, SLACK, least_peak, retained_numpy_bytes
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells
-from goosedove.globals.discount_curve import DiscountCurve, discount_curve
-from goosedove.globals.discount_curve_set import collect_discount_curves
-from goosedove.instrumentation.work_counts import WorkCounter
+from catalyst.excel import bridge
+from catalyst.excel.bridge import Cells
+from catalyst.globals.discount_curve import DiscountCurve, discount_curve
+from catalyst.globals.discount_curve_set import collect_discount_curves
+from catalyst.instrumentation.work_counts import WorkCounter
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 FIRST = np.datetime64("2026-09-11", "D")

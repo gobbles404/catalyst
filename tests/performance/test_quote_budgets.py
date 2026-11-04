@@ -14,27 +14,27 @@ import numpy as np
 import pytest
 from test_seam_allocation import SLACK, least_peak
 
-from goosedove.calendar.calendar import calendar
-from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells
-from goosedove.globals.discount_curve import discount_curve
-from goosedove.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.globals.valuation_date import valuation_date
-from goosedove.index_definitions.contract_specifications import contract_specifications
-from goosedove.index_definitions.futures_schedule import futures_schedule
-from goosedove.index_definitions.holiday_calendar import holiday_calendar
-from goosedove.index_definitions.index import index
-from goosedove.index_definitions.index_conventions import index_conventions
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FIXED_FLOAT
-from goosedove.market.market import Market, market
-from goosedove.market.market_history import market_history
-from goosedove.market_data.futures_fixings import futures_fixings
-from goosedove.market_data.price_vector import price_vector
-from goosedove.quoting.quote import quote, quote_by_dates
-from goosedove.quoting.template import QuoteTemplate
-from goosedove.trades.template import DayOrRule
+from catalyst.calendar.calendar import calendar
+from catalyst.excel import bridge
+from catalyst.excel.bridge import Cells
+from catalyst.globals.discount_curve import discount_curve
+from catalyst.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.globals.valuation_date import valuation_date
+from catalyst.index_definitions.contract_specifications import contract_specifications
+from catalyst.index_definitions.futures_schedule import futures_schedule
+from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.index_definitions.index import index
+from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import FIXED_FLOAT
+from catalyst.market.market import Market, market
+from catalyst.market.market_history import market_history
+from catalyst.market_data.futures_fixings import futures_fixings
+from catalyst.market_data.price_vector import price_vector
+from catalyst.quoting.quote import quote, quote_by_dates
+from catalyst.quoting.template import QuoteTemplate
+from catalyst.trades.template import DayOrRule
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 PATH = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}

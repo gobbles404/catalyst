@@ -1,8 +1,8 @@
 # Check repository documentation links
 
-**Status:** Agreed 17 October 2026 and built the same day from PR 191's accepted head `cdcc6be` on the branch `docs/link-checks`; the pull request that carries this page is the record, and [PR 192](https://github.com/gobbles404/goosedove/pull/192) was the prototype it replaces. Kept as the plan as it was: later changes update [working.md §11](../seam/working.md#11-checking-the-links), not this page.
+**Status:** Agreed 17 October 2026 and built the same day from PR 191's accepted head `cdcc6be` on the branch `docs/link-checks`; the pull request that carries this page is the record, and [PR 192](https://github.com/gobbles404/catalyst/pull/192) was the prototype it replaces. Kept as the plan as it was: later changes update [working.md §11](../seam/working.md#11-checking-the-links), not this page.
 **Suggested PR title:** `test(docs): check local documentation links and anchors`
-**Base:** The accepted head of [PR 191](https://github.com/gobbles404/goosedove/pull/191), or current main once it merges. Treat [PR 192](https://github.com/gobbles404/goosedove/pull/192) as a prototype and source of evidence, not the implementation to keep extending.
+**Base:** The accepted head of [PR 191](https://github.com/gobbles404/catalyst/pull/191), or current main once it merges. Treat [PR 192](https://github.com/gobbles404/catalyst/pull/192) as a prototype and source of evidence, not the implementation to keep extending.
 
 ## The outcome
 

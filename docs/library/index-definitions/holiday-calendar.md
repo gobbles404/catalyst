@@ -2,7 +2,7 @@
 
 Built in #67. Since #183 several calendars combine into one closed on every day any of them is closed, [combine-holiday-calendars.md](combine-holiday-calendars.md); this page is the creator alone, which keeps the list as given.
 
-The days one market is closed, listed one by one as the desk keeps them, kept as given and reached by handle. It is a static calendar: the list is the calendar, and no day is generated from a rule. Its readers reach it through the [index](index.md), which holds it beside a futures schedule since #107, requires it there and refuses it beside an IFERC or a Gas Daily one. The [futures fixings](../market-data/futures-fixings.md), its first reader since #79 and through the index since #108, are refused on a listed day, or without a fixing on a business day, through numpy's business-day functions over this list, as [time.md](../time.md) decided; the [calendar](../calendar/calendar.md) of #82 reads it the same way, flagging whether the market is open on each of its days. A reader that counts the business days between two dates is not specified. The code is `src/goosedove/index_definitions/holiday_calendar.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function.
+The days one market is closed, listed one by one as the desk keeps them, kept as given and reached by handle. It is a static calendar: the list is the calendar, and no day is generated from a rule. Its readers reach it through the [index](index.md), which holds it beside a futures schedule since #107, requires it there and refuses it beside an IFERC or a Gas Daily one. The [futures fixings](../market-data/futures-fixings.md), its first reader since #79 and through the index since #108, are refused on a listed day, or without a fixing on a business day, through numpy's business-day functions over this list, as [time.md](../time.md) decided; the [calendar](../calendar/calendar.md) of #82 reads it the same way, flagging whether the market is open on each of its days. A reader that counts the business days between two dates is not specified. The code is `src/catalyst/index_definitions/holiday_calendar.py`, the record and its builder, and `src/catalyst/excel/index_definitions.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -30,7 +30,7 @@ One column of dates, selected without the header row: row 1 is for the person re
 
 ## Excel help
 
-Quoted from the declaration in `src/goosedove/excel/index_definitions.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+Quoted from the declaration in `src/catalyst/excel/index_definitions.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -43,7 +43,7 @@ None. The seam never compares two arguments and the calendar has one, so there i
 
 ## Tests
 
-The examples and properties below are `tests/unit/test_holiday_calendar.py`; the seam's texts and the handle are `tests/unit/test_index_definitions.py`, whose hidden reader proves the handle resolves to the calendar; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
+The examples and properties below are `tests/unit/test_holiday_calendar.py`; the seam's texts and the handle are `tests/unit/test_index_definitions.py`, whose hidden reader proves the handle resolves to the calendar; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
 
 | Case | Kind |
 |---|---|

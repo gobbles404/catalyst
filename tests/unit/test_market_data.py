@@ -12,13 +12,13 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from test_utilities import read, rows
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells, Handle
-from goosedove.excel.probes import probe
-from goosedove.market_data.futures_fixings import FuturesFixings
-from goosedove.market_data.gas_daily_fixings import GasDailyFixings
-from goosedove.market_data.iferc_fixings import IfercFixings
-from goosedove.market_data.price_vector import PriceVector
+from catalyst.excel import bridge
+from catalyst.excel.bridge import MISSING, Cells, Handle
+from catalyst.excel.probes import probe
+from catalyst.market_data.futures_fixings import FuturesFixings
+from catalyst.market_data.gas_daily_fixings import GasDailyFixings
+from catalyst.market_data.iferc_fixings import IfercFixings
+from catalyst.market_data.price_vector import PriceVector
 
 PID = os.getpid()  # leads every handle this Python publishes
 

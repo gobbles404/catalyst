@@ -32,34 +32,34 @@ from test_trades import (
     spec,
 )
 
-from goosedove.calendar.calendar import calendar
-from goosedove.excel import bridge
-from goosedove.globals.discount_curve import bump_discount_curve
-from goosedove.globals.discount_curve_set import DiscountCurveSet
-from goosedove.globals.payments import factors_on
-from goosedove.globals.unit_conversions import UNITS
-from goosedove.globals.valuation_date import valuation_date
-from goosedove.index_definitions.contract_specifications import contract_specifications
-from goosedove.index_definitions.holiday_calendar import holiday_calendar
-from goosedove.index_definitions.iferc_schedule import iferc_schedule
-from goosedove.index_definitions.index import Index, index
-from goosedove.index_definitions.index_conventions import index_conventions
-from goosedove.index_definitions.periods import end_date, start_date
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FIXED_FLOAT
-from goosedove.instruments.fields import DatesOrTexts
-from goosedove.market.market import Market
-from goosedove.market.market_history import MarketHistory, market_history
-from goosedove.market_data.futures_fixings import futures_fixings
-from goosedove.market_data.iferc_fixings import iferc_fixings
-from goosedove.quoting.quote import quote
-from goosedove.quoting.template import QuoteTemplate
-from goosedove.trades.encoding import encoded
-from goosedove.trades.evaluation import trade_results
-from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.schedule_methods import ScheduleMethod
-from goosedove.trades.template import DayOrRule
-from goosedove.trades.terms import (
+from catalyst.calendar.calendar import calendar
+from catalyst.excel import bridge
+from catalyst.globals.discount_curve import bump_discount_curve
+from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.globals.payments import factors_on
+from catalyst.globals.unit_conversions import UNITS
+from catalyst.globals.valuation_date import valuation_date
+from catalyst.index_definitions.contract_specifications import contract_specifications
+from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.index_definitions.iferc_schedule import iferc_schedule
+from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.periods import end_date, start_date
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.instruments.definitions import FIXED_FLOAT
+from catalyst.instruments.fields import DatesOrTexts
+from catalyst.market.market import Market
+from catalyst.market.market_history import MarketHistory, market_history
+from catalyst.market_data.futures_fixings import futures_fixings
+from catalyst.market_data.iferc_fixings import iferc_fixings
+from catalyst.quoting.quote import quote
+from catalyst.quoting.template import QuoteTemplate
+from catalyst.trades.encoding import encoded
+from catalyst.trades.evaluation import trade_results
+from catalyst.trades.preparation import prepared_trades
+from catalyst.trades.schedule_methods import ScheduleMethod
+from catalyst.trades.template import DayOrRule
+from catalyst.trades.terms import (
     FREQUENCIES,
     PaymentTerms,
     QuantityPer,

@@ -13,8 +13,8 @@ import numpy as np
 import pytest
 from test_seam_allocation import KEYWORD_CALL, SLACK, least_peak
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells
+from catalyst.excel import bridge
+from catalyst.excel.bridge import Cells
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 PATH = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}

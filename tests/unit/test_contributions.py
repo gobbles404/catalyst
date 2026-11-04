@@ -12,17 +12,17 @@ from test_bilateral_kernel import valued as trades_valued
 from test_cashflows import booked
 from test_cashflows import valued as cashflows_valued
 
-from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.trades.aggregation import aggregate_results, aggregate_view
-from goosedove.trades.contributions import (
+from catalyst.instrumentation.work_counts import WorkCounter
+from catalyst.trades.aggregation import aggregate_results, aggregate_view
+from catalyst.trades.contributions import (
     CLEARED,
     CrossContribution,
     RateContribution,
     curve_words,
 )
-from goosedove.trades.results import risk_view
-from goosedove.trades.risk_report import Bucket, Risk
-from goosedove.trades.terms import Route
+from catalyst.trades.results import risk_view
+from catalyst.trades.risk_report import Bucket, Risk
+from catalyst.trades.terms import Route
 
 SOFR = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))
 FFOIS = curve_of((AS_OF, 1.0), (A_YEAR, 0.96), (TWO_YEARS, 0.92), name="FFOIS")

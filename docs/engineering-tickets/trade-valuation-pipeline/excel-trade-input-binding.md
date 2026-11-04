@@ -46,11 +46,11 @@ do not change a field value's own documented grammar, such as contract-code case
 
 | Capability | Current implementation and boundary |
 |---|---|
-| Headers bound to typed columns | `Table`, `Schema`, `_bind` and `_refine` in [bridge.py](../../../src/goosedove/excel/bridge.py) bind a `TextRow` to a declared table. Header width must match body width; order may vary. |
+| Headers bound to typed columns | `Table`, `Schema`, `_bind` and `_refine` in [bridge.py](../../../src/catalyst/excel/bridge.py) bind a `TextRow` to a declared table. Header width must match body width; order may vary. |
 | Canonical header matching | `_bind` uses `casefold()` without trimming. `quantity` and `QUANTITY` are the same field; `quantity ` is not silently repaired. Unknown and repeated headers fail. |
 | One type check at the boundary | `Registered.run` hands the library typed values. Dates arrive as dates, quantities as numbers, and handles as objects. The library validates their economic meaning. |
 | Scalar typed references | `Handle[Kind]` resolves a live stored object of the declared kind. An optional scalar handle can be omitted with `None` as its declaration default. A blank cell still fails. |
-| Publication and lifetime | [Lifetime.cs](../../../host/Goosedove.Host/Lifetime.cs) uses Excel-DNA observation for handle-returning creators. Equal live calls share a publication; changed inputs create a new immutable object; final disconnection releases the store's reference. |
+| Publication and lifetime | [Lifetime.cs](../../../host/Catalyst.Host/Lifetime.cs) uses Excel-DNA observation for handle-returning creators. Equal live calls share a publication; changed inputs create a new immutable object; final disconnection releases the store's reference. |
 
 The `Table` declared beside a function keeps its schema fixed at registration, every column
 required, with number, date, text and boolean columns. The instrument-selected form beside it,
@@ -66,8 +66,8 @@ extension. This document does not change existing table functions.
 
 One extension for library-defined, typed partial tables, agreed in the review of 3 October
 2026 as its decisions 9 to 12 and built in #138 as ticket I3: `FieldRow[S]` and `FieldRows[S]` in
-`src/goosedove/excel/bridge.py`, bound by `_bind_fields`, the `FieldValues` record and the
-`selected` rule in `src/goosedove/instruments/fields.py`, and [inputs.md](../../seam/inputs.md)
+`src/catalyst/excel/bridge.py`, bound by `_bind_fields`, the `FieldValues` record and the
+`selected` rule in `src/catalyst/instruments/fields.py`, and [inputs.md](../../seam/inputs.md)
 decision 42 recording it; the probes `EchoFieldRow` and `CountFieldRows` prove it without a
 trade function. Keep the raw mixed-cell
 transport private to the seam. Do not pass a `MixedArray` to the trade library and ask it to
@@ -192,8 +192,8 @@ reference use and lifecycle guarantees.
 
 ## Price-vector identity limitation
 
-[PriceVector](../../../src/goosedove/market_data/price_vector.py) retains an index-name
-string and ordered prices, without contract identifiers. [Market](../../../src/goosedove/market/market.py)
+[PriceVector](../../../src/catalyst/market_data/price_vector.py) retains an index-name
+string and ordered prices, without contract identifiers. [Market](../../../src/catalyst/market/market.py)
 checks the name and permissible vector length, then interprets positions from the first
 unfixed contract in the history's schedule. It cannot identify a same-length permutation,
 a column mislabeled with the expected name, or an unrolled price column that still fits.

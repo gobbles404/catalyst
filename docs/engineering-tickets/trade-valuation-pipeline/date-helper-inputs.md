@@ -119,7 +119,7 @@ uses the booked dates; advancing market `as_of` does not move them.
 
 Reuse the existing optional-handle input support. The Excel utility wrapper receives
 the resolved `ValuationDate` object and passes its scalar `as_of` to the pure period
-functions in `src/goosedove/index_definitions/periods.py`. Keep handle resolution out
+functions in `src/catalyst/index_definitions/periods.py`. Keep handle resolution out
 of that module. Reuse the existing parser and shared BAL boundary validation; replace
 the before-period refusal with the maximum rule, retaining an after-end refusal.
 
@@ -183,9 +183,9 @@ the seam's record is the #173 row of [history.md](../../seam/history.md).
   same words from both helpers; the seam's own for a blank, a raw date, a fraction of a day, a text
   naming no live object and a handle of another kind, `valuation_date is number 46371.0, expected
   valuation date handle` among them, whatever the label beside.
-- Where the code is: `src/goosedove/index_definitions/periods.py`, `start_date(period, as_of=None)` and
+- Where the code is: `src/catalyst/index_definitions/periods.py`, `start_date(period, as_of=None)` and
   `end_date(period, as_of=None)` over one `_balance_from`, taking the day and never a handle;
-  `src/goosedove/excel/utilities.py`, the two wrappers, `valuation_date: Handle[ValuationDate] | None =
+  `src/catalyst/excel/utilities.py`, the two wrappers, `valuation_date: Handle[ValuationDate] | None =
   None`, passing `as_of` through. Both stay nonvolatile, publish nothing and keep no cache.
 - Migrated callers: the period, utility, help and valuation tests, the seam budget and allocation
   tests, the host's theory rows and a new fact, the smoke's utility block, now over twelve handles in
