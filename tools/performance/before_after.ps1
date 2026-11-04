@@ -56,12 +56,13 @@ if (Test-Path $side) { Invoke-Git worktree remove --force $side | Out-Host }
 Invoke-Git worktree add --detach $side $Base | Out-Host
 try {
     # Each runner is a path in the side it runs in, so a base from before a rename runs its own
-    # scripts and its own measurement project: the one *.Host.Measure under its tools\performance.
+    # scripts and its own measurement project: the one *.Host.Measure.csproj a folder under its
+    # tools\performance holds. A folder an earlier build left behind, bin and obj alone, holds none.
     $runners = @(
         @{ Name = "python"; Run = { & uv run python tools/performance/measure_python.py } },
         @{ Name = "host"; Run = {
-            $projects = @(Get-ChildItem tools\performance -Directory -Filter "*.Host.Measure")
-            if ($projects.Count -ne 1) { throw "expected one *.Host.Measure project under tools\performance, found $($projects.Count)" }
+            $projects = @(Get-ChildItem tools\performance\*\*.Host.Measure.csproj -File)
+            if ($projects.Count -ne 1) { throw "expected one *.Host.Measure.csproj under tools\performance, found $($projects.Count)" }
             & dotnet run --project $projects[0].FullName -c Release
         } },
         @{ Name = "excel"; Run = { & .\tools\performance\measure_excel.ps1 } }
