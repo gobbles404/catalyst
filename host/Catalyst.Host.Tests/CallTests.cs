@@ -275,7 +275,7 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "CountFieldRows", new object[] { "fixed_float", Row("quantity", "fixed_price"), new object[,] { { 1.0, 3.1 }, { 2.0, 3.2 }, { 3.0, 3.3 } } }, 3.0 };
             yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values" };
-            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, settlement_frequency" };
+            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields cell (1, 2) is text 'quantity', already given at cell (1, 1)" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "fixed_price"), Row("ten", "eleven") }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("trade_date"), 46164.5 }, "#ERROR EchoFieldRow: values cell (1, 1) is number 46164.5, expected date" };
@@ -657,7 +657,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("Firm A", booked[2, 5]);
             Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk", Seam.Call("_ReportRisk", results, "delta", "day"));
             var fixedFloat = Seam.Call("_CreateTradeTemplate", "fixed_float", Row("route"), Row("cleared"));
-            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, settlement_frequency", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
+            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
             Assert.Equal("#ERROR _CreateCashflows: ValueError: template is of instrument 'fixed_float', expected cashflow, the one instrument whose cashflows are built", Seam.Call("_CreateCashflows", Row("trade_date"), Row(46391.0), fixedFloat));
         }
 
@@ -681,12 +681,14 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR EchoFieldRow: values cell (1, 1) is valuation date handle '" + date + "', expected holiday calendar handle", Seam.Call("EchoFieldRow", "fixed_float", Row("payment_holiday_calendar"), date));
         }
 
-        // A pair of indexes, two-index-fixed-float.md: A a futures index and B an IFERC one over the
-        // one NYMEX NG specification, booked as one row at 3.30 and -0.30, the histories and the
-        // markets handed as a column and a row in either order: the ticket's hand table, 950 of mark
-        // and -0.095 of DV01 on SOFR at 0.95 a year on, each leg a lot; the risk report two commodity
-        // groups and one DV01 column; the readbacks naming each leg; a column of one history and a
-        // grid of handles refused, the seam's words and the kernel's.
+        // A pair of indexes, two-index-fixed-float.md and two-index-one-price.md: A a futures index
+        // and B an IFERC one over the one NYMEX NG specification, booked as one row at the outright
+        // 3.00, the histories and the markets handed as a column and a row in either order: the
+        // ticket's hand table, 950 of mark and -0.095 of DV01 on SOFR at 0.95 a year on, each leg a
+        // lot; the risk report two commodity groups and one DV01 column; the readbacks naming each
+        // leg and showing one price and no leg value; a column of one history, a grid of handles, the
+        // second leg's method on one index and a second price refused, the seam's words and the
+        // kernel's.
         [Fact]
         public void a_pair_of_indexes_is_booked_prepared_and_valued_as_one_payment()
         {
@@ -700,8 +702,8 @@ namespace Catalyst.Host.Tests
             var curves = (string)Seam.Call("_CollectDiscountCurves", (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 } }));
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, (string)Seam.Call("_CreateHolidayCalendar", 46388.0)));
-            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "second_fixed_price");
-            var row = Row(1.0, 46371.0, "G27", 1.0, 3.30, -0.30);
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
+            var row = Row(1.0, 46371.0, "G27", 1.0, 3.00);
             var trades = (string)Seam.Call("_CreateTrades", Column(a, b), headers, row, template);
             Assert.StartsWith(Pid + ":trades:A+B:", trades);
             var prepared = (string)Seam.Call("_PrepareTrades", trades, Column(historyB, historyA));
@@ -731,18 +733,29 @@ namespace Catalyst.Host.Tests
             Assert.Equal("B", read[3, 1]);
             var booked = (object[,])Seam.Call("util_ReadHandle", trades);
             Assert.Equal(3, booked.GetLength(0));
-            var combined = Heading(booked, "combined_fixed_price");
-            Assert.True(combined > 0);
-            Assert.Equal(3.0, (double)booked[2, combined], 12);
-            Assert.Equal(-0.3, (double)booked[2, combined - 1], 12);
+            var price = Heading(booked, "fixed_price");
+            Assert.True(price > 0);
+            Assert.Equal(3.0, (double)booked[2, price], 12);
+            Assert.Equal(-30000.0, (double)booked[2, Heading(booked, "offset")], 9);  // the trade's fixed leg, once
+            Assert.Equal(-1, Heading(booked, "second_fixed_price"));  // no field since two-index-one-price.md
+            Assert.Equal(-1, Heading(read, "leg_dv01"));  // no value is a leg's
+            // cva-reserve.md: a CVA column on the pair's row books its signed amount once, though the row has two
+            // legs, the bilateral unbrokered template charging no fee.
+            var pairCva = (string)Seam.Call("_CreateTrades", Column(a, b), Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "cva_reserve"), Row(1.0, 46371.0, "G27", 1.0, 3.00, -40.0), template);
+            var pairReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", pairCva, Column(historyA, historyB)), Row(marketA, marketB), curves));
+            Assert.Equal(5, pairReserves.GetLength(1));
+            Assert.Equal(0.0, (double)pairReserves[2, 0], 9);
+            Assert.Equal(-40.0, (double)pairReserves[2, 3], 9);
+            Assert.Equal("USD", pairReserves[2, 4]);
             Assert.Equal("#ERROR _PrepareTrades: ValueError: histories are 1, expected 2, one per leg of the trades", Seam.Call("_PrepareTrades", trades, historyA));
             Assert.Equal("#ERROR _EvaluateTrades: ValueError: market 2 is over the history of index 'A' as market 1 is, expected one market per history of the trades", Seam.Call("_EvaluateTrades", prepared, Column(marketA, marketA), curves));
             Assert.StartsWith("#ERROR _CreateTrades: indexes is 2x2 array, expected one cell, one row or one column of index handles", (string)Seam.Call("_CreateTrades", new object[,] { { a, b }, { a, b } }, headers, row, template));
-            Assert.Equal("#ERROR _CreateTrades: ValueError: second_fixed_price is -0.3, expected none unless two indexes", Seam.Call("_CreateTrades", a, headers, row, template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: second_schedule_method is 'lastday', expected none unless two indexes", Seam.Call("_CreateTrades", a, headers, row, template));
+            Assert.StartsWith("#ERROR _CreateTrades: fields cell (1, 6) is text 'second_fixed_price', expected a field of fixed_float: trade_id,", (string)Seam.Call("_CreateTrades", Column(a, b), Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "second_fixed_price"), Row(1.0, 46371.0, "G27", 1.0, 3.30, -0.30), template));
         }
 
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;
-        // the shown fixed_float spills ten rows by twenty columns, the seven rows of booking and since
+        // the shown fixed_float spills ten rows by twenty-three columns, the seven rows of booking and since
         // template-based-quoting.md the three of quoting, the labels down the first column, the fields across
         // the first row and the required, quote_allowed and quote_required rows booleans, every other cell text.
         [Fact]
@@ -765,10 +778,11 @@ namespace Catalyst.Host.Tests
             Assert.Equal("counterparty", shown[0, 10]);
             Assert.Equal("discount_curve_key", shown[0, 11]);  // after the counterparty, since named-curves-slice-3.md
             Assert.Equal("route = bilateral", shown[3, 11]);
-            Assert.Equal("second_fixed_price", shown[0, 17]);
+            Assert.Equal("second_schedule_method", shown[0, 17]);  // the second leg's one field since two-index-one-price.md
             Assert.Equal("two indexes", shown[3, 17]);
-            Assert.Equal("payment_holiday_calendar", shown[0, 20]);
-            Assert.Equal("marketing_reserve", shown[0, 21]);
+            Assert.Equal("payment_holiday_calendar", shown[0, 19]);
+            Assert.Equal("marketing_reserve", shown[0, 20]);
+            Assert.Equal("cva_reserve", shown[0, 21]);  // signed, since cva-reserve.md
             Assert.Equal("settlement_frequency", shown[0, 22]);  // last, since onetime-averaging.md
             Assert.Equal("required", shown[2, 0]);
             Assert.Equal(false, shown[2, 1]);
@@ -778,8 +792,8 @@ namespace Catalyst.Host.Tests
             Assert.Equal("no contract_code on the row, or with start_date", shown[3, 5]);
             Assert.Equal("route = cleared", shown[3, 9]);
             Assert.Equal("route = bilateral", shown[3, 10]);
-            Assert.Equal("a finite amount of zero or more", shown[5, 21]);
-            Assert.Equal("holiday calendar handle", shown[4, 20]);
+            Assert.Equal("a finite amount of zero or more", shown[5, 20]);
+            Assert.Equal("holiday calendar handle", shown[4, 19]);
             Assert.Equal("the index's specification names", shown[5, 14]);
             Assert.Equal("month, calday, period", shown[5, 15]);
             Assert.Equal("quote_allowed", shown[7, 0]);
@@ -1055,16 +1069,16 @@ namespace Catalyst.Host.Tests
             Assert.Equal("group_dv01", contributions[0, 16]);
             Assert.Equal("-", contributions[2, 13]);  // a cleared batch retains no payment facts
             Assert.Equal("brokerage_reserve", contributions[0, 17]);
-            Assert.Equal(29, contributions.GetLength(1));  // since #197 the contract's cross-gamma and its unit, since named-curves-slice-3.md the key and the curve, since observation-prices-readback.md the four price columns, last
-            Assert.Equal("observation_coefficient", contributions[0, 25]);
-            Assert.Equal(20000.0, contributions[2, 25]);
-            Assert.Equal(72.1, (double)contributions[2, 26], 9);  // the live quote the contribution was made of
-            Assert.Equal("USD/MMBTU", contributions[2, 27]);
-            Assert.Equal(1442000.0, (double)contributions[2, 28], 6);
-            Assert.Equal("contract_cross_gamma", contributions[0, 21]);
-            Assert.Equal("cross_gamma_unit", contributions[0, 22]);
-            Assert.Equal(0.0, contributions[2, 21]);
-            Assert.Equal("lots of NYMEX NG (10000 MMBTU) per basis point", contributions[2, 22]);
+            Assert.Equal(30, contributions.GetLength(1));  // since #197 the contract's cross-gamma and its unit, since named-curves-slice-3.md the key and the curve, since observation-prices-readback.md the four price columns, last, since cva-reserve.md the CVA reserve among the reserves
+            Assert.Equal("observation_coefficient", contributions[0, 26]);
+            Assert.Equal(20000.0, contributions[2, 26]);
+            Assert.Equal(72.1, (double)contributions[2, 27], 9);  // the live quote the contribution was made of
+            Assert.Equal("USD/MMBTU", contributions[2, 28]);
+            Assert.Equal(1442000.0, (double)contributions[2, 29], 6);
+            Assert.Equal("contract_cross_gamma", contributions[0, 22]);
+            Assert.Equal("cross_gamma_unit", contributions[0, 23]);
+            Assert.Equal(0.0, contributions[2, 22]);
+            Assert.Equal("lots of NYMEX NG (10000 MMBTU) per basis point", contributions[2, 23]);
             var ticked = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.20, 72.80)));
             var later = (string)Seam.Call("_EvaluateTrades", prepared, ticked, ExcelMissing.Value);
             Assert.NotEqual(results, later);
@@ -1670,21 +1684,21 @@ namespace Catalyst.Host.Tests
             Assert.Equal(150.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
             Assert.Equal(20.0, (double)((object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year"))[3, 1], 6);
             var mixed = (object[,])Seam.Call("util_ReadHandle", results);  // observation-prices-readback.md: the 2nd fixed at 71, the 3rd and the 4th live at 74, each slot's own, last
-            Assert.Equal(30, mixed.GetLength(1));
-            Assert.Equal("observation_coefficient", mixed[0, 26]);
-            Assert.Equal("observation_price", mixed[0, 27]);
-            Assert.Equal("price_unit", mixed[0, 28]);
-            Assert.Equal("floating_contribution", mixed[0, 29]);
-            Assert.Equal(20.0, (double)mixed[2, 26], 9);
-            Assert.Equal(71.0, (double)mixed[2, 27], 9);
-            Assert.Equal("USD/MMBTU", mixed[2, 28]);
-            Assert.Equal(1420.0, (double)mixed[2, 29], 9);
+            Assert.Equal(31, mixed.GetLength(1));  // since cva-reserve.md one more among the reserves
+            Assert.Equal("observation_coefficient", mixed[0, 27]);
+            Assert.Equal("observation_price", mixed[0, 28]);
+            Assert.Equal("price_unit", mixed[0, 29]);
+            Assert.Equal("floating_contribution", mixed[0, 30]);
+            Assert.Equal(20.0, (double)mixed[2, 27], 9);
+            Assert.Equal(71.0, (double)mixed[2, 28], 9);
+            Assert.Equal("USD/MMBTU", mixed[2, 29]);
+            Assert.Equal(1420.0, (double)mixed[2, 30], 9);
             Assert.Equal(0.0, (double)mixed[2, 7], 9);  // the live contribution stays zero on a fixed slot
-            Assert.Equal(74.0, (double)mixed[3, 27], 9);
-            Assert.Equal(1480.0, (double)mixed[3, 29], 9);
+            Assert.Equal(74.0, (double)mixed[3, 28], 9);
+            Assert.Equal(1480.0, (double)mixed[3, 30], 9);
             Assert.Equal(1480.0, (double)mixed[3, 7], 9);
-            Assert.Equal(-10.0, (double)mixed[5, 26], 9);
-            Assert.Equal(-710.0, (double)mixed[5, 29], 9);
+            Assert.Equal(-10.0, (double)mixed[5, 27], 9);
+            Assert.Equal(-710.0, (double)mixed[5, 30], 9);
             var ticked = (string)Seam.Call("_EvaluateTrades", live, (string)Seam.Call("_CreateMarket", early, (string)Seam.Call("_CreatePriceVector", "PAYS", Column(75.0, 80.0))), ExcelMissing.Value);
             Assert.Equal(170.0, (double)((object[,])Seam.Call("_ReportValues", ticked))[2, 0], 6);
             var seventh = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46363.0, 0.5), index);
@@ -1709,16 +1723,16 @@ namespace Catalyst.Host.Tests
             Assert.Equal(180.0, (double)values[2, 1], 6);
             Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", paid, "nominal_delta", "year"))[3, 1], 6);
             var contributions = (object[,])Seam.Call("util_ReadHandle", paid);
-            Assert.Equal(30, contributions.GetLength(1));  // since #197 two columns more, since slice 3 two more, since observation-prices-readback.md four more, last
+            Assert.Equal(31, contributions.GetLength(1));  // since #197 two columns more, since slice 3 two more, since observation-prices-readback.md four more, last, since cva-reserve.md one more among the reserves
             Assert.Equal("contract_nominal_delta", contributions[0, 10]);
             Assert.Equal("contract_delta", contributions[0, 11]);
             Assert.Equal(46365.0, contributions[5, 3]);
             Assert.Equal(0.0, contributions[5, 10]);
-            Assert.Equal(20.0, (double)contributions[2, 26], 9);  // paid: every slot's settle and contribution still shown, history and no mark
-            Assert.Equal(75.0, (double)contributions[3, 27], 9);
-            Assert.Equal(1500.0, (double)contributions[3, 29], 9);
-            Assert.Equal(73.0, (double)contributions[7, 27], 9);
-            Assert.Equal(-730.0, (double)contributions[7, 29], 9);
+            Assert.Equal(20.0, (double)contributions[2, 27], 9);  // paid: every slot's settle and contribution still shown, history and no mark
+            Assert.Equal(75.0, (double)contributions[3, 28], 9);
+            Assert.Equal(1500.0, (double)contributions[3, 30], 9);
+            Assert.Equal(73.0, (double)contributions[7, 28], 9);
+            Assert.Equal(-730.0, (double)contributions[7, 30], 9);
             Assert.Equal(0.0, (double)contributions[7, 7], 9);  // the live contribution, zero once fixed
         }
 
@@ -2814,23 +2828,25 @@ namespace Catalyst.Host.Tests
             Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year"))[3, 1], 6);
             var reserves = (object[,])Seam.Call("_ReportReserves", results);
             Assert.Equal(3, reserves.GetLength(0));
-            Assert.Equal(4, reserves.GetLength(1));
+            Assert.Equal(5, reserves.GetLength(1));  // since cva-reserve.md the signed CVA before the currency
             Assert.Equal("brokerage_reserve", reserves[0, 0]);
-            Assert.Equal("currency", reserves[0, 3]);
+            Assert.Equal("cva_reserve", reserves[0, 3]);  // signed, since cva-reserve.md
+            Assert.Equal("currency", reserves[0, 4]);
             Assert.Equal("float64", reserves[1, 0]);
-            Assert.Equal("str", reserves[1, 3]);
+            Assert.Equal("str", reserves[1, 4]);
             Assert.Equal(50.0, (double)reserves[2, 0], 9);
             Assert.Equal(20.0, (double)reserves[2, 1], 9);
             Assert.Equal(0.0, (double)reserves[2, 2], 9);
-            Assert.Equal("USD", reserves[2, 3]);
+            Assert.Equal("USD", reserves[2, 4]);
+            Assert.Equal(0.0, (double)reserves[2, 3], 9);
             var table = (object[,])Seam.Call("util_ReadHandle", results);
             Assert.Equal(3, table.GetLength(0));
-            Assert.Equal(30, table.GetLength(1));  // since #197 the two cross-gamma columns, since slice 3 the key and the curve, since observation-prices-readback.md the four price columns, last
+            Assert.Equal(31, table.GetLength(1));  // since #197 the two cross-gamma columns, since slice 3 the key and the curve, since observation-prices-readback.md the four price columns, last, since cva-reserve.md the CVA reserve among the reserves
             Assert.Equal("brokerage_reserve", table[0, 18]);
-            Assert.Equal("currency", table[0, 21]);
+            Assert.Equal("currency", table[0, 22]);
             Assert.Equal(50.0, (double)table[2, 18], 9);
             Assert.Equal(20.0, (double)table[2, 19], 9);
-            Assert.Equal("USD", table[2, 21]);
+            Assert.Equal("USD", table[2, 22]);
             var ticked = Valued(0.31, 0.30, 0.32);
             Assert.Equal(2520.0, (double)((object[,])Seam.Call("_ReportValues", ticked))[2, 0], 6);
             var again = (object[,])Seam.Call("_ReportReserves", ticked);
@@ -2862,7 +2878,8 @@ namespace Catalyst.Host.Tests
             Assert.Equal(60.0, (double)marketedReserves[2, 0], 9);
             Assert.Equal(24.0, (double)marketedReserves[2, 1], 9);
             Assert.Equal(65.0, (double)marketedReserves[2, 2], 9);
-            Assert.Equal("USD", marketedReserves[2, 3]);
+            Assert.Equal("USD", marketedReserves[2, 4]);
+            Assert.Equal(0.0, (double)marketedReserves[2, 3], 9);
             Assert.Equal("#ERROR _CreateTrades: ValueError: marketing_reserve row 2 is -5.0, expected a finite amount of zero or more", Seam.Call("_CreateTrades", index, marketedHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 15.0 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, -5.0 } }, template));
             var seven = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_day", "payment_holiday_calendar", "marketing_reserve"), Row("month", "monthly", "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays, 7.0));
             var templated = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, headers, rows, seven), history), Market(), ExcelMissing.Value);
@@ -2891,6 +2908,70 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _CreateTrades: ValueError: broker is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, brokeredHeaders, brokeredRows, template));
             Assert.Equal("#ERROR _CreateTradeTemplate: ValueError: marketing_reserve is -5.0, expected a finite amount of zero or more", Seam.Call("_CreateTradeTemplate", "fixed_float", Row("marketing_reserve"), -5.0));
             Assert.Equal("#ERROR _CreateTrades: ValueError: marketing_reserve is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, marketedHeaders, marketedRows, seven));
+            // cva-reserve.md: a signed CVA column, 25 on 2 LOT of Z26, -40 on -2 LOT of the strip Z26-F27 and 0 on
+            // 0 LOT, books -15 once per row over 60 and 24, the strip's two components each showing its one amount,
+            // the fourth column of the report before the currency; both reserve columns side by side, 65 and -10; a
+            // template's -40 books -160 on the four plain rows, the mark as without; the field from both and a total
+            // past the largest number in either direction refused; a pair books the amount once, in its own fact.
+            var cvaHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "cva_reserve");
+            var cvaRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 25.0 }, { 1002.0, 46346.0, "Z26-F27", -2.0, "LOT", 0.25, -40.0 }, { 1003.0, 46346.0, "Z26", 0.0, "LOT", 0.25, 0.0 } };
+            var cva = (string)Seam.Call("_CreateTrades", index, cvaHeaders, cvaRows, template);
+            var cvaTable = (object[,])Seam.Call("util_ReadHandle", cva);
+            Assert.Equal(25, cvaTable.GetLength(1));
+            Assert.Equal("cva_reserve", cvaTable[0, 15]);
+            Assert.Equal("entered_contract_code", cvaTable[0, 16]);
+            Assert.Equal(25.0, (double)cvaTable[2, 15], 9);
+            Assert.Equal(-40.0, (double)cvaTable[3, 15], 9);
+            Assert.Equal(-40.0, (double)cvaTable[4, 15], 9);
+            Assert.Equal("F27", cvaTable[4, 3]);
+            var cvaReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", cva, history), Market(), ExcelMissing.Value));
+            Assert.Equal(60.0, (double)cvaReserves[2, 0], 9);
+            Assert.Equal(24.0, (double)cvaReserves[2, 1], 9);
+            Assert.Equal(0.0, (double)cvaReserves[2, 2], 9);
+            Assert.Equal(-15.0, (double)cvaReserves[2, 3], 9);
+            Assert.Equal("USD", cvaReserves[2, 4]);
+            var bothHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "marketing_reserve", "cva_reserve");
+            var bothRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 15.0, 25.0 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 20.0, -40.0 }, { 1003.0, 46346.0, "Z26-F27", 1.0, "LOT", 0.25, 25.0, 0.0 }, { 1004.0, 46346.0, "Z26", 0.0, "LOT", 0.25, 5.0, 5.0 } };
+            var both = (string)Seam.Call("_CreateTrades", index, bothHeaders, bothRows, template);
+            var bothTable = (object[,])Seam.Call("util_ReadHandle", both);
+            Assert.Equal("marketing_reserve", bothTable[0, 15]);
+            Assert.Equal("cva_reserve", bothTable[0, 16]);
+            var bothReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", both, history), Market(), ExcelMissing.Value));
+            Assert.Equal(65.0, (double)bothReserves[2, 2], 9);
+            Assert.Equal(-10.0, (double)bothReserves[2, 3], 9);
+            var forty = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_day", "payment_holiday_calendar", "cva_reserve"), Row("month", "monthly", "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays, -40.0));
+            var fortyResults = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, headers, rows, forty), history), Market(), ExcelMissing.Value);
+            var fortyReserves = (object[,])Seam.Call("_ReportReserves", fortyResults);
+            Assert.Equal(50.0, (double)fortyReserves[2, 0], 9);
+            Assert.Equal(0.0, (double)fortyReserves[2, 2], 9);
+            Assert.Equal(-160.0, (double)fortyReserves[2, 3], 9);
+            Assert.Equal(1260.0, (double)((object[,])Seam.Call("_ReportValues", fortyResults))[2, 0], 6);
+            Assert.Equal(-40.0, (double)((object[,])Seam.Call("util_ReadHandle", forty))[2, Heading((object[,])Seam.Call("util_ReadHandle", forty), "cva_reserve")], 9);
+            Assert.Equal("#ERROR _CreateTrades: ValueError: cva_reserve is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, cvaHeaders, cvaRows, forty));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has inf of cva reserve in all, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number", Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 9e307 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 9e307 } }, template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has -inf of cva reserve in all, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number", Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, -9e307 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, -9e307 } }, template));
+            // cva-reserve.md's review: a dollar beside ten thousand trillion and its negative is a dollar in any
+            // order, the exact total; amounts cancelling past the largest number net to nothing and are not refused.
+            foreach (var amounts in new[] { new[] { 1e16, 1.0, -1e16 }, new[] { 1e16, -1e16, 1.0 }, new[] { 1.0, 1e16, -1e16 } })
+            {
+                var ordered = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, amounts[0] }, { 1002.0, 46346.0, "Z26-F27", -2.0, "LOT", 0.25, amounts[1] }, { 1003.0, 46346.0, "Z26", 0.0, "LOT", 0.25, amounts[2] } };
+                var orderedReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, cvaHeaders, ordered, template), history), Market(), ExcelMissing.Value));
+                Assert.Equal(1.0, (double)orderedReserves[2, 3], 12);
+            }
+            var cancelling = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 9e307 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 9e307 }, { 1003.0, 46346.0, "Z26", 2.0, "LOT", 0.25, -9e307 }, { 1004.0, 46346.0, "Z26", -2.0, "LOT", 0.25, -9e307 } }, template), history), Market(), ExcelMissing.Value));
+            Assert.Equal(0.0, (double)cancelling[2, 3], 12);
+            // and a tiny amount keeps every bit beside zero rows, 3e-308 to the last bit.
+            var tiny = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 3e-308 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 0.0 }, { 1003.0, 46346.0, "Z26", 0.0, "LOT", 0.25, 0.0 } }, template), history), Market(), ExcelMissing.Value));
+            Assert.Equal(3e-308, (double)tiny[2, 3]);
+            // and past the largest number on the way, 9e307 twice and -9e307 twice beside 3e-308, with five rows and nine.
+            foreach (var zeros in new[] { 0, 4 })
+            {
+                var past = new object[5 + zeros, 7];
+                var amounts = new[] { 9e307, 9e307, -9e307, -9e307, 3e-308, 0.0, 0.0, 0.0, 0.0 };
+                for (var r = 0; r < 5 + zeros; r++) { past[r, 0] = 1001.0 + r; past[r, 1] = 46346.0; past[r, 2] = "Z26"; past[r, 3] = 2.0; past[r, 4] = "LOT"; past[r, 5] = 0.25; past[r, 6] = amounts[r]; }
+                var pastReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, cvaHeaders, past, template), history), Market(), ExcelMissing.Value));
+                Assert.Equal(3e-308, (double)pastReserves[2, 3]);
+            }
             var bilateral = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar"), Row("month", "monthly", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", "+2bd", pays));
             var faced = (string)Seam.Call("_CreateTrades", index, headers, rows, bilateral);
             var facedTable = (object[,])Seam.Call("util_ReadHandle", faced);
@@ -2919,16 +3000,16 @@ namespace Catalyst.Host.Tests
             Assert.Equal("RESERVES SOFR cross_gamma [LOT per basis point]", facedAll[1, 4]);
             Assert.Equal(0.99, (double)facedAll[3, 2], 12);
             var facedReadback = (object[,])Seam.Call("util_ReadHandle", facedResults);
-            Assert.Equal(30, facedReadback.GetLength(1));
-            Assert.Equal("contract_cross_gamma", facedReadback[0, 22]);
-            Assert.Equal(-0.0001 * 34 / 365 * 0.99, (double)facedReadback[2, 22], 12);
-            Assert.Equal("lots of LOT (1000 BBL) per basis point", facedReadback[2, 23]);
-            Assert.Equal("discount_curve_key", facedReadback[0, 24]);  // the key and the curve, last, since named-curves-slice-3.md
-            Assert.Equal("SOFR", facedReadback[2, 24]);
-            Assert.Equal("discount_curve", facedReadback[0, 25]);
+            Assert.Equal(31, facedReadback.GetLength(1));
+            Assert.Equal("contract_cross_gamma", facedReadback[0, 23]);
+            Assert.Equal(-0.0001 * 34 / 365 * 0.99, (double)facedReadback[2, 23], 12);
+            Assert.Equal("lots of LOT (1000 BBL) per basis point", facedReadback[2, 24]);
+            Assert.Equal("discount_curve_key", facedReadback[0, 25]);  // the key and the curve, last, since named-curves-slice-3.md
             Assert.Equal("SOFR", facedReadback[2, 25]);
-            Assert.Equal("observation_coefficient", facedReadback[0, 26]);  // observation-prices-readback.md: the four price columns, last
-            Assert.Equal("floating_contribution", facedReadback[0, 29]);
+            Assert.Equal("discount_curve", facedReadback[0, 26]);
+            Assert.Equal("SOFR", facedReadback[2, 26]);
+            Assert.Equal("observation_coefficient", facedReadback[0, 27]);  // observation-prices-readback.md: the four price columns, last
+            Assert.Equal("floating_contribution", facedReadback[0, 30]);
             // Since named-curves-slice-3.md: two rows naming their curves on the ticket, two lots of Z26 on SOFR and one
             // short on FFOIS, 0.99 and 0.98 on the payment day, 34 days out: 2,520 and -1,260 of amount, 1,260 of mark,
             // one lot net and 1.98 less 0.98 discounted, each curve's DV01 and cross-gamma in its own column in key
@@ -2965,10 +3046,10 @@ namespace Catalyst.Host.Tests
             Assert.Equal(perDay * 0.98, (double)keyedAll[3, 6], 12);
             var keyedReadback = (object[,])Seam.Call("util_ReadHandle", keyedResults);
             Assert.Equal(4, keyedReadback.GetLength(0));
-            Assert.Equal("SOFR", keyedReadback[2, 24]);
-            Assert.Equal("FFOIS", keyedReadback[3, 24]);
             Assert.Equal("SOFR", keyedReadback[2, 25]);
             Assert.Equal("FFOIS", keyedReadback[3, 25]);
+            Assert.Equal("SOFR", keyedReadback[2, 26]);
+            Assert.Equal("FFOIS", keyedReadback[3, 26]);
             var keyedCollection = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_AggregateResults", keyedResults));
             Assert.Equal("SOFR, FFOIS", keyedCollection[2, 4]);
             var facedHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "counterparty");

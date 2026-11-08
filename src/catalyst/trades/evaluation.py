@@ -29,12 +29,12 @@ from numpy.typing import NDArray
 
 from catalyst.globals.discount_curve import DiscountCurve
 from catalyst.globals.discount_curve_set import DiscountCurveSet
-from catalyst.globals.payments import curve_starts_on, discounted, factors_on
+from catalyst.globals.payments import compensated, curve_starts_on, discounted, factors_on
 from catalyst.instrumentation.work_counts import KERNEL, WorkCounter
 from catalyst.market.market import Market
 from catalyst.trades.contributions import CrossContribution, RateContribution
 from catalyst.trades.display_axes import EarlyRisk, early_risk
-from catalyst.trades.encoding import CurveAxes, Encoded, PaymentAxes, group_label
+from catalyst.trades.encoding import CurveAxes, PaymentAxes, group_label
 from catalyst.trades.preparation import PreparedLeg, PreparedTrades, UnpaidPayments
 from catalyst.trades.results import LegResults, TradeResults
 from catalyst.trades.terms import Route, Settlement, named_trade
@@ -88,14 +88,16 @@ def trade_results(
     times its reference's quote is its contribution, finite or refused by its slot and its
     quote since #190, reject-nonfinite-trade-arithmetic.md, before either route sums it. For a
     cleared batch each leg's live amount is its contributions' sum, the one reduction this
-    route makes per leg, and the mark is the unsettled offsets and set amounts plus the legs'
-    live amounts, each finite or refused for the batch, since two finite floats add past the
-    largest number without a word; the cash is the preparation's, the sensitivity, the nominal
-    delta and its total each leg's preparation's, shared, the discounted vectors those same
-    arrays, since nothing discounts, DV01 zero and no group vector kept; each leg's mark and
-    cash are retained, the one leg's the batch's own and a pair's each leg's own sums, finite
-    or refused by the leg. A bilateral batch is _discounted's. The reserves are the
-    encoding's, by reference, summed when the batch was made and never here.
+    route makes per leg, and the mark is the unsettled fixed legs, each leg's unsettled set
+    amounts and each leg's live amount summed with Neumaier's compensation since
+    two-index-one-price.md, the terms kept apart so that a small leg's dollar survives a strike
+    that cancels the large leg's, finite or refused for the batch, since two finite floats add
+    past the largest number without a word; the cash is the preparation's, the sensitivity, the
+    nominal delta and its total each leg's preparation's, shared, the discounted vectors those same
+    arrays, since nothing discounts, DV01 zero and no group vector kept; no value is a leg's
+    since two-index-one-price.md, the payment being the trade's against its one fixed price. A
+    bilateral batch is _discounted's. The reserves are the encoding's, by reference, summed
+    when the batch was made and never here.
 
     Work: one kernel call, one quote per live reference of each leg, reported to the counter,
     and for a bilateral batch what _discounted reports; nothing of the encoding or the
@@ -147,26 +149,20 @@ def trade_results(
             f"the batch has {live!r} of live amount in all, expected a finite amount of "
             f"{currency}; the live slots' contributions, each finite, sum past the largest number"
         )
-    mark = prepared.offset_unsettled + prepared.set_unsettled + live
+    mark = float(compensated([prepared.offset_unsettled, *prepared.set_unsettled, *live_amounts]))
     if not np.isfinite(mark):
         raise ValueError(
             f"the batch has {mark!r} of mark in all, expected a finite amount of {currency}; its "
             "unsettled fixed legs, set amounts and live amount, each finite, sum past the largest "
             "number"
         )
-    # One leg's values are the batch's own; a pair's are each leg's own sums.
-    values = (
-        ((mark, prepared.cash),)
-        if len(legs) == 1
-        else _the_leg_values(prepared, live_amounts, currency)
-    )
     return TradeResults(
         prepared=prepared,
         legs=tuple(
             [
-                _cleared_leg(leg, market, contribution, quote, leg_mark, leg_cash)
-                for leg, market, contribution, quote, (leg_mark, leg_cash) in zip(
-                    legs, matched, contributions, quotes, values, strict=True
+                _cleared_leg(leg, market, contribution, quote)
+                for leg, market, contribution, quote in zip(
+                    legs, matched, contributions, quotes, strict=True
                 )
             ]
         ),
@@ -255,56 +251,19 @@ def _the_contributions(
     return dated_live_contribution, quotes, live
 
 
-def _the_leg_values(
-    prepared: PreparedTrades, live_amounts: list[float], currency: str
-) -> tuple[tuple[float, float], ...]:
-    """A cleared pair's legs' marks and cash, since two-index-fixed-float.md: each leg's unsettled
-    fixed legs and set amounts with its live amount, and its settled fixed legs and set amounts,
-    each finite or refused by the leg's index, since a leg's sums can outrun where the batch's,
-    netted, do not."""
-    unsettled = ~prepared.is_settled
-    values: list[tuple[float, float]] = []
-    for leg, live in zip(prepared.legs, live_amounts, strict=True):
-        offsets = leg.encoded.offset_of_group
-        with np.errstate(over="ignore", invalid="ignore"):
-            mark = float(offsets[unsettled].sum() + leg.set_amount[unsettled].sum() + live)
-            cash = float((offsets + leg.set_amount)[prepared.is_settled].sum())
-        _finite_leg_values(leg, (("mark", mark), ("cash", cash)), currency)
-        values.append((mark, cash))
-    return tuple(values)
-
-
-def _finite_leg_values(
-    leg: PreparedLeg, values: tuple[tuple[str, float], ...], currency: str
-) -> None:
-    """Each of a leg's values finite, else the first that is not refused by its index."""
-    for label, value in values:
-        if not np.isfinite(value):
-            raise ValueError(
-                f"the leg of index {leg.encoded.leg.index.name!r} has {value!r} of {label}, "
-                f"expected a finite amount of {currency}; its fixed legs, set amounts and live "
-                "amount, each finite, sum past the largest number"
-            )
-
-
 def _cleared_leg(
     leg: PreparedLeg,
     market: Market,
     contribution: NDArray[np.float64],
     quote: NDArray[np.float64],
-    mark: float,
-    cash: float,
 ) -> LegResults:
     """A cleared leg's results: nothing discounts, so the valuation-adjusted risk is the nominal
     risk itself, the preparation's arrays by reference, no rate moves the lots, the known zero,
-    no contribution and no buffer, and no group vector is kept."""
+    no contribution and no buffer."""
     conventions = leg.encoded.leg.index.conventions
     return LegResults(
         prepared=leg,
         market=market,
-        mark=mark,
-        cash=cash,
-        dv01=0.0,
         dated_live_contribution=contribution,
         quote=quote,
         contracts=leg.encoded.references,
@@ -322,22 +281,10 @@ def _cleared_leg(
         discounted_daily_lots=leg.daily_lots,
         discounted_monthly_lots=leg.monthly_lots,
         discounted_yearly_lots=leg.yearly_lots,
-        payment_amount=None,
-        npv_by_group=None,
-        dv01_by_group=None,
         early_delta=leg.early_nominal,  # the same lots: worded as the delta when asked for
         cross_gamma_total=0.0,
         cross_contributions=(),
     )
-
-
-def _summed(arrays: list[NDArray[np.float64]]) -> NDArray[np.float64]:
-    """The legs' arrays summed elementwise: the one leg's own array, by reference, or the sum,
-    the caller judging it finite under numpy's flags down."""
-    total = arrays[0]
-    for array in arrays[1:]:
-        total = total + array
-    return total
 
 
 def _listed(names: tuple[str, ...]) -> str:
@@ -414,20 +361,23 @@ def _discounted(
 ) -> TradeResults:
     """The bilateral snapshot, since #176, over the rules _the_curves checked, every leg beside
     the trade's preparation since two-index-fixed-float.md. Each leg's live contributions are
-    summed onto the payment groups, one bincount per leg, and each leg's amount of a group is
-    its entry-price offset, its set amount and its live amount together, the group's amount the
-    legs' summed, one payment both legs share; a paid group's amount is cash already and is
-    read for nothing. The unpaid groups, their time fractions and, per key, their distinct
+    summed onto the payment groups, one bincount per leg, and each group's amount is the trade's
+    fixed leg, each leg's set amounts and each leg's live amounts summed with Neumaier's
+    compensation, the terms kept apart so that a small leg's dollar survives a strike that
+    cancels the large leg's, one payment both legs share and, since two-index-one-price.md, no
+    leg's own, the fixed leg being the trade's against its one price; a paid group's amount is
+    cash already and is read for nothing. The unpaid groups, their time fractions and, per key,
+    their distinct
     payment days with each group's place are the preparation's, made once when the batch was
     prepared, so each key's curve is read here once per distinct unpaid payment day of that
     key's groups, by position, the curve being daily from its start, and placed on those groups
     with nothing sorted or counted, each group's factor its own curve's since
-    named-curves-slice-3.md and one factor serving both legs of a group; each leg's unpaid
-    group NPV is its amount times that factor and its DV01 -0.0001 times the group's time
-    fraction times that NPV, the analytic sensitivity to a rise of one basis point in the
-    continuously compounded zero rates of its curve, negative for an amount receivable, the
-    group's NPV and DV01 the legs' summed, the mark the NPVs' sum and the batch's DV01 the
-    groups' summed by curve and then together, every used curve shifted together. The
+    named-curves-slice-3.md and one factor serving both legs of a group; each unpaid group's
+    NPV is its amount times that factor and its DV01 -0.0001 times the group's time fraction
+    times that NPV, the analytic sensitivity to a rise of one basis point in the continuously
+    compounded zero rates of its curve, negative for an amount receivable, the mark the NPVs'
+    sum and the batch's DV01 the groups' summed by curve and then together, every used curve
+    shifted together. The
     discounted lots are each leg's slots' lots times their groups' factors, a fixed slot's lots
     being zero, before any sum, since two slots of one day and one contract may pay on
     different days; summed over the leg's slots onto its references and its days and, since
@@ -438,9 +388,8 @@ def _discounted(
     once: the groups' DV01s summed by curve for the totals and onto the payment days with each
     group's curve beside the axis in its key, a row per curve, since #178 the axes the encoding
     made once, the months and the years then summed from the rows, four bincounts over the
-    groups and the rows. The arithmetic runs with numpy's flags down and the rules judge: a
-    pair's legs' amounts by group, each named by its index, then every group's amount, the two
-    totals, a pair's legs' marks and DV01s, each leg's discounted lots by reference and by
+    groups and the rows. The arithmetic runs with numpy's flags down and the rules judge:
+    every group's amount, the two totals, each leg's discounted lots by reference and by
     bucket, its discounted sensitivity by reference and its lots' total are finite, else the
     first that is not is refused by its group, the batch, the leg, its contract or its bucket;
     each curve's three DV01 views are finite or the first period that is not is refused with its
@@ -475,31 +424,29 @@ def _discounted(
     days, months, years = axes.days.size, axes.months.size, axes.years.size
     factors_read = 0
     with np.errstate(over="ignore", invalid="ignore"):  # the rules below are the judge
-        amounts = [
-            leg.encoded.offset_of_group
-            + leg.set_amount
-            + np.bincount(
-                leg.encoded.slot_group[leg.live_slot], weights=contribution, minlength=groups
+        # Each group's amount: the trade's fixed leg, each leg's set amounts and each leg's live
+        # contributions summed onto the groups, one bincount per leg, the terms kept apart and
+        # summed with Neumaier's compensation, so that a small leg's dollar survives a strike
+        # that cancels the large leg's; one payment both legs share, since
+        # two-index-one-price.md the trade's alone.
+        sides: list[NDArray[np.float64] | float] = [encoded.offset_of_group]
+        for leg, contribution in zip(legs, contributions, strict=True):
+            sides.append(leg.set_amount)
+            sides.append(
+                np.bincount(
+                    leg.encoded.slot_group[leg.live_slot], weights=contribution, minlength=groups
+                )
             )
-            for leg, contribution in zip(legs, contributions, strict=True)
-        ]
-        amount = _summed(amounts)
+        amount = compensated(sides)
         payment_factor = np.ones(groups)  # a paid group's policy factor, read for nothing
         for curve, keyed in zip(curves, pays.by_key, strict=True):
             payment_factor[keyed.groups] = factors_on(curve, keyed.days)[keyed.day_of_group]
             factors_read += int(keyed.days.size)
-        npvs: list[NDArray[np.float64]] = []
-        dv01s: list[NDArray[np.float64]] = []
-        for leg_amount in amounts:
-            leg_npv = np.zeros(groups)
-            leg_dv01 = np.zeros(groups)
-            leg_npv[pays.groups], leg_dv01[pays.groups] = discounted(
-                leg_amount[pays.groups], payment_factor[pays.groups], pays.tau
-            )
-            npvs.append(leg_npv)
-            dv01s.append(leg_dv01)
-        npv = _summed(npvs)
-        dv01_by_group = _summed(dv01s)
+        npv = np.zeros(groups)
+        dv01_by_group = np.zeros(groups)
+        npv[pays.groups], dv01_by_group[pays.groups] = discounted(
+            amount[pays.groups], payment_factor[pays.groups], pays.tau
+        )
         mark = float(npv.sum())
         dv01_by_curve = np.bincount(key_of_group, weights=dv01_by_group, minlength=curve_count)
         dv01 = float(dv01_by_curve.sum())
@@ -516,8 +463,6 @@ def _discounted(
             places.payment_year_of_month, weights=dv01_by_month, minlength=curve_count * years
         )
         lots = [_the_lots_arrays(leg, payment_factor) for leg in legs]
-    if paired:
-        _finite_leg_amounts(legs, amounts, first, encoded, payment_date, key_of_group, currency)
     unfinished = ~np.isfinite(amount)
     if unfinished.any():
         g = int(unfinished.argmax())
@@ -533,12 +478,6 @@ def _discounted(
                 f"the batch has {total!r} of {label} in all, expected a finite amount of "
                 f"{currency}; the groups' amounts, each finite, sum past the largest number"
             )
-    # One leg's values are the batch's own; a pair's are each leg's own sums, finite or refused.
-    values = (
-        _the_bilateral_values(prepared, npvs, dv01s, currency)
-        if paired
-        else [(mark, prepared.cash, dv01)]
-    )
     for leg, each in zip(legs, lots, strict=True):
         _the_lots_checked(
             leg, each, f"index {leg.encoded.leg.index.name!r}" if paired else "the batch"
@@ -605,45 +544,12 @@ def _discounted(
         dv01_by_year,
     ):
         array.setflags(write=False)
-    if paired:  # one leg's arrays are the batch's own, frozen above
-        for array in (*amounts, *npvs, *dv01s):
-            array.setflags(write=False)
-    results: list[LegResults] = []
-    for leg, market, contribution, quote, leg_amount, leg_npv, leg_dv01, each, cross, (
-        leg_mark,
-        leg_cash,
-        leg_rate,
-    ) in zip(
-        legs,
-        markets,
-        contributions,
-        quotes,
-        amounts,
-        npvs,
-        dv01s,
-        lots,
-        crosses,
-        values,
-        strict=True,
-    ):
-        results.append(
-            _discounted_leg(
-                leg,
-                market,
-                contribution,
-                quote,
-                leg_amount,
-                leg_npv,
-                leg_dv01,
-                each,
-                cross,
-                leg_mark,
-                leg_cash,
-                leg_rate,
-                as_of,
-                curves,
-            )
+    results = [
+        _discounted_leg(leg, market, contribution, quote, each, cross, as_of, curves)
+        for leg, market, contribution, quote, each, cross in zip(
+            legs, markets, contributions, quotes, lots, crosses, strict=True
         )
+    ]
     return TradeResults(
         prepared=prepared,
         legs=tuple(results),
@@ -679,56 +585,6 @@ def _discounted(
             ]
         ),
     )
-
-
-def _finite_leg_amounts(
-    legs: tuple[PreparedLeg, ...],
-    amounts: list[NDArray[np.float64]],
-    first: PreparedLeg,
-    encoded: Encoded,
-    payment_date: NDArray[np.datetime64],
-    key_of_group: NDArray[np.intp],
-    currency: str,
-) -> None:
-    """A pair's legs' amounts by group, each finite or the first that is not refused by its
-    group and its index, since two-index-fixed-float.md, before the groups' sums are judged, so
-    that a leg's amount past the largest number is named as the leg's."""
-    for leg, leg_amount in zip(legs, amounts, strict=True):
-        unfinished = ~np.isfinite(leg_amount)
-        if unfinished.any():
-            g = int(unfinished.argmax())
-            label = group_label(encoded.terms, first.encoded.leg, encoded.group_head, g)
-            raise ValueError(
-                f"the payment of {label} on "
-                f"{payment_date[g]} on {encoded.keys[int(key_of_group[g])]} is "
-                f"{float(leg_amount[g])!r} on index {leg.encoded.leg.index.name!r}, expected "
-                f"a finite amount of {currency}; its fixed, set and live legs sum past the "
-                "largest number"
-            )
-
-
-def _the_bilateral_values(
-    prepared: PreparedTrades,
-    npvs: list[NDArray[np.float64]],
-    dv01s: list[NDArray[np.float64]],
-    currency: str,
-) -> list[tuple[float, float, float]]:
-    """A bilateral pair's legs' marks, cash and DV01s, since two-index-fixed-float.md: each
-    leg's NPVs summed, its settled fixed legs and set amounts, and its DV01s by group summed,
-    each finite or refused by the leg's index."""
-    values: list[tuple[float, float, float]] = []
-    for leg, leg_npv, leg_dv01 in zip(prepared.legs, npvs, dv01s, strict=True):
-        with np.errstate(over="ignore", invalid="ignore"):
-            leg_mark = float(leg_npv.sum())
-            leg_rate = float(leg_dv01.sum())
-            leg_cash = float(
-                (leg.encoded.offset_of_group + leg.set_amount)[prepared.is_settled].sum()
-            )
-        _finite_leg_values(
-            leg, (("mark", leg_mark), ("DV01", leg_rate), ("cash", leg_cash)), currency
-        )
-        values.append((leg_mark, leg_cash, leg_rate))
-    return values
 
 
 DiscountedLots = tuple[
@@ -830,9 +686,6 @@ def _discounted_leg(
     market: Market,
     contribution: NDArray[np.float64],
     quote: NDArray[np.float64],
-    amount: NDArray[np.float64],
-    npv: NDArray[np.float64],
-    dv01_by_group: NDArray[np.float64],
     lots: DiscountedLots,
     cross: tuple[
         NDArray[np.float64],
@@ -843,18 +696,15 @@ def _discounted_leg(
         float,
         tuple[EarlyRisk, ...],
     ],
-    mark: float,
-    cash: float,
-    dv01: float,
     as_of: np.datetime64,
     curves: tuple[DiscountCurve, ...],
 ) -> LegResults:
     """A bilateral leg's results over what _discounted made for it: the nominal risk weighted by
-    each live slot's payment factor, the leg's amounts, NPVs and DV01s by group, its values,
-    and since #197 each curve's share of its cross-gamma, its row of the arrays by reference on
-    the axes they were summed onto; and since #186 the facts refusing a month or a year report
-    of the discounted lots standing before the valuation day's period, found once here against
-    the leg's display axes."""
+    each live slot's payment factor and since #197 each curve's share of its cross-gamma, its
+    row of the arrays by reference on the axes they were summed onto; and since #186 the facts
+    refusing a month or a year report of the discounted lots standing before the valuation
+    day's period, found once here against the leg's display axes. No value: since
+    two-index-one-price.md the payments, NPVs and DV01s are the trade's."""
     encoded = leg.encoded
     leg_terms = encoded.leg
     conventions = leg_terms.index.conventions
@@ -882,9 +732,6 @@ def _discounted_leg(
     return LegResults(
         prepared=leg,
         market=market,
-        mark=mark,
-        cash=cash,
-        dv01=dv01,
         dated_live_contribution=contribution,
         quote=quote,
         contracts=encoded.references,
@@ -902,9 +749,6 @@ def _discounted_leg(
         discounted_daily_lots=daily,
         discounted_monthly_lots=monthly,
         discounted_yearly_lots=yearly,
-        payment_amount=amount,
-        npv_by_group=npv,
-        dv01_by_group=dv01_by_group,
         early_delta=early_delta,
         cross_gamma_total=cross_total,
         cross_contributions=tuple(

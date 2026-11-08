@@ -743,7 +743,7 @@ $curves = {
     Put $state $sheet "D33" '=TEXT(INDEX(_ReportRisk(D31,"dv01","day"),4,2),"0.000000")'
     Put $state $sheet "D34" '=TEXT(INDEX(_ReportRisk(D31,"dv01","day"),4,3),"0.000000")'
     Put $state $sheet "D35" '=INDEX(_ReportRisk(D31,"dv01","day"),2,3)'
-    Put $state $sheet "D36" "=INDEX(util_ReadHandle(D31),4,26)"
+    Put $state $sheet "D36" "=INDEX(util_ReadHandle(D31),4,27)"
     $id = Id $state
     $sofr = Text $state $sheet "D29"
     $ffois = Text $state $sheet "D30"
@@ -1547,12 +1547,13 @@ $quotes = {
 # --- pairs ----------------------------------------------------------------------------------------
 # A pair of indexes, two-index-fixed-float.md: A a futures index over F27, G27 and H27 with 1 January
 # 2027 closed and B an IFERC index over Z26 to J27, one NYMEX NG specification between them, in J5
-# and J6; the ticket's row, G27 for one lot at 3.30 and -0.30, bilateral on SOFR paying 4 January
-# 2028, booked over the column J5:J6 in J22, prepared over the histories J13:J14 in J23 and valued
-# over the markets J17:K17, a row, in J24: twenty-four creators, the mark 950 and the DV01 -0.095 of
-# the ticket's hand table read in J25 and J26, the readback naming B's leg in J27 and reading its
-# amount in J28. A tick on B's G27 quote remakes B's vector, B's market and the results, the mark
-# 475; a changed A settle remakes A's fixings, history and market, the preparation and the results,
+# and J6; the ticket's row, G27 for one lot at the outright 3.00, two-index-one-price.md, bilateral
+# on SOFR paying 4 January 2028, booked over the column J5:J6 in J22, prepared over the histories
+# J13:J14 in J23 and valued over the markets J17:K17, a row, in J24: twenty-four creators, the mark
+# 950 and the DV01 -0.095 of the ticket's hand table read in J25 and J26, the readback naming B's
+# leg in J27 and reading its floating contribution, -4,000, in J28. A tick on B's G27 quote remakes
+# B's vector, B's market and the results, the mark 475, B's contribution -4,500; a changed A settle
+# remakes A's fixings, history and market, the preparation and the results,
 # the mark unmoved; the histories retyped B first remake the preparation and the results, matched by
 # index; B's index cleared fails the batch at its cell and everything of B and of the pair as
 # consumers, eight released, and typed back rebuilds the eight.
@@ -1582,8 +1583,8 @@ $pairs = {
     Put $state $sheet "D6" "4-Jan-2028"; Put $state $sheet "E6" "0.95"
     Put $state $sheet "L1" "quantity_unit"; Put $state $sheet "M1" "quantity_per"; Put $state $sheet "N1" "schedule_method"; Put $state $sheet "O1" "second_schedule_method"; Put $state $sheet "P1" "route"; Put $state $sheet "Q1" "settlement_method"; Put $state $sheet "R1" "counterparty"; Put $state $sheet "S1" "discount_curve_key"; Put $state $sheet "T1" "payment_day"; Put $state $sheet "U1" "payment_holiday_calendar"; Put $state $sheet "V1" "settlement_frequency"
     Put $state $sheet "L2" "NYMEX NG"; Put $state $sheet "M2" "month"; Put $state $sheet "N2" "lastday"; Put $state $sheet "O2" "lastday"; Put $state $sheet "P2" "bilateral"; Put $state $sheet "Q2" "financial"; Put $state $sheet "R2" "ACME Trading"; Put $state $sheet "S2" "SOFR"; Put $state $sheet "T2" "4-Jan-2028"; Put $state $sheet "U2" "=J2"; Put $state $sheet "V2" "monthly"
-    Put $state $sheet "L4" "trade_id"; Put $state $sheet "M4" "trade_date"; Put $state $sheet "N4" "contract_code"; Put $state $sheet "O4" "quantity"; Put $state $sheet "P4" "fixed_price"; Put $state $sheet "Q4" "second_fixed_price"
-    Put $state $sheet "L5" "1"; Put $state $sheet "M5" "15-Dec-2026"; Put $state $sheet "N5" "G27"; Put $state $sheet "O5" "1"; Put $state $sheet "P5" "3.3"; Put $state $sheet "Q5" "-0.3"
+    Put $state $sheet "L4" "trade_id"; Put $state $sheet "M4" "trade_date"; Put $state $sheet "N4" "contract_code"; Put $state $sheet "O4" "quantity"; Put $state $sheet "P4" "fixed_price"
+    Put $state $sheet "L5" "1"; Put $state $sheet "M5" "15-Dec-2026"; Put $state $sheet "N5" "G27"; Put $state $sheet "O5" "1"; Put $state $sheet "P5" "3"
     Put $state $sheet "J1" "=_CreateFuturesSchedule(A1:A3,B1:B3)"
     Put $state $sheet "J2" "=_CreateHolidayCalendar(C1)"
     Put $state $sheet "J3" '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
@@ -1607,13 +1608,13 @@ $pairs = {
     Put $state $sheet "J19" '=_CreateDiscountCurve("SOFR",D4:E4,D5:E6)'
     Put $state $sheet "J20" "=_CollectDiscountCurves(J19)"
     Put $state $sheet "J21" '=_CreateTradeTemplate("fixed_float",L1:V1,L2:V2)'
-    Put $state $sheet "J22" "=_CreateTrades(J5:J6,L4:Q4,L5:Q5,J21)"
+    Put $state $sheet "J22" "=_CreateTrades(J5:J6,L4:P4,L5:P5,J21)"
     Put $state $sheet "J23" "=_PrepareTrades(J22,J13:J14)"
     Put $state $sheet "J24" "=_EvaluateTrades(J23,J17:K17,J20)"
     Put $state $sheet "J25" "=INDEX(_ReportValues(J24),3,1)"
     Put $state $sheet "J26" '=INDEX(_ReportRisk(J24,"dv01","year"),4,2)'
     Put $state $sheet "J27" "=INDEX(util_ReadHandle(J24),4,2)"
-    Put $state $sheet "J28" "=INDEX(util_ReadHandle(J24),4,21)"
+    Put $state $sheet "J28" "=INDEX(util_ReadHandle(J24),4,33)"
     $id = Id $state
     $trades = Text $state $sheet "J22"
     Check "the batch's cell shows its handle, named for both indexes in leg order" ($trades.StartsWith("${id}:trades:A+B:")) $trades
@@ -1624,16 +1625,16 @@ $pairs = {
     Check "the values report reads the mark, 950" ((Text $state $sheet "J25") -eq "950") (Text $state $sheet "J25")
     Check "the risk report reads the DV01, -0.095, once" ((Text $state $sheet "J26") -eq "-0.095") (Text $state $sheet "J26")
     Check "the readback names B's leg on its row" ((Text $state $sheet "J27") -eq "B") (Text $state $sheet "J27")
-    Check "and reads B's amount, -1,000" ((Text $state $sheet "J28") -eq "-1000") (Text $state $sheet "J28")
+    Check "and reads B's floating contribution, -4,000" ((Text $state $sheet "J28") -eq "-4000") (Text $state $sheet "J28")
     $c = Settle $state $sheet { param($c) $c.Live -eq 24 }
     Check "twenty-four creators, twenty-four live publications" ($c.Live -eq 24 -and $c.Published -eq 24 -and $c.Released -eq 0) $c.Text
 
     # A tick on B's G27 quote: B's vector, B's market and the results publish anew, the old three
-    # released; the mark follows B's leg, 2,000 - 1,500 at 0.95.
+    # released; the mark follows B's quote, 3.50 less 0.45 less the outright 3.00 at 0.95.
     Put $state $sheet "B16" "-0.45"
     Check "a tick on B gives the results a new handle" ((Text $state $sheet "J24") -ne $results -and (Text $state $sheet "J24").StartsWith("${id}:trade_results:A+B:")) (Text $state $sheet "J24")
     Check "and the mark follows B's quote, 475" ((Text $state $sheet "J25") -eq "475") (Text $state $sheet "J25")
-    Check "B's amount -1,500 on its row" ((Text $state $sheet "J28") -eq "-1500") (Text $state $sheet "J28")
+    Check "B's floating contribution -4,500 on its row" ((Text $state $sheet "J28") -eq "-4500") (Text $state $sheet "J28")
     Check "while the preparation is reused as it is" ((Text $state $sheet "J23") -eq $prepared) (Text $state $sheet "J23")
     $c = Settle $state $sheet { param($c) $c.Live -eq 24 -and $c.Released -ge 3 }
     Check "B's old vector and market and the old results are released; twenty-four live, three more published" ($c.Live -eq 24 -and $c.Released -eq 3 -and $c.Published -eq 27) $c.Text
@@ -1660,7 +1661,7 @@ $pairs = {
     Check "the histories B first give the preparation a new handle, named A+B still" ((Text $state $sheet "J23") -ne $prepared -and (Text $state $sheet "J23").StartsWith("${id}:prepared_trades:A+B:")) (Text $state $sheet "J23")
     Check "and the results a new one" ((Text $state $sheet "J24") -ne $results -and (Text $state $sheet "J24").StartsWith("${id}:trade_results:A+B:")) (Text $state $sheet "J24")
     Check "the mark is 475 as before" ((Text $state $sheet "J25") -eq "475") (Text $state $sheet "J25")
-    Check "and B's leg reads on its row still" ((Text $state $sheet "J27") -eq "B" -and (Text $state $sheet "J28") -eq "-1500") ((Text $state $sheet "J27") + " " + (Text $state $sheet "J28"))
+    Check "and B's leg reads on its row still" ((Text $state $sheet "J27") -eq "B" -and (Text $state $sheet "J28") -eq "-4500") ((Text $state $sheet "J27") + " " + (Text $state $sheet "J28"))
     $c = Settle $state $sheet { param($c) $c.Live -eq 24 -and $c.Released -ge 10 }
     Check "the old preparation and results are released; two more published" ($c.Live -eq 24 -and $c.Released -eq 10 -and $c.Published -eq 34) $c.Text
 

@@ -119,18 +119,17 @@ class EncodedLeg:
     the specification's lot size, converted where the lot unit differs; coefficient[k], the
     settlement currency the component makes for a move of one unit of quote price, the quote
     quantity converted from the quote currency to the settlement currency, so that a cent-quoted
-    price settles in dollars, and the quote quantity itself where the two are one; and
-    offset[k], the leg's entry-price offset in the settlement currency, minus the coefficient
-    times the leg's fixed price, so that the coefficient times the contract's price plus the
-    offset is the component's entry-to-price P&L on this leg.
+    price settles in dollars, and the quote quantity itself where the two are one, what every
+    price of the leg multiplies. No offset: since two-index-one-price.md the fixed leg is the
+    trade's, Encoded.offset, made once from the first leg's coefficient and the trade's one
+    price, so the coefficient times the contract's price is the component's floating side on
+    this leg and nothing of the entry price is a leg's.
 
     Per payment group, aligned with the trade's groups: group_contract[g], the schedule row of
     the g-th group's contract on this leg's schedule, the contract of the calendar month its
-    components were booked on, which owns the fixed leg and, with its payment day, names the
-    group, the group itself keyed since onetime-averaging.md by its calculation period, that
-    month, and not by the contract; and offset_of_group[g],
-    the leg's components' offsets summed by group, the leg's fixed leg of the group, the trade's
-    being the legs' summed.
+    components were booked on, which with its payment day names the group, the group itself
+    keyed since onetime-averaging.md by its calculation period, that month, and not by the
+    contract.
 
     Per slot, the dated inputs: slot_group[s], the group the slot belongs to; slot_date[s], the
     observation day; slot_reference[s], the schedule row of the contract pricing that day, the
@@ -170,9 +169,7 @@ class EncodedLeg:
     observations: Observations
     quote_quantity: NDArray[np.float64]
     coefficient: NDArray[np.float64]
-    offset: NDArray[np.float64]
     group_contract: NDArray[np.intp]
-    offset_of_group: NDArray[np.float64]
     slot_group: NDArray[np.intp]
     slot_date: NDArray[np.datetime64]
     slot_reference: NDArray[np.intp]
@@ -239,9 +236,12 @@ class Encoded:
     booked_words over the heads, the contract's code of a month and the two dates of a window,
     no text kept; keys, the batch's distinct keys in that
     order, and key_of_group[g] each group's place among them, None with no key, a cleared
-    batch's; group_of_component[k]; offset_of_group[g], the legs' offsets summed, the trade's
-    fixed leg of the group; payment_date[g], the day the group pays, an array for a financial
-    settlement and None for a physical one.
+    batch's; group_of_component[k]; offset[k], since two-index-one-price.md the trade's fixed
+    leg per component, minus the first leg's coefficient times the trade's one fixed price, the
+    entry-price side of the component's payment in the settlement currency, booked once
+    whatever the legs; offset_of_group[g], those summed by group, the trade's fixed leg of the
+    group; payment_date[g], the day the group pays, an array for a financial settlement and
+    None for a physical one.
 
     Then reserves, since #170, the batch's booked brokerage and clearing, each charged component's
     count of the first leg's specification times the specification's rate per lot, summed, since
@@ -261,6 +261,7 @@ class Encoded:
     legs: tuple[EncodedLeg, ...]
     group_of_component: NDArray[np.intp]
     group_head: NDArray[np.intp]
+    offset: NDArray[np.float64]
     offset_of_group: NDArray[np.float64]
     payment_date: NDArray[np.datetime64] | None
     reserves: Reserves
@@ -292,7 +293,11 @@ def encoded(
     coefficient: the quote quantity times the factor from the quote currency to the settlement
     currency, USD or CENT to USD or CENT, so that a price in cents times it is an amount in
     dollars; every price the batch meets, a quote, a settle or the fixed price, multiplies the
-    coefficient and never the quantity. The offset: minus the coefficient times the fixed price.
+    coefficient and never the quantity. The trade's fixed leg, since two-index-one-price.md
+    once whatever the legs: minus the first leg's coefficient times the trade's one fixed
+    price, per component, the first leg's coefficient the trade's since the pair rule below
+    holds the two legs' equal to within the roundoff of their conversions, as the first leg
+    supplies the fees and the handle's first word.
     For a pair, since two-index-fixed-float.md, each occurrence's quantity unit is one quantity
     per entered unit on both indexes: the specification it names on each index restates one
     entered unit in the shared quote quantity unit, and the two sizes agree to within
@@ -363,9 +368,9 @@ def encoded(
     charged component's count times its specification's rate per lot and the batch's two sums,
     brokerage over the brokered rows' components and clearing over every component of a cleared
     batch since #188,
-    and since #175 the rows' marketing reserves summed once each, kept beside the encoding and
-    never a contribution to value,
-    docs/library/trades/report-reserves.md.
+    and since #175 the rows' marketing reserves summed once each, since cva-reserve.md the
+    rows' signed CVA reserves the same, kept beside the encoding and never a contribution to
+    value, docs/library/trades/report-reserves.md.
 
     Work: one component per component, one group per payment group, one observation per
     observation and one slot per slot, reported to the counter; one conversion per distinct
@@ -379,17 +384,21 @@ def encoded(
         )
     heads, payment_date, group_of_component, keys, key_of_group = _the_groups(terms)
     groups = heads.size
-    sizes: list[NDArray[np.float64]] = []  # each leg's specifications in the quote unit
+    # Each leg's quantities and coefficients, a pair held to one quantity per entered unit; then
+    # the trade's fixed leg, since two-index-one-price.md once, from the first leg's
+    # coefficient, each finite or refused before any slot, the order the one-leg path had.
+    amounts = [_the_amounts(terms, leg, units) for leg in terms.legs]
+    for leg, (_, _, sizes) in zip(terms.legs[1:], amounts[1:], strict=True):
+        _the_same_quantity(terms, terms.legs[0], amounts[0][2], leg, sizes)
+    offset = _the_fixed_leg(terms, amounts[0][1])
+    offset_of_group = _the_group_offsets(
+        terms, terms.legs[0], heads, group_of_component, offset, payment_date, keys, key_of_group
+    )
     parts: list[_LegParts] = []
-    for leg, observed in zip(terms.legs, observations, strict=True):
-        quote_quantity, coefficient, offset, to_quote_unit = _the_amounts(terms, leg, units)
-        if parts:
-            _the_same_quantity(terms, terms.legs[0], sizes[0], leg, to_quote_unit)
-        sizes.append(to_quote_unit)
+    for leg, observed, (quote_quantity, coefficient, _) in zip(
+        terms.legs, observations, amounts, strict=True
+    ):
         group_contract = leg.contract[heads]
-        offset_of_group = _the_group_offsets(
-            terms, leg, heads, group_of_component, offset, payment_date, keys, key_of_group
-        )
         reference = _the_references(terms, leg, observed)
         slot_of_observation, slot_group, slot_date, slot_reference = _the_slots(
             group_of_component[observed.component], observed.date, reference
@@ -419,9 +428,7 @@ def encoded(
                 (
                     quote_quantity,
                     coefficient,
-                    offset,
                     group_contract,
-                    offset_of_group,
                     slot_group,
                     slot_date,
                     slot_reference,
@@ -493,22 +500,8 @@ def encoded(
                 day_in_union=places,
             )
         )
-    # The trade's fixed leg of each group: the one leg's own array, by reference, or the legs'
-    # summed, finite or refused by the group since the legs' sums, each finite, can outrun.
-    offset_of_group = legs[0].offset_of_group
-    if len(legs) > 1:
-        with np.errstate(over="ignore", invalid="ignore"):
-            offset_of_group = legs[0].offset_of_group + legs[1].offset_of_group
-        outrun = ~np.isfinite(offset_of_group)
-        if outrun.any():
-            g = int(outrun.argmax())
-            group = group_words(terms, terms.legs[0], heads, payment_date, g, keys, key_of_group)
-            raise ValueError(
-                f"the fixed leg of {group} is {float(offset_of_group[g])!r}, expected a finite "
-                f"amount of {terms.legs[0].index.conventions.currency_unit}; the legs' fixed legs, "
-                "each finite, sum past the largest number"
-            )
-        offset_of_group.setflags(write=False)
+    offset.setflags(write=False)
+    offset_of_group.setflags(write=False)
     if payment_date is not None:
         payment_date.setflags(write=False)
     if key_of_group is not None:
@@ -521,6 +514,7 @@ def encoded(
         tuple(legs),
         group_of_component,
         heads,
+        offset,
         offset_of_group,
         payment_date,
         reserved,
@@ -553,11 +547,11 @@ class _LegParts:
 
 def _the_amounts(
     terms: ResolvedTrades, leg: LegTerms, units: UnitConversions
-) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
-    """A leg's three amounts per component, the quote quantity, the coefficient and the offset,
-    each finite or refused by its trade and its operation, and the quote-unit size of each of
-    the leg's specifications, the conversion formed once per distinct specification the batch
-    selects; the arithmetic runs with numpy's flags down and the rules judge."""
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+    """A leg's two amounts per component, the quote quantity and the coefficient, each finite or
+    refused by its trade and its operation, and the quote-unit size of each of the leg's
+    specifications, the conversion formed once per distinct specification the batch selects;
+    the arithmetic runs with numpy's flags down and the rules judge."""
     index = leg.index
     conventions = index.conventions
     specifications = index.specifications
@@ -588,7 +582,6 @@ def _the_amounts(
         )
         quote_quantity = terms.component_quantity * to_quote_unit[selection]
         coefficient = quote_quantity * to_currency
-        offset = -coefficient * leg.fixed_price
     for values, what, unit, why in (
         (
             quote_quantity,
@@ -602,13 +595,7 @@ def _the_amounts(
             f"amount of {per_price}",
             "its quote quantity times the currency factor outruns the largest number",
         ),
-        (
-            offset,
-            "fixed leg",
-            f"amount of {currency}",
-            "its coefficient times its fixed price outruns the largest number",
-        ),
-    ):  # the three products, each checked where it is made and named by its operation
+    ):  # the two products, each checked where it is made and named by its operation
         outrun = ~np.isfinite(values)
         if outrun.any():
             k = int(outrun.argmax())
@@ -616,7 +603,26 @@ def _the_amounts(
                 f"{terms.named(k)} has {float(values[k])!r} of {what}, expected a finite {unit}; "
                 f"{why}"
             )
-    return quote_quantity, coefficient, offset, to_quote_unit
+    return quote_quantity, coefficient, to_quote_unit
+
+
+def _the_fixed_leg(terms: ResolvedTrades, coefficient: NDArray[np.float64]) -> NDArray[np.float64]:
+    """The trade's fixed leg per component, since two-index-one-price.md: minus the first leg's
+    coefficient times the trade's one fixed price, the entry-price side of each component's
+    payment in the settlement currency, booked once whatever the legs; each finite or the first
+    that is not refused by its trade and its operation, the arithmetic running with numpy's
+    flags down."""
+    currency = terms.legs[0].index.conventions.currency_unit
+    with np.errstate(over="ignore", invalid="ignore"):
+        offset = -coefficient * terms.fixed_price
+    outrun = ~np.isfinite(offset)
+    if outrun.any():
+        k = int(outrun.argmax())
+        raise ValueError(
+            f"{terms.named(k)} has {float(offset[k])!r} of fixed leg, expected a finite amount "
+            f"of {currency}; its coefficient times its fixed price outruns the largest number"
+        )
+    return offset
 
 
 def _the_same_quantity(
@@ -659,8 +665,9 @@ def _the_group_offsets(
     keys: tuple[str, ...],
     key_of_group: NDArray[np.intp] | None,
 ) -> NDArray[np.float64]:
-    """A leg's offsets summed by group, one bincount, each finite or the first that is not
-    refused by its group, a sum blamed on the group and never on one of its trades."""
+    """The trade's fixed legs summed by group, one bincount, each finite or the first that is not
+    refused by its group, a sum blamed on the group and never on one of its trades; the leg
+    given names the group's contract in the refusal, the first leg's."""
     with np.errstate(over="ignore", invalid="ignore"):
         offset_of_group = np.bincount(group_of_component, weights=offset, minlength=heads.size)
     outrun = ~np.isfinite(offset_of_group)

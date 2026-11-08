@@ -1057,12 +1057,14 @@ def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> N
 # a hundred a cell and the slack covered fifteen columns, 11,411 bytes measured on 2026-10-07.
 # Since template-based-quoting.md three rows more, 190 cells: two rows of booleans after their
 # labels and one of conditions, mostly `none`, cheaper than the rule texts, so the same 155 a cell
-# covers them with room; 22,765 bytes measured on 2026-10-18, about 120 a cell.
+# covers them with room; 22,765 bytes measured on 2026-10-18, about 120 a cell. Since
+# cva-reserve.md twenty-three columns, 230 cells, 29,713 bytes measured on 2026-11-08, about 129
+# a cell, the new field's rule among the longer texts.
 # Neither publishes.
 def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() -> None:
     live = bridge.live_handles()
     assert least_peak(lambda: ENTRY["_ListInstruments"]()) <= 2 * SLACK
-    cells = 10 * 19
+    cells = 10 * 23
     assert least_peak(lambda: ENTRY["_ShowInstrument"]("fixed_float")) <= 155 * cells + SLACK
     assert bridge.live_handles() == live
 

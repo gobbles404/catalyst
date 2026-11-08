@@ -65,11 +65,11 @@ def test_the_catalog_holds_the_fixed_float_with_its_twenty_two_fields_in_order()
         "quantity_unit",
         "quantity_per",
         "fixed_price",
-        "second_fixed_price",
         "second_schedule_method",
         "payment_day",
         "payment_holiday_calendar",
         "marketing_reserve",
+        "cva_reserve",
         "settlement_frequency",
     )
     by_name = {field.name: field for field in FIXED_FLOAT.fields}
@@ -97,12 +97,13 @@ def test_the_catalog_holds_the_fixed_float_with_its_twenty_two_fields_in_order()
         "end_date",
     ]
     assert by_name["payment_day"].required_when == "settlement_method = financial"
-    # Since two-index-fixed-float.md the second leg's two fields, required with two indexes,
-    # the count _CreateTrades alone knows; a quote template holds neither.
-    for name in ("second_fixed_price", "second_schedule_method"):
-        assert by_name[name].required_when == "two indexes" and not by_name[name].required
-        assert not by_name[name].quote_allowed
-    assert by_name["second_fixed_price"].type is FieldType.NUMBER
+    # Since two-index-fixed-float.md the second leg's method, required with two indexes, the
+    # count _CreateTrades alone knows, and since two-index-one-price.md the one field a second
+    # leg adds, the fixed price being the trade's; a quote template holds it not.
+    second = by_name["second_schedule_method"]
+    assert second.required_when == "two indexes" and not second.required
+    assert not second.quote_allowed
+    assert "second_fixed_price" not in by_name
     assert by_name["payment_holiday_calendar"].required_when == "settlement_method = financial"
     assert by_name["payment_holiday_calendar"].type is FieldType.HOLIDAY_CALENDAR
     assert by_name["payment_day"].type is FieldType.DATE_OR_TEXT  # a date or a rule

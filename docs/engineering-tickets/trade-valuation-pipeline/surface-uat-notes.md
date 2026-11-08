@@ -818,3 +818,45 @@ of zero quantity, or two rows that net to nothing, and see the prices still show
 batch and see its prices and contributions kept as history while the mark is zero; compare a
 bilateral batch's contributions, unchanged by its curve, and a two-index pair's leg rows, each
 at its own index's quote.
+
+## 30. One outright price on a two-index fixed_float
+
+Agreed 8 November 2026 and built in #242, issue #241: [two-index-one-price.md](two-index-one-price.md).
+A pair is booked at the one outright `fixed_price` the system of record holds, in the quote unit the
+two indexes share; `second_fixed_price` is no field and `combined_fixed_price` no column;
+`second_schedule_method` stays. The swap's DV01 is one number, counted once against its curve
+and named by the handle's descriptor, `HNG+WAH`, on its own row of a collection's membership
+readback, the leg rows carrying each index's deltas and cross gamma; the results readback
+loses its six leg value columns. This supersedes item 27's two leg prices, leg values and
+reallocation check.
+
+UAT: book the Henry Hub plus Waha swap at the record's outright price and compare the mark
+with the record's NPV; read the risk report and see Henry Hub's and Waha's deltas apart, one
+DV01 column and a cross gamma per index; collect it with a Henry Hub swap and read the
+membership rows, the pair's DV01 on its `HNG+WAH` row; move the outright price and see the
+value and the DV01 move with the deltas still; follow one leg fixing before the other, both
+fixed, then paid, one cash amount; type `second_fixed_price` on a kept sheet and see it
+refused at the header, then remove the column and set `fixed_price` to the outright, both
+steps, since the first leg's old strike left in place misprices the swap without a word.
+
+## 31. A signed CVA reserve on the fixed_float
+
+Agreed 8 November 2026 and built in #244, issue #243: [cva-reserve.md](cva-reserve.md), stacked
+on #242. The
+fixed_float gains `cva_reserve`, an optional amount in the settlement currency beside
+`marketing_reserve`, from the template or the ticket on either route, finite and of either
+sign, booked once per ticket row whatever its months, quantity or direction, a strip and a
+two-index swap once. `_ReportReserves` and the results readback show its signed total as
+`cva_reserve` after `marketing_reserve` and before `currency`, so the results readback's
+later columns move one to the right; the trades readback shows the row's amount on each of
+its components where the batch has the field. The mark, the cash and every risk are as
+before.
+
+UAT: add a `cva_reserve` column to a ticket with 25, -40 and 0, the second row a strip, and
+read -15 under `cva_reserve` in `_ReportReserves`, the brokerage and clearing as before and
+the marketing 0; put -40 on a template instead and read -40 times the rows; book both
+columns and read the two totals side by side; book a pair with the column and read the
+amount once; compare the mark and the risk report with the column and without; type a
+blank cell, a word and the field on both the template and the ticket and read the
+refusals; read a results handle back and find `currency` and the columns after it one to
+the right of where they were.

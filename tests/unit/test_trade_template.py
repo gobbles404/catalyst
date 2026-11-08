@@ -128,8 +128,8 @@ def test_a_template_selects_its_instrument_for_a_ticket() -> None:
 
 
 def test_a_templates_numbers_pass_the_kernels_rules_as_a_tickets_do() -> None:
-    template = a_template(quantity=-4.0, fixed_price=3.15)
-    assert dict(template.defaults) == {"quantity": -4.0, "fixed_price": 3.15}
+    template = a_template(quantity=-4.0, fixed_price=3.15, cva_reserve=-40.0)
+    assert dict(template.defaults) == {"quantity": -4.0, "fixed_price": 3.15, "cva_reserve": -40.0}
 
 
 def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
@@ -198,6 +198,14 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
         (
             {"marketing_reserve": float("nan")},
             "marketing_reserve is nan, expected a finite amount of zero or more",
+        ),
+        (  # since cva-reserve.md: a CVA reserve is a finite amount of either sign
+            {"cva_reserve": float("inf")},
+            "cva_reserve is inf, expected a finite amount",
+        ),
+        (
+            {"cva_reserve": float("nan")},
+            "cva_reserve is nan, expected a finite amount",
         ),
         ({"fixed_price": float("inf")}, "fixed_price is inf, expected a finite price"),
         (

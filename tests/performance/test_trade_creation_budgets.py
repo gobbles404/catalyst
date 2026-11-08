@@ -310,7 +310,8 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_Fields.one_text": 2,  # the route and the settlement, one each for the batch
         "_Fields.has": 23,  # the required fields, the code the first period field found, and
         # since #175 the counterparty's condition and the marketing reserve looked for, since
-        # slice 3 the key's condition and the key itself
+        # slice 3 the key's condition and the key itself, since two-index-one-price.md the
+        # second leg's one field and no second price, since cva-reserve.md the CVA reserve
         "_Fields.rows": 10,  # the rows asked once less: the periods count their own since
         # dated-quotes.md, a request's rows resolving through the same rule
         "_Fields.texts": 5,  # the four row fields' columns read once each, the codes apart
@@ -319,7 +320,8 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_Fields.period_dates": 2,  # the two dates, none supplied by this ticket
         "_Fields.labels": 3,  # clearing_house, counterparty and broker; the IDs are read by ids
         "_Fields.keys": 1,  # the curve keys, since named-curves-slice-3.md, none on a cleared route
-        "_Fields.amounts": 1,  # the marketing reserve, None when neither supplies it, since #175
+        "_Fields.amounts": 2,  # the marketing reserve since #175 and the CVA reserve since
+        # cva-reserve.md, each None when neither supplies it
         "_Fields.ids": 1,  # the trade IDs, whole numbers since #168, none in this ticket
         "_Fields.numbers": 2,
         "_Fields.dates": 1,
@@ -330,14 +332,16 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "FieldValues.numbers": 2,
         "FieldValues.dates": 1,
         "resolved_trades": 1,
-        "_the_leg_fields": 1,  # two-index-fixed-float.md: the second leg's fields
+        "_the_leg_fields": 1,  # two-index-fixed-float.md: the second leg's field, its method
         "_owner": 1,  # the words naming an index's specifications and schedule in a refusal
         "_schedule_of": 1,
         "_the_payments": 1,  # the payment anchors, the later of the legs' last observations
         "_the_leg": 1,  # the leg's columns copied and frozen
         "_the_leg_selections": 1,  # the leg's specification rows and methods, then the basis
         "_the_choices": 2,
-        "_the_leg_columns": 1,  # the leg's contract rows and fixed prices
+        "_the_contract_column": 1,  # the leg's contract rows, each a row of its schedule
+        "_the_component_column": 2,  # the contract column and the price column, one per component
+        "_the_fixed_prices": 1,  # two-index-one-price.md: the trade's one price column, finite
         "_the_keys": 1,  # the keys present exactly on the bilateral route, since slice 3
         "_the_selections": 1,  # each occurrence's unit, method, basis and frequency in range
         "_the_method": 1,
@@ -690,8 +694,9 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "trades": 1,
         "encoded": 1,
         "_the_groups": 1,
-        "_the_amounts": 1,  # two-index-fixed-float.md: the leg's three amounts per component
-        "_the_group_offsets": 1,  # the leg's offsets by group
+        "_the_amounts": 1,  # two-index-fixed-float.md: the leg's two amounts per component
+        "_the_fixed_leg": 1,  # two-index-one-price.md: the trade's fixed leg, once
+        "_the_group_offsets": 1,  # the trade's fixed legs by group
         "_the_exposures": 1,  # the leg's slots' exposures
         "_distinct": 2,  # the groups by contract and day, the slots by group and day
         "_the_references": 1,
@@ -711,6 +716,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         # payment-day-date-or-rule.md
         "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
         "_charged": 1,  # clearing, the one fee a cleared, unbrokered template charges, since #188
+        "_summed_once": 2,  # the marketing and the CVA reserve, none here, since cva-reserve.md
         "ResolvedTrades.descriptor": 1,  # the handle's name, the legs' index names joined,
         # since two-index-fixed-float.md
         "_publish": 1,
@@ -853,7 +859,9 @@ def dated_ledger(contracts: int) -> dict[str, int]:
     return {
         **ledger,
         "_Fields.where": 7,  # the lag and the six batch fields, no code named
-        "_Fields.has": 24,  # the three period fields looked for, the two dates found
+        "_Fields.has": 24,  # the three period fields looked for, the two dates found; the
+        # second leg's one field since two-index-one-price.md, the CVA reserve since
+        # cva-reserve.md
         "_the_required.<locals>.<genexpr>": 3,
         "_Fields.rows": 9,  # one less since dated-quotes.md, the periods counting their own rows
         "_Fields.dates": 1,  # the trade dates; the two dates come through the periods' own read
@@ -1154,7 +1162,7 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "_each_distinct.<locals>.<lambda>": 9,  # likewise
         "_Fields.rows": 7,  # three fewer than the resolution's: the ticket's three columns, no
         # template value repeated
-        "FieldValues.has": 19,  # three columns more looked for
+        "FieldValues.has": 19,  # three columns more looked for, the second price no field
         "FieldValues.texts": 4,  # and read
         "_the_days": 4,  # the four methods present, once each
         "_with_expiries_priced": 1,  # the penultimate and last3day rows' expiries open
@@ -1268,23 +1276,40 @@ def test_an_iferc_ticket_resolves_like_a_futures_one_without_the_days(
 
 # --- the marketing reserve, booking-fields-and-marketing-reserve.md ------------------------------
 # A ticket with a marketing column sums its amounts once per row, reported as reserved_occurrences
-# beside the components' brokerage and clearing; nothing else in the counter moves, since #175.
+# beside the components' brokerage and clearing, since #175, and a CVA column the same, the rows
+# counted once per reserve field, since cva-reserve.md; nothing else in the counter moves.
 
 
 @pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
-def test_a_marketing_column_sums_once_per_row_and_the_counter_says_so(
+def test_a_marketing_and_a_cva_column_each_sum_once_per_row_and_the_counter_says_so(
     rows: int, contracts: int
 ) -> None:
     base = a_ticket(rows, contracts)
     ticket = FieldValues(
         FIXED_FLOAT,
         rows,
-        (*base.names, "marketing_reserve"),
-        {**base.columns, "marketing_reserve": np.full(rows, 7.5)},
+        (*base.names, "marketing_reserve", "cva_reserve"),
+        {
+            **base.columns,
+            "marketing_reserve": np.full(rows, 7.5),
+            "cva_reserve": np.full(rows, -2.5),  # signed, since cva-reserve.md
+        },
     )
     counter = WorkCounter()
     batch = trades((GAS,), ticket, a_template(), UNITS, counter)
     assert batch.encoded.reserves.marketing == pytest.approx(7.5 * rows)
+    assert batch.encoded.reserves.cva == pytest.approx(-2.5 * rows)
+    alone = FieldValues(
+        FIXED_FLOAT,
+        rows,
+        (*base.names, "cva_reserve"),
+        {**base.columns, "cva_reserve": np.full(rows, -2.5)},
+    )
+    once = WorkCounter()
+    assert trades((GAS,), alone, a_template(), UNITS, once).encoded.reserves.cva == pytest.approx(
+        -2.5 * rows
+    )
+    assert once.freeze()["reserved_occurrences"] == rows  # the one field's rows
     assert counter.freeze().as_dict() == {
         "encoded_components": rows,
         "encoded_groups": contracts,
@@ -1293,7 +1318,8 @@ def test_a_marketing_column_sums_once_per_row_and_the_counter_says_so(
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
         "payment_shifts": 1,
         "reserved_fee_components": rows,  # clearing alone: cleared and unbrokered, since #188
-        "reserved_occurrences": rows,  # the rows' amounts summed once each, since #175
+        "reserved_occurrences": 2 * rows,  # the rows once per reserve field booked, marketing
+        # since #175 and CVA since cva-reserve.md
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,

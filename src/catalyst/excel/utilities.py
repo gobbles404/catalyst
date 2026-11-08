@@ -508,7 +508,8 @@ def trades_table(obj: Trades) -> MixedArray:
     # and a rule its text since payment-day-date-or-rule.md, and the day it gives for a
     # financial settlement; since #175 marketing_reserve where the batch has it, the amount the
     # row booked shown on each of its components, the one amount and no allocation among them,
-    # so a reader never sums the column down a strip;
+    # so a reader never sums the column down a strip, and since cva-reserve.md cva_reserve where
+    # it has that, the row's signed amount, likewise;
     # then what the resolution derived, since #172 entered_contract_code, the code text the row
     # entered as typed, kept apart from the period its components resolved to under
     # booked_period, and the words `(not supplied)` where the row entered none and booked by
@@ -521,9 +522,9 @@ def trades_table(obj: Trades) -> MixedArray:
     # then what the encoding made, quote_quantity the component quantity in the index's quote
     # quantity unit, coefficient and offset in the settlement currency. A pair, since
     # two-index-fixed-float.md, shows the second leg's second_schedule_method after the first's
-    # method, second_fixed_price and combined_fixed_price, the sum the terms formed and held
-    # finite at creation, after fixed_price, and
-    # second_offset after offset, one row per component still; a single index shows none.
+    # method, one row per component still, and a single index shows no such column; since
+    # two-index-one-price.md fixed_price and offset are the trade's, one price and one fixed
+    # leg whatever the legs, and no column is a leg's price.
     terms, encoding = obj.resolved, obj.encoded
     leg, leg_encoding = terms.legs[0], encoding.legs[0]  # the first leg's, the batch's own
     paired = len(terms.legs) > 1
@@ -570,10 +571,7 @@ def trades_table(obj: Trades) -> MixedArray:
         tuple(np.array(leg.index.specifications.names, dtype=object)[leg.specification[rows]]),
     )
     text("quantity_per", tuple(BASIS_NAMES[terms.quantity_per[rows]]))
-    numbers("fixed_price", "float64", leg.fixed_price)
-    if paired:
-        numbers("second_fixed_price", "float64", terms.legs[1].fixed_price)
-        numbers("combined_fixed_price", "float64", terms.combined_fixed_price)
+    numbers("fixed_price", "float64", terms.fixed_price)
     if terms.payment is not None:
         headers.append("payment_day")  # as the ticket or the template wrote, each kind its own
         types.append("date or text")
@@ -581,6 +579,8 @@ def trades_table(obj: Trades) -> MixedArray:
         numbers("payment_date", "datetime64[D]", terms.payment.date)
     if terms.marketing_reserve is not None:  # the row's one amount on each of its components
         numbers("marketing_reserve", "float64", terms.marketing_reserve[rows])
+    if terms.cva_reserve is not None:  # likewise the row's signed amount, since cva-reserve.md
+        numbers("cva_reserve", "float64", terms.cva_reserve[rows])
     entered = np.full(obj.code_entered.size, NOT_SUPPLIED, dtype=object)
     entered[obj.code_entered] = np.array(obj.entered_codes, dtype=object)
     text("entered_contract_code", tuple(entered[rows]))
@@ -590,9 +590,7 @@ def trades_table(obj: Trades) -> MixedArray:
     numbers("component_quantity", "float64", terms.component_quantity)
     numbers("quote_quantity", "float64", leg_encoding.quote_quantity)
     numbers("coefficient", "float64", leg_encoding.coefficient)
-    numbers("offset", "float64", leg_encoding.offset)
-    if paired:
-        numbers("second_offset", "float64", encoding.legs[1].offset)
+    numbers("offset", "float64", encoding.offset)
     # settlement_frequency last, since onetime-averaging.md, a term of the row shown after the
     # encoding's columns so that no column before it moves, as the observation columns of #229
     # were appended: each row's own word, monthly or onetime.
@@ -717,11 +715,14 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
     named-curves-slice-2.md a batch of cashflows is a row too: a dash under the index, the lot,
     the two deltas, the cross-gamma and its unit, numbers it has not, `cashflow` under the route,
     its curve's word, its currency and its DV01. Since two-index-fixed-float.md a pair is a row
-    per leg under its one position, each leg's index, lot, deltas and cross-gamma its own, the
-    source's route, curve, currency and day on both and its DV01 on the first leg's row alone,
-    an additive number never repeated. The collection's totals and vectors are _ReportRisk's to
-    show; no handle text, since a source's cell may have been released while the collection
-    holds the object."""
+    per leg under its one position, each leg's index, lot, deltas and cross-gamma its own, and
+    since two-index-one-price.md a row of its own before them, named by the handle's
+    descriptor, `A+B`, carrying the swap's DV01 and a dash under every commodity column, the
+    DV01 being the swap's against its one price and no leg's; the leg rows show a dash under
+    the DV01, and a one-index source keeps its one row, its descriptor its index's name. The
+    source's route, curve, currency and day stand on every row of it. The collection's totals
+    and vectors are _ReportRisk's to show; no handle text, since a source's cell may have been
+    released while the collection holds the object."""
     sources = obj.sources
     # The words of every curve a source used, in its own key order, since named-curves-slice-3.md,
     # joined with a comma and a space; a cleared source, with no contribution, a dash.
@@ -743,7 +744,20 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
         word = ", ".join([word_of_curve[id(c.curve)] for c in source.rate_contributions]) or "-"
         match source:
             case TradeResults():
-                for j, leg in enumerate(source.legs):
+                paired = len(source.legs) > 1
+                if paired:
+                    # The swap's own row: its descriptor, its DV01 and nothing of a leg's.
+                    positions.append(k + 1)
+                    index_names.append(source.prepared.encoded.terms.descriptor)
+                    lots.append("-")
+                    routes.append(source.route.value)
+                    curves.append(word)
+                    currencies.append(source.currency)
+                    trade.append(False)
+                    units.append("-")
+                    dv01_on.append(True)
+                    dv01.append(source.dv01)
+                for leg in source.legs:
                     leg_terms = leg.prepared.encoded.leg
                     positions.append(k + 1)
                     index_names.append(leg_terms.index.name)
@@ -756,8 +770,8 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
                     delta.append(leg.delta_total)
                     cross.append(leg.cross_gamma_total)
                     units.append(f"{leg.lot_unit} per basis point")
-                    dv01_on.append(j == 0)
-                    if j == 0:
+                    dv01_on.append(not paired)
+                    if not paired:
                         dv01.append(source.dv01)
             case CashflowResults():
                 positions.append(k + 1)
@@ -811,11 +825,10 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # on each of its slots would read as each slot's and sum twice; a cleared result retains none
     # of the four and shows a dash on every row. A pair, since two-index-fixed-float.md, shows
     # each leg's slots after the other's, each row naming its leg and its index, the group facts
-    # once per group on the group's first row of all, and then its leg values: leg_amount,
-    # leg_npv and leg_group_dv01, the leg's share of the group, once on that leg's first slot row
-    # of the group and a dash elsewhere, a cleared pair's none, and leg_mark, leg_cash and
-    # leg_dv01, the leg's totals, once on the leg's first row; a single index shows none of the
-    # six. Then, since #170, the batch's reserves, once: the three totals and their currency on
+    # once per group on the group's first row of all, the trade's and no leg's, since
+    # two-index-one-price.md the payment being one amount against one price; a leg's floating
+    # side is the observation columns' last. Then, since #170, the batch's reserves, once: the
+    # three totals, since cva-reserve.md the signed CVA's fourth, and their currency on
     # the first slot row, as _ReportReserves spills them, and a dash on every later row, since
     # they are the batch's booked amounts and no slot's. Then, since #197, the contract's
     # cross-gamma on every slot, read by the slot's reference as the contract's four risks are
@@ -889,8 +902,6 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
                 for name, vector in zip(PAYMENT_COLUMNS[1:], held, strict=True)
             ),  # the three are retained together with the factors
         ]
-    if len(legs) > 1:
-        payments.extend(_leg_values(obj, slots, offsets, none, nothing))
     reserves = obj.reserves
     currency = np.full(slots, "-", dtype=object)
     currency[0] = reserves.currency
@@ -923,6 +934,7 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
             _numbers_on("brokerage_reserve", np.array([reserves.brokerage]), once),
             _numbers_on("clearing_reserve", np.array([reserves.clearing]), once),
             _numbers_on("marketing_reserve", np.array([reserves.marketing]), once),
+            _numbers_on("cva_reserve", np.array([reserves.cva]), once),
             _words_on("currency", currency),
             _numbers_on("contract_cross_gamma", cross, every),
             _words_on("cross_gamma_unit", per_bp),
@@ -986,47 +998,6 @@ def _quote_unit(leg: LegResults) -> str:
     return f"{conventions.quote_currency_unit}/{conventions.quote_quantity_unit}"
 
 
-def _leg_values(
-    obj: TradeResults,
-    slots: int,
-    offsets: list[int],
-    none: NDArray[np.bool_],
-    nothing: NDArray[np.float64],
-) -> list[Added]:
-    """A pair's leg values, since two-index-fixed-float.md: each leg's amount, NPV and DV01 of a
-    group once on that leg's first slot row of the group, a dash elsewhere and on every row of a
-    cleared pair; and each leg's mark, cash and DV01 once on the leg's first row."""
-    legs = obj.legs
-    leg_first = np.zeros(slots, dtype=np.bool_)
-    heads: list[NDArray[np.intp]] = []  # each leg's groups at its first slots, in row order
-    for leg, offset in zip(legs, offsets, strict=True):
-        groups, at = np.unique(leg.prepared.encoded.slot_group, return_index=True)
-        leg_first[offset + at] = True
-        heads.append(groups)
-    leg_head = np.zeros(slots, dtype=np.bool_)
-    leg_head[offsets] = True
-    shares: list[Added] = []
-    for name, field in zip(
-        LEG_COLUMNS[:3], ("payment_amount", "npv_by_group", "dv01_by_group"), strict=True
-    ):
-        if obj.payment_factor is None:
-            shares.append(_numbers_on(name, nothing, none))
-            continue
-        held = np.concatenate(
-            [
-                cast(NDArray[np.float64], getattr(leg, field))[groups]
-                for leg, groups in zip(legs, heads, strict=True)
-            ]
-        )
-        shares.append(_numbers_on(name, held, leg_first))
-    totals = [
-        _numbers_on(name, np.array([getattr(leg, field) for leg in legs]), leg_head)
-        for name, field in zip(LEG_COLUMNS[3:], ("mark", "cash", "dv01"), strict=True)
-    ]
-    return [*shares, *totals]
-
-
-LEG_COLUMNS = ("leg_amount", "leg_npv", "leg_group_dv01", "leg_mark", "leg_cash", "leg_dv01")
 PAYMENT_COLUMNS = ("payment_factor", "payment_amount", "group_npv", "group_dv01")
 
 

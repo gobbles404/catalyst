@@ -1,12 +1,13 @@
-"""Two index legs on a fixed_float, two-index-fixed-float.md: a pair of synthetic indexes, A a
-futures index with a 10,000 MMBTU reporting lot and B an IFERC index with a 2,500 MMBTU one,
-each defining one MMBTU per entered unit, through resolution, encoding, preparation and
-evaluation; the ticket's hand-priced acceptance table, its cleared version, its fixed-price
-reallocation, the F27 lifecycle, the bump check of the analytic rate risk, and the rules of the
-pair: the second leg's fields, distinct indexes of one quoting, one quantity on both legs, the
-later observation anchoring one shared payment, histories and markets matched by identity
-whatever their order, and the first leg's fees. Every expected number is the ticket's or hand
-arithmetic here; the production code is never asked for an expected answer."""
+"""Two index legs on a fixed_float at one outright price, two-index-fixed-float.md and
+two-index-one-price.md: a pair of synthetic indexes, A a futures index with a 10,000 MMBTU
+reporting lot and B an IFERC index with a 2,500 MMBTU one, each defining one MMBTU per entered
+unit, through resolution, encoding, preparation and evaluation; the hand-priced acceptance
+table at the outright price, its cleared version, the outright price moved, the F27 lifecycle,
+the bump check of the analytic rate risk, and the rules of the pair: the second leg's method
+and no second price, distinct indexes of one quoting, one quantity on both legs, the later
+observation anchoring one shared payment, histories and markets matched by identity whatever
+their order, and the first leg's fees. Every expected number is the ticket's or hand arithmetic
+here; the production code is never asked for an expected answer."""
 
 import os
 import re
@@ -37,10 +38,9 @@ from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index, index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.instrumentation.work_counts import WorkCounter
-from catalyst.instruments.definitions import CASHFLOW
+from catalyst.instruments.definitions import CASHFLOW, FIXED_FLOAT
 from catalyst.market.market import Market
 from catalyst.market.market_history import MarketHistory
-from catalyst.quoting.template import quote_template
 from catalyst.trades.aggregation import aggregate_results
 from catalyst.trades.evaluation import trade_results
 from catalyst.trades.preparation import PreparedTrades, prepared_trades
@@ -166,8 +166,7 @@ TICKET: dict[str, list[object]] = {
     "trade_date": ["2026-12-15"],
     "contract_code": ["G27"],
     "quantity": [10_000],
-    "fixed_price": [3.30],
-    "second_fixed_price": [-0.30],
+    "fixed_price": [3.00],  # the outright, the one price of the deal
 }
 
 
@@ -234,28 +233,29 @@ def legs_of(results: TradeResults) -> tuple[Any, Any]:
 
 
 def test_the_hand_table_both_legs_live_on_4_january_2027() -> None:
-    # 10,000 MMBTU at 3.30 and -0.30 against 3.50 and -0.40, one payment a year on at 0.95:
-    # amounts 2,000 and -1,000, marks 1,900 and -950, nominal deltas 1 lot of A and 4 of B,
-    # deltas 0.95 and 3.8, DV01s -0.19 and +0.095, cross-gammas -0.000095 and -0.00038; the
-    # whole trade 1,000, 950 and -0.095, and no sum across the two indexes' lots.
+    # 10,000 MMBTU at the outright 3.00 against 3.50 and -0.40, 3.10 together, one payment a
+    # year on at 0.95: payment 1,000, mark 950, DV01 -0.095; nominal deltas 1 lot of A and 4 of
+    # B, deltas 0.95 and 3.8, cross-gammas -0.000095 and -0.00038; no leg has a value and no
+    # sum crosses the two indexes' lots.
     batch = booked()
     assert batch.resolved.descriptor == "A+B"
     assert [leg.index for leg in batch.resolved.legs] == [A, B]
+    close(batch.resolved.fixed_price, [3.0])
+    close(batch.encoded.offset, [-30_000.0])  # -10,000 MMBTU at 3.00, the trade's once
+    close(batch.encoded.offset_of_group, [-30_000.0])
     results = valued(batch)
     a, b = legs_of(results)
     assert (a.prepared.encoded.leg.index, b.prepared.encoded.leg.index) == (A, B)
-    close(a.payment_amount, [2000.0])
-    close(b.payment_amount, [-1000.0])
     close(results.payment_amount, [1000.0])
     close(results.payment_factor, [0.95])
-    assert a.mark == pytest.approx(1900.0, **CLOSE)
-    assert b.mark == pytest.approx(-950.0, **CLOSE)
     assert results.mark == pytest.approx(950.0, **CLOSE)
-    assert a.dv01 == pytest.approx(-0.19, **CLOSE)
-    assert b.dv01 == pytest.approx(0.095, **CLOSE)
     assert results.dv01 == pytest.approx(-0.095, **CLOSE)
     close(results.npv_by_group, [950.0])
     close(results.dv01_by_group, [-0.095])
+    # Each leg's floating side, its one slot's live contribution: 35,000 of A and -4,000 of B,
+    # which with the fixed leg make the payment.
+    close(a.dated_live_contribution, [35_000.0])
+    close(b.dated_live_contribution, [-4_000.0])
     assert a.nominal_delta_total == pytest.approx(1.0, **CLOSE)
     assert b.nominal_delta_total == pytest.approx(4.0, **CLOSE)
     assert a.delta_total == pytest.approx(0.95, **CLOSE)
@@ -263,14 +263,12 @@ def test_the_hand_table_both_legs_live_on_4_january_2027() -> None:
     assert a.cross_gamma_total == pytest.approx(-0.000095, **CLOSE)
     assert b.cross_gamma_total == pytest.approx(-0.00038, **CLOSE)
     assert "LOT" in a.lot_unit and "LOT" in b.lot_unit and a.lot_unit != b.lot_unit
-    # The sums are the whole trade's, exactly, and the trade's rate risk is one curve's.
-    assert a.mark + b.mark == results.mark
-    assert a.dv01 + b.dv01 == results.dv01
-    np.testing.assert_array_equal(a.npv_by_group + b.npv_by_group, results.npv_by_group)
-    np.testing.assert_array_equal(a.dv01_by_group + b.dv01_by_group, results.dv01_by_group)
+    # No value is a leg's, the records holding none, and the trade's rate risk is one curve's.
+    for name in ("mark", "cash", "dv01", "payment_amount", "npv_by_group", "dv01_by_group"):
+        assert not hasattr(a, name), name
     (rate,) = results.rate_contributions
     assert rate.curve is SOFR and rate.dv01 == pytest.approx(-0.095, **CLOSE)
-    assert results.cash == 0.0 and a.cash == 0.0 and b.cash == 0.0
+    assert results.cash == 0.0
     assert [c.curve for c in a.cross_contributions] == [SOFR]
     assert a.cross_contributions[0].cross_gamma_total == pytest.approx(-0.000095, **CLOSE)
 
@@ -278,30 +276,21 @@ def test_the_hand_table_both_legs_live_on_4_january_2027() -> None:
 def test_the_cleared_version_is_undiscounted_with_no_rate_risk() -> None:
     results = valued(booked(CLEARED), curve=None)
     a, b = legs_of(results)
-    assert (a.mark, b.mark, results.mark) == (2000.0, -1000.0, 1000.0)
-    assert (a.dv01, b.dv01, results.dv01) == (0.0, 0.0, 0.0)
+    assert (results.mark, results.dv01) == (1000.0, 0.0)
     assert (a.cross_gamma_total, b.cross_gamma_total) == (0.0, 0.0)
     assert a.delta is a.nominal_delta and b.delta is b.nominal_delta
-    assert a.payment_amount is None and results.payment_amount is None
+    assert results.payment_amount is None and results.npv_by_group is None
     assert results.curves == () and results.rate_contributions == ()
 
 
-def test_moving_the_fixed_prices_moves_the_leg_values_and_not_the_whole() -> None:
-    # 3.20 and -0.20 sum to the same 3.00: the legs' marks become 2,850 and -1,900 and their
-    # DV01s -0.285 and 0.19; the whole mark, DV01, deltas and cross-gammas stand.
-    moved: dict[str, list[object]] = {
-        **TICKET,
-        "fixed_price": [3.20],
-        "second_fixed_price": [-0.20],
-    }
-    results = valued(booked(ticket=moved))
+def test_moving_the_outright_price_moves_the_value_and_the_rate_risk_and_not_the_deltas() -> None:
+    # 2.90 in place of 3.00: the payment 2,000, the mark 1,900 and the DV01 -0.19; every delta
+    # and cross-gamma stands, the fixed price entering none of them.
+    results = valued(booked(ticket={**TICKET, "fixed_price": [2.90]}))
     a, b = legs_of(results)
-    assert a.mark == pytest.approx(2850.0, **CLOSE)
-    assert b.mark == pytest.approx(-1900.0, **CLOSE)
-    assert a.dv01 == pytest.approx(-0.285, **CLOSE)
-    assert b.dv01 == pytest.approx(0.19, **CLOSE)
-    assert results.mark == pytest.approx(950.0, **CLOSE)
-    assert results.dv01 == pytest.approx(-0.095, **CLOSE)
+    close(results.payment_amount, [2000.0])
+    assert results.mark == pytest.approx(1900.0, **CLOSE)
+    assert results.dv01 == pytest.approx(-0.19, **CLOSE)
     assert (a.nominal_delta_total, b.nominal_delta_total) == (1.0, 4.0)
     assert (a.delta_total, b.delta_total) == pytest.approx((0.95, 3.8), **CLOSE)
     assert a.cross_gamma_total == pytest.approx(-0.000095, **CLOSE)
@@ -312,8 +301,6 @@ def test_a_sold_pair_reverses_every_value_and_risk() -> None:
     bought = valued(booked())
     sold = valued(booked(ticket={**TICKET, "quantity": [-10_000]}))
     for mine, theirs in zip(sold.legs, bought.legs, strict=True):
-        assert mine.mark == pytest.approx(-theirs.mark, **CLOSE)
-        assert mine.dv01 == pytest.approx(-theirs.dv01, **CLOSE)
         assert mine.nominal_delta_total == pytest.approx(-theirs.nominal_delta_total, **CLOSE)
         assert mine.delta_total == pytest.approx(-theirs.delta_total, **CLOSE)
         assert mine.cross_gamma_total == pytest.approx(-theirs.cross_gamma_total, **CLOSE)
@@ -322,16 +309,15 @@ def test_a_sold_pair_reverses_every_value_and_risk() -> None:
 
 
 def test_the_analytic_rate_risk_matches_a_bumped_curve() -> None:
-    # One basis point up and down on the curve: the marks' half difference is the DV01, the
-    # whole trade's and each leg's, and each leg's discounted lots' half difference its
-    # cross-gamma, to the second order a bump of a basis point leaves.
+    # One basis point up and down on the curve: the marks' half difference is the trade's DV01,
+    # and each leg's discounted lots' half difference its cross-gamma, to the second order a
+    # bump of a basis point leaves.
     batch = booked()
     up = valued(batch, curve=bump_discount_curve(SOFR, 1.0, WorkCounter()))
     down = valued(batch, curve=bump_discount_curve(SOFR, -1.0, WorkCounter()))
     results = valued(batch)
     assert (up.mark - down.mark) / 2 == pytest.approx(results.dv01, rel=1e-6)
     for before, after, leg in zip(up.legs, down.legs, results.legs, strict=True):
-        assert (before.mark - after.mark) / 2 == pytest.approx(leg.dv01, rel=1e-6)
         assert (before.delta_total - after.delta_total) / 2 == pytest.approx(
             leg.cross_gamma_total, rel=1e-6
         )
@@ -372,15 +358,13 @@ def test_the_lifecycle_both_live_on_28_december() -> None:
     )
     a, b = legs_of(results)
     tau = 9 / 365
-    close(a.payment_amount, [2000.0])
-    close(b.payment_amount, [-1000.0])
+    close(results.payment_amount, [1000.0])
     assert results.mark == pytest.approx(1000.0 * 0.99, **CLOSE)
-    assert a.dv01 == pytest.approx(-0.0001 * tau * 2000.0 * 0.99, **CLOSE)
-    assert b.dv01 == pytest.approx(0.0001 * tau * 1000.0 * 0.99, **CLOSE)
+    assert results.dv01 == pytest.approx(-0.0001 * tau * 1000.0 * 0.99, **CLOSE)
     assert (a.nominal_delta_total, b.nominal_delta_total) == (1.0, 4.0)
 
 
-def test_the_lifecycle_a_fixed_on_30_december_and_both_legs_still_carry_dv01() -> None:
+def test_the_lifecycle_a_fixed_on_30_december_and_the_unpaid_payment_still_carries_dv01() -> None:
     results = valued(
         booked(LIFECYCLE, F27),
         "2026-12-30",
@@ -390,14 +374,15 @@ def test_the_lifecycle_a_fixed_on_30_december_and_both_legs_still_carry_dv01() -
     )
     a, b = legs_of(results)
     tau = 7 / 365
-    close(a.payment_amount, [2500.0])  # 10,000 at 3.55 less 3.30
-    close(b.payment_amount, [-1000.0])
+    close(results.payment_amount, [1500.0])  # 10,000 at 3.55 less 0.40 less the outright 3.00
+    close(a.prepared.fixed_contribution, [35_500.0])  # A's side, fixed at 3.55
+    close(b.dated_live_contribution, [-4_000.0])  # B's side, live at -0.40
     assert results.mark == pytest.approx(1500.0 * 0.995, **CLOSE)
-    assert a.dv01 == pytest.approx(-0.0001 * tau * 2500.0 * 0.995, **CLOSE)
-    assert b.dv01 == pytest.approx(0.0001 * tau * 1000.0 * 0.995, **CLOSE)
+    assert results.dv01 == pytest.approx(-0.0001 * tau * 1500.0 * 0.995, **CLOSE)
     assert (a.nominal_delta_total, b.nominal_delta_total) == (0.0, 4.0)
     assert a.cross_gamma_total == 0.0 and b.cross_gamma_total != 0.0
-    # A's fixing corrected moves A's amount alone; B's quote moved moves B's alone.
+    # A's fixing corrected moves A's side alone, and the one payment with it; B's quote moved
+    # moves B's side alone.
     corrected = valued(
         booked(LIFECYCLE, F27),
         "2026-12-30",
@@ -406,8 +391,9 @@ def test_the_lifecycle_a_fixed_on_30_december_and_both_legs_still_carry_dv01() -
         quotes_b=(-0.40, -0.42, -0.44),
         curve=on("2026-12-30", 0.995),
     )
-    close(corrected.legs[0].payment_amount, [3000.0])
-    close(corrected.legs[1].payment_amount, [-1000.0])
+    close(corrected.payment_amount, [2000.0])  # 3.60 less 0.40 less 3.00
+    close(corrected.legs[0].prepared.fixed_contribution, [36_000.0])
+    close(corrected.legs[1].dated_live_contribution, [-4_000.0])
     moved = valued(
         booked(LIFECYCLE, F27),
         "2026-12-30",
@@ -415,8 +401,9 @@ def test_the_lifecycle_a_fixed_on_30_december_and_both_legs_still_carry_dv01() -
         quotes_b=(-0.45, -0.42, -0.44),
         curve=on("2026-12-30", 0.995),
     )
-    close(moved.legs[0].payment_amount, [2500.0])
-    close(moved.legs[1].payment_amount, [-1500.0])
+    close(moved.payment_amount, [1000.0])  # 3.55 less 0.45 less 3.00
+    close(moved.legs[0].prepared.fixed_contribution, [35_500.0])
+    close(moved.legs[1].dated_live_contribution, [-4_500.0])
 
 
 def test_the_lifecycle_both_fixed_on_5_january_with_dv01_remaining() -> None:
@@ -430,16 +417,16 @@ def test_the_lifecycle_both_fixed_on_5_january_with_dv01_remaining() -> None:
     )
     a, b = legs_of(results)
     tau = 1 / 365
-    close(a.payment_amount, [2500.0])
-    close(b.payment_amount, [-500.0])
+    close(results.payment_amount, [2000.0])  # 3.55 less 0.35 less 3.00, both sides fixed
+    close(a.prepared.fixed_contribution, [35_500.0])
+    close(b.prepared.fixed_contribution, [-3_500.0])
     assert results.mark == pytest.approx(2000.0 * 0.9999, **CLOSE)
     assert results.dv01 == pytest.approx(-0.0001 * tau * 2000.0 * 0.9999, **CLOSE)
-    assert a.dv01 == pytest.approx(-0.0001 * tau * 2500.0 * 0.9999, **CLOSE)
     assert (a.nominal_delta_total, b.nominal_delta_total) == (0.0, 0.0)
     assert results.cash == 0.0
 
 
-def test_the_lifecycle_paid_on_6_january_is_cash_split_by_leg() -> None:
+def test_the_lifecycle_paid_on_6_january_is_one_cash_amount() -> None:
     results = valued(
         booked(LIFECYCLE, F27),
         "2027-01-06",
@@ -450,11 +437,72 @@ def test_the_lifecycle_paid_on_6_january_is_cash_split_by_leg() -> None:
     )
     a, b = legs_of(results)
     assert (results.mark, results.dv01) == (0.0, 0.0)
-    assert (a.mark, b.mark, a.dv01, b.dv01) == (0.0, 0.0, 0.0, 0.0)
-    assert results.cash == pytest.approx(2000.0, **CLOSE)
-    assert a.cash == pytest.approx(2500.0, **CLOSE)
-    assert b.cash == pytest.approx(-500.0, **CLOSE)
+    assert results.cash == pytest.approx(2000.0, **CLOSE)  # one amount, split by nothing
+    assert (a.nominal_delta_total, b.nominal_delta_total) == (0.0, 0.0)
     assert results.prepared.is_settled.tolist() == [True]
+
+
+def test_a_small_legs_dollar_survives_a_strike_that_cancels_the_large_leg() -> None:
+    # The review's case on #242: one MMBTU, A quoted and struck at ten thousand trillion, B
+    # quoted at one dollar. Adding the two sides before the strike rounds the dollar away; the
+    # payment is its signed terms summed with compensation, so it reads one dollar with both
+    # legs live, with A fixed, with both fixed and, paid, as cash, on either route.
+    extreme: dict[str, list[object]] = {**F27, "quantity": [1], "fixed_price": [1e16]}
+    big, one = (1e16, 1e16, 1e16), (1.0, 1.0, 1.0)
+    live = valued(
+        booked(LIFECYCLE, extreme),
+        "2026-12-28",
+        finals_a={},
+        quotes_a=big,
+        quotes_b=one,
+        curve=on("2026-12-28", 0.99),
+    )
+    close(live.payment_amount, [1.0])
+    assert live.mark == pytest.approx(0.99, **CLOSE)
+    a_fixed = valued(
+        booked(LIFECYCLE, extreme),
+        "2026-12-30",
+        finals_a={"F27": 1e16},
+        quotes_a=big,
+        quotes_b=one,
+        curve=on("2026-12-30", 0.995),
+    )
+    close(a_fixed.payment_amount, [1.0])
+    both_fixed = valued(
+        booked(LIFECYCLE, extreme),
+        "2027-01-05",
+        finals_a={"F27": 1e16},
+        indices_b={"Z26": -0.30, "F27": 1.0},
+        quotes_a=big,
+        quotes_b=one,
+        curve=on("2027-01-05", 0.9999),
+    )
+    close(both_fixed.payment_amount, [1.0])
+    paid = valued(
+        booked(LIFECYCLE, extreme),
+        "2027-01-06",
+        finals_a={"F27": 1e16},
+        indices_b={"Z26": -0.30, "F27": 1.0},
+        quotes_a=big,
+        quotes_b=one,
+        curve=curve_of(("2027-01-06", 1.0), ("2027-06-30", 0.98)),
+    )
+    assert (paid.cash, paid.mark) == (1.0, 0.0)
+    cleared = {**CLEARED, "payment_day": "+2bd"}
+    both_live = valued(
+        booked(cleared, extreme), "2026-12-28", finals_a={}, quotes_a=big, quotes_b=one, curve=None
+    )
+    assert both_live.mark == 1.0
+    fixed = valued(
+        booked(cleared, extreme),
+        "2027-01-05",
+        finals_a={"F27": 1e16},
+        indices_b={"Z26": -0.30, "F27": 1.0},
+        quotes_a=big,
+        quotes_b=one,
+        curve=None,
+    )
+    assert fixed.mark == 1.0 and fixed.prepared.set_unsettled == (1e16, 1.0)
 
 
 # --- slots, offsets and payments of a pair -------------------------------------------------------
@@ -462,27 +510,28 @@ def test_the_lifecycle_paid_on_6_january_is_cash_split_by_leg() -> None:
 
 def test_two_futures_legs_observing_one_day_are_two_slots_with_their_own_fixings() -> None:
     # A and C expire alike; each leg's F27 slot is its own, fixed at its own settle, and the
-    # offsets keep their legs after grouping: a pair whose NPV nets to nothing still has values.
+    # fixed leg is the trade's once: a pair whose NPV nets to nothing still has its two sides.
     c = futures("C", 2_500.0, 0.0, 0.0)
     batch = booked(LIFECYCLE, F27, (A, c))
     a, other = batch.encoded.legs
     np.testing.assert_array_equal(a.slot_date, other.slot_date)
     assert a.slot_group.size == 1 and other.slot_group.size == 1
-    close(a.offset_of_group, [-33_000.0])  # -10,000 at 3.30
-    close(other.offset_of_group, [3_000.0])  # -10,000 at -0.30
+    close(batch.encoded.offset, [-30_000.0])  # -10,000 at the outright 3.00, the trade's
     close(batch.encoded.offset_of_group, [-30_000.0])
     hist_a = history_on(A, "2026-12-30", {"F27": 3.55})
     hist_c = history_on(c, "2026-12-30", {"F27": 3.45})
     prep = prepared_trades(batch.encoded, (hist_c, hist_a), WorkCounter())  # any order
     assert prep.legs[0].history is hist_a and prep.legs[1].history is hist_c
     close(prep.legs[0].set_amount, [35_500.0])
-    close(prep.legs[1].set_amount, [34_500.0])
-    close(prep.set_amount, [70_000.0])
-    # Cancelling legs: A at 3.50 against 3.30 and B at -0.50 against -0.30 net to nothing.
+    close(
+        prep.legs[1].set_amount, [34_500.0]
+    )  # each leg's own, never summed apart from the payment
+    # A payment of nothing: A at 3.50 and B at -0.50 make the outright 3.00 exactly; the two
+    # sides and the deltas stand while the value is zero.
     nothing = valued(booked(), quotes_b=(-0.48, -0.50, -0.52))
     assert nothing.mark == 0.0 and nothing.dv01 == 0.0
-    assert nothing.legs[0].mark == pytest.approx(1900.0, **CLOSE)
-    assert nothing.legs[1].mark == pytest.approx(-1900.0, **CLOSE)
+    close(nothing.legs[0].dated_live_contribution, [35_000.0])
+    close(nothing.legs[1].dated_live_contribution, [-5_000.0])
     assert nothing.legs[0].delta_total == pytest.approx(0.95, **CLOSE)
     assert nothing.legs[1].delta_total == pytest.approx(3.8, **CLOSE)
 
@@ -509,8 +558,8 @@ def test_a_strip_pays_each_month_from_its_later_observation_or_all_on_one_date()
         curve=curve_of(("2026-12-28", 1.0), ("2027-06-01", 0.97), ("2027-12-31", 0.95)),
     )
     close(results.payment_factor, [0.97] * 3)
-    close(results.legs[0].payment_amount, [2000.0, 3000.0, 4000.0])
-    close(results.legs[1].payment_amount, [-1000.0, -1200.0, -1400.0])
+    # 3.50 less 0.40, 3.60 less 0.42 and 3.70 less 0.44, each less the outright 3.00.
+    close(results.payment_amount, [1000.0, 1800.0, 2600.0])
 
 
 def test_different_methods_on_the_two_legs_each_observe_their_own_days() -> None:
@@ -531,8 +580,7 @@ def test_a_batch_equals_its_singleton_rows_and_a_duplicate_counts_twice() -> Non
         "trade_date": ["2026-12-15", "2026-12-16"],
         "contract_code": ["G27", "H27"],
         "quantity": [10_000, -5_000],
-        "fixed_price": [3.30, 3.40],
-        "second_fixed_price": [-0.30, -0.35],
+        "fixed_price": [3.00, 3.05],
     }
     both = valued(booked(ticket=rows))
     first = valued(booked(ticket={k: [v[0]] for k, v in rows.items()}))
@@ -540,7 +588,6 @@ def test_a_batch_equals_its_singleton_rows_and_a_duplicate_counts_twice() -> Non
     assert both.mark == pytest.approx(first.mark + second.mark, **CLOSE)
     assert both.dv01 == pytest.approx(first.dv01 + second.dv01, **CLOSE)
     for k in range(2):
-        assert both.legs[k].mark == pytest.approx(first.legs[k].mark + second.legs[k].mark, **CLOSE)
         assert both.legs[k].nominal_delta_total == pytest.approx(
             first.legs[k].nominal_delta_total + second.legs[k].nominal_delta_total, **CLOSE
         )
@@ -553,9 +600,8 @@ def test_a_batch_equals_its_singleton_rows_and_a_duplicate_counts_twice() -> Non
 
 def test_calday_and_zero_quantities_hold_on_both_legs() -> None:
     daily = valued(booked({**BILATERAL, "quantity_per": "calday"}))
-    # G27 covers February's 28 days: 280,000 MMBTU at 0.20 and -0.10, discounted at 0.95.
-    close(daily.legs[0].payment_amount, [56_000.0])
-    close(daily.legs[1].payment_amount, [-28_000.0])
+    # G27 covers February's 28 days: 280,000 MMBTU at 3.10 less 3.00, discounted at 0.95.
+    close(daily.payment_amount, [28_000.0])
     assert daily.mark == pytest.approx(28_000.0 * 0.95, **CLOSE)
     assert daily.legs[1].nominal_delta_total == pytest.approx(112.0, **CLOSE)
     zero = valued(booked(ticket={**TICKET, "quantity": [0]}))
@@ -564,6 +610,17 @@ def test_calday_and_zero_quantities_hold_on_both_legs() -> None:
 
 
 # --- order, identity and fees --------------------------------------------------------------------
+
+
+def test_the_pair_books_a_cva_reserve_once_per_row_though_it_has_two_legs() -> None:
+    # cva-reserve.md: the row's signed amount once, the legs apart; a reserve enters no number.
+    batch = booked(ticket={**TICKET, "cva_reserve": [-40.0]})
+    assert (batch.encoded.reserves.marketing, batch.encoded.reserves.cva) == (0.0, -40.0)
+    results = valued(batch)
+    assert results.reserves is batch.encoded.reserves
+    assert results.mark == valued(booked()).mark
+    both = booked(ticket={**TICKET, "marketing_reserve": [15.0], "cva_reserve": [-40.0]})
+    assert (both.encoded.reserves.marketing, both.encoded.reserves.cva) == (15.0, -40.0)
 
 
 def test_histories_and_markets_match_the_legs_by_identity_whatever_their_order() -> None:
@@ -577,18 +634,14 @@ def test_histories_and_markets_match_the_legs_by_identity_whatever_their_order()
     other = trade_results(backward, (market_b, market_a), WorkCounter(), curve_set(SOFR))
     assert one.mark == other.mark and one.dv01 == other.dv01
     for mine, theirs in zip(one.legs, other.legs, strict=True):
-        assert mine.mark == theirs.mark and mine.dv01 == theirs.dv01
+        assert mine.delta_total == theirs.delta_total
         assert mine.market is theirs.market and mine.prepared.history is theirs.prepared.history
 
 
 def test_reversing_the_indexes_with_their_prices_keeps_the_values_and_moves_the_fees() -> None:
     brokered = {**BILATERAL, "broker": "ICAP"}
     forward = booked(brokered)
-    backward = booked(
-        brokered,
-        {**TICKET, "fixed_price": [-0.30], "second_fixed_price": [3.30]},
-        (B, A),
-    )
+    backward = booked(brokered, TICKET, (B, A))  # the one price is the deal's, whatever the order
     assert backward.resolved.descriptor == "B+A"
     hist_a, hist_b = histories()
     one = trade_results(
@@ -605,59 +658,49 @@ def test_reversing_the_indexes_with_their_prices_keeps_the_values_and_moves_the_
     )
     assert one.mark == pytest.approx(other.mark, **CLOSE)
     assert one.dv01 == pytest.approx(other.dv01, **CLOSE)
-    assert one.legs[0].mark == pytest.approx(other.legs[1].mark, **CLOSE)
+    assert one.legs[0].delta_total == pytest.approx(other.legs[1].delta_total, **CLOSE)
     assert one.legs[1].delta_total == pytest.approx(other.legs[0].delta_total, **CLOSE)
     # The first leg's specification charges the brokerage: a cent a MMBTU on A, half a dollar
     # on B; the second index's rates are never read.
     assert forward.encoded.reserves.brokerage == pytest.approx(100.0, **CLOSE)
     assert backward.encoded.reserves.brokerage == pytest.approx(5000.0, **CLOSE)
     alone = booked(
-        {k: v for k, v in brokered.items() if k != "second_schedule_method"},
-        {k: v for k, v in TICKET.items() if k != "second_fixed_price"},
-        (A,),
+        {k: v for k, v in brokered.items() if k != "second_schedule_method"}, TICKET, (A,)
     )
     assert alone.encoded.reserves == forward.encoded.reserves
 
 
 def test_a_single_index_batch_is_as_it_was() -> None:
     one = {k: v for k, v in BILATERAL.items() if k != "second_schedule_method"}
-    ticket = {k: v for k, v in TICKET.items() if k != "second_fixed_price"}
-    batch = booked(one, ticket, (A,))
+    batch = booked(one, {**TICKET, "fixed_price": [3.30]}, (A,))
     assert batch.resolved.descriptor == "A" and len(batch.encoded.legs) == 1
+    close(batch.resolved.fixed_price, [3.3])
+    close(batch.encoded.offset, [-33_000.0])
     hist_a = history_on(A, AS_OF, {"F27": 3.55})
     prep = prepared_trades(batch.encoded, (hist_a,), WorkCounter())
     results = trade_results(prep, (quoted(hist_a, 3.50, 3.60),), WorkCounter(), curve_set(SOFR))
     (leg,) = results.legs
-    assert results.mark == pytest.approx(1900.0, **CLOSE) and leg.mark == results.mark
-    assert leg.payment_amount is results.payment_amount
-    assert leg.npv_by_group is results.npv_by_group and leg.dv01 == results.dv01
+    assert results.mark == pytest.approx(1900.0, **CLOSE)
+    close(results.payment_amount, [2000.0])
+    assert leg.nominal_delta_total == pytest.approx(1.0, **CLOSE)
 
 
 # --- the rules of the pair -----------------------------------------------------------------------
 
 
-def test_the_second_legs_fields_are_present_exactly_with_two_indexes() -> None:
+def test_the_second_legs_method_is_present_exactly_with_two_indexes_and_no_second_price() -> None:
     without = {k: v for k, v in BILATERAL.items() if k != "second_schedule_method"}
-    assert refused(without, {k: v for k, v in TICKET.items() if k != "second_fixed_price"}) == (
-        "second_fixed_price is missing, expected it with two indexes"
-    )
     assert refused(without) == "second_schedule_method is missing, expected it with two indexes"
-    assert refused(without, TICKET, (A,)) == (
-        "second_fixed_price is -0.3, expected none unless two indexes"
-    )
-    assert (
-        refused(BILATERAL, {k: v for k, v in TICKET.items() if k != "second_fixed_price"}, (A,))
-        == "second_schedule_method is 'lastday', expected none unless two indexes"
+    assert refused(BILATERAL, TICKET, (A,)) == (
+        "second_schedule_method is 'lastday', expected none unless two indexes"
     )
     assert refused(indexes=(A, B, A)) == (
         "indexes are 3, expected one or two; a batch is on one index or, since "
         "two-index-fixed-float.md, on a pair"
     )
-    with pytest.raises(ValueError) as refusal:
-        quote_template(a_ticket({"route": ["bilateral"], "second_fixed_price": [1.0]}))
-    assert str(refusal.value).startswith(
-        "second_fixed_price is a field of booking alone, expected one a quote template holds: "
-    )
+    # Since two-index-one-price.md the fixed_float has no second price: not a field of the
+    # definition, so the sheet refuses it at the header as any unknown name, below.
+    assert "second_fixed_price" not in {field.name for field in FIXED_FLOAT.fields}
 
 
 def test_the_pair_is_two_distinct_indexes_of_one_quoting_on_a_financial_settlement() -> None:
@@ -814,7 +857,7 @@ def one_index(
 ) -> Trades:
     """A single-index batch of the hand table's row on one index at its own fixed price."""
     shared = {k: v for k, v in template.items() if k != "second_schedule_method"}
-    rows: dict[str, list[object]] = {k: v for k, v in TICKET.items() if k != "second_fixed_price"}
+    rows: dict[str, list[object]] = dict(TICKET)
     rows["fixed_price"] = [fixed_price]
     rows["quantity"] = [quantity]
     return booked(shared, rows, (ix,))
@@ -841,7 +884,8 @@ def valued_one(
 def test_a_pairs_report_reads_as_the_collection_of_its_legs(cleared: bool) -> None:
     # Every risk by every bucket: the pair's report and the collection of the two legs booked
     # and valued apart have the same labels, dates, Totals and columns, two commodity groups and
-    # one DV01 column, never a combined-index column.
+    # one DV01 column, never a combined-index column. The singles book A at 3.30 and B at -0.30,
+    # one split of the outright 3.00: no column depends on the split, so any split reads alike.
     template, curve = (CLEARED, None) if cleared else (BILATERAL, SOFR)
     pair = valued(booked(template), curve=curve)
     legs = aggregate_results(
@@ -980,24 +1024,20 @@ def cell(table: list[list[object]], row: int, name: str) -> object:
     return table[2 + row][table[0].index(name)]
 
 
-def test_the_created_pair_reads_back_both_prices_and_the_combined_one() -> None:
+def test_the_created_pair_reads_back_one_price_and_one_fixed_leg() -> None:
     table = grid(booked())
     assert len(table) == 3
     headings = table[0]
     assert headings.index("second_schedule_method") == headings.index("schedule_method") + 1
-    assert headings.index("second_fixed_price") == headings.index("fixed_price") + 1
-    assert headings.index("combined_fixed_price") == headings.index("fixed_price") + 2
-    assert headings.index("second_offset") == headings.index("offset") + 1
+    for name in ("second_fixed_price", "combined_fixed_price", "second_offset"):
+        assert name not in headings, name  # since two-index-one-price.md no column is a leg's price
     assert cell(table, 0, "schedule_method") == "lastday"
     assert cell(table, 0, "second_schedule_method") == "lastday"
-    assert cell(table, 0, "fixed_price") == 3.3
-    assert cell(table, 0, "second_fixed_price") == -0.3
-    assert cell(table, 0, "combined_fixed_price") == pytest.approx(3.0, **CLOSE)
-    assert cell(table, 0, "offset") == pytest.approx(-33_000.0, **CLOSE)
-    assert cell(table, 0, "second_offset") == pytest.approx(3_000.0, **CLOSE)
+    assert cell(table, 0, "fixed_price") == 3.0
+    assert cell(table, 0, "offset") == pytest.approx(-30_000.0, **CLOSE)
     one = grid(one_index(A, 3.30))
-    assert "second_fixed_price" not in one[0] and "second_offset" not in one[0]
-    assert len(one[0]) == len(headings) - 4
+    assert "second_schedule_method" not in one[0]
+    assert len(one[0]) == len(headings) - 1
 
 
 def test_the_prepared_and_valued_pair_read_back_one_row_per_slot_naming_its_leg() -> None:
@@ -1028,24 +1068,15 @@ def test_the_prepared_and_valued_pair_read_back_one_row_per_slot_naming_its_leg(
     )
     table = grid(results)
     assert len(table) == 4 and [row[:2] for row in table[2:]] == [[1.0, "A"], [2.0, "B"]]
-    # The group's combined facts once, on its first row of all; each leg's share of the group
-    # and its totals once on the leg's first row; the payment factor on every row.
+    # The group's facts once, on its first row of all, the swap's and under no index; the
+    # payment factor on every row; no column a leg's value since two-index-one-price.md.
     assert cell(table, 0, "payment_amount") == pytest.approx(1000.0, **CLOSE)
     assert cell(table, 1, "payment_amount") == "-"
     assert cell(table, 0, "group_npv") == pytest.approx(950.0, **CLOSE)
     assert cell(table, 0, "group_dv01") == pytest.approx(-0.095, **CLOSE)
     assert cell(table, 0, "payment_factor") == 0.95 and cell(table, 1, "payment_factor") == 0.95
-    assert cell(table, 0, "leg_amount") == pytest.approx(2000.0, **CLOSE)
-    assert cell(table, 1, "leg_amount") == pytest.approx(-1000.0, **CLOSE)
-    assert cell(table, 0, "leg_npv") == pytest.approx(1900.0, **CLOSE)
-    assert cell(table, 1, "leg_npv") == pytest.approx(-950.0, **CLOSE)
-    assert cell(table, 0, "leg_group_dv01") == pytest.approx(-0.19, **CLOSE)
-    assert cell(table, 1, "leg_group_dv01") == pytest.approx(0.095, **CLOSE)
-    assert cell(table, 0, "leg_mark") == pytest.approx(1900.0, **CLOSE)
-    assert cell(table, 1, "leg_mark") == pytest.approx(-950.0, **CLOSE)
-    assert cell(table, 0, "leg_cash") == 0.0 and cell(table, 1, "leg_cash") == 0.0
-    assert cell(table, 0, "leg_dv01") == pytest.approx(-0.19, **CLOSE)
-    assert cell(table, 1, "leg_dv01") == pytest.approx(0.095, **CLOSE)
+    for name in ("leg_amount", "leg_npv", "leg_group_dv01", "leg_mark", "leg_cash", "leg_dv01"):
+        assert name not in table[0], name
     assert cell(table, 0, "brokerage_reserve") == 0.0 and cell(table, 1, "brokerage_reserve") == "-"
     assert cell(table, 0, "contract_cross_gamma") == pytest.approx(-0.000095, **CLOSE)
     assert cell(table, 1, "contract_cross_gamma") == pytest.approx(-0.00038, **CLOSE)
@@ -1069,30 +1100,35 @@ def test_the_prepared_and_valued_pair_read_back_one_row_per_slot_naming_its_leg(
         "price_unit",
         "floating_contribution",
     ]
-    assert headings.index("leg_amount") == headings.index("group_dv01") + 1
-    assert headings.index("brokerage_reserve") == headings.index("leg_dv01") + 1
-    # A cleared pair: the leg totals stand, the group and leg shares are none.
+    assert headings.index("brokerage_reserve") == headings.index("group_dv01") + 1
+    # A cleared pair: the group facts are none, a dash on every row.
     cleared = grid(valued(booked(CLEARED), curve=None))
-    assert cell(cleared, 0, "leg_mark") == 2000.0 and cell(cleared, 1, "leg_mark") == -1000.0
-    assert cell(cleared, 0, "leg_dv01") == 0.0 and cell(cleared, 1, "leg_amount") == "-"
-    assert cell(cleared, 0, "payment_amount") == "-"
-    # A single index reads back as it did: no leg column, none of the six.
+    assert cell(cleared, 0, "payment_amount") == "-" and cell(cleared, 1, "group_dv01") == "-"
+    # A single index reads back as it did: no leg column.
     one = grid(valued_one(one_index(A, 3.30), (3.50, 3.60)))
-    assert one[0][0] == "pricing_contract" and "leg_amount" not in one[0] and len(one) == 3
+    assert one[0][0] == "pricing_contract" and "leg" not in one[0] and len(one) == 3
 
 
-def test_a_collections_readback_has_a_row_per_leg_of_a_pair() -> None:
+def test_a_collections_readback_has_a_row_for_the_swap_and_a_row_per_leg() -> None:
+    # Since two-index-one-price.md the pair's DV01 sits on a row of its own, named by the
+    # handle's descriptor, and each leg's row carries its index's commodity risk alone; the
+    # A-alone source keeps its one row with everything on it.
     pair, alone = pair_beside_alone()
     table = grid(aggregate_results((pair, alone), WorkCounter()))
-    assert len(table) == 5
-    assert [cell(table, r, "position") for r in range(3)] == [1.0, 1.0, 2.0]
-    assert [cell(table, r, "index") for r in range(3)] == ["A", "B", "A"]
-    assert [cell(table, r, "nominal_delta") for r in range(3)] == pytest.approx([1.0, 4.0, 0.5])
+    assert len(table) == 6
+    assert [cell(table, r, "position") for r in range(4)] == [1.0, 1.0, 1.0, 2.0]
+    assert [cell(table, r, "index") for r in range(4)] == ["A+B", "A", "B", "A"]
+    assert [cell(table, r, "reporting_lot") for r in range(4)] == ["-", "LOT", "LOT", "LOT"]
+    assert cell(table, 0, "nominal_delta") == "-" and cell(table, 0, "delta") == "-"
+    assert [cell(table, r, "nominal_delta") for r in (1, 2, 3)] == pytest.approx([1.0, 4.0, 0.5])
     assert cell(table, 0, "dv01") == pytest.approx(-0.095, **CLOSE)
-    assert cell(table, 1, "dv01") == "-"  # the source's DV01 once, on its first leg's row
-    assert cell(table, 2, "dv01") == pytest.approx(-0.0475, **CLOSE)
-    assert [cell(table, r, "curve") for r in range(3)] == ["SOFR"] * 3
-    assert cell(table, 1, "cross_gamma") == pytest.approx(-0.00038, **CLOSE)
+    assert cell(table, 1, "dv01") == "-" and cell(table, 2, "dv01") == "-"
+    assert cell(table, 3, "dv01") == pytest.approx(-0.0475, **CLOSE)
+    assert [cell(table, r, "route") for r in range(4)] == ["bilateral"] * 4
+    assert [cell(table, r, "curve") for r in range(4)] == ["SOFR"] * 4
+    assert cell(table, 0, "cross_gamma") == "-" and cell(table, 0, "cross_gamma_unit") == "-"
+    assert cell(table, 2, "cross_gamma") == pytest.approx(-0.00038, **CLOSE)
+    assert cell(table, 3, "cross_gamma") == pytest.approx(-0.0000475, **CLOSE)
 
 
 # --- the pair on the sheet -----------------------------------------------------------------
@@ -1173,7 +1209,7 @@ def sheet() -> dict[str, Any]:
     lot of 10,000 MMBTU; valued on 4 January 2027, A's two December settles and B's Z26 index
     behind the histories, A quoted 3.50 and 3.60 and B -0.38, -0.40 and -0.42, SOFR at 0.95 a
     year on; a bilateral template carrying the second leg's method and the ticket's one row,
-    G27 for one lot at 3.30 and -0.30."""
+    G27 for one lot at the outright 3.00."""
     conventions = SEAM["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
     specs = SEAM["_CreateContractSpecifications"](
         across("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
@@ -1265,15 +1301,8 @@ def sheet() -> dict[str, Any]:
         "market_b": market_b,
         "curves": curves,
         "template": template,
-        "headers": across(
-            "trade_id",
-            "trade_date",
-            "contract_code",
-            "quantity",
-            "fixed_price",
-            "second_fixed_price",
-        ),
-        "row": across(1.0, serial("2026-12-15"), "G27", 1.0, 3.30, -0.30),
+        "headers": across("trade_id", "trade_date", "contract_code", "quantity", "fixed_price"),
+        "row": across(1.0, serial("2026-12-15"), "G27", 1.0, 3.00),
     }
 
 
@@ -1283,12 +1312,18 @@ def test_the_sheet_books_a_pair_from_a_column_of_two_index_handles(sheet: dict[s
     assert re.fullmatch(rf"{PID}:trades:A\+B:\d+", str(trades))
     table = read(trades)
     assert len(table) == 3
-    assert under(table, "fixed_price") == [3.3]
-    assert under(table, "second_fixed_price") == [-0.3]
-    assert under(table, "combined_fixed_price") == pytest.approx([3.0], **CLOSE)
+    assert under(table, "fixed_price") == [3.0]
     assert under(table, "second_schedule_method") == ["lastday"]
-    assert under(table, "offset") == pytest.approx([-33_000.0], **CLOSE)
-    assert under(table, "second_offset") == pytest.approx([3_000.0], **CLOSE)
+    assert under(table, "offset") == pytest.approx([-30_000.0], **CLOSE)
+    assert "second_fixed_price" not in table[0] and "second_offset" not in table[0]
+    # cva-reserve.md: a CVA column books the row's signed amount once, the row's two legs apart.
+    marked = create(
+        down(sheet["a"], sheet["b"]),
+        across("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "cva_reserve"),
+        across(1.0, serial("2026-12-15"), "G27", 1.0, 3.00, -40.0),
+        sheet["template"],
+    )
+    assert under(read(marked), "cva_reserve") == [-40.0]
     # A row of two reads the same pair; the order entered is the legs' order and the handle's.
     assert re.fullmatch(
         rf"{PID}:trades:A\+B:\d+",
@@ -1341,10 +1376,10 @@ def test_the_sheet_prepares_and_values_a_pair_from_ranges_in_either_order(
     assert risk[3][1:6] == pytest.approx([1.0, 0.95, 1.0, 0.95, -0.095], **CLOSE)
     table = read(results)
     assert under(table, "leg") == [1.0, 2.0] and under(table, "index") == ["A", "B"]
-    assert under(table, "leg_amount") == pytest.approx([2000.0, -1000.0], **CLOSE)
     assert under(table, "payment_amount")[0] == pytest.approx(1000.0, **CLOSE)
     assert under(table, "payment_amount")[1] == "-"
-    assert under(table, "leg_dv01") == pytest.approx([-0.19, 0.095], **CLOSE)
+    assert under(table, "group_dv01")[0] == pytest.approx(-0.095, **CLOSE)
+    assert "leg_dv01" not in table[0] and "leg_amount" not in table[0]
     # A single history and a single market in a cell, as every one-index sheet types them.
     alone = SEAM["_CreateTrades"](
         sheet["a"],
@@ -1417,8 +1452,8 @@ def test_the_sheet_refuses_a_pairs_ranges_in_the_seams_words_and_the_kernels(
         "column"
     )
     assert create(a, headers, row, template) == (
-        "#ERROR _CreateTrades: ValueError: second_fixed_price is -0.3, expected none unless two "
-        "indexes"
+        "#ERROR _CreateTrades: ValueError: second_schedule_method is 'lastday', expected none "
+        "unless two indexes"
     )
     assert create(down(a, a), headers, row, template) == (
         "#ERROR _CreateTrades: ValueError: index 2 is index 1, 'A', again, expected two distinct "
@@ -1450,51 +1485,44 @@ def test_the_sheet_refuses_a_pairs_ranges_in_the_seams_words_and_the_kernels(
     )
 
 
-# --- the combined fixed price ---------------------------------------------------------------
+# --- the second price, no field since two-index-one-price.md -----------------------------------
 
 
-OUTRUN = (
-    "trade 1 at row 1 has inf of combined fixed price, expected a finite price in USD per MMBTU; "
-    "its legs' prices, 1e+308 and 1e+308, sum past the largest number"
+FIELDS = (
+    "trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, "
+    "settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, "
+    "quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, "
+    "payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency"
 )
 
 
-def test_a_pairs_combined_price_is_formed_once_at_creation_and_held_finite() -> None:
-    # Two finite prices can sum past the largest number; a row of nothing prices nothing, so no
-    # fixed leg catches it, and the sum is refused where it is made, before any handle exists.
-    extreme: dict[str, list[object]] = {
-        **TICKET,
-        "quantity": [0],
-        "fixed_price": [1e308],
-        "second_fixed_price": [1e308],
-    }
-    assert refused(ticket=extreme) == OUTRUN
-    # The sum at the edge but finite is kept, frozen, and is what the readback shows.
-    edge: dict[str, list[object]] = {**extreme, "second_fixed_price": [-1e308]}
-    batch = booked(ticket=edge)
-    combined = batch.resolved.combined_fixed_price
-    assert combined.tolist() == [0.0] and not combined.flags.writeable
-    assert cell(grid(batch), 0, "combined_fixed_price") == 0.0
-    pair = booked()
-    assert pair.resolved.combined_fixed_price.tolist() == pytest.approx([3.0], **CLOSE)
-    # A one-index batch's combined price is its leg's own array, by reference.
-    one = one_index(A, 3.30)
-    assert one.resolved.combined_fixed_price is one.resolved.legs[0].fixed_price
-
-
-def test_the_sheet_refuses_a_pair_whose_prices_sum_past_the_largest_number(
+def test_the_sheet_refuses_a_second_price_as_a_field_the_instrument_has_not(
     sheet: dict[str, Any],
 ) -> None:
-    create = SEAM["_CreateTrades"]
-    extreme = across(1.0, serial("2026-12-15"), "G27", 0.0, 1e308, 1e308)
-    assert create(down(sheet["a"], sheet["b"]), sheet["headers"], extreme, sheet["template"]) == (
-        f"#ERROR _CreateTrades: ValueError: {OUTRUN}"
+    # A ticket or a template still typing second_fixed_price is refused at the header, in the
+    # seam's words for any unknown field, the list no longer carrying it: no alias, no default
+    # and no silent zero.
+    headers = across(
+        "trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "second_fixed_price"
     )
-    kept = create(
+    row = across(1.0, serial("2026-12-15"), "G27", 1.0, 3.30, -0.30)
+    assert SEAM["_CreateTrades"](down(sheet["a"], sheet["b"]), headers, row, sheet["template"]) == (
+        "#ERROR _CreateTrades: fields cell (1, 6) is text 'second_fixed_price', expected a field "
+        f"of fixed_float: {FIELDS}"
+    )
+    assert SEAM["_CreateTradeTemplate"](
+        "fixed_float", across("route", "second_fixed_price"), across("bilateral", -0.30)
+    ) == (
+        "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'second_fixed_price', expected a "
+        f"field of fixed_float: {FIELDS}"
+    )
+    # The one price's fixed leg is the trade's, once, whatever the row's quantity: a row of
+    # nothing books a fixed leg of nothing and is kept, ready for a deal.
+    kept = SEAM["_CreateTrades"](
         down(sheet["a"], sheet["b"]),
         sheet["headers"],
-        across(1.0, serial("2026-12-15"), "G27", 0.0, 1e308, -1e308),
+        across(1.0, serial("2026-12-15"), "G27", 0.0, 3.00),
         sheet["template"],
     )
     assert re.fullmatch(rf"{PID}:trades:A\+B:\d+", str(kept))
-    assert under(read(kept), "combined_fixed_price") == [0.0]
+    assert under(read(kept), "offset") == [0.0]

@@ -323,6 +323,7 @@ def test_a_tick_runs_evaluation_alone_and_nothing_of_the_steps_before(
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -396,8 +397,9 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
 ENCODING_LEDGER = {
     "encoded": 1,
     "_the_groups": 1,
-    "_the_amounts": 1,  # two-index-fixed-float.md: the leg's three amounts per component
-    "_the_group_offsets": 1,  # the leg's offsets by group
+    "_the_amounts": 1,  # two-index-fixed-float.md: the leg's two amounts per component
+    "_the_fixed_leg": 1,  # two-index-one-price.md: the trade's fixed leg, once
+    "_the_group_offsets": 1,  # the trade's fixed legs by group
     "_the_exposures": 1,  # the leg's slots' exposures
     "_distinct": 2,
     "_the_references": 1,
@@ -416,6 +418,7 @@ ENCODING_LEDGER = {
     # payment-day-date-or-rule.md
     "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
     "_charged": 1,  # clearing, the one fee a cleared, unbrokered batch charges, since #188
+    "_summed_once": 2,  # the marketing and the CVA reserve, none here, since cva-reserve.md
     "UnitConversions.factor": 2,
     "UnitConversions.category": 2,
     "WorkCounter.__init__": 1,
@@ -438,6 +441,7 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_totals": 1,  # the two unsettled totals, finite
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -554,6 +558,7 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_totals": 1,  # the two unsettled totals, finite
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -570,6 +575,7 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -607,6 +613,7 @@ def test_a_last3day_batch_prepares_and_ticks_with_the_same_functions_as_a_lastda
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_totals": 1,  # the two unsettled totals, finite
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -623,6 +630,7 @@ def test_a_last3day_batch_prepares_and_ticks_with_the_same_functions_as_a_lastda
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -702,7 +710,7 @@ def test_a_daily_batch_prepares_per_slot_and_ticks_per_live_reference(
     assert result.legs[0].dated_live_contribution.nbytes == 8 * (slots - fixed)  # one per live slot
     assert result.legs[0].quote.nbytes == 8 * live_references  # one per live reference, kept
     assert result.legs[0].dated_live_contribution.sum() == pytest.approx(
-        result.mark - prep.offset_unsettled - prep.set_unsettled
+        result.mark - prep.offset_unsettled - prep.set_unsettled[0]
     )
     np.testing.assert_allclose(
         np.bincount(
@@ -761,6 +769,7 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_totals": 1,  # the two unsettled totals, finite
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -778,6 +787,7 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -793,6 +803,12 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
 # tick 7,792 bytes, about
 # 22 a slot, the quotes, their gather onto the live slots and the contributions; the five-trade
 # batch of six slots 1,210, its records and a few small arrays, under twice the slack.
+# Since two-index-one-price.md a tick sums the payment's signed terms under one compensation, the
+# fixed leg, the set amounts and the live amounts kept apart: a handful of small arrays over the
+# groups, within half a slack.
+COMPENSATED = 512
+
+
 def test_a_daily_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> None:
     components, contracts, days = DAILY[1]
     enc = a_daily_batch(components, contracts, days)
@@ -805,7 +821,7 @@ def test_a_daily_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> 
     small = a_daily_batch(*DAILY[0])
     small_prep = prepared_trades(small, (history,), WorkCounter())
     assert least_peak(lambda: trade_results(small_prep, (quoted,), WorkCounter())) <= (
-        KEYWORD_CALL + 2 * SLACK
+        KEYWORD_CALL + 2 * SLACK + COMPENSATED
     )
 
 
@@ -835,6 +851,7 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_totals": 1,  # the two unsettled totals, finite
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -852,6 +869,7 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -948,6 +966,7 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_totals": 1,  # the two unsettled totals, finite
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -963,6 +982,7 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -1150,6 +1170,7 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_totals": 1,  # the two unsettled totals, finite
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -1165,6 +1186,7 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -1190,7 +1212,7 @@ def test_a_mixed_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> 
     small_enc = encoded(small, (observed_of(small),), UNITS, WorkCounter())
     small_prep = prepared_trades(small_enc, (history,), WorkCounter())
     assert least_peak(lambda: trade_results(small_prep, (quoted,), WorkCounter())) <= (
-        KEYWORD_CALL + 2 * SLACK
+        KEYWORD_CALL + 2 * SLACK + COMPENSATED
     )
 
 
@@ -1301,6 +1323,7 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_totals": 1,  # the two unsettled totals, finite
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -1317,6 +1340,7 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -1469,6 +1493,7 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_totals": 1,  # the two unsettled totals, finite
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -1485,6 +1510,7 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -1518,9 +1544,9 @@ def test_an_iferc_batchs_preparation_and_tick_allocate_by_month_not_by_trade() -
     # since #197 the record holds the cross-gamma's six fields, 48 bytes, None and 0.0 here.
     assert (
         least_peak(lambda: trade_results(big_prep, (quoted,), WorkCounter()))
-        <= 24 * 24 + KEYWORD_CALL + SLACK + 304
+        <= 24 * 24 + KEYWORD_CALL + SLACK + 304 + COMPENSATED
     )
     small_prep = prepared_trades(small, (history,), WorkCounter())
     assert least_peak(lambda: trade_results(small_prep, (quoted,), WorkCounter())) <= (
-        KEYWORD_CALL + 2 * SLACK
+        KEYWORD_CALL + 2 * SLACK + COMPENSATED
     )

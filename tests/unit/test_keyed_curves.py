@@ -715,7 +715,7 @@ def test_the_two_asians_as_fixings_arrive_keep_each_days_amount_on_its_curve() -
         prep = prepared(terms, history)
         assert int(prep.legs[0].is_fixed.sum()) == 2 * len(fixed)
         np.testing.assert_array_equal(keys_of_groups(prep.encoded), [0, 1])
-        np.testing.assert_allclose(prep.set_amount, [set_amount, -set_amount], **TIGHT)
+        np.testing.assert_allclose(prep.legs[0].set_amount, [set_amount, -set_amount], **TIGHT)
         result = valued_on(prep, eth_curves(as_of), quoted(history, *ETH_QUOTES))
         assert [c.name for c in result.curves] == ["SOFR", "FFOIS"]
         np.testing.assert_array_equal(given(result.payment_factor), [0.95, 0.90])

@@ -262,6 +262,7 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_totals": 1,  # the two unsettled totals, finite
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 4,
@@ -339,7 +340,7 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
-        "_summed": 3,  # the legs' amounts, NPVs and DV01s by group, one leg's by reference
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_the_lots_arrays": 1,  # the leg's discounted lots and their sums
         "_the_lots_checked": 1,
         "_discounted_leg": 1,  # the leg's results over them
@@ -639,7 +640,7 @@ def test_a_bilateral_tick_on_several_curves_does_no_work_per_curve_over_the_slot
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
-        "_summed": 3,  # the legs' amounts, NPVs and DV01s by group, one leg's by reference
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_the_lots_arrays": 1,  # the leg's discounted lots and their sums
         "_the_lots_checked": 1,
         "_discounted_leg": 1,  # the leg's results over them

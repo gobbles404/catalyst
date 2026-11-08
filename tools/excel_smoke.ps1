@@ -614,7 +614,7 @@ $formulas = [ordered]@{
     '=INDEX(_ShowInstrument("fixed_float"),4,4)'  = "no start_date and end_date on the row"
     '=INDEX(_ShowInstrument("fixed_float"),4,5)'  = "no contract_code on the row, or with end_date"
     '=INDEX(_ShowInstrument("fixed_float"),4,10)' = "route = cleared"
-    '=INDEX(_ShowInstrument("fixed_float"),5,21)' = "holiday calendar handle"
+    '=INDEX(_ShowInstrument("fixed_float"),5,20)' = "holiday calendar handle"
     '=INDEX(_ShowInstrument("fixed_float"),6,15)' = "the index's specification names"
     '=INDEX(_ShowInstrument("fixed_float"),1,11)' = "counterparty"
     '=INDEX(_ShowInstrument("fixed_float"),4,11)' = "route = bilateral"
@@ -622,12 +622,16 @@ $formulas = [ordered]@{
     '=INDEX(_ShowInstrument("fixed_float"),3,12)' = "FALSE"
     '=INDEX(_ShowInstrument("fixed_float"),4,12)' = "route = bilateral"
     '=INDEX(_ShowInstrument("fixed_float"),5,12)' = "text"
-    '=INDEX(_ShowInstrument("fixed_float"),1,18)' = "second_fixed_price"
+    '=INDEX(_ShowInstrument("fixed_float"),1,18)' = "second_schedule_method"
     '=INDEX(_ShowInstrument("fixed_float"),4,18)' = "two indexes"
-    '=INDEX(_ShowInstrument("fixed_float"),4,19)' = "two indexes"
-    '=INDEX(_ShowInstrument("fixed_float"),1,22)' = "marketing_reserve"
+    '=INDEX(_ShowInstrument("fixed_float"),1,19)' = "payment_day"
+    '=INDEX(_ShowInstrument("fixed_float"),1,21)' = "marketing_reserve"
+    '=INDEX(_ShowInstrument("fixed_float"),3,21)' = "FALSE"
+    '=INDEX(_ShowInstrument("fixed_float"),6,21)' = "a finite amount of zero or more"
+    '=INDEX(_ShowInstrument("fixed_float"),1,22)' = "cva_reserve"
     '=INDEX(_ShowInstrument("fixed_float"),3,22)' = "FALSE"
-    '=INDEX(_ShowInstrument("fixed_float"),6,22)' = "a finite amount of zero or more"
+    '=INDEX(_ShowInstrument("fixed_float"),6,22)' = "a finite amount of either sign"
+    '=INDEX(_ShowInstrument("fixed_float"),1,23)' = "settlement_frequency"
     # Since template-based-quoting.md three rows more: what a quote template may hold, what a quote always
     # requires, and the condition that otherwise requires it.
     '=ROWS(_ShowInstrument("fixed_float"))'       = "10"
@@ -653,7 +657,7 @@ $formulas = [ordered]@{
     '=COLUMNS(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2))'  = "6"
     '=CountFieldRows("fixed_float",EP4:EQ4,EP5:EQ7)'        = "3"
     '=EchoFieldRow("Future",EP1:EU1,EP2:EU2)' = "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'"
-    '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, settlement_frequency"
+    '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EQ7)' = "#ERROR EchoFieldRow: values is 3x2 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EP7)' = "#ERROR EchoFieldRow: values is 3x1 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP7:EQ8)' = "#ERROR EchoFieldRow: values is 2x2 array, expected one row of field values"
@@ -782,9 +786,9 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(FG7),1,17)" = "group_dv01"
     "=INDEX(util_ReadHandle(FG7),3,14)" = "-"
     "=INDEX(util_ReadHandle(FG7),1,18)" = "brokerage_reserve"
-    "=INDEX(util_ReadHandle(FG7),1,22)" = "contract_cross_gamma"
-    "=INDEX(util_ReadHandle(FG7),3,22)" = "0"
-    "=INDEX(util_ReadHandle(FG7),3,23)" = "lots of lots (1000 BBL) per basis point"
+    "=INDEX(util_ReadHandle(FG7),1,23)" = "contract_cross_gamma"
+    "=INDEX(util_ReadHandle(FG7),3,23)" = "0"
+    "=INDEX(util_ReadHandle(FG7),3,24)" = "lots of lots (1000 BBL) per basis point"
     # A quantity of zero, a row kept ready: the batch in FG12 holds the two lots of n26 beside a
     # row of nothing on n26 at 72, FG10:FK11; prepared in FG13 and evaluated in FG14 as FG5 is, it
     # marks the two lots' 8,500 with their delta of 2 lots, one slot of the two components, and
@@ -975,24 +979,24 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(KA14),3,1)"    = "-30"
     "=INDEX(_ReportValues(KA14),3,2)"    = "180"
     '=INDEX(_ReportRisk(KA14,"nominal_delta","year"),4,2)'      = "0"
-    "=COLUMNS(util_ReadHandle(KA14))"    = "30"
+    "=COLUMNS(util_ReadHandle(KA14))"    = "31"
     "=INDEX(util_ReadHandle(KA14),1,11)"  = "contract_nominal_delta"
     "=INDEX(util_ReadHandle(KA14),6,11)"  = "0"
-    "=INDEX(util_ReadHandle(KA14),1,27)"  = "observation_coefficient"
-    "=INDEX(util_ReadHandle(KA14),1,28)"  = "observation_price"
-    "=INDEX(util_ReadHandle(KA14),1,29)"  = "price_unit"
-    "=INDEX(util_ReadHandle(KA14),1,30)"  = "floating_contribution"
-    "=INDEX(util_ReadHandle(KA14),2,30)"  = "float64"
-    "=INDEX(util_ReadHandle(KA14),3,27)"  = "20"
-    "=INDEX(util_ReadHandle(KA14),3,28)"  = "71"
-    "=INDEX(util_ReadHandle(KA14),4,28)"  = "75"
-    "=INDEX(util_ReadHandle(KA14),5,28)"  = "73"
-    "=INDEX(util_ReadHandle(KA14),3,29)"  = "USD/MMBTU"
-    "=INDEX(util_ReadHandle(KA14),3,30)"  = "1420"
-    "=INDEX(util_ReadHandle(KA14),4,30)"  = "1500"
-    "=INDEX(util_ReadHandle(KA14),6,27)"  = "-10"
-    "=INDEX(util_ReadHandle(KA14),6,30)"  = "-710"
-    "=INDEX(util_ReadHandle(KA14),8,30)"  = "-730"
+    "=INDEX(util_ReadHandle(KA14),1,28)"  = "observation_coefficient"
+    "=INDEX(util_ReadHandle(KA14),1,29)"  = "observation_price"
+    "=INDEX(util_ReadHandle(KA14),1,30)"  = "price_unit"
+    "=INDEX(util_ReadHandle(KA14),1,31)"  = "floating_contribution"
+    "=INDEX(util_ReadHandle(KA14),2,31)"  = "float64"
+    "=INDEX(util_ReadHandle(KA14),3,28)"  = "20"
+    "=INDEX(util_ReadHandle(KA14),3,29)"  = "71"
+    "=INDEX(util_ReadHandle(KA14),4,29)"  = "75"
+    "=INDEX(util_ReadHandle(KA14),5,29)"  = "73"
+    "=INDEX(util_ReadHandle(KA14),3,30)"  = "USD/MMBTU"
+    "=INDEX(util_ReadHandle(KA14),3,31)"  = "1420"
+    "=INDEX(util_ReadHandle(KA14),4,31)"  = "1500"
+    "=INDEX(util_ReadHandle(KA14),6,28)"  = "-10"
+    "=INDEX(util_ReadHandle(KA14),6,31)"  = "-710"
+    "=INDEX(util_ReadHandle(KA14),8,31)"  = "-730"
     "=INDEX(util_ReadHandle(KA14),8,8)"   = "0"
     # Mixed fields in one batch, mixed-trade-fields.md: the four rows of Z26 at 10 in KU2:LA5, each
     # its own unit, basis, method and clearing house, read back row by row off the batch in KU7;
@@ -1240,41 +1244,45 @@ $formulas = [ordered]@{
     # ethane schedule with the ticket's rates, 2 LOT, -2 LOT, 1,000 BBL and 0 LOT, under a cleared
     # template naming ION as broker since #188, booking 50 of
     # brokerage and 20 of clearing in USD when the batch is made; _ReportReserves on the 2 December
-    # results in OR23 spills the three totals and the currency, the results readback shows them
+    # results in OR23 spills the four totals, the signed CVA fourth since cva-reserve.md, and the
+    # currency, the results readback shows them
     # once, on the first slot row, and a dash on every later row of the ethane asian's 22 in IY16;
     # the batch's own readback carries no reserve; a blank and a handle naming nothing refused in the
     # seam's words; and a rate of 9E+307 a lot, near the largest number a cell takes typed, refused
     # at creation, two lots of one row past the largest number and one lot each of two rows
     # summing past it.
     "=ROWS(_ReportReserves(OR23))"         = "3"
-    "=COLUMNS(_ReportReserves(OR23))"      = "4"
+    "=COLUMNS(_ReportReserves(OR23))"      = "5"
     "=INDEX(_ReportReserves(OR23),1,1)"    = "brokerage_reserve"
     "=INDEX(_ReportReserves(OR23),1,2)"    = "clearing_reserve"
     "=INDEX(_ReportReserves(OR23),1,3)"    = "marketing_reserve"
-    "=INDEX(_ReportReserves(OR23),1,4)"    = "currency"
+    "=INDEX(_ReportReserves(OR23),1,5)"    = "currency"
     "=INDEX(_ReportReserves(OR23),2,1)"    = "float64"
-    "=INDEX(_ReportReserves(OR23),2,4)"    = "str"
+    "=INDEX(_ReportReserves(OR23),2,5)"    = "str"
     "=INDEX(_ReportReserves(OR23),3,1)"    = "50"
     "=INDEX(_ReportReserves(OR23),3,2)"    = "20"
     "=INDEX(_ReportReserves(OR23),3,3)"    = "0"
-    "=INDEX(_ReportReserves(OR23),3,4)"    = "USD"
+    "=INDEX(_ReportReserves(OR23),3,5)"    = "USD"
+    "=INDEX(_ReportReserves(OR23),1,4)"    = "cva_reserve"
+    "=INDEX(_ReportReserves(OR23),2,4)"    = "float64"
+    "=INDEX(_ReportReserves(OR23),3,4)"    = "0"
     "=INDEX(_ReportValues(OR23),3,1)"      = "1260"
     '=INDEX(_ReportRisk(OR23,"nominal_delta","year"),4,2)'        = "1"
     "=ROWS(util_ReadHandle(OR23))"         = "3"
-    "=COLUMNS(util_ReadHandle(OR23))"      = "30"
+    "=COLUMNS(util_ReadHandle(OR23))"      = "31"
     "=INDEX(util_ReadHandle(OR23),1,19)"   = "brokerage_reserve"
-    "=INDEX(util_ReadHandle(OR23),1,22)"   = "currency"
+    "=INDEX(util_ReadHandle(OR23),1,23)"   = "currency"
     "=INDEX(util_ReadHandle(OR23),3,19)"   = "50"
     "=INDEX(util_ReadHandle(OR23),3,20)"   = "20"
-    "=INDEX(util_ReadHandle(OR23),3,22)"   = "USD"
+    "=INDEX(util_ReadHandle(OR23),3,23)"   = "USD"
     "=COLUMNS(util_ReadHandle(OR16))"      = "24"
     "=INDEX(util_ReadHandle(OR16),1,9)"    = "broker"
     "=INDEX(util_ReadHandle(OR16),3,9)"    = "ION"
     "=INDEX(_ReportReserves(IY16),3,1)"    = "0"
     "=INDEX(util_ReadHandle(IY16),3,19)"   = "0"
-    "=INDEX(util_ReadHandle(IY16),3,22)"   = "USD"
+    "=INDEX(util_ReadHandle(IY16),3,23)"   = "USD"
     "=INDEX(util_ReadHandle(IY16),4,19)"   = "-"
-    "=INDEX(util_ReadHandle(IY16),24,22)"  = "-"
+    "=INDEX(util_ReadHandle(IY16),24,23)"  = "-"
     "=_ReportReserves(C2)"                 = "#ERROR _ReportReserves: results is blank, expected trade results handle"
     '=_ReportReserves("x:trade_results:9")' = "#ERROR _ReportReserves: results is text 'x:trade_results:9' naming no live object, expected trade results handle"
     "=_CreateTrades(OR27,OR10:OW10,OR28:OW28,OR9)" = "#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, expected a finite amount of USD; 2.0 of 'LOT' at 9e+307 a lot"
@@ -1295,7 +1303,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(OR39),3,1)"    = "60"
     "=INDEX(_ReportReserves(OR39),3,2)"    = "24"
     "=INDEX(_ReportReserves(OR39),3,3)"    = "65"
-    "=INDEX(_ReportReserves(OR39),3,4)"    = "USD"
+    "=INDEX(_ReportReserves(OR39),3,5)"    = "USD"
     "=COLUMNS(util_ReadHandle(OR37))"      = "25"
     "=INDEX(util_ReadHandle(OR37),1,16)"   = "marketing_reserve"
     "=INDEX(util_ReadHandle(OR37),2,16)"   = "float64"
@@ -1332,6 +1340,58 @@ $formulas = [ordered]@{
     "=_CreateTrades(OR5,OR32:OX32,OR40:OX40,OR9)" = "#ERROR _CreateTrades: ValueError: marketing_reserve row 1 is -5.0, expected a finite amount of zero or more"
     '=_CreateTradeTemplate("fixed_float",{"marketing_reserve"},{-5})' = "#ERROR _CreateTradeTemplate: ValueError: marketing_reserve is -5.0, expected a finite amount of zero or more"
     "=_CreateTrades(OR5,OR32:OX32,OR33:OX36,OR44)" = "#ERROR _CreateTrades: ValueError: marketing_reserve is supplied by the template and by the ticket, expected by one of them"
+    # A signed CVA reserve, cva-reserve.md: the ticket's rows in OR80:OX83 on the RESERVES index book
+    # -15 once per row, the strip's -40 once over its two components, over 60 of brokerage and 24 of
+    # clearing and no marketing, the fourth column of _ReportReserves and the results readback's
+    # twenty-second, the batch's readback showing the row's signed amount on each component; both
+    # columns side by side in OR92, 40 and -15; the template in OR98 booking -40 on each of the four
+    # plain rows, -160, the mark as without; two rows of 9E+307 and of -9E+307 refused for the
+    # batch; a blank amount refused by the seam; the field from both refused.
+    "=COLUMNS(_ReportReserves(OR86))"      = "5"
+    "=INDEX(_ReportReserves(OR86),1,4)"    = "cva_reserve"
+    "=INDEX(_ReportReserves(OR86),2,4)"    = "float64"
+    "=INDEX(_ReportReserves(OR86),3,1)"    = "60"
+    "=INDEX(_ReportReserves(OR86),3,2)"    = "24"
+    "=INDEX(_ReportReserves(OR86),3,3)"    = "0"
+    "=INDEX(_ReportReserves(OR86),3,4)"    = "-15"
+    "=INDEX(_ReportReserves(OR86),3,5)"    = "USD"
+    "=COLUMNS(util_ReadHandle(OR84))"      = "25"
+    "=INDEX(util_ReadHandle(OR84),1,16)"   = "cva_reserve"
+    "=INDEX(util_ReadHandle(OR84),2,16)"   = "float64"
+    "=INDEX(util_ReadHandle(OR84),3,16)"   = "25"
+    "=INDEX(util_ReadHandle(OR84),4,16)"   = "-40"
+    "=INDEX(util_ReadHandle(OR84),5,16)"   = "-40"
+    "=INDEX(util_ReadHandle(OR84),5,4)"    = "F27"
+    "=INDEX(util_ReadHandle(OR84),6,16)"   = "0"
+    "=INDEX(util_ReadHandle(OR84),1,17)"   = "entered_contract_code"
+    "=INDEX(util_ReadHandle(OR86),1,22)"   = "cva_reserve"
+    "=INDEX(util_ReadHandle(OR86),3,22)"   = "-15"
+    "=INDEX(util_ReadHandle(OR86),4,22)"   = "-"
+    "=INDEX(_ReportReserves(OR94),3,3)"    = "40"
+    "=INDEX(_ReportReserves(OR94),3,4)"    = "-15"
+    "=INDEX(util_ReadHandle(OR92),1,16)"   = "marketing_reserve"
+    "=INDEX(util_ReadHandle(OR92),1,17)"   = "cva_reserve"
+    "=INDEX(_ReportReserves(OR101),3,1)"   = "50"
+    "=INDEX(_ReportReserves(OR101),3,3)"   = "0"
+    "=INDEX(_ReportReserves(OR101),3,4)"   = "-160"
+    "=INDEX(_ReportValues(OR101),3,1)"     = "1260"
+    "=INDEX(util_ReadHandle(OR98),1,9)"    = "cva_reserve"
+    "=INDEX(util_ReadHandle(OR98),3,9)"    = "-40"
+    "=_CreateTrades(OR5,OR80:OX80,OR103:OX104,OR9)" = "#ERROR _CreateTrades: ValueError: the batch has inf of cva reserve in all, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number"
+    "=_CreateTrades(OR5,OR80:OX80,OR105:OX106,OR9)" = "#ERROR _CreateTrades: ValueError: the batch has -inf of cva reserve in all, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number"
+    "=_CreateTrades(OR5,OR80:OX80,OR108:OX108,OR9)" = "#ERROR _CreateTrades: trade_rows cell (1, 7) is blank, expected number"
+    "=_CreateTrades(OR5,OR80:OX80,OR81:OX83,OR98)" = "#ERROR _CreateTrades: ValueError: cva_reserve is supplied by the template and by the ticket, expected by one of them"
+    # cva-reserve.md's review: the exact total whatever the rows' order, a dollar beside ten thousand
+    # trillion and its negative in OR119 and OR122, and two pairs cancelling past the largest
+    # number netting to nothing in OR130, not refused.
+    "=INDEX(_ReportReserves(OR119),3,4)"   = "1"
+    "=INDEX(_ReportReserves(OR122),3,4)"   = "1"
+    "=INDEX(_ReportReserves(OR130),3,4)"   = "0"
+    "=INDEX(_ReportReserves(OR130),3,1)"   = "80"
+    "=INDEX(_ReportReserves(OR137),3,4)"   = "3E-308"
+    "=INDEX(_ReportReserves(OR146),3,4)"   = "3E-308"
+    "=INDEX(_ReportReserves(OR159),3,4)"   = "3E-308"
+    "=INDEX(_ReportReserves(OR159),3,1)"   = "180"
     "=COLUMNS(util_ReadHandle(OR52))"      = "24"
     "=INDEX(util_ReadHandle(OR52),1,9)"    = "discount_curve_key"
     "=INDEX(util_ReadHandle(OR52),3,9)"    = "SOFR"
@@ -1647,13 +1707,13 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(QV31,"cross_gamma","year"),4,3)' = "0.00184"
     '=INDEX(_ReportRisk(QV31,"nominal_delta","year"),4,2)' = "0"
     '=ROUND(INDEX(_ReportRisk(QV31,"delta","year"),4,2),12)' = "0.3"
-    "=COLUMNS(util_ReadHandle(QV31))"      = "30"
-    "=INDEX(util_ReadHandle(QV31),1,27)"   = "observation_coefficient"
-    "=INDEX(util_ReadHandle(QV31),1,25)"   = "discount_curve_key"
-    "=INDEX(util_ReadHandle(QV31),1,26)"   = "discount_curve"
-    "=INDEX(util_ReadHandle(QV31),3,25)"   = "SOFR"
-    "=INDEX(util_ReadHandle(QV31),4,25)"   = "FFOIS"
+    "=COLUMNS(util_ReadHandle(QV31))"      = "31"
+    "=INDEX(util_ReadHandle(QV31),1,28)"   = "observation_coefficient"
+    "=INDEX(util_ReadHandle(QV31),1,26)"   = "discount_curve_key"
+    "=INDEX(util_ReadHandle(QV31),1,27)"   = "discount_curve"
+    "=INDEX(util_ReadHandle(QV31),3,26)"   = "SOFR"
     "=INDEX(util_ReadHandle(QV31),4,26)"   = "FFOIS"
+    "=INDEX(util_ReadHandle(QV31),4,27)"   = "FFOIS"
     "=INDEX(util_ReadHandle(QV27),1,9)"    = "discount_curve_key"
     "=INDEX(util_ReadHandle(QV27),3,9)"    = "SOFR"
     "=INDEX(util_ReadHandle(QV27),4,9)"    = "FFOIS"
@@ -1704,16 +1764,16 @@ $formulas = [ordered]@{
     '=ROWS(_ReportRisk(QV24,"cross_gamma","year"))' = "5"
     "=INDEX(_ReportReserves(QV8),3,3)"    = "10"
     "=ROWS(util_ReadHandle(QV8))"         = "4"
-    "=COLUMNS(util_ReadHandle(QV8))"      = "30"
-    "=INDEX(util_ReadHandle(QV8),1,25)"   = "discount_curve_key"
-    "=INDEX(util_ReadHandle(QV8),3,25)"   = "SOFR"
-    "=INDEX(util_ReadHandle(QV8),1,26)"   = "discount_curve"
+    "=COLUMNS(util_ReadHandle(QV8))"      = "31"
+    "=INDEX(util_ReadHandle(QV8),1,26)"   = "discount_curve_key"
     "=INDEX(util_ReadHandle(QV8),3,26)"   = "SOFR"
-    "=INDEX(util_ReadHandle(QV8),1,23)"   = "contract_cross_gamma"
-    "=INDEX(util_ReadHandle(QV8),3,23)"   = "0.00085"
-    "=INDEX(util_ReadHandle(QV8),4,23)"   = "0.00085"
-    "=INDEX(util_ReadHandle(QV8),1,24)"   = "cross_gamma_unit"
-    "=INDEX(util_ReadHandle(QV8),3,24)"   = "lots of UNIT (1 BBL) per basis point"
+    "=INDEX(util_ReadHandle(QV8),1,27)"   = "discount_curve"
+    "=INDEX(util_ReadHandle(QV8),3,27)"   = "SOFR"
+    "=INDEX(util_ReadHandle(QV8),1,24)"   = "contract_cross_gamma"
+    "=INDEX(util_ReadHandle(QV8),3,24)"   = "0.00085"
+    "=INDEX(util_ReadHandle(QV8),4,24)"   = "0.00085"
+    "=INDEX(util_ReadHandle(QV8),1,25)"   = "cross_gamma_unit"
+    "=INDEX(util_ReadHandle(QV8),3,25)"   = "lots of UNIT (1 BBL) per basis point"
     "=INDEX(util_ReadHandle(QV8),1,10)"    = "contract_discounted_sensitivity"
     "=INDEX(util_ReadHandle(QV8),1,12)"   = "contract_delta"
     "=INDEX(util_ReadHandle(QV8),1,15)"   = "payment_factor"
@@ -2037,7 +2097,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(UF8),4,10)" = "-"
     "=INDEX(util_ReadHandle(UF5),3,6)" = "Firm A"
     '=_ReportRisk(UF8,"delta","day")' = "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk"
-    "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, settlement_frequency"
+    "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency"
     "=_EvaluateCashflows(UF5,UF6,AA1)" = "#ERROR _EvaluateCashflows: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2027-01-04, the valuation date; a curve is never rebased"
     "=_EvaluateCashflows(UF5)" = "#ERROR _EvaluateCashflows: valuation_date is missing, expected valuation date handle"
     # A quote, template-based-quoting.md: the ticket's strip on the STRIP index in UX5, valued
@@ -2075,16 +2135,17 @@ $formulas = [ordered]@{
     '=_Quote(VA7,"BALF27-G27",VF7)-VP2' = "0"
     '=_Quote(VA7,"BALZ26",VF7)' = "30"
     '=_Quote(VA7,"BALX26",VF7)' = "#ERROR _Quote: ValueError: valuation_date is 2026-12-31, after 'BALX26' ended on 2026-11-30, expected a valuation day on or before the period's last day"
-    # A pair of indexes, two-index-fixed-float.md: A a futures index and B an IFERC index over one
-    # NYMEX NG specification, booked as one row of G27 for one lot at 3.30 and -0.30 in WJ22 over
-    # the column WJ5:WJ6, prepared in WJ23 over the histories WJ13:WJ14 and valued in WJ24 over the
-    # markets WJ17:WK17, a row, on SOFR at 0.95: the ticket's hand table, 950 of mark and -0.095 of
-    # DV01, the risk report two commodity groups and one DV01 column, the readbacks naming each leg
-    # and showing the group's payment once and each leg's share; the histories B first in WJ25 and
-    # the markets as a column in WJ28 and B first in WJ29 valuing the same; the indexes B first in
-    # WJ27 a batch named B+A; the collection of the pair alone in WJ26 a row per leg; a grid of
-    # handles, one history and one market for two legs, two histories of one index and the second
-    # leg's price without a second index refused.
+    # A pair of indexes, two-index-fixed-float.md and two-index-one-price.md: A a futures index and
+    # B an IFERC index over one NYMEX NG specification, booked as one row of G27 for one lot at the
+    # outright 3.00 in WJ22 over the column WJ5:WJ6, prepared in WJ23 over the histories WJ13:WJ14
+    # and valued in WJ24 over the markets WJ17:WK17, a row, on SOFR at 0.95: the ticket's hand
+    # table, 950 of mark and -0.095 of DV01, the risk report two commodity groups and one DV01
+    # column, the readbacks naming each leg and showing the group's payment once, the trade's and
+    # no leg's; the histories B first in WJ25 and the markets as a column in WJ28 and B first in
+    # WJ29 valuing the same; the indexes B first in WJ27 a batch named B+A; the collection of the
+    # pair alone in WJ26 a row for the swap and a row per leg; a grid of handles, one history and
+    # one market for two legs, two histories of one index, the second leg's method without a second
+    # index and a second price, no field since two-index-one-price.md, refused.
     '=MID(WJ22,FIND(":",WJ22)+1,11)' = "trades:A+B:"
     '=MID(WJ23,FIND(":",WJ23)+1,20)' = "prepared_trades:A+B:"
     '=MID(WJ24,FIND(":",WJ24)+1,18)' = "trade_results:A+B:"
@@ -2111,15 +2172,14 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(WJ24,"all","day"),7,1)' = "46756"
     '=INDEX(_ReportRisk(WJ24,"all","day"),7,6)' = "-0.095"
     "=ROWS(util_ReadHandle(WJ22))"       = "3"
-    "=COLUMNS(util_ReadHandle(WJ22))"    = "28"
+    "=COLUMNS(util_ReadHandle(WJ22))"    = "25"
     "=INDEX(util_ReadHandle(WJ22),1,6)"  = "second_schedule_method"
     "=INDEX(util_ReadHandle(WJ22),3,6)"  = "lastday"
-    "=INDEX(util_ReadHandle(WJ22),1,16)" = "combined_fixed_price"
-    "=INDEX(util_ReadHandle(WJ22),3,14)" = "3.3"
-    "=INDEX(util_ReadHandle(WJ22),3,15)" = "-0.3"
-    "=INDEX(util_ReadHandle(WJ22),3,16)" = "3"
-    "=INDEX(util_ReadHandle(WJ22),3,26)" = "-33000"
-    "=INDEX(util_ReadHandle(WJ22),3,27)" = "3000"
+    "=INDEX(util_ReadHandle(WJ22),1,14)" = "fixed_price"
+    "=INDEX(util_ReadHandle(WJ22),3,14)" = "3"
+    "=INDEX(util_ReadHandle(WJ22),1,15)" = "payment_day"
+    "=INDEX(util_ReadHandle(WJ22),1,24)" = "offset"
+    "=INDEX(util_ReadHandle(WJ22),3,24)" = "-30000"
     "=ROWS(util_ReadHandle(WJ23))"       = "4"
     "=COLUMNS(util_ReadHandle(WJ23))"    = "10"
     "=INDEX(util_ReadHandle(WJ23),1,1)"  = "leg"
@@ -2129,39 +2189,52 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(WJ23),4,5)"  = "46419"
     "=INDEX(util_ReadHandle(WJ23),4,10)" = "1"
     "=ROWS(util_ReadHandle(WJ24))"       = "4"
-    "=COLUMNS(util_ReadHandle(WJ24))"    = "38"
+    "=COLUMNS(util_ReadHandle(WJ24))"    = "33"
     # since observation-prices-readback.md each leg's slot at its own quote, last: A's 10,000
     # at G27's 3.50, 35,000, and B's at -0.40, -4,000, each under its index's quote unit
-    "=INDEX(util_ReadHandle(WJ24),1,35)" = "observation_coefficient"
-    "=INDEX(util_ReadHandle(WJ24),1,38)" = "floating_contribution"
-    "=INDEX(util_ReadHandle(WJ24),3,35)" = "10000"
-    "=INDEX(util_ReadHandle(WJ24),3,36)" = "3.5"
-    "=INDEX(util_ReadHandle(WJ24),4,36)" = "-0.4"
-    "=INDEX(util_ReadHandle(WJ24),3,37)" = "USD/MMBTU"
-    "=ROUND(INDEX(util_ReadHandle(WJ24),3,38),6)" = "35000"
-    "=ROUND(INDEX(util_ReadHandle(WJ24),4,38),6)" = "-4000"
-    "=INDEX(util_ReadHandle(WJ24),1,21)" = "leg_amount"
-    "=INDEX(util_ReadHandle(WJ24),1,26)" = "leg_dv01"
+    "=INDEX(util_ReadHandle(WJ24),1,30)" = "observation_coefficient"
+    "=INDEX(util_ReadHandle(WJ24),1,33)" = "floating_contribution"
+    "=INDEX(util_ReadHandle(WJ24),3,30)" = "10000"
+    "=INDEX(util_ReadHandle(WJ24),3,31)" = "3.5"
+    "=INDEX(util_ReadHandle(WJ24),4,31)" = "-0.4"
+    "=INDEX(util_ReadHandle(WJ24),3,32)" = "USD/MMBTU"
+    "=ROUND(INDEX(util_ReadHandle(WJ24),3,33),6)" = "35000"
+    "=ROUND(INDEX(util_ReadHandle(WJ24),4,33),6)" = "-4000"
+    # cva-reserve.md: the pair's row with a CVA column in WL7:WQ8 books -40 once, though two legs,
+    # the bilateral unbrokered template charging no fee; the batch's readback a column wider.
+    "=COLUMNS(_ReportReserves(WJ32))"    = "5"
+    "=INDEX(_ReportReserves(WJ32),3,1)"  = "0"
+    "=INDEX(_ReportReserves(WJ32),3,4)"  = "-40"
+    "=INDEX(_ReportReserves(WJ32),3,5)"  = "USD"
+    "=COLUMNS(util_ReadHandle(WJ30))"    = "26"
+    "=INDEX(util_ReadHandle(WJ30),1,17)" = "cva_reserve"
+    "=INDEX(util_ReadHandle(WJ30),3,17)" = "-40"
+    # the group's payment, NPV and DV01 once, the trade's; since two-index-one-price.md no leg
+    # value column stands between them and the reserves
     "=INDEX(util_ReadHandle(WJ24),3,2)"  = "A"
+    "=INDEX(util_ReadHandle(WJ24),1,18)" = "payment_amount"
     "=INDEX(util_ReadHandle(WJ24),3,18)" = "1000"
     "=INDEX(util_ReadHandle(WJ24),4,18)" = "-"
     "=INDEX(util_ReadHandle(WJ24),3,19)" = "950"
-    "=INDEX(util_ReadHandle(WJ24),3,21)" = "2000"
-    "=INDEX(util_ReadHandle(WJ24),4,21)" = "-1000"
-    "=INDEX(util_ReadHandle(WJ24),3,22)" = "1900"
-    "=INDEX(util_ReadHandle(WJ24),4,24)" = "-950"
-    "=INDEX(util_ReadHandle(WJ24),3,26)" = "-0.19"
-    "=INDEX(util_ReadHandle(WJ24),4,26)" = "0.095"
-    "=INDEX(util_ReadHandle(WJ24),4,27)" = "-"
-    "=ROWS(util_ReadHandle(WJ26))"       = "4"
-    "=INDEX(util_ReadHandle(WJ26),3,2)"  = "A"
-    "=INDEX(util_ReadHandle(WJ26),4,2)"  = "B"
+    "=INDEX(util_ReadHandle(WJ24),3,20)" = "-0.095"
+    "=INDEX(util_ReadHandle(WJ24),1,21)" = "brokerage_reserve"
+    "=INDEX(util_ReadHandle(WJ24),4,21)" = "-"
+    # the collection: the swap's row first, named by the descriptor and carrying the DV01, then a
+    # row per leg with its index's commodity risk and a dash under the DV01
+    "=ROWS(util_ReadHandle(WJ26))"       = "5"
+    "=INDEX(util_ReadHandle(WJ26),3,2)"  = "A+B"
+    "=INDEX(util_ReadHandle(WJ26),3,3)"  = "-"
+    "=INDEX(util_ReadHandle(WJ26),3,7)"  = "-"
     "=INDEX(util_ReadHandle(WJ26),3,9)"  = "-0.095"
+    "=INDEX(util_ReadHandle(WJ26),4,2)"  = "A"
+    "=INDEX(util_ReadHandle(WJ26),4,7)"  = "1"
     "=INDEX(util_ReadHandle(WJ26),4,9)"  = "-"
+    "=INDEX(util_ReadHandle(WJ26),5,2)"  = "B"
+    "=INDEX(util_ReadHandle(WJ26),5,9)"  = "-"
     '=INDEX(_ReportRisk(WJ26,"dv01","year"),4,2)' = "-0.095"
-    "=_CreateTrades(WJ5:WK6,WL4:WQ4,WL5:WQ5,WJ21)" = "#ERROR _CreateTrades: indexes is 2x2 array, expected one cell, one row or one column of index handles"
-    "=_CreateTrades(WJ5,WL4:WQ4,WL5:WQ5,WJ21)"     = "#ERROR _CreateTrades: ValueError: second_fixed_price is -0.3, expected none unless two indexes"
-    "=_CreateTrades(WJ5:WJ6,WL4:WP4,WL5:WP5,WJ21)" = "#ERROR _CreateTrades: ValueError: second_fixed_price is missing, expected it with two indexes"
+    "=_CreateTrades(WJ5:WK6,WL4:WP4,WL5:WP5,WJ21)" = "#ERROR _CreateTrades: indexes is 2x2 array, expected one cell, one row or one column of index handles"
+    "=_CreateTrades(WJ5,WL4:WP4,WL5:WP5,WJ21)"     = "#ERROR _CreateTrades: ValueError: second_schedule_method is 'lastday', expected none unless two indexes"
+    "=_CreateTrades(WJ5:WJ6,WL4:WQ4,WL5:WQ5,WJ21)" = "#ERROR _CreateTrades: fields cell (1, 6) is text 'second_fixed_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency"
     "=_PrepareTrades(WJ22,WJ13)"      = "#ERROR _PrepareTrades: ValueError: histories are 1, expected 2, one per leg of the trades"
     "=_PrepareTrades(WJ22,WK15:WK16)" = "#ERROR _PrepareTrades: ValueError: history 2 is over index 'A' as history 1 is, expected one history per index of the trades"
     "=_EvaluateTrades(WJ23,WJ17,WJ20)" = "#ERROR _EvaluateTrades: ValueError: markets are 1, expected 2, one per leg of the trades"
@@ -2908,6 +2981,90 @@ $cells = [ordered]@{
     # lot, for the no-broker template over the HUGE index, whose clearing rate is zero, so that no
     # reserve speaks before the quote quantity.
     "OR78" = "101"; "OS78" = "20-Nov-2026"; "OT78" = "Z26"; "OU78" = "9E+307"; "OV78" = "LOT"; "OW78" = "0.25"
+    # A signed CVA reserve, cva-reserve.md: the ticket's rows with a CVA column in OR80:OX83, 2 LOT
+    # of Z26 at 25, -2 LOT of the strip Z26-F27 at -40 and 0 LOT of Z26 at 0, their batch,
+    # preparation and results in OR84:OR86; both reserve columns in OR88:OY91 over OR92:OR94; the
+    # template booking -40 in OR98 over the four plain rows, OR99:OR101; two rows of 9E+307 in
+    # OR103:OX104 and of -9E+307 in OR105:OX106, each pair summing past the largest number; a row
+    # with a blank amount in OR108:OX108.
+    "OR80" = "trade_id"; "OS80" = "trade_date"; "OT80" = "contract_code"; "OU80" = "quantity"; "OV80" = "quantity_unit"; "OW80" = "fixed_price"; "OX80" = "cva_reserve"
+    "OR81" = "1001"; "OS81" = "20-Nov-2026"; "OT81" = "Z26"; "OU81" = "2"; "OV81" = "LOT"; "OW81" = "0.25"; "OX81" = "25"
+    "OR82" = "1002"; "OS82" = "20-Nov-2026"; "OT82" = "Z26-F27"; "OU82" = "-2"; "OV82" = "LOT"; "OW82" = "0.25"; "OX82" = "-40"
+    "OR83" = "1003"; "OS83" = "20-Nov-2026"; "OT83" = "Z26"; "OU83" = "0"; "OV83" = "LOT"; "OW83" = "0.25"; "OX83" = "0"
+    "OR84" = "=_CreateTrades(OR5,OR80:OX80,OR81:OX83,OR9)"
+    "OR85" = "=_PrepareTrades(OR84,OR19)"
+    "OR86" = "=_EvaluateTrades(OR85,OR21)"
+    "OR88" = "trade_id"; "OS88" = "trade_date"; "OT88" = "contract_code"; "OU88" = "quantity"; "OV88" = "quantity_unit"; "OW88" = "fixed_price"; "OX88" = "marketing_reserve"; "OY88" = "cva_reserve"
+    "OR89" = "1001"; "OS89" = "20-Nov-2026"; "OT89" = "Z26"; "OU89" = "2"; "OV89" = "LOT"; "OW89" = "0.25"; "OX89" = "15"; "OY89" = "25"
+    "OR90" = "1002"; "OS90" = "20-Nov-2026"; "OT90" = "Z26-F27"; "OU90" = "-2"; "OV90" = "LOT"; "OW90" = "0.25"; "OX90" = "20"; "OY90" = "-40"
+    "OR91" = "1003"; "OS91" = "20-Nov-2026"; "OT91" = "Z26"; "OU91" = "0"; "OV91" = "LOT"; "OW91" = "0.25"; "OX91" = "5"; "OY91" = "0"
+    "OR92" = "=_CreateTrades(OR5,OR88:OY88,OR89:OY91,OR9)"
+    "OR93" = "=_PrepareTrades(OR92,OR19)"
+    "OR94" = "=_EvaluateTrades(OR93,OR21)"
+    "OR96" = "quantity_per"; "OS96" = "schedule_method"; "OT96" = "route"; "OU96" = "settlement_method"; "OV96" = "clearing_house"; "OW96" = "payment_day"; "OX96" = "payment_holiday_calendar"; "OY96" = "cva_reserve"; "OZ96" = "broker"; "PA96" = "settlement_frequency"
+    "OR97" = "month"; "OS97" = "lastday"; "OT97" = "cleared"; "OU97" = "financial"; "OV97" = "Prototype Clearing"; "OW97" = "+2bd"; "OX97" = "=IC2"; "OY97" = "-40"; "OZ97" = "ION"; "PA97" = "monthly"
+    "OR98" = '=_CreateTradeTemplate("fixed_float",OR96:PA96,OR97:PA97)'
+    "OR99" = "=_CreateTrades(OR5,OR10:OW10,OR11:OW14,OR98)"
+    "OR100" = "=_PrepareTrades(OR99,OR19)"
+    "OR101" = "=_EvaluateTrades(OR100,OR21)"
+    "OR103" = "1001"; "OS103" = "20-Nov-2026"; "OT103" = "Z26"; "OU103" = "2"; "OV103" = "LOT"; "OW103" = "0.25"; "OX103" = "9E+307"
+    "OR104" = "1002"; "OS104" = "20-Nov-2026"; "OT104" = "Z26"; "OU104" = "-2"; "OV104" = "LOT"; "OW104" = "0.25"; "OX104" = "9E+307"
+    "OR105" = "1001"; "OS105" = "20-Nov-2026"; "OT105" = "Z26"; "OU105" = "2"; "OV105" = "LOT"; "OW105" = "0.25"; "OX105" = "-9E+307"
+    "OR106" = "1002"; "OS106" = "20-Nov-2026"; "OT106" = "Z26"; "OU106" = "-2"; "OV106" = "LOT"; "OW106" = "0.25"; "OX106" = "-9E+307"
+    "OR108" = "1001"; "OS108" = "20-Nov-2026"; "OT108" = "Z26"; "OU108" = "2"; "OV108" = "LOT"; "OW108" = "0.25"
+    # cva-reserve.md's review: a dollar beside ten thousand trillion and its negative in OR110:OX112
+    # and in the other order in OR114:OX116, their batches, preparations and results in OR117:OR119
+    # and OR120:OR122; two pairs cancelling past the largest number in OR124:OX127, theirs in
+    # OR128:OR130.
+    "OR110" = "1001"; "OS110" = "20-Nov-2026"; "OT110" = "Z26"; "OU110" = "2"; "OV110" = "LOT"; "OW110" = "0.25"; "OX110" = "1E+16"
+    "OR111" = "1002"; "OS111" = "20-Nov-2026"; "OT111" = "Z26"; "OU111" = "-2"; "OV111" = "LOT"; "OW111" = "0.25"; "OX111" = "1"
+    "OR112" = "1003"; "OS112" = "20-Nov-2026"; "OT112" = "Z26"; "OU112" = "0"; "OV112" = "LOT"; "OW112" = "0.25"; "OX112" = "-1E+16"
+    "OR114" = "1001"; "OS114" = "20-Nov-2026"; "OT114" = "Z26"; "OU114" = "2"; "OV114" = "LOT"; "OW114" = "0.25"; "OX114" = "1E+16"
+    "OR115" = "1002"; "OS115" = "20-Nov-2026"; "OT115" = "Z26"; "OU115" = "-2"; "OV115" = "LOT"; "OW115" = "0.25"; "OX115" = "-1E+16"
+    "OR116" = "1003"; "OS116" = "20-Nov-2026"; "OT116" = "Z26"; "OU116" = "0"; "OV116" = "LOT"; "OW116" = "0.25"; "OX116" = "1"
+    "OR117" = "=_CreateTrades(OR5,OR80:OX80,OR110:OX112,OR9)"
+    "OR118" = "=_PrepareTrades(OR117,OR19)"
+    "OR119" = "=_EvaluateTrades(OR118,OR21)"
+    "OR120" = "=_CreateTrades(OR5,OR80:OX80,OR114:OX116,OR9)"
+    "OR121" = "=_PrepareTrades(OR120,OR19)"
+    "OR122" = "=_EvaluateTrades(OR121,OR21)"
+    "OR124" = "1001"; "OS124" = "20-Nov-2026"; "OT124" = "Z26"; "OU124" = "2"; "OV124" = "LOT"; "OW124" = "0.25"; "OX124" = "9E+307"
+    "OR125" = "1002"; "OS125" = "20-Nov-2026"; "OT125" = "Z26"; "OU125" = "-2"; "OV125" = "LOT"; "OW125" = "0.25"; "OX125" = "9E+307"
+    "OR126" = "1003"; "OS126" = "20-Nov-2026"; "OT126" = "Z26"; "OU126" = "2"; "OV126" = "LOT"; "OW126" = "0.25"; "OX126" = "-9E+307"
+    "OR127" = "1004"; "OS127" = "20-Nov-2026"; "OT127" = "Z26"; "OU127" = "-2"; "OV127" = "LOT"; "OW127" = "0.25"; "OX127" = "-9E+307"
+    "OR128" = "=_CreateTrades(OR5,OR80:OX80,OR124:OX127,OR9)"
+    "OR129" = "=_PrepareTrades(OR128,OR19)"
+    "OR130" = "=_EvaluateTrades(OR129,OR21)"
+    # and 3E-308 beside two zero rows in OR132:OX134, 3E-308 to the last bit in OR137.
+    "OR132" = "1001"; "OS132" = "20-Nov-2026"; "OT132" = "Z26"; "OU132" = "2"; "OV132" = "LOT"; "OW132" = "0.25"; "OX132" = "3E-308"
+    "OR133" = "1002"; "OS133" = "20-Nov-2026"; "OT133" = "Z26"; "OU133" = "-2"; "OV133" = "LOT"; "OW133" = "0.25"; "OX133" = "0"
+    "OR134" = "1003"; "OS134" = "20-Nov-2026"; "OT134" = "Z26"; "OU134" = "0"; "OV134" = "LOT"; "OW134" = "0.25"; "OX134" = "0"
+    "OR135" = "=_CreateTrades(OR5,OR80:OX80,OR132:OX134,OR9)"
+    "OR136" = "=_PrepareTrades(OR135,OR19)"
+    "OR137" = "=_EvaluateTrades(OR136,OR21)"
+    # and past the largest number on the way: 9E+307 twice and -9E+307 twice beside 3E-308 in
+    # OR139:OX143, five rows, and with four zero rows in OR148:OX156, nine; 3E-308 both, in OR146
+    # and OR159.
+    "OR139" = "1001"; "OS139" = "20-Nov-2026"; "OT139" = "Z26"; "OU139" = "2"; "OV139" = "LOT"; "OW139" = "0.25"; "OX139" = "9E+307"
+    "OR140" = "1002"; "OS140" = "20-Nov-2026"; "OT140" = "Z26"; "OU140" = "2"; "OV140" = "LOT"; "OW140" = "0.25"; "OX140" = "9E+307"
+    "OR141" = "1003"; "OS141" = "20-Nov-2026"; "OT141" = "Z26"; "OU141" = "2"; "OV141" = "LOT"; "OW141" = "0.25"; "OX141" = "-9E+307"
+    "OR142" = "1004"; "OS142" = "20-Nov-2026"; "OT142" = "Z26"; "OU142" = "2"; "OV142" = "LOT"; "OW142" = "0.25"; "OX142" = "-9E+307"
+    "OR143" = "1005"; "OS143" = "20-Nov-2026"; "OT143" = "Z26"; "OU143" = "2"; "OV143" = "LOT"; "OW143" = "0.25"; "OX143" = "3E-308"
+    "OR144" = "=_CreateTrades(OR5,OR80:OX80,OR139:OX143,OR9)"
+    "OR145" = "=_PrepareTrades(OR144,OR19)"
+    "OR146" = "=_EvaluateTrades(OR145,OR21)"
+    "OR148" = "1001"; "OS148" = "20-Nov-2026"; "OT148" = "Z26"; "OU148" = "2"; "OV148" = "LOT"; "OW148" = "0.25"; "OX148" = "9E+307"
+    "OR149" = "1002"; "OS149" = "20-Nov-2026"; "OT149" = "Z26"; "OU149" = "2"; "OV149" = "LOT"; "OW149" = "0.25"; "OX149" = "9E+307"
+    "OR150" = "1003"; "OS150" = "20-Nov-2026"; "OT150" = "Z26"; "OU150" = "2"; "OV150" = "LOT"; "OW150" = "0.25"; "OX150" = "-9E+307"
+    "OR151" = "1004"; "OS151" = "20-Nov-2026"; "OT151" = "Z26"; "OU151" = "2"; "OV151" = "LOT"; "OW151" = "0.25"; "OX151" = "-9E+307"
+    "OR152" = "1005"; "OS152" = "20-Nov-2026"; "OT152" = "Z26"; "OU152" = "2"; "OV152" = "LOT"; "OW152" = "0.25"; "OX152" = "3E-308"
+    "OR153" = "1006"; "OS153" = "20-Nov-2026"; "OT153" = "Z26"; "OU153" = "2"; "OV153" = "LOT"; "OW153" = "0.25"; "OX153" = "0"
+    "OR154" = "1007"; "OS154" = "20-Nov-2026"; "OT154" = "Z26"; "OU154" = "2"; "OV154" = "LOT"; "OW154" = "0.25"; "OX154" = "0"
+    "OR155" = "1008"; "OS155" = "20-Nov-2026"; "OT155" = "Z26"; "OU155" = "2"; "OV155" = "LOT"; "OW155" = "0.25"; "OX155" = "0"
+    "OR156" = "1009"; "OS156" = "20-Nov-2026"; "OT156" = "Z26"; "OU156" = "2"; "OV156" = "LOT"; "OW156" = "0.25"; "OX156" = "0"
+    "OR157" = "=_CreateTrades(OR5,OR80:OX80,OR148:OX156,OR9)"
+    "OR158" = "=_PrepareTrades(OR157,OR19)"
+    "OR159" = "=_EvaluateTrades(OR158,OR21)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"
@@ -3528,8 +3685,9 @@ $cells = [ordered]@{
     # December settles in WA12:WB13 and B's Z26 index in WA14:WB14, the two histories in WJ13:WJ14
     # with a copy B first in WK13:WK14 and a copy of A's twice in WK15:WK16; the vectors over
     # WA15:WA16 and WB15:WB17, the markets in WJ17:WJ18 with B beside A in WK17 and B first in
-    # WK18:WK19; SOFR in WJ19 and its collection in WJ20; the template over WL1:WU2 with the second
-    # leg's method and the ticket's row in WL4:WQ5; the batch, the preparation and the results
+    # WK18:WK19; SOFR in WJ19 and its collection in WJ20; the template over WL1:WV2 with the second
+    # leg's method and the ticket's row in WL4:WP5 at the outright 3.00, a stale second_fixed_price
+    # header beside it in WQ4:WQ5 for the refusal alone; the batch, the preparation and the results
     # in WJ22:WJ24, the B-first preparation in WJ25, the collection in WJ26, the B+A batch in WJ27
     # and the results over the markets as a column and B first in WJ28 and WJ29.
     "WA1" = "F27"; "WB1" = "29-Dec-2026"
@@ -3579,15 +3737,22 @@ $cells = [ordered]@{
     "WL2" = "NYMEX NG"; "WM2" = "month"; "WN2" = "lastday"; "WO2" = "lastday"; "WP2" = "bilateral"; "WQ2" = "financial"; "WR2" = "ACME Trading"; "WS2" = "SOFR"; "WT2" = "4-Jan-2028"; "WU2" = "=WJ2"; "WV2" = "monthly"
     "WJ21" = '=_CreateTradeTemplate("fixed_float",WL1:WV1,WL2:WV2)'
     "WL4" = "trade_id"; "WM4" = "trade_date"; "WN4" = "contract_code"; "WO4" = "quantity"; "WP4" = "fixed_price"; "WQ4" = "second_fixed_price"
-    "WL5" = "1"; "WM5" = "15-Dec-2026"; "WN5" = "G27"; "WO5" = "1"; "WP5" = "3.3"; "WQ5" = "-0.3"
-    "WJ22" = "=_CreateTrades(WJ5:WJ6,WL4:WQ4,WL5:WQ5,WJ21)"
+    "WL5" = "1"; "WM5" = "15-Dec-2026"; "WN5" = "G27"; "WO5" = "1"; "WP5" = "3"; "WQ5" = "-0.3"
+    "WJ22" = "=_CreateTrades(WJ5:WJ6,WL4:WP4,WL5:WP5,WJ21)"
     "WJ23" = "=_PrepareTrades(WJ22,WJ13:WJ14)"
     "WJ24" = "=_EvaluateTrades(WJ23,WJ17:WK17,WJ20)"
     "WJ25" = "=_PrepareTrades(WJ22,WK13:WK14)"
     "WJ26" = "=_AggregateResults(WJ24)"
-    "WJ27" = "=_CreateTrades(WK5:WK6,WL4:WQ4,WL5:WQ5,WJ21)"
+    "WJ27" = "=_CreateTrades(WK5:WK6,WL4:WP4,WL5:WP5,WJ21)"
     "WJ28" = "=_EvaluateTrades(WJ23,WJ17:WJ18,WJ20)"
     "WJ29" = "=_EvaluateTrades(WJ25,WK18:WK19,WJ20)"
+    # cva-reserve.md: the pair's row again with a CVA column, WL7:WQ8, its batch, preparation and
+    # results in WJ30:WJ32.
+    "WL7" = "trade_id"; "WM7" = "trade_date"; "WN7" = "contract_code"; "WO7" = "quantity"; "WP7" = "fixed_price"; "WQ7" = "cva_reserve"
+    "WL8" = "1"; "WM8" = "15-Dec-2026"; "WN8" = "G27"; "WO8" = "1"; "WP8" = "3"; "WQ8" = "-40"
+    "WJ30" = "=_CreateTrades(WJ5:WJ6,WL7:WQ7,WL8:WQ8,WJ21)"
+    "WJ31" = "=_PrepareTrades(WJ30,WJ13:WJ14)"
+    "WJ32" = "=_EvaluateTrades(WJ31,WJ17:WK17,WJ20)"
     # The request for quote, rfq-quoting.md and dated-quotes.md, on the quoting block's strip as a
     # ticket's rows: the two months, their quantities and the request's payment days in XA1:XC2, 8
     # February and 1 March, and in XA4:XC5 paying 1 March and 8 March, under the headers XE1:XG1;

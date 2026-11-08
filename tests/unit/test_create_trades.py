@@ -226,14 +226,14 @@ def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
         terms.end_date,
         dates("2026-12-31", "2026-12-31", "2027-01-31", "2027-01-31", "2026-12-31"),
     )
-    np.testing.assert_array_equal(terms.legs[0].fixed_price, [3.1, 3.15, 3.4, 3.35, 3.1])
+    np.testing.assert_array_equal(terms.fixed_price, [3.1, 3.15, 3.4, 3.35, 3.1])
     assert terms.payment is None
     assert batch.encoded.terms is terms
     np.testing.assert_array_equal(
         batch.encoded.legs[0].quote_quantity, [100_000, -40_000, 70_000, -120_000, 100_000]
     )
     np.testing.assert_array_equal(
-        batch.encoded.legs[0].offset, [-310_000, 126_000, -238_000, 402_000, -310_000]
+        batch.encoded.offset, [-310_000, 126_000, -238_000, 402_000, -310_000]
     )
     np.testing.assert_array_equal(batch.encoded.legs[0].group_contract, [1, 2])
     np.testing.assert_array_equal(batch.encoded.legs[0].slot_exposure, [160_000, -50_000])
@@ -278,7 +278,7 @@ def test_a_strip_makes_one_component_per_month_on_its_one_occurrence() -> None:
     np.testing.assert_array_equal(terms.occurrence, [0, 0, 1])
     np.testing.assert_array_equal(terms.legs[0].contract, [1, 2, 2])
     np.testing.assert_array_equal(terms.quantity, [3, 3, -1])  # the strip's quantity in every month
-    np.testing.assert_array_equal(terms.legs[0].fixed_price, [3.2, 3.2, 3.3])
+    np.testing.assert_array_equal(terms.fixed_price, [3.2, 3.2, 3.3])
     assert terms.payment is not None
     np.testing.assert_array_equal(
         terms.payment.date, dates("2026-11-30", "2026-12-31", "2026-12-31")
@@ -733,7 +733,7 @@ def test_a_last3day_strip_observes_each_month_thrice_and_pays_once_per_month() -
     twice = {name: values * 2 for name, values in strip.items()}
     assert l3d_days(twice)[3] == ["2026-12-09", "2027-01-11"] * 2
     batch, _ = created(SYN, twice, L3D_TEMPLATE)
-    np.testing.assert_array_equal(batch.encoded.legs[0].offset, [-210.0] * 4)
+    np.testing.assert_array_equal(batch.encoded.offset, [-210.0] * 4)
     np.testing.assert_allclose(batch.encoded.legs[0].slot_exposure, [2.0] * 6)
 
 
@@ -874,7 +874,7 @@ def test_an_asian_strip_observes_each_month_on_its_own_days_and_pays_once_per_mo
     assert weights == pytest.approx([1 / 22] * 22 + [1 / 20] * 20)
     assert pays == ["2027-01-05", "2027-02-02"]
     batch, _ = created(ETHANE, strip, ASIAN_TEMPLATE)
-    np.testing.assert_allclose(batch.encoded.legs[0].offset, [-550.0, -550.0])
+    np.testing.assert_allclose(batch.encoded.offset, [-550.0, -550.0])
     np.testing.assert_allclose(batch.encoded.legs[0].slot_exposure, [100.0] * 22 + [110.0] * 20)
     twice = {name: values * 2 for name, values in strip.items()}
     assert asian_days(twice)[3] == ["2027-01-05", "2027-02-02"] * 2
@@ -1532,7 +1532,7 @@ def test_a_zero_quantity_in_the_ticket_is_kept_with_its_row() -> None:
     np.testing.assert_array_equal(terms.quantity, [2.0, 0.0])
     np.testing.assert_array_equal(terms.legs[0].contract, [1, 2])
     np.testing.assert_array_equal(batch.encoded.legs[0].quote_quantity, [20_000.0, 0.0])
-    np.testing.assert_array_equal(batch.encoded.legs[0].offset, [-60_000.0, 0.0])
+    np.testing.assert_array_equal(batch.encoded.offset, [-60_000.0, 0.0])
     np.testing.assert_array_equal(batch.encoded.legs[0].slot_exposure, [20_000.0, 0.0])
     assert counter.freeze()["resolved_occurrences"] == 2
     negative_zero, _ = created(NG, {**ENTRY_TICKET, "quantity": [2, -0.0]})
@@ -1673,6 +1673,11 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
             {**NG_TICKET, "marketing_reserve": [15.0, -5.0, 25.0, 5.0, 0.0]},
             NG_TEMPLATE,
             "marketing_reserve row 2 is -5.0, expected a finite amount of zero or more",
+        ),
+        (  # a CVA reserve is a finite amount of either sign, since cva-reserve.md
+            {**NG_TICKET, "cva_reserve": [25.0, float("inf"), -40.0, 0.0, 5.0]},
+            NG_TEMPLATE,
+            "cva_reserve row 2 is inf, expected a finite amount",
         ),
         (
             {**NG_TICKET, "contract_code": ["Z26", "Z2026", "F27", "F27", "Z26"]},
@@ -1930,11 +1935,12 @@ def test_the_conditions_are_the_definitions_own() -> None:
         "start_date": "no contract_code on the row, or with end_date",
         "end_date": "no contract_code on the row, or with start_date",
     }
-    # Since two-index-fixed-float.md the second leg's two fields are conditional on the index
-    # count, which the creator alone knows: their rule is the resolution's, not CONDITIONS'.
+    # Since two-index-fixed-float.md the second leg's method is conditional on the index count,
+    # which the creator alone knows: its rule is the resolution's, not CONDITIONS'; since
+    # two-index-one-price.md it is the one field a second leg adds.
     assert conditional == {
         name: f"{fact} = {value.value}" for name, (fact, value) in CONDITIONS.items()
-    } | {"second_fixed_price": "two indexes", "second_schedule_method": "two indexes"}
+    } | {"second_schedule_method": "two indexes"}
 
 
 def test_the_ticket_and_the_template_are_of_one_instrument_the_future() -> None:
@@ -2560,7 +2566,7 @@ def test_a_mixed_ticket_resolves_each_row_to_its_own_choices_and_encodes_to_the_
     )
     enc = batch.encoded
     np.testing.assert_allclose(enc.legs[0].quote_quantity, [42.0, -62.0, 126.0, 22.0])
-    np.testing.assert_allclose(enc.legs[0].offset, [-420.0, 620.0, -1_260.0, -220.0])
+    np.testing.assert_allclose(enc.offset, [-420.0, 620.0, -1_260.0, -220.0])
     np.testing.assert_array_equal(enc.legs[0].group_contract, [1, 1])
     np.testing.assert_array_equal(enc.payment_date, dates("2026-12-31", "2027-01-04"))
     np.testing.assert_allclose(enc.offset_of_group, [620.0, -1_900.0])
@@ -2925,7 +2931,7 @@ def test_an_iferc_basis_future_observes_publication_day_and_pays_from_it() -> No
     np.testing.assert_array_equal(terms.end_date, dates("2026-12-31"))
     np.testing.assert_array_equal(terms.covered_days, [31])
     np.testing.assert_array_equal(terms.quantity, [1])
-    np.testing.assert_array_equal(terms.legs[0].fixed_price, [-0.5])
+    np.testing.assert_array_equal(terms.fixed_price, [-0.5])
     assert terms.payment is not None
     assert terms.payment.entered.texts == ("+2bd",)
     assert terms.payment.calendar == (WAHA_PAYS,)
@@ -2934,7 +2940,7 @@ def test_an_iferc_basis_future_observes_publication_day_and_pays_from_it() -> No
     np.testing.assert_array_equal(enc.legs[0].observations.date, dates("2026-12-01"))
     np.testing.assert_array_equal(enc.legs[0].observations.weight, [1.0])
     np.testing.assert_array_equal(enc.legs[0].quote_quantity, [2_500.0])
-    np.testing.assert_array_equal(enc.legs[0].offset, [1_250.0])
+    np.testing.assert_array_equal(enc.offset, [1_250.0])
     np.testing.assert_array_equal(enc.legs[0].slot_date, dates("2026-12-01"))
     np.testing.assert_array_equal(enc.legs[0].slot_reference, [1])
     np.testing.assert_array_equal(enc.legs[0].group_contract, [1])
@@ -3095,7 +3101,7 @@ def test_the_tickets_numeric_ids_are_kept_whole_and_the_repeat_counts_twice() ->
     np.testing.assert_array_equal(
         other.encoded.legs[0].quote_quantity, batch.encoded.legs[0].quote_quantity
     )
-    np.testing.assert_array_equal(other.encoded.legs[0].offset, batch.encoded.legs[0].offset)
+    np.testing.assert_array_equal(other.encoded.offset, batch.encoded.offset)
     np.testing.assert_array_equal(
         other.encoded.legs[0].slot_exposure, batch.encoded.legs[0].slot_exposure
     )
@@ -3470,7 +3476,7 @@ def test_a_half_year_is_its_six_months_as_a_strip_of_them_is() -> None:
         np.testing.assert_array_equal(
             batch.encoded.legs[0].quote_quantity, half.encoded.legs[0].quote_quantity
         )
-        np.testing.assert_array_equal(batch.encoded.legs[0].offset, half.encoded.legs[0].offset)
+        np.testing.assert_array_equal(batch.encoded.offset, half.encoded.offset)
         np.testing.assert_array_equal(
             batch.encoded.legs[0].slot_date, half.encoded.legs[0].slot_date
         )

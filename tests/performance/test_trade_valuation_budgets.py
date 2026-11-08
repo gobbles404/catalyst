@@ -199,6 +199,7 @@ def test_preparing_resolves_two_handles_and_runs_the_kernels_preparation_alone(
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_totals": 1,  # the two unsettled totals, finite
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -235,6 +236,7 @@ def test_a_tick_resolves_two_handles_and_runs_the_evaluation_alone(
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_cleared_leg": 1,  # the leg's results, the nominal risk by reference
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
@@ -253,7 +255,8 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
     live = bridge.live_handles()
     for name, numeric, dated in (
         ("_ReportValues", 3, True),
-        ("_ReportReserves", 3, False),  # three totals and a currency, no day, since #170
+        ("_ReportReserves", 4, False),  # four totals and a currency, no day, since #170 and
+        # cva-reserve.md
     ):
         profile = call_profile(lambda name=name: PATH[name](results))
         expected = {
@@ -291,7 +294,9 @@ RISK_PEAK = 5 * SLACK
 
 def test_the_valuation_path_allocates_by_slot_and_never_by_trade(sheet: dict[str, Any]) -> None:
     trades = a_batch(sheet, 2_500, 24)
-    assert least_peak(lambda: PATH["_PrepareTrades"](trades, sheet["history"])) <= 10 * SLACK
+    # Since two-index-one-price.md the preparation sums the cash's signed terms under one
+    # compensation, a handful of small arrays over the groups: a slack more.
+    assert least_peak(lambda: PATH["_PrepareTrades"](trades, sheet["history"])) <= 11 * SLACK
     prepared = PATH["_PrepareTrades"](trades, sheet["history"])
     assert (
         least_peak(lambda: PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING))
@@ -335,7 +340,7 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
-        "_summed": 3,  # the legs' amounts, NPVs and DV01s by group, one leg's by reference
+        "compensated": 1,  # two-index-one-price.md: the signed terms under one compensation
         "_the_lots_arrays": 1,  # the leg's discounted lots and their sums
         "_the_lots_checked": 1,
         "_discounted_leg": 1,  # the leg's results over them

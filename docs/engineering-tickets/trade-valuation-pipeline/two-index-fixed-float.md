@@ -8,7 +8,10 @@ and not checked against a confirmation; separately paying legs are outside this
 version. This ticket supersedes the issue's original single-fixed-price and
 combined-index alternatives. The first pull request, the internal one-leg
 representation, is #215; the second, two-leg resolution and pricing, is #216,
-stacked on it; the third, the pair on the sheet, is #217, stacked on #216.
+stacked on it; the third, the pair on the sheet, is #217, stacked on #216. Since
+8 November 2026 [two-index-one-price.md](two-index-one-price.md), issue #241, built in #242,
+replaces the two entered leg prices with the one outright price the system of record books
+and retires the leg values and leg DV01s; the rest of this ticket stands as built.
 
 ## Outcome
 
