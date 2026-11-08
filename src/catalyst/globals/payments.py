@@ -8,6 +8,8 @@ are each evaluator's to decide and to name in its own words; the convention is
 docs/library/trades/evaluate-trades.md's, and nothing here reads a trade, a cashflow or a
 market."""
 
+from collections.abc import Sequence
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -47,3 +49,24 @@ def discounted(
     finite, under numpy's flags down where it sums them."""
     npv = amounts * factors
     return npv, -0.0001 * tau * npv
+
+
+def compensated(terms: Sequence[NDArray[np.float64] | float]) -> NDArray[np.float64]:
+    """Two or more signed terms of a payment summed with compensation, every payment at once for
+    arrays of one shape and once for floats: the running sum and the part each addition dropped,
+    Knuth's two-sum, exact whatever the two magnitudes, added back at the end, so that a small
+    leg's dollar survives a strike that cancels a large leg's ten thousand trillion whatever
+    order the terms come in, the way the aggregation sums its saved vectors,
+    two-index-one-price.md. Nothing is copied or written in place: each step makes its own
+    arrays, and the caller holds numpy's flags down where arrays may outrun and judges the
+    result: a sum past the largest number is inf, and the dropped part is added back only where
+    it is finite, so an overflow stays inf and not nan, and infinities of both signs are nan,
+    which no rule takes for finite."""
+    held = terms[0]
+    dropped: NDArray[np.float64] | float = 0.0
+    for entries in terms[1:]:
+        after = held + entries
+        carried = after - held  # the part of entries that reached the sum
+        dropped = dropped + ((held - (after - carried)) + (entries - carried))  # the rest
+        held = after
+    return np.where(np.isfinite(dropped), held + dropped, held)

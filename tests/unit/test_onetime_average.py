@@ -455,7 +455,9 @@ def test_the_ng_strip_paid_once_keeps_each_months_fixing_and_quantity() -> None:
     assert [str(d) for d in batch.resolved.payment.date] == ["2027-04-07"] * 3
     unpaid = valued_on(batch, "2027-04-01", strip_final, 4.5)
     assert unpaid.mark == pytest.approx(30_000.0) and unpaid.cash == 0.0
-    amounts = unpaid.prepared.set_amount + batch.encoded.offset_of_group  # set less the fixed leg
+    amounts = (
+        unpaid.prepared.legs[0].set_amount + batch.encoded.offset_of_group
+    )  # set and fixed leg
     assert amounts.tolist() == pytest.approx([-5_000.0, 30_000.0, 5_000.0])
     paid = valued_on(batch, "2027-04-08", strip_final, 4.5)
     assert paid.mark == pytest.approx(0.0) and paid.cash == pytest.approx(30_000.0)

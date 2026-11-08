@@ -442,6 +442,69 @@ def test_the_lifecycle_paid_on_6_january_is_one_cash_amount() -> None:
     assert results.prepared.is_settled.tolist() == [True]
 
 
+def test_a_small_legs_dollar_survives_a_strike_that_cancels_the_large_leg() -> None:
+    # The review's case on #242: one MMBTU, A quoted and struck at ten thousand trillion, B
+    # quoted at one dollar. Adding the two sides before the strike rounds the dollar away; the
+    # payment is its signed terms summed with compensation, so it reads one dollar with both
+    # legs live, with A fixed, with both fixed and, paid, as cash, on either route.
+    extreme: dict[str, list[object]] = {**F27, "quantity": [1], "fixed_price": [1e16]}
+    big, one = (1e16, 1e16, 1e16), (1.0, 1.0, 1.0)
+    live = valued(
+        booked(LIFECYCLE, extreme),
+        "2026-12-28",
+        finals_a={},
+        quotes_a=big,
+        quotes_b=one,
+        curve=on("2026-12-28", 0.99),
+    )
+    close(live.payment_amount, [1.0])
+    assert live.mark == pytest.approx(0.99, **CLOSE)
+    a_fixed = valued(
+        booked(LIFECYCLE, extreme),
+        "2026-12-30",
+        finals_a={"F27": 1e16},
+        quotes_a=big,
+        quotes_b=one,
+        curve=on("2026-12-30", 0.995),
+    )
+    close(a_fixed.payment_amount, [1.0])
+    both_fixed = valued(
+        booked(LIFECYCLE, extreme),
+        "2027-01-05",
+        finals_a={"F27": 1e16},
+        indices_b={"Z26": -0.30, "F27": 1.0},
+        quotes_a=big,
+        quotes_b=one,
+        curve=on("2027-01-05", 0.9999),
+    )
+    close(both_fixed.payment_amount, [1.0])
+    paid = valued(
+        booked(LIFECYCLE, extreme),
+        "2027-01-06",
+        finals_a={"F27": 1e16},
+        indices_b={"Z26": -0.30, "F27": 1.0},
+        quotes_a=big,
+        quotes_b=one,
+        curve=curve_of(("2027-01-06", 1.0), ("2027-06-30", 0.98)),
+    )
+    assert (paid.cash, paid.mark) == (1.0, 0.0)
+    cleared = {**CLEARED, "payment_day": "+2bd"}
+    both_live = valued(
+        booked(cleared, extreme), "2026-12-28", finals_a={}, quotes_a=big, quotes_b=one, curve=None
+    )
+    assert both_live.mark == 1.0
+    fixed = valued(
+        booked(cleared, extreme),
+        "2027-01-05",
+        finals_a={"F27": 1e16},
+        indices_b={"Z26": -0.30, "F27": 1.0},
+        quotes_a=big,
+        quotes_b=one,
+        curve=None,
+    )
+    assert fixed.mark == 1.0 and fixed.prepared.set_unsettled == (1e16, 1.0)
+
+
 # --- slots, offsets and payments of a pair -------------------------------------------------------
 
 
@@ -460,8 +523,9 @@ def test_two_futures_legs_observing_one_day_are_two_slots_with_their_own_fixings
     prep = prepared_trades(batch.encoded, (hist_c, hist_a), WorkCounter())  # any order
     assert prep.legs[0].history is hist_a and prep.legs[1].history is hist_c
     close(prep.legs[0].set_amount, [35_500.0])
-    close(prep.legs[1].set_amount, [34_500.0])
-    close(prep.set_amount, [70_000.0])
+    close(
+        prep.legs[1].set_amount, [34_500.0]
+    )  # each leg's own, never summed apart from the payment
     # A payment of nothing: A at 3.50 and B at -0.50 make the outright 3.00 exactly; the two
     # sides and the deltas stand while the value is zero.
     nothing = valued(booked(), quotes_b=(-0.48, -0.50, -0.52))

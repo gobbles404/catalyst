@@ -757,12 +757,12 @@ def test_before_either_expiry_both_contracts_are_live_and_nothing_is_set() -> No
     prep = prepared_trades(enc, (history_on(NG, "2026-11-24", {}),), counter)
     np.testing.assert_array_equal(prep.legs[0].is_fixed, [False, False])
     np.testing.assert_array_equal(prep.is_settled, [False, False])
-    np.testing.assert_array_equal(prep.set_amount, [0.0, 0.0])
+    np.testing.assert_array_equal(prep.legs[0].set_amount, [0.0, 0.0])
     np.testing.assert_array_equal(prep.legs[0].live_slot, [0, 1])
     np.testing.assert_array_equal(prep.legs[0].live_references, [1, 2])
     np.testing.assert_array_equal(prep.legs[0].reference_of_live_slot, [0, 1])
     np.testing.assert_array_equal(prep.legs[0].dated_live_exposure, [160_000, -50_000])
-    assert (prep.offset_unsettled, prep.set_unsettled, prep.cash) == (-330_000, 0.0, 0.0)
+    assert (prep.offset_unsettled, prep.set_unsettled, prep.cash) == (-330_000, (0.0,), 0.0)
     assert counter.freeze().as_dict() == {
         "display_periods": 5,
         "fixings_read": 0,
@@ -771,7 +771,7 @@ def test_before_either_expiry_both_contracts_are_live_and_nothing_is_set() -> No
     for array in (
         prep.legs[0].is_fixed,
         prep.is_settled,
-        prep.set_amount,
+        prep.legs[0].set_amount,
         prep.legs[0].dated_live_exposure,
     ):
         assert not array.flags.writeable
@@ -1564,7 +1564,7 @@ def test_the_daily_toy_marks_as_the_page_says_date_by_date(
     result, counter = daily_evaluated(as_of)
     prep = result.prepared
     np.testing.assert_allclose(prep.legs[0].dated_live_exposure, live)
-    assert prep.set_unsettled == pytest.approx(set_amount)
+    assert prep.set_unsettled[0] == pytest.approx(set_amount)
     assert result.legs[0].dated_live_contribution.sum() == pytest.approx(live_amount)
     np.testing.assert_allclose(result.legs[0].dated_live_contribution, [x * 74 for x in live if x])
     assert (result.mark, result.cash) == (pytest.approx(mark), 0.0)
@@ -4380,7 +4380,7 @@ def test_preparation_refuses_a_set_amount_or_unsettled_total_past_the_largest_nu
     enc = encoded(terms, (observed_of(terms),), UNITS, WorkCounter())
     history = history_on(ONE, "2026-12-30", {"Z26": 1.0, "F27": 1.0})
     prep = prepared_trades(enc, (history,), WorkCounter())
-    assert prep.set_unsettled == 1e308 and prep.offset_unsettled == 0.0
+    assert prep.set_unsettled == (1e308,) and prep.offset_unsettled == 0.0
 
 
 def test_paid_groups_past_the_largest_number_each_way_are_refused_as_cash() -> None:

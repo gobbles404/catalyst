@@ -836,4 +836,5 @@ DV01 column and a cross gamma per index; collect it with a Henry Hub swap and re
 membership rows, the pair's DV01 on its `HNG+WAH` row; move the outright price and see the
 value and the DV01 move with the deltas still; follow one leg fixing before the other, both
 fixed, then paid, one cash amount; type `second_fixed_price` on a kept sheet and see it
-refused at the header.
+refused at the header, then remove the column and set `fixed_price` to the outright, both
+steps, since the first leg's old strike left in place misprices the swap without a word.

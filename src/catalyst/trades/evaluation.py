@@ -29,7 +29,7 @@ from numpy.typing import NDArray
 
 from catalyst.globals.discount_curve import DiscountCurve
 from catalyst.globals.discount_curve_set import DiscountCurveSet
-from catalyst.globals.payments import curve_starts_on, discounted, factors_on
+from catalyst.globals.payments import compensated, curve_starts_on, discounted, factors_on
 from catalyst.instrumentation.work_counts import KERNEL, WorkCounter
 from catalyst.market.market import Market
 from catalyst.trades.contributions import CrossContribution, RateContribution
@@ -88,10 +88,12 @@ def trade_results(
     times its reference's quote is its contribution, finite or refused by its slot and its
     quote since #190, reject-nonfinite-trade-arithmetic.md, before either route sums it. For a
     cleared batch each leg's live amount is its contributions' sum, the one reduction this
-    route makes per leg, and the mark is the unsettled offsets and set amounts plus the legs'
-    live amounts, each finite or refused for the batch, since two finite floats add past the
-    largest number without a word; the cash is the preparation's, the sensitivity, the nominal
-    delta and its total each leg's preparation's, shared, the discounted vectors those same
+    route makes per leg, and the mark is the unsettled fixed legs, each leg's unsettled set
+    amounts and each leg's live amount summed with Neumaier's compensation since
+    two-index-one-price.md, the terms kept apart so that a small leg's dollar survives a strike
+    that cancels the large leg's, finite or refused for the batch, since two finite floats add
+    past the largest number without a word; the cash is the preparation's, the sensitivity, the
+    nominal delta and its total each leg's preparation's, shared, the discounted vectors those same
     arrays, since nothing discounts, DV01 zero and no group vector kept; no value is a leg's
     since two-index-one-price.md, the payment being the trade's against its one fixed price. A
     bilateral batch is _discounted's. The reserves are the encoding's, by reference, summed
@@ -147,7 +149,7 @@ def trade_results(
             f"the batch has {live!r} of live amount in all, expected a finite amount of "
             f"{currency}; the live slots' contributions, each finite, sum past the largest number"
         )
-    mark = prepared.offset_unsettled + prepared.set_unsettled + live
+    mark = float(compensated([prepared.offset_unsettled, *prepared.set_unsettled, *live_amounts]))
     if not np.isfinite(mark):
         raise ValueError(
             f"the batch has {mark!r} of mark in all, expected a finite amount of {currency}; its "
@@ -360,10 +362,12 @@ def _discounted(
     """The bilateral snapshot, since #176, over the rules _the_curves checked, every leg beside
     the trade's preparation since two-index-fixed-float.md. Each leg's live contributions are
     summed onto the payment groups, one bincount per leg, and each group's amount is the trade's
-    fixed leg, the legs' set amounts and their live amounts together, one payment both legs
-    share and, since two-index-one-price.md, no leg's own, the fixed leg being the trade's
-    against its one price; a paid group's amount is cash already and is
-    read for nothing. The unpaid groups, their time fractions and, per key, their distinct
+    fixed leg, each leg's set amounts and each leg's live amounts summed with Neumaier's
+    compensation, the terms kept apart so that a small leg's dollar survives a strike that
+    cancels the large leg's, one payment both legs share and, since two-index-one-price.md, no
+    leg's own, the fixed leg being the trade's against its one price; a paid group's amount is
+    cash already and is read for nothing. The unpaid groups, their time fractions and, per key,
+    their distinct
     payment days with each group's place are the preparation's, made once when the batch was
     prepared, so each key's curve is read here once per distinct unpaid payment day of that
     key's groups, by position, the curve being daily from its start, and placed on those groups
@@ -420,17 +424,20 @@ def _discounted(
     days, months, years = axes.days.size, axes.months.size, axes.years.size
     factors_read = 0
     with np.errstate(over="ignore", invalid="ignore"):  # the rules below are the judge
-        # Each group's amount: the trade's fixed leg, the legs' set amounts the preparation
-        # summed, and each leg's live contributions summed onto the groups, one bincount per
-        # leg; one payment both legs share, since two-index-one-price.md the trade's alone.
-        live = np.bincount(
-            first.encoded.slot_group[first.live_slot], weights=contributions[0], minlength=groups
-        )
-        for leg, contribution in zip(legs[1:], contributions[1:], strict=True):
-            live = live + np.bincount(
-                leg.encoded.slot_group[leg.live_slot], weights=contribution, minlength=groups
+        # Each group's amount: the trade's fixed leg, each leg's set amounts and each leg's live
+        # contributions summed onto the groups, one bincount per leg, the terms kept apart and
+        # summed with Neumaier's compensation, so that a small leg's dollar survives a strike
+        # that cancels the large leg's; one payment both legs share, since
+        # two-index-one-price.md the trade's alone.
+        sides: list[NDArray[np.float64] | float] = [encoded.offset_of_group]
+        for leg, contribution in zip(legs, contributions, strict=True):
+            sides.append(leg.set_amount)
+            sides.append(
+                np.bincount(
+                    leg.encoded.slot_group[leg.live_slot], weights=contribution, minlength=groups
+                )
             )
-        amount = encoded.offset_of_group + prepared.set_amount + live
+        amount = compensated(sides)
         payment_factor = np.ones(groups)  # a paid group's policy factor, read for nothing
         for curve, keyed in zip(curves, pays.by_key, strict=True):
             payment_factor[keyed.groups] = factors_on(curve, keyed.days)[keyed.day_of_group]

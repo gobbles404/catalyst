@@ -102,6 +102,12 @@ NPV = payment_amount * DF
 DV01 = -tau * NPV / 10000
 ```
 
+A payment is its signed terms summed with Neumaier's compensation, the aggregation's way: the
+fixed leg and each leg's set and live amounts kept apart until the one sum, so that a Waha
+dollar survives a Henry Hub price that cancels the strike at the sixteenth digit; the cash and
+the cleared mark are summed the same way. The review of #242 found the first build adding the
+two sides before the strike, which read 0, 1 and 0 across the fixing states where 1 was owed.
+
 Cleared valuation stays undiscounted with zero DV01 and cross gamma. On payment the amount
 becomes cash, one amount. A fixed but unpaid payment still has DV01 and no commodity delta.
 The two legs' coefficients, Q in the settlement currency per unit of quote price, agree to
@@ -191,7 +197,9 @@ Aggregation: the pair beside the A-alone trade above, A totals 1.5 nominal and 1
 B 4 and 3.8, SOFR DV01 -0.1425, the membership rows as the table above shows; a cashflow on
 SOFR moves that column alone; a repeated pair counts twice.
 
-Also pin: every refusal of the October ticket that stands, the pair rules, the
+Also pin: a payment of one dollar, one MMBtu of A quoted and struck at 1e16 against B quoted
+at 1, reading 1 with both legs live, with A fixed, with both fixed and as cash, on either
+route, the review's case; every refusal of the October ticket that stands, the pair rules, the
 count-dependent `second_schedule_method`, histories and markets matched by identity;
 `second_fixed_price` refused as an unknown field in a template and in a ticket; a
 single-index batch unchanged in numbers, reports and readback; a batch equal to its
@@ -218,7 +226,11 @@ stand; the function ledgers move where the fixed leg's helper moves and the leg 
 helpers go; the pair's work counts stand too, eight risk reductions a leg and four for the
 trade as before, since the per-leg NPVs and DV01s were elementwise products and never
 reductions; the pull request states the counts. No shim: a kept sheet typing
-`second_fixed_price` fails at the header until the column is removed.
+`second_fixed_price` fails at the header until the column is removed, and removing it is half
+of the migration. The row's `fixed_price` must become the outright, 3.00 in the example where
+the legs were booked at 3.30 and -0.30, since the first leg's strike left in place would price
+the swap against 3.30 and read -1,900 where 950 is owed, with no refusal to catch it; the kept
+workbook does both.
 
 ## Outside this slice
 

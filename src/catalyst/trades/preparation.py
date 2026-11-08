@@ -15,7 +15,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from catalyst.calendar.calendar import Calendar
-from catalyst.globals.payments import time_fractions
+from catalyst.globals.payments import compensated, time_fractions
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index_conventions import IndexConventions
@@ -131,13 +131,15 @@ class PreparedTrades:
     read-only, since two-index-fixed-float.md.
 
     Per payment group, aligned with the encoding's groups, a contract paying on two days being
-    two of them: set_amount[g], the legs' set amounts summed, the trade's fixed amount of the
-    group, the one leg's own array today; is_settled[g], whether every slot of the group on every
-    leg has fixed and it pays on or before the valuation date, so its amount is modeled as cash.
-    Then three sums: offset_unsettled and set_unsettled, the entry-price offsets and set amounts
-    of the groups not yet settled, which the tick adds to the live amount for the mark; and cash,
-    the whole amounts of the settled groups, offset and set together, moved out of the mark on
-    the day they pay and never discounted. And since #176, for a bilateral financial batch,
+    two of them: is_settled[g], whether every slot of the group on every leg has fixed and it
+    pays on or before the valuation date, so its amount is modeled as cash; the set amounts stay
+    each leg's, since two-index-one-price.md, never summed apart from the payment or the total
+    they enter. Then the totals: offset_unsettled, the fixed legs of the groups not yet settled
+    in all, and set_unsettled, each leg's set amounts of those groups in all, one per leg in
+    leg order, which the tick sums with the legs' live amounts for the mark under one
+    compensation; and cash, the whole amounts of the settled groups, fixed leg and set amounts
+    together, moved out of the mark on the day they pay and never discounted. And since #176,
+    for a bilateral financial batch,
     unpaid_payments, the distinct payment days of the groups not yet settled with each such
     group's place among them and its time fraction, made once here, since the groups settled and
     the valuation date change only when a batch is prepared again, so that a tick gathers the
@@ -145,10 +147,9 @@ class PreparedTrades:
 
     encoded: Encoded
     legs: tuple[PreparedLeg, ...]
-    set_amount: NDArray[np.float64]
     is_settled: NDArray[np.bool_]
     offset_unsettled: float
-    set_unsettled: float
+    set_unsettled: tuple[float, ...]
     cash: float
     unpaid_payments: UnpaidPayments | None
 
@@ -307,33 +308,47 @@ def _the_sensitivity(
 
 def _the_totals(
     encoded: Encoded,
-    set_amount: NDArray[np.float64],
+    legs: tuple[PreparedLeg, ...],
     is_settled: NDArray[np.bool_],
     unsettled: NDArray[np.bool_],
     currency: str,
-) -> tuple[float, float, float]:
-    """The cash, the settled groups' fixed legs and set amounts, and the two totals a tick adds
-    to the live amount for the mark, kept for both routes: the unsettled groups' fixed legs and
-    their set amounts, each sum finite since #190, the arithmetic running with numpy's flags
-    down, else refused for the batch by its total, the cash first."""
+) -> tuple[float, float, tuple[float, ...]]:
+    """The cash, the settled groups' fixed legs and set amounts, and the totals a tick sums with
+    the live amounts for the mark, kept for both routes: the unsettled groups' fixed legs in
+    all and, since two-index-one-price.md one per leg, each leg's unsettled set amounts in all,
+    kept apart so that the mark sums them with the legs' live amounts under one compensation.
+    Each group's cash is its signed terms, the fixed leg and each leg's set amount, summed with
+    Neumaier's compensation, so that a small leg's dollar survives a strike that cancelled the
+    large leg's; every sum finite since #190, the arithmetic running with numpy's flags down,
+    else refused for the batch by its total, the cash first, a pair's set amounts by the leg's
+    index."""
     with np.errstate(over="ignore", invalid="ignore"):
-        cash = float((encoded.offset_of_group + set_amount)[is_settled].sum())
+        settled_amounts = compensated([encoded.offset_of_group, *[leg.set_amount for leg in legs]])
+        cash = float(settled_amounts[is_settled].sum())
         offset_unsettled = float(encoded.offset_of_group[unsettled].sum())
-        set_unsettled = float(set_amount[unsettled].sum())
+        set_unsettled = tuple([float(leg.set_amount[unsettled].sum()) for leg in legs])
     if not np.isfinite(cash):
         raise ValueError(
             f"the batch has {cash!r} of cash in all, expected a finite amount of {currency}; the "
             "settled groups' offsets and set amounts sum past the largest number"
         )
-    for label, total, parts in (
-        ("unsettled fixed leg", offset_unsettled, "fixed legs"),
-        ("unsettled set amount", set_unsettled, "set amounts"),
-    ):
+    if not np.isfinite(offset_unsettled):
+        raise ValueError(
+            f"the batch has {offset_unsettled!r} of unsettled fixed leg in all, expected a finite "
+            f"amount of {currency}; the unsettled groups' fixed legs, each finite, sum past the "
+            "largest number"
+        )
+    for leg, total in zip(legs, set_unsettled, strict=True):
         if not np.isfinite(total):
+            whose = (
+                "the batch"
+                if len(legs) == 1
+                else f"the leg of index {leg.encoded.leg.index.name!r}"
+            )
             raise ValueError(
-                f"the batch has {total!r} of {label} in all, expected a finite amount of "
-                f"{currency}; the unsettled groups' {parts}, each finite, sum past the largest "
-                "number"
+                f"{whose} has {total!r} of unsettled set amount in all, expected a finite amount "
+                f"of {currency}; the unsettled groups' set amounts, each finite, sum past the "
+                "largest number"
             )
     return cash, offset_unsettled, set_unsettled
 
@@ -351,8 +366,9 @@ def prepared_trades(
     first's; each is over its leg's index, the one object the leg holds, as the history
     itself requires of its fixings; another index of the same name is another index. A group
     is settled when every slot of every leg has fixed and its payment day has come, so a
-    common payment is never cash while one leg's observation is live; the trade's set amount
-    of a group is the legs' summed, each finite and the sum finite. On a
+    common payment is never cash while one leg's observation is live; the set amounts stay
+    each leg's, since two-index-one-price.md, summed with the fixed leg and the live amounts
+    only where a payment or a total is formed, with Neumaier's compensation. On a
     futures index each slot's day is a day of the calendar, which runs from the day after the
     schedule's first expiry to its last: the first contract only bounds the calendar, so a slot
     on or before its expiry is refused by name, nothing ever pricing it. On an IFERC index,
@@ -440,13 +456,9 @@ def prepared_trades(
         ]
     )
     currency = legs[0].leg.index.conventions.currency_unit
-    # The trade's set amounts: the one leg's own array, by reference, or the legs' summed.
-    set_amount = prepared[0].set_amount
-    if len(prepared) > 1:
-        set_amount = _the_summed_set_amounts(encoded, prepared, currency)
     unsettled = ~is_settled
     cash, offset_unsettled, set_unsettled = _the_totals(
-        encoded, set_amount, is_settled, unsettled, currency
+        encoded, prepared, is_settled, unsettled, currency
     )
     # A cleared batch discounts nothing and runs nothing more here; its ledgers stand.
     unpaid_payments = (
@@ -456,14 +468,7 @@ def prepared_trades(
     )
     is_settled.setflags(write=False)
     return PreparedTrades(
-        encoded,
-        prepared,
-        set_amount,
-        is_settled,
-        offset_unsettled,
-        set_unsettled,
-        cash,
-        unpaid_payments,
+        encoded, prepared, is_settled, offset_unsettled, set_unsettled, cash, unpaid_payments
     )
 
 
@@ -641,31 +646,3 @@ def _the_prepared_leg(
         by_year,
         early_nominal,
     )
-
-
-def _the_summed_set_amounts(
-    encoded: Encoded, prepared: tuple[PreparedLeg, ...], currency: str
-) -> NDArray[np.float64]:
-    """The two legs' set amounts summed by group, since two-index-fixed-float.md, each finite
-    already and the sum finite, else the first group that is not is refused by its contract and
-    payment day, a sum blamed on the group; frozen."""
-    with np.errstate(over="ignore", invalid="ignore"):
-        set_amount = prepared[0].set_amount + prepared[1].set_amount
-    outrun = ~np.isfinite(set_amount)
-    if outrun.any():
-        g = int(outrun.argmax())
-        group = group_words(
-            encoded.terms,
-            encoded.terms.legs[0],
-            encoded.group_head,
-            encoded.payment_date,
-            g,
-            encoded.keys,
-            encoded.key_of_group,
-        )
-        raise ValueError(
-            f"the set amount of {group} is {float(set_amount[g])!r}, expected a finite amount of "
-            f"{currency}; the legs' set amounts, each finite, sum past the largest number"
-        )
-    set_amount.setflags(write=False)
-    return set_amount
