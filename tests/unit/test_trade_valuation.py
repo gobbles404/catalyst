@@ -4458,6 +4458,17 @@ def test_a_cva_dollar_beside_ten_thousand_trillion_survives_whatever_the_rows_or
     # A tiny amount keeps every bit beside zero rows: 3e-308 alone and with two zero rows.
     assert booked(CVA_ROWS[:1], (3e-308,)) == [20.0, 8.0, 0.0, 3e-308, "USD"]
     assert booked(CVA_ROWS, (3e-308, 0.0, 0.0)) == [60.0, 24.0, 0.0, 3e-308, "USD"]
+    # And past the largest number on the way: 9e307 twice and -9e307 twice beside 3e-308 is 3e-308
+    # with five rows and with nine, the first row repeated, four zero rows appended.
+    past = (9e307, 9e307, -9e307, -9e307, 3e-308)
+    assert booked([CVA_ROWS[0]] * 5, past) == [100.0, 40.0, 0.0, 3e-308, "USD"]
+    assert booked([CVA_ROWS[0]] * 9, (*past, 0.0, 0.0, 0.0, 0.0)) == [
+        180.0,
+        72.0,
+        0.0,
+        3e-308,
+        "USD",
+    ]
 
 
 def test_a_bilateral_batch_names_its_counterparty_and_is_refused_at_evaluation_as_before(

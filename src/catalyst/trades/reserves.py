@@ -10,6 +10,7 @@ or DV01. docs/library/trades/report-reserves.md is the page."""
 
 import math
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import assert_never
 
 import numpy as np
@@ -163,16 +164,34 @@ def _exact_total(amounts: NDArray[np.float64]) -> float:
     keeps it by the order the rows came in. Shewchuk's exact partials, math.fsum, over the amounts
     as they are, so that a tiny amount keeps every bit beside zero rows; fsum refuses a running
     sum past the largest number, which a total that is not past it may still pass on the way, and
-    then, and only then, the amounts are summed again scaled down by the power of two that is at
-    least their count, one multiplication over the rows, exact there for every amount above the
-    subnormal range, and the total scaled back up once, exact again, an infinity of its sign when
-    the total itself passes the largest number, so that the caller's one rule judges the total
-    and never a step."""
+    then, and only then, the amounts are summed as the integers they are and rounded to a number
+    once, an infinity of its sign when the total itself passes the largest number, so that the
+    caller's one rule judges the total and never a step."""
     try:
         return math.fsum(amounts)
     except OverflowError:  # a running sum past the largest number; the total itself may not be
-        shift = (int(amounts.size) - 1).bit_length()  # 2 ** shift is at least the count
-        return math.fsum(amounts * math.ldexp(1.0, -shift)) * math.ldexp(1.0, shift)
+        return _total_as_integers(amounts)
+
+
+def _total_as_integers(amounts: NDArray[np.float64]) -> float:
+    """The amounts summed as the integers they are and rounded to a number once, for the amounts a
+    running sum passes the largest number on, which no sum of numbers can carry: each finite
+    amount is a 53-bit integer times a power of two, np.frexp giving the two apart, exact for the
+    tiniest amount as for the largest; the integers are shifted up to the smallest power among
+    them, Python's integers under numpy's object arrays, as wide as they need to be, and summed
+    exactly; that one integer times the power is the total, rounded to the nearest number once,
+    correctly, by the integers' own division, and an infinity of its sign where no number is large
+    enough. Array code over the rows, no row visited by hand, on a path a batch of dollars never
+    takes."""
+    mantissas, exponents = np.frexp(amounts)  # each amount mantissa * 2 ** exponent, exactly
+    integers = np.ldexp(mantissas, 53).astype(np.int64)  # the 53-bit integer of each, exactly
+    low = int(exponents.min())
+    total = int((integers.astype(object) << (exponents - low).astype(object)).sum())
+    scale = low - 53  # the total is total * 2 ** scale
+    try:
+        return float(Fraction(total, 1 << -scale)) if scale < 0 else float(total << scale)
+    except OverflowError:
+        return math.inf if total > 0 else -math.inf
 
 
 def _charged(

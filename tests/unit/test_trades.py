@@ -6311,3 +6311,23 @@ def test_a_tiny_reserve_keeps_every_bit_beside_zero_rows() -> None:
     beside = marketed_terms(ix, (3e-308, 0.0, 0.0, 0.0), cva=(0.0, 3e-308, 0.0, 0.0))
     booked = encoded(beside, (observed_of(beside),), UNITS, WorkCounter()).reserves
     assert (booked.marketing, booked.cva) == (3e-308, 3e-308)
+
+
+def test_the_total_past_the_largest_number_is_summed_as_integers_and_rounded_once() -> None:
+    # cva-reserve.md's review, third pass: 9e307 twice and -9e307 twice beside 3e-308 is 3e-308
+    # with five rows and with nine, four zero rows appended, where a sum scaled by the row count
+    # on the way past the largest number rounded the 3e-308 by that count.
+    ix = a_fee_index()
+    five = (9e307, 9e307, -9e307, -9e307, 3e-308)
+    for amounts in (five, (*five, 0.0, 0.0, 0.0, 0.0)):
+        n = len(amounts)
+        terms = marketed_terms(
+            ix,
+            None,
+            occurrence=tuple(range(n)),
+            contract=(1,) * n,
+            quantities=(2.0,) * n,
+            trade_ids=tuple(range(1001, 1001 + n)),
+            cva=amounts,
+        )
+        assert encoded(terms, (observed_of(terms),), UNITS, WorkCounter()).reserves.cva == 3e-308

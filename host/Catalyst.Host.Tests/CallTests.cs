@@ -2963,6 +2963,15 @@ namespace Catalyst.Host.Tests
             // and a tiny amount keeps every bit beside zero rows, 3e-308 to the last bit.
             var tiny = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 3e-308 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 0.0 }, { 1003.0, 46346.0, "Z26", 0.0, "LOT", 0.25, 0.0 } }, template), history), Market(), ExcelMissing.Value));
             Assert.Equal(3e-308, (double)tiny[2, 3]);
+            // and past the largest number on the way, 9e307 twice and -9e307 twice beside 3e-308, with five rows and nine.
+            foreach (var zeros in new[] { 0, 4 })
+            {
+                var past = new object[5 + zeros, 7];
+                var amounts = new[] { 9e307, 9e307, -9e307, -9e307, 3e-308, 0.0, 0.0, 0.0, 0.0 };
+                for (var r = 0; r < 5 + zeros; r++) { past[r, 0] = 1001.0 + r; past[r, 1] = 46346.0; past[r, 2] = "Z26"; past[r, 3] = 2.0; past[r, 4] = "LOT"; past[r, 5] = 0.25; past[r, 6] = amounts[r]; }
+                var pastReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, cvaHeaders, past, template), history), Market(), ExcelMissing.Value));
+                Assert.Equal(3e-308, (double)pastReserves[2, 3]);
+            }
             var bilateral = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar"), Row("month", "monthly", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", "+2bd", pays));
             var faced = (string)Seam.Call("_CreateTrades", index, headers, rows, bilateral);
             var facedTable = (object[,])Seam.Call("util_ReadHandle", faced);
