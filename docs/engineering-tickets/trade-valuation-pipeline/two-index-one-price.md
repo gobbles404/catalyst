@@ -1,8 +1,8 @@
 # One outright price on a two-index fixed_float
 
-**Status:** Agreed with the owner, 8 November 2026, for
-[issue #241](https://github.com/gobbles404/catalyst/issues/241). One pull request from
-main, this page in its first commit. It replaces the two entered leg prices of
+**Status:** Built in #242, from main after #240, agreed with the owner on 8 November 2026
+for [issue #241](https://github.com/gobbles404/catalyst/issues/241), this page in its first
+commit. It replaces the two entered leg prices of
 [two-index-fixed-float.md](two-index-fixed-float.md), built in #215, #216 and #217, with the
 one outright price the system of record books, and retires the leg values and leg DV01s
 that split invented; everything else of that ticket stands as built.

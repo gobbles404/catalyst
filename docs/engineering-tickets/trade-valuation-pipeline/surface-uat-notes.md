@@ -821,8 +821,8 @@ at its own index's quote.
 
 ## 30. One outright price on a two-index fixed_float
 
-Agreed 8 November 2026, issue #241: [two-index-one-price.md](two-index-one-price.md). A pair
-is booked at the one outright `fixed_price` the system of record holds, in the quote unit the
+Agreed 8 November 2026 and built in #242, issue #241: [two-index-one-price.md](two-index-one-price.md).
+A pair is booked at the one outright `fixed_price` the system of record holds, in the quote unit the
 two indexes share; `second_fixed_price` is no field and `combined_fixed_price` no column;
 `second_schedule_method` stays. The swap's DV01 is one number, counted once against its curve
 and named by the handle's descriptor, `HNG+WAH`, on its own row of a collection's membership
