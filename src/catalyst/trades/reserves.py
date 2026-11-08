@@ -2,12 +2,15 @@
 route, the clearing every component incurs, each a component's count of its specification times
 that specification's rate per lot, summed for the batch once, when the batch is made, since #188
 charged only where the booking says so, reserve-fee-applicability.md; since #175 the marketing
-reserve each row booked, summed once per row, zero when no row booked one; and the currency they
-are in. Static booked amounts in the settlement currency: a fixing, a payment, a tick or a roll of
-the valuation date changes none of them, and they enter no mark, cash, delta or DV01.
-docs/library/trades/report-reserves.md is the page."""
+reserve each row booked, summed once per row, zero when no row booked one; since cva-reserve.md
+the CVA reserve each row booked, a signed amount summed once per row the same way; and the
+currency they are in. Static booked amounts in the settlement currency: a fixing, a payment, a
+tick or a roll of the valuation date changes none of them, and they enter no mark, cash, delta
+or DV01. docs/library/trades/report-reserves.md is the page."""
 
+import math
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import assert_never
 
 import numpy as np
@@ -20,12 +23,15 @@ from catalyst.trades.terms import ResolvedTrades, Route
 # brokerage and every component for clearing on a cleared route, so nothing for a bilateral batch
 # without a broker, one per component with one fee and two with both.
 RESERVED_FEE_COMPONENTS = "reserved_fee_components"
-RESERVED_OCCURRENCES = "reserved_occurrences"  # rows whose marketing reserve was summed, since #175
+# Rows whose entered reserve was summed, once per reserve field a row booked: the marketing
+# reserve since #175 and the CVA reserve since cva-reserve.md, so the rows once for a batch
+# booking one of the two and twice for a batch booking both.
+RESERVED_OCCURRENCES = "reserved_occurrences"
 
 
 @dataclass(frozen=True, slots=True)
 class Reserves:
-    """The batch's three totals and their currency. brokerage is the sum over the components of the
+    """The batch's four totals and their currency. brokerage is the sum over the components of the
     rows naming a broker, since #188, of each component's count of its specification, the quantity
     its basis gave it taken without its sign, times the specification's brokerage rate per lot; a
     row whose broker field was not given, or whose text is none in any case, a screen trade,
@@ -37,20 +43,24 @@ class Reserves:
     to nothing both reserve. marketing, since #175, is the sum over the ticket's rows of the
     marketing_reserve each entered, the template's one value for every row or the ticket's
     column, counted once per row whatever its months, quantity, days or sign, a duplicate row
-    twice and a row of zero quantity its full amount; 0.0 when neither supplied the field.
-    currency is the index's settlement currency, the conventions' currency_unit, the one every
-    rate and amount is in."""
+    twice and a row of zero quantity its full amount; 0.0 when neither supplied the field. cva,
+    since cva-reserve.md, is the same sum of the cva_reserve each row entered, a credit valuation
+    adjustment the desk books as an amount of either sign, so the total carries the rows' signs
+    and may be negative; 0.0 when neither supplied the field. currency is the index's settlement
+    currency, the conventions' currency_unit, the one every rate and amount is in."""
 
     brokerage: float
     clearing: float
     marketing: float
+    cva: float
     currency: str
 
 
 def reserves(terms: ResolvedTrades, counter: WorkCounter) -> Reserves:
     """The one way to make Reserves: each fee charged where the booking says so, since #188, the
     amounts of each in one pass over the components it charges, then two rules per fee charged,
-    brokerage before clearing, checked once, the first failure being the message.
+    brokerage before clearing, checked once, the first failure being the message; then the two
+    entered reserves, marketing before CVA, each the rows' amounts summed once.
 
     Brokerage charges the components of the rows the terms found brokered, the rows naming a
     broker, and nothing else: a batch without the field, or with none in every row, makes no
@@ -69,17 +79,20 @@ def reserves(terms: ResolvedTrades, counter: WorkCounter) -> Reserves:
     the largest number, and nothing is published that a reader would then fail on; the
     multiplications and the sums run with numpy's flags down, the rules being the judge. The
     amounts are not kept: the totals are what the batch books. The marketing reserve, since #175,
-    is the rows' amounts summed once, each finite and zero or more by the rule that read them,
-    over the occurrences and never the components, so a strip books its amount once; the sum is
-    held finite the same way, refused for the batch when finite amounts sum past the largest
-    number; and a batch with no marketing field books 0.0 and sums nothing.
+    and the CVA reserve, since cva-reserve.md, are each the rows' amounts summed once, each amount
+    finite by the rule that read it, zero or more for marketing and of either sign for CVA, over
+    the occurrences and never the components, so a strip books its amount once; each sum is the
+    exact one, the correctly rounded total of the rows' amounts whatever their order and however
+    they cancel, refused for the batch only when the total itself passes the largest number in
+    either direction; and a batch without the field books 0.0 and sums nothing.
 
     Work: one fee component per component charged, reported to the counter as
     reserved_fee_components, the brokered components once for brokerage and every component once
     for clearing on a cleared route, so none for a bilateral batch without a broker and twice the
-    components for a cleared batch brokered throughout; and one occurrence per occurrence where a
-    marketing reserve stands, as reserved_occurrences; nothing per observation, group or slot, and
-    nothing again at preparation, evaluation or reading.
+    components for a cleared batch brokered throughout; and one occurrence per occurrence per
+    entered reserve the batch books, as reserved_occurrences, the rows once with one of the two
+    fields and twice with both; nothing per observation, group or slot, and nothing again at
+    preparation, evaluation or reading.
     """
     leg = terms.legs[0]  # the first leg's index charges the fees, two-index-fixed-float.md
     specifications = leg.index.specifications
@@ -117,18 +130,68 @@ def reserves(terms: ResolvedTrades, counter: WorkCounter) -> Reserves:
             clearing = 0.0
         case _:
             assert_never(terms.route)
-    marketing = 0.0
-    if terms.marketing_reserve is not None:
-        with np.errstate(over="ignore"):  # the rule below is the judge
-            marketing = float(terms.marketing_reserve.sum())
-        if not np.isfinite(marketing):
-            raise ValueError(
-                f"the batch has {marketing!r} of marketing reserve in all, expected a finite "
-                f"amount of {currency}; the rows' amounts, each finite, sum past the largest number"
-            )
-        counter.hit(RESERVED_OCCURRENCES, int(terms.marketing_reserve.size))
+    marketing = _summed_once("marketing", terms.marketing_reserve, currency, counter)
+    cva = _summed_once("cva", terms.cva_reserve, currency, counter)
     counter.hit(RESERVED_FEE_COMPONENTS, charged)
-    return Reserves(brokerage, clearing, marketing, currency)
+    return Reserves(brokerage, clearing, marketing, cva, currency)
+
+
+def _summed_once(
+    name: str, amounts: NDArray[np.float64] | None, currency: str, counter: WorkCounter
+) -> float:
+    """One entered reserve's total: the rows' amounts summed once each, exactly, and the one rule
+    the judge, that the total is finite, since amounts each finite by the rule that read them can
+    sum past the largest number, in either direction for a signed reserve; refused for the batch
+    naming the reserve, never a row, since every row's amount was good. 0.0 and nothing summed
+    or counted when the batch has no such field, else the rows reported to the counter as
+    reserved_occurrences."""
+    if amounts is None:
+        return 0.0
+    total = _exact_total(amounts)
+    if not math.isfinite(total):
+        raise ValueError(
+            f"the batch has {total!r} of {name} reserve in all, expected a finite amount of "
+            f"{currency}; the rows' amounts, each finite, sum past the largest number"
+        )
+    counter.hit(RESERVED_OCCURRENCES, int(amounts.size))
+    return total
+
+
+def _exact_total(amounts: NDArray[np.float64]) -> float:
+    """The amounts' one total, the correctly rounded sum of the finite amounts whatever their order
+    and however they cancel, since cva-reserve.md's review: a dollar beside ten thousand trillion
+    and its negative is a dollar in whichever row it stands, where a running sum rounds it away or
+    keeps it by the order the rows came in. Shewchuk's exact partials, math.fsum, over the amounts
+    as they are, so that a tiny amount keeps every bit beside zero rows; fsum refuses a running
+    sum past the largest number, which a total that is not past it may still pass on the way, and
+    then, and only then, the amounts are summed as the integers they are and rounded to a number
+    once, an infinity of its sign when the total itself passes the largest number, so that the
+    caller's one rule judges the total and never a step."""
+    try:
+        return math.fsum(amounts)
+    except OverflowError:  # a running sum past the largest number; the total itself may not be
+        return _total_as_integers(amounts)
+
+
+def _total_as_integers(amounts: NDArray[np.float64]) -> float:
+    """The amounts summed as the integers they are and rounded to a number once, for the amounts a
+    running sum passes the largest number on, which no sum of numbers can carry: each finite
+    amount is a 53-bit integer times a power of two, np.frexp giving the two apart, exact for the
+    tiniest amount as for the largest; the integers are shifted up to the smallest power among
+    them, Python's integers under numpy's object arrays, as wide as they need to be, and summed
+    exactly; that one integer times the power is the total, rounded to the nearest number once,
+    correctly, by the integers' own division, and an infinity of its sign where no number is large
+    enough. Array code over the rows, no row visited by hand, on a path a batch of dollars never
+    takes."""
+    mantissas, exponents = np.frexp(amounts)  # each amount mantissa * 2 ** exponent, exactly
+    integers = np.ldexp(mantissas, 53).astype(np.int64)  # the 53-bit integer of each, exactly
+    low = int(exponents.min())
+    total = int((integers.astype(object) << (exponents - low).astype(object)).sum())
+    scale = low - 53  # the total is total * 2 ** scale
+    try:
+        return float(Fraction(total, 1 << -scale)) if scale < 0 else float(total << scale)
+    except OverflowError:
+        return math.inf if total > 0 else -math.inf
 
 
 def _charged(

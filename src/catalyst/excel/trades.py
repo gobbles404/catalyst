@@ -272,17 +272,24 @@ def _ReportReserves(
         "for it.",
     ],
 ) -> MixedArray:
-    """Reports the batch's booked reserves from its results: brokerage on the trades naming a
-    broker and clearing on a cleared route, each trade's unsigned quantity times its
-    specification's rate per lot, summed; marketing summed once a row; and the currency."""
+    """Reports the batch's booked reserves: brokerage on the trades naming a broker and clearing
+    on a cleared route, each trade's unsigned quantity times its specification's rate per lot,
+    summed; marketing and the signed CVA, once a row; and the currency."""
     reserves = results.reserves
     return MixedArray.table(
         [
-            ("brokerage_reserve", "clearing_reserve", "marketing_reserve", "currency"),
-            ("float64", "float64", "float64", "str"),
+            (
+                "brokerage_reserve",
+                "clearing_reserve",
+                "marketing_reserve",
+                "cva_reserve",
+                "currency",
+            ),
+            ("float64", "float64", "float64", "float64", "str"),
         ],
         np.array([reserves.brokerage]),
         np.array([reserves.clearing]),
         np.array([reserves.marketing]),
+        np.array([reserves.cva]),
         (reserves.currency,),
     )

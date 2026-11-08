@@ -222,6 +222,7 @@ REFUSED: list[tuple[str, object]] = [
     ("quantity_unit", "NYMEX NG"),
     ("fixed_price", 3.0),
     ("marketing_reserve", 0.0),
+    ("cva_reserve", -25.0),
 ]
 
 

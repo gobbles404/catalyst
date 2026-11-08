@@ -954,9 +954,9 @@ def test_the_two_reports_explain_themselves() -> None:
         )
     ]
     assert description == (
-        "Reports the batch's booked reserves from its results: brokerage on the trades naming a "
-        "broker and clearing on a cleared route, each trade's unsigned quantity times its "
-        "specification's rate per lot, summed; marketing summed once a row; and the currency."
+        "Reports the batch's booked reserves: brokerage on the trades naming a broker and "
+        "clearing on a cleared route, each trade's unsigned quantity times its specification's "
+        "rate per lot, summed; marketing and the signed CVA, once a row; and the currency."
     )
 
 

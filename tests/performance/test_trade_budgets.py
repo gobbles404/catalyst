@@ -418,6 +418,7 @@ ENCODING_LEDGER = {
     # payment-day-date-or-rule.md
     "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
     "_charged": 1,  # clearing, the one fee a cleared, unbrokered batch charges, since #188
+    "_summed_once": 2,  # the marketing and the CVA reserve, none here, since cva-reserve.md
     "UnitConversions.factor": 2,
     "UnitConversions.category": 2,
     "WorkCounter.__init__": 1,

@@ -1674,6 +1674,11 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
             NG_TEMPLATE,
             "marketing_reserve row 2 is -5.0, expected a finite amount of zero or more",
         ),
+        (  # a CVA reserve is a finite amount of either sign, since cva-reserve.md
+            {**NG_TICKET, "cva_reserve": [25.0, float("inf"), -40.0, 0.0, 5.0]},
+            NG_TEMPLATE,
+            "cva_reserve row 2 is inf, expected a finite amount",
+        ),
         (
             {**NG_TICKET, "contract_code": ["Z26", "Z2026", "F27", "F27", "Z26"]},
             NG_TEMPLATE,

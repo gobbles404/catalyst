@@ -205,6 +205,14 @@ def marketing_reserve_of(where: str, number: float) -> float:
     return number
 
 
+def cva_reserve_of(where: str, number: float) -> float:
+    """A CVA reserve by the reserves' rule, finite and of either sign, the cashflow amount's rule
+    in its words, named by its field, since cva-reserve.md: the one amount a template holds, read
+    once here and booked once by every row of a batch made under it."""
+    finite_amounts(np.array([number]), lambda _: where)
+    return number
+
+
 def amount_of(where: str, number: float) -> float:
     """A cashflow's amount by the cashflows' rule, finite, zero and fractions included, named by
     its field, since #200: the one amount a template holds, every row of a batch made under it
@@ -226,8 +234,9 @@ def months_of(where: str, text: str) -> tuple[int, int]:
 
 
 # The readers by field name: the text fields whose text means something beyond being text, and
-# the four numbers the library has a rule for, the trade ID since #168 and the marketing
-# reserve since #175; the three labels and the dates are read by nobody, and since #172 neither
+# the numbers the library has a rule for, the trade ID since #168, the marketing reserve since
+# #175 and the CVA reserve since cva-reserve.md; the three labels and the dates are read by
+# nobody, and since #172 neither
 # is a contract code, which the resolution reads for the rows that book by it, a row with both
 # dates keeping it as entered text.
 READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
@@ -249,6 +258,7 @@ NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float | int]]] = Mappi
         "quantity": quantity_of,
         "fixed_price": price_of,
         "marketing_reserve": marketing_reserve_of,
+        "cva_reserve": cva_reserve_of,  # signed, since cva-reserve.md
         "amount": amount_of,  # the cashflow instrument's, since #200
     }
 )

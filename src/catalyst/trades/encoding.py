@@ -368,9 +368,9 @@ def encoded(
     charged component's count times its specification's rate per lot and the batch's two sums,
     brokerage over the brokered rows' components and clearing over every component of a cleared
     batch since #188,
-    and since #175 the rows' marketing reserves summed once each, kept beside the encoding and
-    never a contribution to value,
-    docs/library/trades/report-reserves.md.
+    and since #175 the rows' marketing reserves summed once each, since cva-reserve.md the
+    rows' signed CVA reserves the same, kept beside the encoding and never a contribution to
+    value, docs/library/trades/report-reserves.md.
 
     Work: one component per component, one group per payment group, one observation per
     observation and one slot per slot, reported to the counter; one conversion per distinct

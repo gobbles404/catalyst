@@ -24,6 +24,7 @@ from typing import Any, Final, assert_never, cast
 import numpy as np
 from numpy.typing import NDArray
 
+from catalyst.cashflows.rules import finite_amounts
 from catalyst.globals.discount_curve import curve_name
 from catalyst.globals.unit_conversions import UnitConversions
 from catalyst.index_definitions.contract_codes import month_label, schedule_months
@@ -336,7 +337,8 @@ def resolved(
         fields.numbers("fixed_price")[occurrence],
         payment,
         counterparty=fields.labels("counterparty"),
-        marketing_reserve=fields.amounts("marketing_reserve"),
+        marketing_reserve=fields.amounts("marketing_reserve", marketing_reserves),
+        cva_reserve=fields.amounts("cva_reserve", finite_amounts),  # signed, cva-reserve.md
         discount_curve_key=fields.keys("discount_curve_key"),
         schedule_month=months,
         second_leg=second_leg,
@@ -448,16 +450,22 @@ class _Fields:
             return np.full(self.rows, cast(int, self.template.defaults[name]), dtype=np.int64)
         return whole_trade_ids(self.ticket.numbers(name), lambda k: self.where(name, k))
 
-    def amounts(self, name: str) -> NDArray[np.float64] | None:
-        """The marketing reserves per occurrence, finite amounts of zero or more since #175, or None
-        when neither supplied them: the template's one, read for the rule when the template was
-        made and repeated here, or the ticket's column read for it now, the first bad row named
-        by the field and the row."""
+    def amounts(
+        self, name: str, rule: Callable[[NDArray[np.float64], Callable[[int], str]], object]
+    ) -> NDArray[np.float64] | None:
+        """An entered reserve's amounts per occurrence, the marketing reserve's finite amounts of
+        zero or more since #175 and the CVA reserve's finite amounts of either sign since
+        cva-reserve.md, each by the rule its caller hands over, or None when neither supplied
+        them: the template's one, read for the rule when the template was made and repeated
+        here, or the ticket's column read for it now, the first bad row named by the field and
+        the row."""
         if not self.has(name):
             return None
         if name in self.template.defaults:
             return np.full(self.rows, cast(float, self.template.defaults[name]))
-        return marketing_reserves(self.ticket.numbers(name), lambda k: self.where(name, k))
+        numbers = self.ticket.numbers(name)
+        rule(numbers, lambda k: self.where(name, k))
+        return numbers
 
     def numbers(self, name: str) -> NDArray[np.float64]:
         if name in self.template.defaults:

@@ -238,7 +238,7 @@ FIXED_FLOAT = Instrument(
             "a signed whole count, zero included",
             "A whole count of the selected quantity definition, positive, negative or zero; a "
             "zero row is kept, has no exposure and no quantity-based reserve, keeps a marketing "
-            "reserve it entered and can be filled in later",
+            "or CVA reserve it entered and can be filled in later",
         ),
         Field(
             "quantity_unit",
@@ -325,6 +325,18 @@ FIXED_FLOAT = Instrument(
             "a finite amount of zero or more",
             "In the index's settlement currency, counted once per ticket row whatever its months, "
             "quantity or days; left out of the template and the ticket, zero; static, never a "
+            "contribution to value",
+        ),
+        Field(
+            "cva_reserve",
+            "A credit valuation adjustment reserve booked once with the trade, signed",
+            False,
+            NONE,
+            FieldType.NUMBER,
+            "a finite amount of either sign",
+            "In the index's settlement currency, counted once per ticket row whatever its months, "
+            "quantity or days, its sign as entered, positive, zero or negative, whatever the "
+            "quantity's; left out of the template and the ticket, zero; static, never a "
             "contribution to value",
         ),
         Field(

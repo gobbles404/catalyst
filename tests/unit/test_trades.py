@@ -6060,6 +6060,7 @@ def marketed_terms(
     contract: tuple[int, ...] = (1, 1, 1, 2, 1),
     quantities: tuple[float, ...] = (2.0, -2.0, 1.0, 1.0, 0.0),
     trade_ids: tuple[int, ...] = (1001, 1002, 1003, 1004),
+    cva: tuple[float, ...] | None = None,
 ) -> ResolvedTrades:
     n = len(trade_ids)
     return resolved_trades(
@@ -6072,6 +6073,7 @@ def marketed_terms(
         dates(*["2026-09-24"] * n), rows(*occurrence), rows(*contract), numbers(*quantities),
         *bounds_of(ix, rows(*contract)), numbers(*([70.0] * len(contract))), None,
         marketing_reserve=None if amounts is None else numbers(*amounts),
+        cva_reserve=None if cva is None else numbers(*cva),
     )  # fmt: skip
 
 
@@ -6166,3 +6168,166 @@ def test_finite_marketing_amounts_summing_past_the_largest_number_are_refused_fo
             numbers(2.0, -2.0, 1.0, 0.0), *bounds_of(ix, rows(1, 1, 1, 1)), numbers(*([70.0] * 4)),
             None, counterparty=("ACME Trading", "Beta Energy"),
         )  # fmt: skip
+
+
+def test_the_tickets_rows_book_minus_fifteen_of_cva_once_per_row_with_their_signs() -> None:
+    # cva-reserve.md: 2 LOT of Z26 at 25, -2 LOT of the strip Z26-F27 at -40, two components, and
+    # 0 LOT of Z26 at 0: -15 once per row, the rows' signs kept, over 60 of brokerage and 24 of
+    # clearing on the four components and no marketing.
+    ix = a_fee_index()
+    counter = WorkCounter()
+    terms = marketed_terms(
+        ix,
+        None,
+        occurrence=(0, 1, 1, 2),
+        contract=(1, 1, 2, 1),
+        quantities=(2.0, -2.0, -2.0, 0.0),
+        trade_ids=(1001, 1002, 1003),
+        cva=(25.0, -40.0, 0.0),
+    )
+    np.testing.assert_array_equal(terms.cva_reserve, [25.0, -40.0, 0.0])
+    assert terms.marketing_reserve is None
+    enc = encoded(terms, (observed_of(terms),), UNITS, counter)
+    booked = enc.reserves
+    assert (booked.brokerage, booked.clearing, booked.marketing, booked.cva) == (
+        60.0,
+        24.0,
+        0.0,
+        -15.0,
+    )
+    assert counter.freeze()["reserved_occurrences"] == 3  # the rows, not the four components
+    # Both fields: each summed once per row, the rows counted once per field.
+    both = marketed_terms(ix, (15.0, 20.0, 25.0, 5.0), cva=(25.0, -40.0, 0.0, 5.0))
+    twice = WorkCounter()
+    both_encoded = encoded(both, (observed_of(both),), UNITS, twice)
+    paired = both_encoded.reserves
+    assert (paired.marketing, paired.cva) == (65.0, -10.0)
+    assert twice.freeze()["reserved_occurrences"] == 8
+    # A duplicate row counts again, a template's one amount books once per row, and no field at
+    # all books nought and sums nothing.
+    repeated = marketed_terms(
+        ix,
+        None,
+        occurrence=(0, 1, 1, 2, 3),
+        contract=(1, 1, 2, 1, 1),
+        quantities=(2.0, -2.0, -2.0, 0.0, 2.0),
+        trade_ids=(1001, 1002, 1003, 1001),
+        cva=(25.0, -40.0, 0.0, 25.0),
+    )
+    assert encoded(repeated, (observed_of(repeated),), UNITS, WorkCounter()).reserves.cva == 10.0
+    forty = marketed_terms(ix, None, cva=(-40.0,) * 4)
+    assert encoded(forty, (observed_of(forty),), UNITS, WorkCounter()).reserves.cva == -160.0
+    plain = marketed_terms(ix, None)
+    quiet = WorkCounter()
+    assert encoded(plain, (observed_of(plain),), UNITS, quiet).reserves.cva == 0.0
+    assert "reserved_occurrences" not in quiet.freeze().as_dict()
+    # Value and risk are the same with the amounts and without: a reserve enters no number.
+    history = history_on(ix, "2026-10-20", {})
+    marketed = marketed_terms(ix, (15.0, 20.0, 25.0, 5.0))
+    with_cva = trade_results(
+        prepared_trades(both_encoded, (history,), WorkCounter()),
+        (quoted(history, 70.5, 71.0),),
+        WorkCounter(),
+    )
+    without = trade_results(
+        prepared_trades(
+            encoded(marketed, (observed_of(marketed),), UNITS, WorkCounter()),
+            (history,),
+            WorkCounter(),
+        ),
+        (quoted(history, 70.5, 71.0),),
+        WorkCounter(),
+    )
+    assert with_cva.mark == without.mark and with_cva.cash == without.cash
+    assert with_cva.legs[0].nominal_delta_total == without.legs[0].nominal_delta_total
+    assert with_cva.reserves is paired and with_cva.reserves.cva == -10.0
+
+
+def test_finite_cva_amounts_summing_past_the_largest_number_are_refused_for_the_batch() -> None:
+    ix = a_fee_index()
+    for sign, text in ((1.0, "inf"), (-1.0, "-inf")):
+        terms = marketed_terms(ix, None, cva=(sign * 1e308, sign * 1e308, 0.0, 0.0))
+        with pytest.raises(ValueError) as refused:
+            encoded(terms, (observed_of(terms),), UNITS, WorkCounter())
+        assert str(refused.value) == (
+            f"the batch has {text} of cva reserve in all, expected a finite amount of USD; the "
+            "rows' amounts, each finite, sum past the largest number"
+        )
+    with pytest.raises(
+        ValueError, match=r"^cva_reserve has 3 amounts, expected 4, one per occurrence$"
+    ):
+        marketed_terms(ix, None, cva=(1.0, 2.0, 3.0))
+
+
+def test_the_signed_cva_sum_is_exact_whatever_the_rows_order() -> None:
+    # cva-reserve.md's review: a dollar beside ten thousand trillion and its negative is a dollar in
+    # any order, the correctly rounded total and no running sum's rounding; two pairs cancelling
+    # past the largest number net to nothing and are not refused, nor is a running sum past it on
+    # the way to a finite total; and the hand example books -15 with its rows reversed.
+    ix = a_fee_index()
+
+    def total(cva: tuple[float, ...]) -> float:
+        terms = marketed_terms(ix, None, cva=cva)
+        return encoded(terms, (observed_of(terms),), UNITS, WorkCounter()).reserves.cva
+
+    for order in (
+        (1e16, 1.0, -1e16, 0.0),
+        (1e16, -1e16, 1.0, 0.0),
+        (1.0, 1e16, -1e16, 0.0),
+        (0.0, -1e16, 1.0, 1e16),
+    ):
+        assert total(order) == 1.0
+    assert total((1e308, 1e308, -1e308, -1e308)) == 0.0
+    assert total((9e307, 9e307, -9e307, 0.0)) == 9e307  # a running sum past the largest number
+    reversed_rows = marketed_terms(
+        ix,
+        None,
+        occurrence=(0, 1, 1, 2),
+        contract=(1, 1, 2, 1),
+        quantities=(0.0, -2.0, -2.0, 2.0),
+        trade_ids=(1003, 1002, 1001),
+        cva=(0.0, -40.0, 25.0),
+    )
+    booked = encoded(reversed_rows, (observed_of(reversed_rows),), UNITS, WorkCounter()).reserves
+    assert (booked.brokerage, booked.clearing, booked.cva) == (60.0, 24.0, -15.0)
+
+
+def test_a_tiny_reserve_keeps_every_bit_beside_zero_rows() -> None:
+    # cva-reserve.md's review: 3e-308 alone and beside zero rows is 3e-308 to the last bit, for the
+    # CVA and the marketing reserve alike, the amounts summed as they are; a scaling for a running
+    # sum past the largest number would push it under the smallest normal number and round it.
+    ix = a_fee_index()
+    alone = marketed_terms(
+        ix,
+        (3e-308,),
+        cva=(3e-308,),
+        occurrence=(0,),
+        contract=(1,),
+        quantities=(2.0,),
+        trade_ids=(1001,),
+    )
+    booked = encoded(alone, (observed_of(alone),), UNITS, WorkCounter()).reserves
+    assert (booked.marketing, booked.cva) == (3e-308, 3e-308)
+    beside = marketed_terms(ix, (3e-308, 0.0, 0.0, 0.0), cva=(0.0, 3e-308, 0.0, 0.0))
+    booked = encoded(beside, (observed_of(beside),), UNITS, WorkCounter()).reserves
+    assert (booked.marketing, booked.cva) == (3e-308, 3e-308)
+
+
+def test_the_total_past_the_largest_number_is_summed_as_integers_and_rounded_once() -> None:
+    # cva-reserve.md's review, third pass: 9e307 twice and -9e307 twice beside 3e-308 is 3e-308
+    # with five rows and with nine, four zero rows appended, where a sum scaled by the row count
+    # on the way past the largest number rounded the 3e-308 by that count.
+    ix = a_fee_index()
+    five = (9e307, 9e307, -9e307, -9e307, 3e-308)
+    for amounts in (five, (*five, 0.0, 0.0, 0.0, 0.0)):
+        n = len(amounts)
+        terms = marketed_terms(
+            ix,
+            None,
+            occurrence=tuple(range(n)),
+            contract=(1,) * n,
+            quantities=(2.0,) * n,
+            trade_ids=tuple(range(1001, 1001 + n)),
+            cva=amounts,
+        )
+        assert encoded(terms, (observed_of(terms),), UNITS, WorkCounter()).reserves.cva == 3e-308
