@@ -46,7 +46,7 @@ FIELDS = tuple([field.name for field in FIXED_FLOAT.fields])
 # --- the definitions ------------------------------------------------------------------------
 
 
-def test_the_catalog_holds_the_fixed_float_with_its_twenty_two_fields_in_order() -> None:
+def test_the_catalog_holds_the_fixed_float_with_its_twenty_one_fields_in_order() -> None:
     assert [each.name for each in CATALOG] == ["fixed_float", "cashflow"]
     assert FIELDS == (
         "trade_id",
