@@ -4437,6 +4437,26 @@ def test_a_cva_reserve_is_refused_by_its_row_its_cell_its_template_or_its_total(
         )
 
 
+def test_a_cva_dollar_beside_ten_thousand_trillion_survives_whatever_the_rows_order(
+    fees: dict[str, Any],
+) -> None:
+    # cva-reserve.md's review: 1e16, 1 and -1e16 report 1 in every order, the exact total; amounts
+    # cancelling past the largest number net to nothing and are not refused, nor a running sum
+    # past it on the way to a finite total; the rows are the example's with the amounts changed.
+    def booked(lines: list[list[object]], amounts: tuple[float, ...]) -> list[object]:
+        rows_ = [[*line[:-1], amount] for line, amount in zip(lines, amounts, strict=True)]
+        _, _, results = ete_state(
+            fees["index"], fees["template"], rows_, "2026-12-02", {}, (28.0, 29.0), CVA_HEADERS
+        )
+        return reserved(results)[2]
+
+    for order in ((1e16, 1.0, -1e16), (1e16, -1e16, 1.0), (1.0, 1e16, -1e16)):
+        assert booked(CVA_ROWS, order) == [60.0, 24.0, 0.0, 1.0, "USD"]
+    assert booked(CVA_ROWS, (9e307, 9e307, -9e307)) == [60.0, 24.0, 0.0, 9e307, "USD"]
+    four = [*CVA_ROWS, CVA_ROWS[0]]
+    assert booked(four, (9e307, 9e307, -9e307, -9e307)) == [80.0, 32.0, 0.0, 0.0, "USD"]
+
+
 def test_a_bilateral_batch_names_its_counterparty_and_is_refused_at_evaluation_as_before(
     fees: dict[str, Any],
 ) -> None:

@@ -6257,3 +6257,36 @@ def test_finite_cva_amounts_summing_past_the_largest_number_are_refused_for_the_
         ValueError, match=r"^cva_reserve has 3 amounts, expected 4, one per occurrence$"
     ):
         marketed_terms(ix, None, cva=(1.0, 2.0, 3.0))
+
+
+def test_the_signed_cva_sum_is_exact_whatever_the_rows_order() -> None:
+    # cva-reserve.md's review: a dollar beside ten thousand trillion and its negative is a dollar in
+    # any order, the correctly rounded total and no running sum's rounding; two pairs cancelling
+    # past the largest number net to nothing and are not refused, nor is a running sum past it on
+    # the way to a finite total; and the hand example books -15 with its rows reversed.
+    ix = a_fee_index()
+
+    def total(cva: tuple[float, ...]) -> float:
+        terms = marketed_terms(ix, None, cva=cva)
+        return encoded(terms, (observed_of(terms),), UNITS, WorkCounter()).reserves.cva
+
+    for order in (
+        (1e16, 1.0, -1e16, 0.0),
+        (1e16, -1e16, 1.0, 0.0),
+        (1.0, 1e16, -1e16, 0.0),
+        (0.0, -1e16, 1.0, 1e16),
+    ):
+        assert total(order) == 1.0
+    assert total((1e308, 1e308, -1e308, -1e308)) == 0.0
+    assert total((9e307, 9e307, -9e307, 0.0)) == 9e307  # a running sum past the largest number
+    reversed_rows = marketed_terms(
+        ix,
+        None,
+        occurrence=(0, 1, 1, 2),
+        contract=(1, 1, 2, 1),
+        quantities=(0.0, -2.0, -2.0, 2.0),
+        trade_ids=(1003, 1002, 1001),
+        cva=(0.0, -40.0, 25.0),
+    )
+    booked = encoded(reversed_rows, (observed_of(reversed_rows),), UNITS, WorkCounter()).reserves
+    assert (booked.brokerage, booked.clearing, booked.cva) == (60.0, 24.0, -15.0)

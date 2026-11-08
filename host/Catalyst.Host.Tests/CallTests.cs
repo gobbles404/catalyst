@@ -2950,6 +2950,16 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _CreateTrades: ValueError: cva_reserve is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, cvaHeaders, cvaRows, forty));
             Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has inf of cva reserve in all, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number", Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 9e307 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 9e307 } }, template));
             Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has -inf of cva reserve in all, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number", Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, -9e307 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, -9e307 } }, template));
+            // cva-reserve.md's review: a dollar beside ten thousand trillion and its negative is a dollar in any
+            // order, the exact total; amounts cancelling past the largest number net to nothing and are not refused.
+            foreach (var amounts in new[] { new[] { 1e16, 1.0, -1e16 }, new[] { 1e16, -1e16, 1.0 }, new[] { 1.0, 1e16, -1e16 } })
+            {
+                var ordered = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, amounts[0] }, { 1002.0, 46346.0, "Z26-F27", -2.0, "LOT", 0.25, amounts[1] }, { 1003.0, 46346.0, "Z26", 0.0, "LOT", 0.25, amounts[2] } };
+                var orderedReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, cvaHeaders, ordered, template), history), Market(), ExcelMissing.Value));
+                Assert.Equal(1.0, (double)orderedReserves[2, 3], 12);
+            }
+            var cancelling = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 9e307 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 9e307 }, { 1003.0, 46346.0, "Z26", 2.0, "LOT", 0.25, -9e307 }, { 1004.0, 46346.0, "Z26", -2.0, "LOT", 0.25, -9e307 } }, template), history), Market(), ExcelMissing.Value));
+            Assert.Equal(0.0, (double)cancelling[2, 3], 12);
             var bilateral = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar"), Row("month", "monthly", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", "+2bd", pays));
             var faced = (string)Seam.Call("_CreateTrades", index, headers, rows, bilateral);
             var facedTable = (object[,])Seam.Call("util_ReadHandle", faced);

@@ -8,6 +8,7 @@ currency they are in. Static booked amounts in the settlement currency: a fixing
 tick or a roll of the valuation date changes none of them, and they enter no mark, cash, delta
 or DV01. docs/library/trades/report-reserves.md is the page."""
 
+import math
 from dataclasses import dataclass
 from typing import assert_never
 
@@ -79,8 +80,9 @@ def reserves(terms: ResolvedTrades, counter: WorkCounter) -> Reserves:
     amounts are not kept: the totals are what the batch books. The marketing reserve, since #175,
     and the CVA reserve, since cva-reserve.md, are each the rows' amounts summed once, each amount
     finite by the rule that read it, zero or more for marketing and of either sign for CVA, over
-    the occurrences and never the components, so a strip books its amount once; each sum is held
-    finite the same way, refused for the batch when finite amounts sum past the largest number in
+    the occurrences and never the components, so a strip books its amount once; each sum is the
+    exact one, the correctly rounded total of the rows' amounts whatever their order and however
+    they cancel, refused for the batch only when the total itself passes the largest number in
     either direction; and a batch without the field books 0.0 and sums nothing.
 
     Work: one fee component per component charged, reported to the counter as
@@ -136,23 +138,36 @@ def reserves(terms: ResolvedTrades, counter: WorkCounter) -> Reserves:
 def _summed_once(
     name: str, amounts: NDArray[np.float64] | None, currency: str, counter: WorkCounter
 ) -> float:
-    """One entered reserve's total: the rows' amounts summed once each, with numpy's flags down
-    and the one rule the judge, that the total is finite, since amounts each finite by the rule
-    that read them can sum past the largest number, in either direction for a signed reserve;
-    refused for the batch naming the reserve, never a row, since every row's amount was good.
-    0.0 and nothing summed or counted when the batch has no such field, else the rows reported
-    to the counter as reserved_occurrences."""
+    """One entered reserve's total: the rows' amounts summed once each, exactly, and the one rule
+    the judge, that the total is finite, since amounts each finite by the rule that read them can
+    sum past the largest number, in either direction for a signed reserve; refused for the batch
+    naming the reserve, never a row, since every row's amount was good. 0.0 and nothing summed
+    or counted when the batch has no such field, else the rows reported to the counter as
+    reserved_occurrences."""
     if amounts is None:
         return 0.0
-    with np.errstate(over="ignore"):  # the rule below is the judge
-        total = float(amounts.sum())
-    if not np.isfinite(total):
+    total = _exact_total(amounts)
+    if not math.isfinite(total):
         raise ValueError(
             f"the batch has {total!r} of {name} reserve in all, expected a finite amount of "
             f"{currency}; the rows' amounts, each finite, sum past the largest number"
         )
     counter.hit(RESERVED_OCCURRENCES, int(amounts.size))
     return total
+
+
+def _exact_total(amounts: NDArray[np.float64]) -> float:
+    """The amounts' one total, the correctly rounded sum of the finite amounts whatever their order
+    and however they cancel, since cva-reserve.md's review: a dollar beside ten thousand trillion
+    and its negative is a dollar in whichever row it stands, where a running sum rounds it away or
+    keeps it by the order the rows came in. Shewchuk's exact partials, math.fsum, over the amounts
+    scaled down by the power of two that is at least their count, one multiplication over the
+    rows, exact for every amount above the subnormal range, so that no running sum can pass the
+    largest number on the way to a total that does not; and the total scaled back up once, exact
+    again, an infinity of its sign when the total itself passes the largest number, so that the
+    caller's one rule judges the total and never a step."""
+    shift = (int(amounts.size) - 1).bit_length()  # 2 ** shift is at least the count, 0 for one
+    return math.fsum(amounts * math.ldexp(1.0, -shift)) * math.ldexp(1.0, shift)
 
 
 def _charged(

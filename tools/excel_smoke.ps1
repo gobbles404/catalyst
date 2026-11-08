@@ -1381,6 +1381,13 @@ $formulas = [ordered]@{
     "=_CreateTrades(OR5,OR80:OX80,OR105:OX106,OR9)" = "#ERROR _CreateTrades: ValueError: the batch has -inf of cva reserve in all, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number"
     "=_CreateTrades(OR5,OR80:OX80,OR108:OX108,OR9)" = "#ERROR _CreateTrades: trade_rows cell (1, 7) is blank, expected number"
     "=_CreateTrades(OR5,OR80:OX80,OR81:OX83,OR98)" = "#ERROR _CreateTrades: ValueError: cva_reserve is supplied by the template and by the ticket, expected by one of them"
+    # cva-reserve.md's review: the exact total whatever the rows' order, a dollar beside ten thousand
+    # trillion and its negative in OR119 and OR122, and two pairs cancelling past the largest
+    # number netting to nothing in OR130, not refused.
+    "=INDEX(_ReportReserves(OR119),3,4)"   = "1"
+    "=INDEX(_ReportReserves(OR122),3,4)"   = "1"
+    "=INDEX(_ReportReserves(OR130),3,4)"   = "0"
+    "=INDEX(_ReportReserves(OR130),3,1)"   = "80"
     "=COLUMNS(util_ReadHandle(OR52))"      = "24"
     "=INDEX(util_ReadHandle(OR52),1,9)"    = "discount_curve_key"
     "=INDEX(util_ReadHandle(OR52),3,9)"    = "SOFR"
@@ -3001,6 +3008,29 @@ $cells = [ordered]@{
     "OR105" = "1001"; "OS105" = "20-Nov-2026"; "OT105" = "Z26"; "OU105" = "2"; "OV105" = "LOT"; "OW105" = "0.25"; "OX105" = "-9E+307"
     "OR106" = "1002"; "OS106" = "20-Nov-2026"; "OT106" = "Z26"; "OU106" = "-2"; "OV106" = "LOT"; "OW106" = "0.25"; "OX106" = "-9E+307"
     "OR108" = "1001"; "OS108" = "20-Nov-2026"; "OT108" = "Z26"; "OU108" = "2"; "OV108" = "LOT"; "OW108" = "0.25"
+    # cva-reserve.md's review: a dollar beside ten thousand trillion and its negative in OR110:OX112
+    # and in the other order in OR114:OX116, their batches, preparations and results in OR117:OR119
+    # and OR120:OR122; two pairs cancelling past the largest number in OR124:OX127, theirs in
+    # OR128:OR130.
+    "OR110" = "1001"; "OS110" = "20-Nov-2026"; "OT110" = "Z26"; "OU110" = "2"; "OV110" = "LOT"; "OW110" = "0.25"; "OX110" = "1E+16"
+    "OR111" = "1002"; "OS111" = "20-Nov-2026"; "OT111" = "Z26"; "OU111" = "-2"; "OV111" = "LOT"; "OW111" = "0.25"; "OX111" = "1"
+    "OR112" = "1003"; "OS112" = "20-Nov-2026"; "OT112" = "Z26"; "OU112" = "0"; "OV112" = "LOT"; "OW112" = "0.25"; "OX112" = "-1E+16"
+    "OR114" = "1001"; "OS114" = "20-Nov-2026"; "OT114" = "Z26"; "OU114" = "2"; "OV114" = "LOT"; "OW114" = "0.25"; "OX114" = "1E+16"
+    "OR115" = "1002"; "OS115" = "20-Nov-2026"; "OT115" = "Z26"; "OU115" = "-2"; "OV115" = "LOT"; "OW115" = "0.25"; "OX115" = "-1E+16"
+    "OR116" = "1003"; "OS116" = "20-Nov-2026"; "OT116" = "Z26"; "OU116" = "0"; "OV116" = "LOT"; "OW116" = "0.25"; "OX116" = "1"
+    "OR117" = "=_CreateTrades(OR5,OR80:OX80,OR110:OX112,OR9)"
+    "OR118" = "=_PrepareTrades(OR117,OR19)"
+    "OR119" = "=_EvaluateTrades(OR118,OR21)"
+    "OR120" = "=_CreateTrades(OR5,OR80:OX80,OR114:OX116,OR9)"
+    "OR121" = "=_PrepareTrades(OR120,OR19)"
+    "OR122" = "=_EvaluateTrades(OR121,OR21)"
+    "OR124" = "1001"; "OS124" = "20-Nov-2026"; "OT124" = "Z26"; "OU124" = "2"; "OV124" = "LOT"; "OW124" = "0.25"; "OX124" = "9E+307"
+    "OR125" = "1002"; "OS125" = "20-Nov-2026"; "OT125" = "Z26"; "OU125" = "-2"; "OV125" = "LOT"; "OW125" = "0.25"; "OX125" = "9E+307"
+    "OR126" = "1003"; "OS126" = "20-Nov-2026"; "OT126" = "Z26"; "OU126" = "2"; "OV126" = "LOT"; "OW126" = "0.25"; "OX126" = "-9E+307"
+    "OR127" = "1004"; "OS127" = "20-Nov-2026"; "OT127" = "Z26"; "OU127" = "-2"; "OV127" = "LOT"; "OW127" = "0.25"; "OX127" = "-9E+307"
+    "OR128" = "=_CreateTrades(OR5,OR80:OX80,OR124:OX127,OR9)"
+    "OR129" = "=_PrepareTrades(OR128,OR19)"
+    "OR130" = "=_EvaluateTrades(OR129,OR21)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"
