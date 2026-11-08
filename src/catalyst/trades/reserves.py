@@ -161,13 +161,18 @@ def _exact_total(amounts: NDArray[np.float64]) -> float:
     and however they cancel, since cva-reserve.md's review: a dollar beside ten thousand trillion
     and its negative is a dollar in whichever row it stands, where a running sum rounds it away or
     keeps it by the order the rows came in. Shewchuk's exact partials, math.fsum, over the amounts
-    scaled down by the power of two that is at least their count, one multiplication over the
-    rows, exact for every amount above the subnormal range, so that no running sum can pass the
-    largest number on the way to a total that does not; and the total scaled back up once, exact
-    again, an infinity of its sign when the total itself passes the largest number, so that the
-    caller's one rule judges the total and never a step."""
-    shift = (int(amounts.size) - 1).bit_length()  # 2 ** shift is at least the count, 0 for one
-    return math.fsum(amounts * math.ldexp(1.0, -shift)) * math.ldexp(1.0, shift)
+    as they are, so that a tiny amount keeps every bit beside zero rows; fsum refuses a running
+    sum past the largest number, which a total that is not past it may still pass on the way, and
+    then, and only then, the amounts are summed again scaled down by the power of two that is at
+    least their count, one multiplication over the rows, exact there for every amount above the
+    subnormal range, and the total scaled back up once, exact again, an infinity of its sign when
+    the total itself passes the largest number, so that the caller's one rule judges the total
+    and never a step."""
+    try:
+        return math.fsum(amounts)
+    except OverflowError:  # a running sum past the largest number; the total itself may not be
+        shift = (int(amounts.size) - 1).bit_length()  # 2 ** shift is at least the count
+        return math.fsum(amounts * math.ldexp(1.0, -shift)) * math.ldexp(1.0, shift)
 
 
 def _charged(

@@ -2960,6 +2960,9 @@ namespace Catalyst.Host.Tests
             }
             var cancelling = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 9e307 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 9e307 }, { 1003.0, 46346.0, "Z26", 2.0, "LOT", 0.25, -9e307 }, { 1004.0, 46346.0, "Z26", -2.0, "LOT", 0.25, -9e307 } }, template), history), Market(), ExcelMissing.Value));
             Assert.Equal(0.0, (double)cancelling[2, 3], 12);
+            // and a tiny amount keeps every bit beside zero rows, 3e-308 to the last bit.
+            var tiny = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 3e-308 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 0.0 }, { 1003.0, 46346.0, "Z26", 0.0, "LOT", 0.25, 0.0 } }, template), history), Market(), ExcelMissing.Value));
+            Assert.Equal(3e-308, (double)tiny[2, 3]);
             var bilateral = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar"), Row("month", "monthly", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", "+2bd", pays));
             var faced = (string)Seam.Call("_CreateTrades", index, headers, rows, bilateral);
             var facedTable = (object[,])Seam.Call("util_ReadHandle", faced);

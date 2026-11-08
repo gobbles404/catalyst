@@ -4455,6 +4455,9 @@ def test_a_cva_dollar_beside_ten_thousand_trillion_survives_whatever_the_rows_or
     assert booked(CVA_ROWS, (9e307, 9e307, -9e307)) == [60.0, 24.0, 0.0, 9e307, "USD"]
     four = [*CVA_ROWS, CVA_ROWS[0]]
     assert booked(four, (9e307, 9e307, -9e307, -9e307)) == [80.0, 32.0, 0.0, 0.0, "USD"]
+    # A tiny amount keeps every bit beside zero rows: 3e-308 alone and with two zero rows.
+    assert booked(CVA_ROWS[:1], (3e-308,)) == [20.0, 8.0, 0.0, 3e-308, "USD"]
+    assert booked(CVA_ROWS, (3e-308, 0.0, 0.0)) == [60.0, 24.0, 0.0, 3e-308, "USD"]
 
 
 def test_a_bilateral_batch_names_its_counterparty_and_is_refused_at_evaluation_as_before(

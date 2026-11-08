@@ -1388,6 +1388,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(OR122),3,4)"   = "1"
     "=INDEX(_ReportReserves(OR130),3,4)"   = "0"
     "=INDEX(_ReportReserves(OR130),3,1)"   = "80"
+    "=INDEX(_ReportReserves(OR137),3,4)"   = "3E-308"
     "=COLUMNS(util_ReadHandle(OR52))"      = "24"
     "=INDEX(util_ReadHandle(OR52),1,9)"    = "discount_curve_key"
     "=INDEX(util_ReadHandle(OR52),3,9)"    = "SOFR"
@@ -3031,6 +3032,13 @@ $cells = [ordered]@{
     "OR128" = "=_CreateTrades(OR5,OR80:OX80,OR124:OX127,OR9)"
     "OR129" = "=_PrepareTrades(OR128,OR19)"
     "OR130" = "=_EvaluateTrades(OR129,OR21)"
+    # and 3E-308 beside two zero rows in OR132:OX134, 3E-308 to the last bit in OR137.
+    "OR132" = "1001"; "OS132" = "20-Nov-2026"; "OT132" = "Z26"; "OU132" = "2"; "OV132" = "LOT"; "OW132" = "0.25"; "OX132" = "3E-308"
+    "OR133" = "1002"; "OS133" = "20-Nov-2026"; "OT133" = "Z26"; "OU133" = "-2"; "OV133" = "LOT"; "OW133" = "0.25"; "OX133" = "0"
+    "OR134" = "1003"; "OS134" = "20-Nov-2026"; "OT134" = "Z26"; "OU134" = "0"; "OV134" = "LOT"; "OW134" = "0.25"; "OX134" = "0"
+    "OR135" = "=_CreateTrades(OR5,OR80:OX80,OR132:OX134,OR9)"
+    "OR136" = "=_PrepareTrades(OR135,OR19)"
+    "OR137" = "=_EvaluateTrades(OR136,OR21)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"

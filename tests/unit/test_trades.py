@@ -6290,3 +6290,24 @@ def test_the_signed_cva_sum_is_exact_whatever_the_rows_order() -> None:
     )
     booked = encoded(reversed_rows, (observed_of(reversed_rows),), UNITS, WorkCounter()).reserves
     assert (booked.brokerage, booked.clearing, booked.cva) == (60.0, 24.0, -15.0)
+
+
+def test_a_tiny_reserve_keeps_every_bit_beside_zero_rows() -> None:
+    # cva-reserve.md's review: 3e-308 alone and beside zero rows is 3e-308 to the last bit, for the
+    # CVA and the marketing reserve alike, the amounts summed as they are; a scaling for a running
+    # sum past the largest number would push it under the smallest normal number and round it.
+    ix = a_fee_index()
+    alone = marketed_terms(
+        ix,
+        (3e-308,),
+        cva=(3e-308,),
+        occurrence=(0,),
+        contract=(1,),
+        quantities=(2.0,),
+        trade_ids=(1001,),
+    )
+    booked = encoded(alone, (observed_of(alone),), UNITS, WorkCounter()).reserves
+    assert (booked.marketing, booked.cva) == (3e-308, 3e-308)
+    beside = marketed_terms(ix, (3e-308, 0.0, 0.0, 0.0), cva=(0.0, 3e-308, 0.0, 0.0))
+    booked = encoded(beside, (observed_of(beside),), UNITS, WorkCounter()).reserves
+    assert (booked.marketing, booked.cva) == (3e-308, 3e-308)

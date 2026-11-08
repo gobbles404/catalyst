@@ -40,12 +40,14 @@ cva_total = sum over the ticket's rows i of cva_reserve[i]      # signs kept, on
 
 Each amount is finite by the rule that read it; the total is the exact one, the correctly
 rounded sum of the rows' amounts whatever their order, Shewchuk's partials through `math.fsum`
-over the amounts scaled down by a power of two so that no running sum passes the largest
-number on the way to a total that does not, and refused for the batch only when the total
-itself passes it, in either direction; the marketing total takes the same road. The review of
-8 November found the first build's running sum losing a dollar beside ten thousand trillion by
-the rows' order, and refusing two pairs that cancel past the largest number. The example is on
-the fee index of
+over the amounts as they are, and, only when a running sum passes the largest number on the way
+to a total that may not, summed again scaled down by a power of two and scaled back once, exact
+there for every amount above the subnormal range; refused for the batch only when the total
+itself passes the largest number, in either direction; the marketing total takes the same road.
+The review of 8 November found the first build's running sum losing a dollar beside ten
+thousand trillion by the rows' order, and refusing two pairs that cancel past the largest
+number; its second pass found a scaling that always ran pushing 3e-308 under the smallest
+normal number beside two zero rows. The example is on the fee index of
 [report-reserves.md](../../library/trades/report-reserves.md), LOT at 10 of brokerage and 4 of
 clearing a lot, under the cleared template naming ION as broker:
 
@@ -93,7 +95,8 @@ same with the column and without, through a tick, a fixing and a payment.
 - A pair books the amount once per row, though it has two legs.
 - The total is exact in every order of the rows: 1e16, 1 and -1e16 book 1 however they stand,
   9e307 twice and -9e307 twice book 0 and are not refused, 9e307 twice and -9e307 once book
-  9e307; 1e308 twice is still refused.
+  9e307; 1e308 twice is still refused; 3e-308 alone and beside two zero rows is 3e-308 to the
+  last bit, for the marketing reserve too.
 - The results carry the encoding's record by reference; nothing is reserved again at
   preparation, evaluation or reading.
 - The ledgers: `_Fields.has` and `FieldValues.has` one more each, the field looked for;
