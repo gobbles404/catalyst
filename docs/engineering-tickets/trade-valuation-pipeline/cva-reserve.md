@@ -1,6 +1,6 @@
 # A signed CVA reserve on the fixed_float
 
-**Status:** Agreed with the owner on 8 November 2026 for
+**Status:** Built in #244, agreed with the owner on 8 November 2026 for
 [issue #243](https://github.com/gobbles404/catalyst/issues/243), this page in its first commit;
 one pull request on `feat/cva-reserve`, stacked on `feat/two-index-one-price`, the branch of
 [two-index-one-price.md](two-index-one-price.md), #242. It follows

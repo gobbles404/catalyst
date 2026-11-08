@@ -841,7 +841,8 @@ steps, since the first leg's old strike left in place misprices the swap without
 
 ## 31. A signed CVA reserve on the fixed_float
 
-Agreed 8 November 2026, issue #243: [cva-reserve.md](cva-reserve.md), stacked on #242. The
+Agreed 8 November 2026 and built in #244, issue #243: [cva-reserve.md](cva-reserve.md), stacked
+on #242. The
 fixed_float gains `cva_reserve`, an optional amount in the settlement currency beside
 `marketing_reserve`, from the template or the ticket on either route, finite and of either
 sign, booked once per ticket row whatever its months, quantity or direction, a strip and a
