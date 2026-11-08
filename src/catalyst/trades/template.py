@@ -248,7 +248,6 @@ NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float | int]]] = Mappi
         "trade_id": trade_id_of,
         "quantity": quantity_of,
         "fixed_price": price_of,
-        "second_fixed_price": price_of,  # two-index-fixed-float.md
         "marketing_reserve": marketing_reserve_of,
         "amount": amount_of,  # the cashflow instrument's, since #200
     }

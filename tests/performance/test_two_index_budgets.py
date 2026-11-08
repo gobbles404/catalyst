@@ -117,8 +117,7 @@ TICKET: dict[str, list[object]] = {
     "trade_date": ["2026-12-15"],
     "contract_code": ["G27"],
     "quantity": [10_000],
-    "fixed_price": [3.30],
-    "second_fixed_price": [-0.30],
+    "fixed_price": [3.00],  # the outright, the one price since two-index-one-price.md
 }
 
 
@@ -152,13 +151,10 @@ def a_ticket(columns: Mapping[str, list[object]]) -> FieldValues:
     )
 
 
-def rows_of(n: int, second: bool = True) -> dict[str, list[object]]:
-    """n rows of the hand table's trade, each its own occurrence of G27."""
-    return {
-        name: list(values) * n
-        for name, values in TICKET.items()
-        if second or name != "second_fixed_price"
-    }
+def rows_of(n: int) -> dict[str, list[object]]:
+    """n rows of the hand table's trade, each its own occurrence of G27, the same ticket for a
+    pair and for one index since the one price is the trade's."""
+    return {name: list(values) * n for name, values in TICKET.items()}
 
 
 def pair(n: int, counter: WorkCounter) -> Trades:
@@ -170,7 +166,7 @@ def single(n: int, counter: WorkCounter) -> Trades:
     template = trade_template(
         a_ticket({k: [v] for k, v in TEMPLATE.items() if k != "second_schedule_method"})
     )
-    return trades((A,), a_ticket(rows_of(n, second=False)), template, UNITS, counter)
+    return trades((A,), a_ticket(rows_of(n)), template, UNITS, counter)
 
 
 def history_a() -> MarketHistory:

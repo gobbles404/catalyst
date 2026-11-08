@@ -214,10 +214,11 @@ row 3100, every ticket of a pair booked at one price. The pages above, a history
 item 30 and the status line of the October ticket.
 
 Measure before and after: the one-leg path's work counts, numpy ledgers and allocation pins
-stand; the function ledgers move where the fixed leg's helper moves; the pair's
-`risk_reductions` fall by the per-leg NPV and DV01 reductions, and the pull request states
-the counts. No shim: a kept sheet typing `second_fixed_price` fails at the header until the
-column is removed.
+stand; the function ledgers move where the fixed leg's helper moves and the leg values'
+helpers go; the pair's work counts stand too, eight risk reductions a leg and four for the
+trade as before, since the per-leg NPVs and DV01s were elementwise products and never
+reductions; the pull request states the counts. No shim: a kept sheet typing
+`second_fixed_price` fails at the header until the column is removed.
 
 ## Outside this slice
 

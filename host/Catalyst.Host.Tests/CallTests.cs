@@ -275,7 +275,7 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "CountFieldRows", new object[] { "fixed_float", Row("quantity", "fixed_price"), new object[,] { { 1.0, 3.1 }, { 2.0, 3.2 }, { 3.0, 3.3 } } }, 3.0 };
             yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values" };
-            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, settlement_frequency" };
+            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, settlement_frequency" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields cell (1, 2) is text 'quantity', already given at cell (1, 1)" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "fixed_price"), Row("ten", "eleven") }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("trade_date"), 46164.5 }, "#ERROR EchoFieldRow: values cell (1, 1) is number 46164.5, expected date" };
@@ -657,7 +657,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("Firm A", booked[2, 5]);
             Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk", Seam.Call("_ReportRisk", results, "delta", "day"));
             var fixedFloat = Seam.Call("_CreateTradeTemplate", "fixed_float", Row("route"), Row("cleared"));
-            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, settlement_frequency", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
+            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, settlement_frequency", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
             Assert.Equal("#ERROR _CreateCashflows: ValueError: template is of instrument 'fixed_float', expected cashflow, the one instrument whose cashflows are built", Seam.Call("_CreateCashflows", Row("trade_date"), Row(46391.0), fixedFloat));
         }
 
@@ -681,12 +681,14 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR EchoFieldRow: values cell (1, 1) is valuation date handle '" + date + "', expected holiday calendar handle", Seam.Call("EchoFieldRow", "fixed_float", Row("payment_holiday_calendar"), date));
         }
 
-        // A pair of indexes, two-index-fixed-float.md: A a futures index and B an IFERC one over the
-        // one NYMEX NG specification, booked as one row at 3.30 and -0.30, the histories and the
-        // markets handed as a column and a row in either order: the ticket's hand table, 950 of mark
-        // and -0.095 of DV01 on SOFR at 0.95 a year on, each leg a lot; the risk report two commodity
-        // groups and one DV01 column; the readbacks naming each leg; a column of one history and a
-        // grid of handles refused, the seam's words and the kernel's.
+        // A pair of indexes, two-index-fixed-float.md and two-index-one-price.md: A a futures index
+        // and B an IFERC one over the one NYMEX NG specification, booked as one row at the outright
+        // 3.00, the histories and the markets handed as a column and a row in either order: the
+        // ticket's hand table, 950 of mark and -0.095 of DV01 on SOFR at 0.95 a year on, each leg a
+        // lot; the risk report two commodity groups and one DV01 column; the readbacks naming each
+        // leg and showing one price and no leg value; a column of one history, a grid of handles, the
+        // second leg's method on one index and a second price refused, the seam's words and the
+        // kernel's.
         [Fact]
         public void a_pair_of_indexes_is_booked_prepared_and_valued_as_one_payment()
         {
@@ -700,8 +702,8 @@ namespace Catalyst.Host.Tests
             var curves = (string)Seam.Call("_CollectDiscountCurves", (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 } }));
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, (string)Seam.Call("_CreateHolidayCalendar", 46388.0)));
-            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "second_fixed_price");
-            var row = Row(1.0, 46371.0, "G27", 1.0, 3.30, -0.30);
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
+            var row = Row(1.0, 46371.0, "G27", 1.0, 3.00);
             var trades = (string)Seam.Call("_CreateTrades", Column(a, b), headers, row, template);
             Assert.StartsWith(Pid + ":trades:A+B:", trades);
             var prepared = (string)Seam.Call("_PrepareTrades", trades, Column(historyB, historyA));
@@ -731,14 +733,17 @@ namespace Catalyst.Host.Tests
             Assert.Equal("B", read[3, 1]);
             var booked = (object[,])Seam.Call("util_ReadHandle", trades);
             Assert.Equal(3, booked.GetLength(0));
-            var combined = Heading(booked, "combined_fixed_price");
-            Assert.True(combined > 0);
-            Assert.Equal(3.0, (double)booked[2, combined], 12);
-            Assert.Equal(-0.3, (double)booked[2, combined - 1], 12);
+            var price = Heading(booked, "fixed_price");
+            Assert.True(price > 0);
+            Assert.Equal(3.0, (double)booked[2, price], 12);
+            Assert.Equal(-30000.0, (double)booked[2, Heading(booked, "offset")], 9);  // the trade's fixed leg, once
+            Assert.Equal(-1, Heading(booked, "second_fixed_price"));  // no field since two-index-one-price.md
+            Assert.Equal(-1, Heading(read, "leg_dv01"));  // no value is a leg's
             Assert.Equal("#ERROR _PrepareTrades: ValueError: histories are 1, expected 2, one per leg of the trades", Seam.Call("_PrepareTrades", trades, historyA));
             Assert.Equal("#ERROR _EvaluateTrades: ValueError: market 2 is over the history of index 'A' as market 1 is, expected one market per history of the trades", Seam.Call("_EvaluateTrades", prepared, Column(marketA, marketA), curves));
             Assert.StartsWith("#ERROR _CreateTrades: indexes is 2x2 array, expected one cell, one row or one column of index handles", (string)Seam.Call("_CreateTrades", new object[,] { { a, b }, { a, b } }, headers, row, template));
-            Assert.Equal("#ERROR _CreateTrades: ValueError: second_fixed_price is -0.3, expected none unless two indexes", Seam.Call("_CreateTrades", a, headers, row, template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: second_schedule_method is 'lastday', expected none unless two indexes", Seam.Call("_CreateTrades", a, headers, row, template));
+            Assert.StartsWith("#ERROR _CreateTrades: fields cell (1, 6) is text 'second_fixed_price', expected a field of fixed_float: trade_id,", (string)Seam.Call("_CreateTrades", Column(a, b), Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "second_fixed_price"), Row(1.0, 46371.0, "G27", 1.0, 3.30, -0.30), template));
         }
 
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;
@@ -758,18 +763,18 @@ namespace Catalyst.Host.Tests
             Assert.Equal(8, ((object[,])Seam.Call("_ShowInstrument", "cashflow")).GetLength(1));
             var shown = (object[,])Seam.Call("_ShowInstrument", "fixed_float");
             Assert.Equal(10, shown.GetLength(0));
-            Assert.Equal(23, shown.GetLength(1));  // twenty-two fields, settlement_frequency last since onetime-averaging.md
+            Assert.Equal(22, shown.GetLength(1));  // twenty-one fields, settlement_frequency last since onetime-averaging.md
             Assert.Equal("field", shown[0, 0]);
             Assert.Equal("trade_id", shown[0, 1]);
             Assert.Equal("start_date", shown[0, 4]);
             Assert.Equal("counterparty", shown[0, 10]);
             Assert.Equal("discount_curve_key", shown[0, 11]);  // after the counterparty, since named-curves-slice-3.md
             Assert.Equal("route = bilateral", shown[3, 11]);
-            Assert.Equal("second_fixed_price", shown[0, 17]);
+            Assert.Equal("second_schedule_method", shown[0, 17]);  // the second leg's one field since two-index-one-price.md
             Assert.Equal("two indexes", shown[3, 17]);
-            Assert.Equal("payment_holiday_calendar", shown[0, 20]);
-            Assert.Equal("marketing_reserve", shown[0, 21]);
-            Assert.Equal("settlement_frequency", shown[0, 22]);  // last, since onetime-averaging.md
+            Assert.Equal("payment_holiday_calendar", shown[0, 19]);
+            Assert.Equal("marketing_reserve", shown[0, 20]);
+            Assert.Equal("settlement_frequency", shown[0, 21]);  // last, since onetime-averaging.md
             Assert.Equal("required", shown[2, 0]);
             Assert.Equal(false, shown[2, 1]);
             Assert.Equal(true, shown[2, 2]);
@@ -778,8 +783,8 @@ namespace Catalyst.Host.Tests
             Assert.Equal("no contract_code on the row, or with start_date", shown[3, 5]);
             Assert.Equal("route = cleared", shown[3, 9]);
             Assert.Equal("route = bilateral", shown[3, 10]);
-            Assert.Equal("a finite amount of zero or more", shown[5, 21]);
-            Assert.Equal("holiday calendar handle", shown[4, 20]);
+            Assert.Equal("a finite amount of zero or more", shown[5, 20]);
+            Assert.Equal("holiday calendar handle", shown[4, 19]);
             Assert.Equal("the index's specification names", shown[5, 14]);
             Assert.Equal("month, calday, period", shown[5, 15]);
             Assert.Equal("quote_allowed", shown[7, 0]);

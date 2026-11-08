@@ -308,9 +308,10 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_monthly_components": 1,  # each monthly component in one calendar month
         "choice": 5,
         "_Fields.one_text": 2,  # the route and the settlement, one each for the batch
-        "_Fields.has": 23,  # the required fields, the code the first period field found, and
+        "_Fields.has": 22,  # the required fields, the code the first period field found, and
         # since #175 the counterparty's condition and the marketing reserve looked for, since
-        # slice 3 the key's condition and the key itself
+        # slice 3 the key's condition and the key itself, since two-index-one-price.md the
+        # second leg's one field and no second price
         "_Fields.rows": 10,  # the rows asked once less: the periods count their own since
         # dated-quotes.md, a request's rows resolving through the same rule
         "_Fields.texts": 5,  # the four row fields' columns read once each, the codes apart
@@ -324,20 +325,22 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_Fields.numbers": 2,
         "_Fields.dates": 1,
         "_Fields.objects": 1,
-        "FieldValues.has": 16,
+        "FieldValues.has": 15,
         "FieldValues.supplied_rows": 1,  # which rows hold a code: every one, the column full
         "FieldValues.texts": 1,
         "FieldValues.numbers": 2,
         "FieldValues.dates": 1,
         "resolved_trades": 1,
-        "_the_leg_fields": 1,  # two-index-fixed-float.md: the second leg's fields
+        "_the_leg_fields": 1,  # two-index-fixed-float.md: the second leg's field, its method
         "_owner": 1,  # the words naming an index's specifications and schedule in a refusal
         "_schedule_of": 1,
         "_the_payments": 1,  # the payment anchors, the later of the legs' last observations
         "_the_leg": 1,  # the leg's columns copied and frozen
         "_the_leg_selections": 1,  # the leg's specification rows and methods, then the basis
         "_the_choices": 2,
-        "_the_leg_columns": 1,  # the leg's contract rows and fixed prices
+        "_the_contract_column": 1,  # the leg's contract rows, each a row of its schedule
+        "_the_component_column": 2,  # the contract column and the price column, one per component
+        "_the_fixed_prices": 1,  # two-index-one-price.md: the trade's one price column, finite
         "_the_keys": 1,  # the keys present exactly on the bilateral route, since slice 3
         "_the_selections": 1,  # each occurrence's unit, method, basis and frequency in range
         "_the_method": 1,
@@ -690,8 +693,9 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "trades": 1,
         "encoded": 1,
         "_the_groups": 1,
-        "_the_amounts": 1,  # two-index-fixed-float.md: the leg's three amounts per component
-        "_the_group_offsets": 1,  # the leg's offsets by group
+        "_the_amounts": 1,  # two-index-fixed-float.md: the leg's two amounts per component
+        "_the_fixed_leg": 1,  # two-index-one-price.md: the trade's fixed leg, once
+        "_the_group_offsets": 1,  # the trade's fixed legs by group
         "_the_exposures": 1,  # the leg's slots' exposures
         "_distinct": 2,  # the groups by contract and day, the slots by group and day
         "_the_references": 1,
@@ -853,11 +857,12 @@ def dated_ledger(contracts: int) -> dict[str, int]:
     return {
         **ledger,
         "_Fields.where": 7,  # the lag and the six batch fields, no code named
-        "_Fields.has": 24,  # the three period fields looked for, the two dates found
+        "_Fields.has": 23,  # the three period fields looked for, the two dates found; the
+        # second leg's one field since two-index-one-price.md
         "_the_required.<locals>.<genexpr>": 3,
         "_Fields.rows": 9,  # one less since dated-quotes.md, the periods counting their own rows
         "_Fields.dates": 1,  # the trade dates; the two dates come through the periods' own read
-        "FieldValues.has": 17,
+        "FieldValues.has": 16,
         "FieldValues.dates": 3,
         "FieldValues.supplied_rows": 2,  # which rows hold a start and an end: every one
     }
@@ -1154,7 +1159,7 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "_each_distinct.<locals>.<lambda>": 9,  # likewise
         "_Fields.rows": 7,  # three fewer than the resolution's: the ticket's three columns, no
         # template value repeated
-        "FieldValues.has": 19,  # three columns more looked for
+        "FieldValues.has": 18,  # three columns more looked for, the second price no field
         "FieldValues.texts": 4,  # and read
         "_the_days": 4,  # the four methods present, once each
         "_with_expiries_priced": 1,  # the penultimate and last3day rows' expiries open

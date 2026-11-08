@@ -271,19 +271,10 @@ FIXED_FLOAT = Instrument(
             NONE,
             FieldType.NUMBER,
             "no fixed list",
-            "A finite number in the index's quote units; the same for every month of a strip",
-        ),
-        Field(
-            "second_fixed_price",
-            "The second leg's fixed price agreed when the deal was executed, with two indexes",
-            False,
-            "two indexes",
-            FieldType.NUMBER,
-            "no fixed list",
-            "A finite number in the quote units the two indexes share, the second index's "
-            "leg; required with two indexes given to _CreateTrades and refused with one, where "
-            "the index count is known; the trade's fixed price is the two legs' summed, derived "
-            "and never entered",
+            "A finite number in the index's quote units, the same for every month of a strip; "
+            "with two indexes given to _CreateTrades the one outright price of the deal, the "
+            "price of the sum of the two indexes in the quote unit they share, never a price "
+            "per index",
         ),
         Field(
             "second_schedule_method",

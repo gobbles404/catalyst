@@ -83,7 +83,9 @@ SCHEDULE_CODES_READ = "schedule_codes_read"  # codes of the index's schedule rea
 TICKET_CODES_READ = "ticket_codes_read"
 PERIOD_FIELDS: Final = ("contract_code", "start_date", "end_date")
 # The second leg's two fields, since two-index-fixed-float.md, present exactly with two indexes.
-SECOND_LEG_FIELDS: Final = ("second_fixed_price", "second_schedule_method")
+# The field a second leg adds, since two-index-one-price.md the one: the second index's method;
+# the fixed price is the trade's, entered once.
+SECOND_LEG_FIELDS: Final = ("second_schedule_method",)
 
 # The conditions of the fixed_float's required_when fields, as library rules: the field, the batch
 # fact it depends on and the value that fact must have, rendered as the definition shows them,
@@ -204,10 +206,11 @@ def resolved(
     itself rolled back first so that a day the payment calendar closes is not counted; the rule
     of the four methods.
     Two indexes, since two-index-fixed-float.md, make two legs of the same rows. The indexes are
-    one or two, else refused by their number, before anything else. second_fixed_price and
-    second_schedule_method are present exactly with two, checked here where the index count is
-    known and by no template, each refused by its name, missing with two and present with one.
-    The second leg follows the first's rules on its own index, the first leg's steps as they
+    one or two, else refused by their number, before anything else. second_schedule_method is
+    present exactly with two, checked here where the index count is known and by no template,
+    refused by its name, missing with two and present with one; since two-index-one-price.md
+    the one fixed_price is the trade's, the outright price of the deal, and no second price
+    exists. The second leg follows the first's rules on its own index, the first leg's steps as they
     were: the quantity unit names one of its specifications, exactly; its methods are read
     from the list; every code of its schedule is read for its month; each row's months are
     resolved against its schedule, a month a schedule lacks refused by the index and the month,
@@ -859,9 +862,9 @@ def _schedule_of(index: Index, paired: bool) -> str:
 
 
 def _the_leg_fields(fields: _Fields, paired: bool) -> None:
-    """The second leg's two fields present exactly with two indexes, since
-    two-index-fixed-float.md, the count the creator alone knows: each refused by its name,
-    missing with two and present with one."""
+    """The second leg's field, second_schedule_method, present exactly with two indexes, since
+    two-index-fixed-float.md and the one field since two-index-one-price.md, the count the
+    creator alone knows: refused by its name, missing with two and present with one."""
     for name in SECOND_LEG_FIELDS:
         if paired and not fields.has(name):
             raise ValueError(f"{name} is missing, expected it with two indexes")
@@ -893,9 +896,9 @@ def _the_second_leg(
     """The second leg's inputs and observations, since two-index-fixed-float.md, over the rows
     the first leg resolved and the contract rows the periods resolved on this index's schedule:
     the quantity unit resolved on this index, each distinct text once; second_schedule_method
-    read from the list, each distinct text once; the fixed prices second_fixed_price's per
-    occurrence, on every component of the row; and the observations this leg's methods give the
-    components over the same days, named as the first leg's are."""
+    read from the list, each distinct text once; and the observations this leg's methods give the
+    components over the same days, named as the first leg's are. No price of its own since
+    two-index-one-price.md: the trade's one fixed price is the outright."""
     specifications, by_unit = _each_distinct(
         fields, "quantity_unit", partial(_the_specification, index, owner=_owner(index, True))
     )
@@ -911,12 +914,7 @@ def _the_second_leg(
         "second_schedule_method",
     )
     leg = LegInputs(
-        index,
-        np.array(specifications, dtype=np.intp)[by_unit],
-        schedule_method,
-        contract,
-        fields.numbers("second_fixed_price")[occurrence],
-        months,
+        index, np.array(specifications, dtype=np.intp)[by_unit], schedule_method, contract, months
     )
     return leg, observations
 

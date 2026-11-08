@@ -196,10 +196,11 @@ def test_a_window_needs_no_contract_for_the_month_it_opens_in() -> None:
     full, _ = created(CL, TMA_TICKET, TMA_TEMPLATE)
     assert components_of(batch) == (["N26"], ["2026-05-26"], ["2026-06-25"], [31], [2_200.0])
     assert labels(batch) == [WINDOW]
-    for name in ("slot_date", "slot_exposure", "offset_of_group"):
+    for name in ("slot_date", "slot_exposure"):
         np.testing.assert_array_equal(
             getattr(batch.encoded.legs[0], name), getattr(full.encoded.legs[0], name)
         )
+    np.testing.assert_array_equal(batch.encoded.offset_of_group, full.encoded.offset_of_group)
     assert codes_of(batch, batch.encoded.legs[0].slot_reference) == ["N26"] * 19 + ["Q26"] * 3
     results = valued_on(batch, "2026-05-20", 70.0, 70.0, 72.0, 74.0)
     assert results.mark == pytest.approx(-1_600.0)
@@ -290,10 +291,12 @@ def test_within_one_calendar_month_onetime_and_monthly_agree_to_the_slot() -> No
     }
     window, _ = created(CL, june, TMA_TEMPLATE)
     month, _ = created(CL, june, {**TMA_TEMPLATE, **MONTHLY})
-    for name in ("slot_date", "slot_reference", "slot_exposure", "offset_of_group"):
+    for name in ("slot_date", "slot_reference", "slot_exposure"):
         np.testing.assert_array_equal(
             getattr(window.encoded.legs[0], name), getattr(month.encoded.legs[0], name)
         )
+    # The fixed leg is the trade's since two-index-one-price.md, one per group.
+    np.testing.assert_array_equal(window.encoded.offset_of_group, month.encoded.offset_of_group)
     assert window.encoded.legs[0].slot_date.size == 18
     assert labels(window) == ["2026-06-01 to 2026-06-25"] and labels(month) == ["M26"]
     one = valued_on(window, "2026-06-10", 69.0, 70.0, 72.0, 74.0)

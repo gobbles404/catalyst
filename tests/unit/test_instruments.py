@@ -65,7 +65,6 @@ def test_the_catalog_holds_the_fixed_float_with_its_twenty_two_fields_in_order()
         "quantity_unit",
         "quantity_per",
         "fixed_price",
-        "second_fixed_price",
         "second_schedule_method",
         "payment_day",
         "payment_holiday_calendar",
@@ -97,12 +96,13 @@ def test_the_catalog_holds_the_fixed_float_with_its_twenty_two_fields_in_order()
         "end_date",
     ]
     assert by_name["payment_day"].required_when == "settlement_method = financial"
-    # Since two-index-fixed-float.md the second leg's two fields, required with two indexes,
-    # the count _CreateTrades alone knows; a quote template holds neither.
-    for name in ("second_fixed_price", "second_schedule_method"):
-        assert by_name[name].required_when == "two indexes" and not by_name[name].required
-        assert not by_name[name].quote_allowed
-    assert by_name["second_fixed_price"].type is FieldType.NUMBER
+    # Since two-index-fixed-float.md the second leg's method, required with two indexes, the
+    # count _CreateTrades alone knows, and since two-index-one-price.md the one field a second
+    # leg adds, the fixed price being the trade's; a quote template holds it not.
+    second = by_name["second_schedule_method"]
+    assert second.required_when == "two indexes" and not second.required
+    assert not second.quote_allowed
+    assert "second_fixed_price" not in by_name
     assert by_name["payment_holiday_calendar"].required_when == "settlement_method = financial"
     assert by_name["payment_holiday_calendar"].type is FieldType.HOLIDAY_CALENDAR
     assert by_name["payment_day"].type is FieldType.DATE_OR_TEXT  # a date or a rule
@@ -304,10 +304,10 @@ def test_a_one_field_definition_shows_ten_rows_and_two_columns() -> None:
 
 def test_the_show_spills_ten_rows_and_a_column_per_field() -> None:
     shown = _ShowInstrument("fixed_float")
-    assert shown.shape == (10, 23)
-    labels = (0, 23, 46, 47, 70, 93, 116, 139, 140, 141)  # column one, among the texts
+    assert shown.shape == (10, 22)
+    labels = (0, 22, 44, 45, 67, 89, 111, 133, 134, 135)  # column one, among the texts
     assert tuple([shown.texts[i] for i in labels]) == ROWS
-    assert shown.texts[:23] == ("field", *FIELDS)
+    assert shown.texts[:22] == ("field", *FIELDS)
     # The required row and, since template-based-quoting.md, the two quote rows of booleans
     # after their labels: what a quote template may hold and what a quote always requires.
     for row, fact in ((2, "required"), (7, "quote_allowed"), (8, "quote_required")):
@@ -319,11 +319,11 @@ def test_the_show_spills_ten_rows_and_a_column_per_field() -> None:
         )
     other_rows = np.delete(shown.kinds, (2, 7, 8), axis=0)
     assert (other_rows == TEXT_CODE).all()
-    assert len(shown.texts) == 10 * 23 - 3 * 22
+    assert len(shown.texts) == 10 * 22 - 3 * 21
     assert "" not in shown.texts
 
 
-@pytest.mark.parametrize(("definition", "columns"), [(FIXED_FLOAT, 23), (CASHFLOW, 8)])
+@pytest.mark.parametrize(("definition", "columns"), [(FIXED_FLOAT, 22), (CASHFLOW, 8)])
 def test_the_show_page_shows_the_same_cells_as_the_spill(
     definition: Instrument, columns: int
 ) -> None:
@@ -349,7 +349,7 @@ def test_the_two_functions_through_the_seam_and_their_errors() -> None:
     kinds, slots, text = spilled(ENTRY["_ListInstruments"]())
     assert kinds.shape == (3, 2) and text.split("\0")[2::2] == ["fixed_float", "cashflow"]
     kinds, slots, text = spilled(ENTRY["_ShowInstrument"]("fixed_float"))
-    assert kinds.shape == (10, 23) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
+    assert kinds.shape == (10, 22) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
     assert slots[7, 6] == 1.0 and slots[8, 6] == 1.0 and slots[7, 1] == 0.0
     assert ENTRY["_ShowInstrument"]("Future") == (
         "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: "

@@ -339,7 +339,6 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
-        "_summed": 3,  # the legs' amounts, NPVs and DV01s by group, one leg's by reference
         "_the_lots_arrays": 1,  # the leg's discounted lots and their sums
         "_the_lots_checked": 1,
         "_discounted_leg": 1,  # the leg's results over them
@@ -639,7 +638,6 @@ def test_a_bilateral_tick_on_several_curves_does_no_work_per_curve_over_the_slot
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
         "_the_contributions": 1,  # the leg's live contributions off its market
-        "_summed": 3,  # the legs' amounts, NPVs and DV01s by group, one leg's by reference
         "_the_lots_arrays": 1,  # the leg's discounted lots and their sums
         "_the_lots_checked": 1,
         "_discounted_leg": 1,  # the leg's results over them

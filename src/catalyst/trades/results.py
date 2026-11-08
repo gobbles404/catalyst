@@ -78,21 +78,13 @@ class LegResults:
     curve shifted by one basis point together, explicitly not the sensitivity to one curve
     alone, zero for a cleared batch.
 
-    Since the ticket's second pull request the leg's values, retained so that a pair's legs
-    are separable: mark, the leg's share of the batch's mark, for a cleared batch its unsettled
-    fixed legs, set amounts and live amount, for a bilateral one its NPV; cash, its share of the
-    cash, its settled fixed legs and set amounts; dv01, its share of the batch's DV01, the leg's
-    DV01 by group summed, zero for a cleared batch; and per group payment_amount[g], the leg's
-    fixed leg, set amount and live amount of the group together, npv_by_group[g] that amount
-    times the group's factor, zero for a paid group, and dv01_by_group[g] -0.0001 times the
-    group's time fraction times that NPV, the three None for a cleared batch; the trade's are
-    the legs' summed, and with one leg the leg's are the trade's own, by reference."""
+    No value is a leg's, since two-index-one-price.md: a group's payment, NPV and DV01 are the
+    trade's, one amount against its one outright fixed price, and a leg's floating side is read
+    slot by slot, dated_live_contribution here and the preparation's fixed_contribution, by the
+    readback; nothing of the entry price is divided among the legs."""
 
     prepared: PreparedLeg
     market: Market
-    mark: float
-    cash: float
-    dv01: float
     dated_live_contribution: NDArray[np.float64]
     quote: NDArray[np.float64]
     contracts: NDArray[np.intp]
@@ -107,9 +99,6 @@ class LegResults:
     discounted_daily_lots: NDArray[np.float64]
     discounted_monthly_lots: NDArray[np.float64]
     discounted_yearly_lots: NDArray[np.float64]
-    payment_amount: NDArray[np.float64] | None
-    npv_by_group: NDArray[np.float64] | None
-    dv01_by_group: NDArray[np.float64] | None
     early_delta: EarlyRisk
     cross_gamma_total: float
     cross_contributions: tuple[CrossContribution, ...]
@@ -137,8 +126,9 @@ class TradeResults:
     Since #176, the bilateral fields. curves, since named-curves-slice-3.md, are the exact curve
     objects the batch's keys selected from the collection it was evaluated with, in key order,
     the curves the contributions are owned by, and none for a cleared batch; the collection
-    itself is not kept. payment_amount[g] is the group's offset, set amount and live amount
-    together over every leg, npv_by_group[g] that amount times its payment factor, zero for a
+    itself is not kept. payment_amount[g] is the group's fixed leg, the trade's since
+    two-index-one-price.md, with its set amounts and live amounts over every leg, one payment
+    against one price, npv_by_group[g] that amount times its payment factor, zero for a
     paid group, dv01_by_group[g] -0.0001 times the group's day count over 365 times its NPV, and
     payment_factor[g] the factor of the group's own curve, the one its key named, on the group's
     payment day, 1.0 for a paid group, the policy and no read; the four None for a cleared
