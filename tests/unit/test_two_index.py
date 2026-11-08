@@ -612,6 +612,17 @@ def test_calday_and_zero_quantities_hold_on_both_legs() -> None:
 # --- order, identity and fees --------------------------------------------------------------------
 
 
+def test_the_pair_books_a_cva_reserve_once_per_row_though_it_has_two_legs() -> None:
+    # cva-reserve.md: the row's signed amount once, the legs apart; a reserve enters no number.
+    batch = booked(ticket={**TICKET, "cva_reserve": [-40.0]})
+    assert (batch.encoded.reserves.marketing, batch.encoded.reserves.cva) == (0.0, -40.0)
+    results = valued(batch)
+    assert results.reserves is batch.encoded.reserves
+    assert results.mark == valued(booked()).mark
+    both = booked(ticket={**TICKET, "marketing_reserve": [15.0], "cva_reserve": [-40.0]})
+    assert (both.encoded.reserves.marketing, both.encoded.reserves.cva) == (15.0, -40.0)
+
+
 def test_histories_and_markets_match_the_legs_by_identity_whatever_their_order() -> None:
     batch = booked()
     hist_a, hist_b = histories()
@@ -1305,6 +1316,14 @@ def test_the_sheet_books_a_pair_from_a_column_of_two_index_handles(sheet: dict[s
     assert under(table, "second_schedule_method") == ["lastday"]
     assert under(table, "offset") == pytest.approx([-30_000.0], **CLOSE)
     assert "second_fixed_price" not in table[0] and "second_offset" not in table[0]
+    # cva-reserve.md: a CVA column books the row's signed amount once, the row's two legs apart.
+    marked = create(
+        down(sheet["a"], sheet["b"]),
+        across("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "cva_reserve"),
+        across(1.0, serial("2026-12-15"), "G27", 1.0, 3.00, -40.0),
+        sheet["template"],
+    )
+    assert under(read(marked), "cva_reserve") == [-40.0]
     # A row of two reads the same pair; the order entered is the legs' order and the handle's.
     assert re.fullmatch(
         rf"{PID}:trades:A\+B:\d+",
@@ -1473,7 +1492,7 @@ FIELDS = (
     "trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, "
     "settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, "
     "quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, "
-    "payment_holiday_calendar, marketing_reserve, settlement_frequency"
+    "payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency"
 )
 
 

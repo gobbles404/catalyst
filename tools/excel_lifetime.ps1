@@ -743,7 +743,7 @@ $curves = {
     Put $state $sheet "D33" '=TEXT(INDEX(_ReportRisk(D31,"dv01","day"),4,2),"0.000000")'
     Put $state $sheet "D34" '=TEXT(INDEX(_ReportRisk(D31,"dv01","day"),4,3),"0.000000")'
     Put $state $sheet "D35" '=INDEX(_ReportRisk(D31,"dv01","day"),2,3)'
-    Put $state $sheet "D36" "=INDEX(util_ReadHandle(D31),4,26)"
+    Put $state $sheet "D36" "=INDEX(util_ReadHandle(D31),4,27)"
     $id = Id $state
     $sofr = Text $state $sheet "D29"
     $ffois = Text $state $sheet "D30"
@@ -1614,7 +1614,7 @@ $pairs = {
     Put $state $sheet "J25" "=INDEX(_ReportValues(J24),3,1)"
     Put $state $sheet "J26" '=INDEX(_ReportRisk(J24,"dv01","year"),4,2)'
     Put $state $sheet "J27" "=INDEX(util_ReadHandle(J24),4,2)"
-    Put $state $sheet "J28" "=INDEX(util_ReadHandle(J24),4,32)"
+    Put $state $sheet "J28" "=INDEX(util_ReadHandle(J24),4,33)"
     $id = Id $state
     $trades = Text $state $sheet "J22"
     Check "the batch's cell shows its handle, named for both indexes in leg order" ($trades.StartsWith("${id}:trades:A+B:")) $trades

@@ -255,7 +255,8 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
     live = bridge.live_handles()
     for name, numeric, dated in (
         ("_ReportValues", 3, True),
-        ("_ReportReserves", 3, False),  # three totals and a currency, no day, since #170
+        ("_ReportReserves", 4, False),  # four totals and a currency, no day, since #170 and
+        # cva-reserve.md
     ):
         profile = call_profile(lambda name=name: PATH[name](results))
         expected = {

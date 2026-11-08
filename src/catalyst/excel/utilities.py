@@ -508,7 +508,8 @@ def trades_table(obj: Trades) -> MixedArray:
     # and a rule its text since payment-day-date-or-rule.md, and the day it gives for a
     # financial settlement; since #175 marketing_reserve where the batch has it, the amount the
     # row booked shown on each of its components, the one amount and no allocation among them,
-    # so a reader never sums the column down a strip;
+    # so a reader never sums the column down a strip, and since cva-reserve.md cva_reserve where
+    # it has that, the row's signed amount, likewise;
     # then what the resolution derived, since #172 entered_contract_code, the code text the row
     # entered as typed, kept apart from the period its components resolved to under
     # booked_period, and the words `(not supplied)` where the row entered none and booked by
@@ -578,6 +579,8 @@ def trades_table(obj: Trades) -> MixedArray:
         numbers("payment_date", "datetime64[D]", terms.payment.date)
     if terms.marketing_reserve is not None:  # the row's one amount on each of its components
         numbers("marketing_reserve", "float64", terms.marketing_reserve[rows])
+    if terms.cva_reserve is not None:  # likewise the row's signed amount, since cva-reserve.md
+        numbers("cva_reserve", "float64", terms.cva_reserve[rows])
     entered = np.full(obj.code_entered.size, NOT_SUPPLIED, dtype=object)
     entered[obj.code_entered] = np.array(obj.entered_codes, dtype=object)
     text("entered_contract_code", tuple(entered[rows]))
@@ -825,7 +828,7 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # once per group on the group's first row of all, the trade's and no leg's, since
     # two-index-one-price.md the payment being one amount against one price; a leg's floating
     # side is the observation columns' last. Then, since #170, the batch's reserves, once: the
-    # three totals and their currency on
+    # three totals, since cva-reserve.md the signed CVA's fourth, and their currency on
     # the first slot row, as _ReportReserves spills them, and a dash on every later row, since
     # they are the batch's booked amounts and no slot's. Then, since #197, the contract's
     # cross-gamma on every slot, read by the slot's reference as the contract's four risks are
@@ -931,6 +934,7 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
             _numbers_on("brokerage_reserve", np.array([reserves.brokerage]), once),
             _numbers_on("clearing_reserve", np.array([reserves.clearing]), once),
             _numbers_on("marketing_reserve", np.array([reserves.marketing]), once),
+            _numbers_on("cva_reserve", np.array([reserves.cva]), once),
             _words_on("currency", currency),
             _numbers_on("contract_cross_gamma", cross, every),
             _words_on("cross_gamma_unit", per_bp),

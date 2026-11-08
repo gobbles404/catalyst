@@ -272,6 +272,7 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
             "brokerage_reserve",
             "clearing_reserve",
             "marketing_reserve",
+            "cva_reserve",
             "currency",
             "contract_cross_gamma",
             "cross_gamma_unit",
@@ -285,7 +286,7 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
         ["str", "str", "datetime64[D]", "bool"]
         + ["float64"] * 7
         + ["str", "str"]
-        + ["float64"] * 7
+        + ["float64"] * 8
         + ["str", "float64", "str", "str", "str"]
         + ["float64", "float64", "str", "float64"],
     ]
@@ -301,6 +302,7 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
         0.0,
         0.0,
         0.0,
+        0.0,
         "USD",
         0.0,  # since #197 the contract's cross-gamma, nothing for a cleared batch, and its unit
         NG_PER_BP,
@@ -311,7 +313,7 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
         "USD/MMBTU",
         pytest.approx(512_000.0),
     ]
-    assert table[3][11:] == ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"] + ["-"] * 8 + [
+    assert table[3][11:] == ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"] + ["-"] * 9 + [
         0.0,
         NG_PER_BP,
         "-",
@@ -529,6 +531,7 @@ def test_the_paid_contract_reads_back_fixed_and_settled_with_no_live_exposure(
         0.0,
         0.0,
         0.0,
+        0.0,
         "USD",
         0.0,
         TOY_PER_BP,
@@ -539,7 +542,7 @@ def test_the_paid_contract_reads_back_fixed_and_settled_with_no_live_exposure(
         "USD/MMBTU",
         pytest.approx(516_800.0),
     ]
-    assert table[3][-12:-8] == ["-"] * 4  # the four price columns follow the key and curve
+    assert table[3][-13:-8] == ["-"] * 5  # the four price columns follow the key and curve
     assert table[3][-4:] == [-50_000.0, 3.50, "USD/MMBTU", pytest.approx(-175_000.0)]
     assert table[3][:7] == [
         "F27",
@@ -564,12 +567,12 @@ def test_a_fully_fixed_batch_inside_a_live_market_reports_its_cash_and_no_live_e
         + [0.0] * 7
         + TOY_UNITS
         + ["-"] * 4
-        + [0.0, 0.0, 0.0, "USD", 0.0, TOY_PER_BP, "-", "-"]
+        + [0.0, 0.0, 0.0, 0.0, "USD", 0.0, TOY_PER_BP, "-", "-"]
         + [160_000.0, 3.23, "USD/MMBTU", pytest.approx(516_800.0)],
         ["F27", "F27", serial("2026-12-29"), serial("2026-12-31"), True]
         + [0.0] * 7
         + TOY_UNITS
-        + ["-"] * 8
+        + ["-"] * 9
         + [0.0, TOY_PER_BP, "-", "-"]
         + [-50_000.0, 3.45, "USD/MMBTU", pytest.approx(-172_500.0)],
     ]
@@ -1170,7 +1173,7 @@ def test_the_pages_example_marks_2000_with_the_row_kept_ready_and_1000_once_it_i
     units = ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"]
     assert table[3] == ["F27", "F27", serial("2026-12-29"), False] + [0.0] * 7 + units + [
         "-"
-    ] * 8 + [
+    ] * 9 + [
         0.0,
         NG_PER_BP,
         "-",
@@ -2281,6 +2284,7 @@ def test_two_payment_days_on_one_contract_value_on_the_sheet_as_the_ticket_says(
         "brokerage_reserve",
         "clearing_reserve",
         "marketing_reserve",
+        "cva_reserve",
         "currency",
         "contract_cross_gamma",
         "cross_gamma_unit",
@@ -2292,8 +2296,8 @@ def test_two_payment_days_on_one_contract_value_on_the_sheet_as_the_ticket_says(
         "floating_contribution",
     ]
     assert [line[3] for line in table[2:]] == [line[3] for line in slots[2:]]
-    assert table[2][-12:-8] == [0.0, 0.0, 0.0, "USD"]
-    assert [line[-12:-8] for line in table[3:]] == [["-"] * 4] * 5  # once, not per slot
+    assert table[2][-13:-8] == [0.0, 0.0, 0.0, 0.0, "USD"]
+    assert [line[-13:-8] for line in table[3:]] == [["-"] * 5] * 5  # once, not per slot
     assert (
         by_header(results, "contract_nominal_delta") == [pytest.approx(delta)] * 6
     )  # the contract's
@@ -2748,6 +2752,7 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
         "brokerage_reserve",
         "clearing_reserve",
         "marketing_reserve",
+        "cva_reserve",
         "currency",
         "contract_cross_gamma",
         "cross_gamma_unit",
@@ -2769,6 +2774,7 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
         "USD per CENT/GAL",
         "lots of LOT (1000 BBL)",
         *["-"] * 4,
+        0.0,
         0.0,
         0.0,
         0.0,
@@ -2802,6 +2808,7 @@ def test_the_three_ete_rows_together_report_three_lots(ete: dict[str, Any]) -> N
         "USD per CENT/GAL",
         "lots of LOT (1000 BBL)",
         *["-"] * 4,
+        0.0,
         0.0,
         0.0,
         0.0,
@@ -2916,6 +2923,7 @@ def test_a_lot_is_one_lot_in_every_quote_and_settlement_unit(
         f"{settled} per {quote[0]}/{quote[1]}",
         "lots of LOT (1000 BBL)",
         *["-"] * 4,
+        0.0,
         0.0,
         0.0,
         0.0,
@@ -3773,11 +3781,11 @@ RESERVE_ROWS: list[list[object]] = [
     [104.0, serial("2026-11-20"), "Z26", 0.0, "LOT", 25.0, "lastday"],
 ]
 RESERVE_SPILL: list[list[object]] = [
-    ["brokerage_reserve", "clearing_reserve", "marketing_reserve", "currency"],
-    ["float64", "float64", "float64", "str"],
-    [50.0, 20.0, 0.0, "USD"],
+    ["brokerage_reserve", "clearing_reserve", "marketing_reserve", "cva_reserve", "currency"],
+    ["float64", "float64", "float64", "float64", "str"],
+    [50.0, 20.0, 0.0, 0.0, "USD"],
 ]
-RESERVE_HEADERS = ["brokerage_reserve", "clearing_reserve", "marketing_reserve", "currency"]
+RESERVE_HEADERS = RESERVE_SPILL[0]
 
 
 @pytest.fixture(scope="module")
@@ -3799,10 +3807,10 @@ def test_the_tickets_four_rows_report_fifty_and_twenty_dollars_of_reserves(
     # The results readback shows the four once, on its one slot row here; the batch's readback
     # carries no reserve, the owner's choice of the evaluated results as the place to read them.
     table = spilled(ENTRY["util_ReadHandle"](results))
-    assert table[0][-12:-8] == RESERVE_HEADERS  # the cross-gamma's two columns follow, then
+    assert table[0][-13:-8] == RESERVE_HEADERS  # the cross-gamma's two columns follow, then
     # since named-curves-slice-3.md the key and the curve, then the four price columns
-    assert table[1][-12:-8] == ["float64", "float64", "float64", "str"]
-    assert len(table) == 3 and table[2][-12:-8] == [50.0, 20.0, 0.0, "USD"]
+    assert table[1][-13:-8] == ["float64", "float64", "float64", "float64", "str"]
+    assert len(table) == 3 and table[2][-13:-8] == [50.0, 20.0, 0.0, 0.0, "USD"]
     batch = spilled(ENTRY["util_ReadHandle"](trades))
     assert not any("reserve" in str(header) for header in batch[0])
     # Value and risk are the free rows': the two LOT rows net, the barrels mark three cents on
@@ -3825,8 +3833,8 @@ def test_the_pricing_days_change_no_reserve_and_the_readback_shows_it_once(
     assert reserved(results) == RESERVE_SPILL
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert len(table) == 2 + slots
-    assert table[2][-12:-8] == [50.0, 20.0, 0.0, "USD"]
-    assert [line[-12:-8] for line in table[3:]] == [["-", "-", "-", "-"]] * (slots - 1)
+    assert table[2][-13:-8] == [50.0, 20.0, 0.0, 0.0, "USD"]
+    assert [line[-13:-8] for line in table[3:]] == [["-"] * 5] * (slots - 1)
 
 
 def test_one_batch_keeps_its_reserves_through_ticks_fixings_corrections_and_payment(
@@ -3869,12 +3877,12 @@ def test_recreating_the_batch_with_other_quantities_or_rates_books_other_reserve
     _, _, results = ete_state(
         fees["index"], fees["template"], doubled, "2026-12-02", {}, (28.0, 29.0)
     )
-    assert reserved(results)[2] == [100.0, 40.0, 0.0, "USD"]
+    assert reserved(results)[2] == [100.0, 40.0, 0.0, 0.0, "USD"]
     dearer = ete_index(fees={"LOT": (12.0, 5.0), "BBL": (0.02, 0.005)})
     _, _, results = ete_state(
         dearer, ete_template(broker="ION"), RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0)
     )
-    assert reserved(results)[2] == [68.0, 25.0, 0.0, "USD"]  # 24 + 24 + 20 and 10 + 10 + 5
+    assert reserved(results)[2] == [68.0, 25.0, 0.0, 0.0, "USD"]  # 24 + 24 + 20 and 10 + 10 + 5
     by_barrel = ete_index(reporting_lot="BBL", fees=RESERVE_FEES)
     _, _, results = ete_state(
         by_barrel, ete_template(broker="ION"), RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0)
@@ -3895,7 +3903,7 @@ def test_a_calday_strip_and_a_partial_asian_month_reserve_on_their_counts(
     _, _, results = ete_state(
         fees["index"], ete_template("calday", "ION"), strip, "2026-12-02", {}, (28.0, 29.0)
     )
-    assert reserved(results)[2] == [pytest.approx(1.24), pytest.approx(0.496), 0.0, "USD"]
+    assert reserved(results)[2] == [pytest.approx(1.24), pytest.approx(0.496), 0.0, 0.0, "USD"]
     partial: list[list[object]] = [
         [
             301.0,
@@ -3911,7 +3919,7 @@ def test_a_calday_strip_and_a_partial_asian_month_reserve_on_their_counts(
     _, _, results = ete_state(
         fees["index"], fees["template"], partial, "2026-12-02", {}, (28.0, 29.0), ETE_DATED
     )
-    assert reserved(results)[2] == [10.0, 4.0, 0.0, "USD"]
+    assert reserved(results)[2] == [10.0, 4.0, 0.0, 0.0, "USD"]
 
 
 def test_reserves_past_the_largest_number_publish_no_batch() -> None:
@@ -4227,7 +4235,7 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_
     assert reserved(results) == [
         RESERVE_SPILL[0],
         RESERVE_SPILL[1],
-        [60.0, 24.0, 65.0, "USD"],
+        [60.0, 24.0, 65.0, 0.0, "USD"],
     ]
     table = spilled(ENTRY["util_ReadHandle"](trades))
     i = table[0].index("marketing_reserve")
@@ -4237,14 +4245,14 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_
     assert [line[1] for line in table[2:]] == [1001.0, 1002.0, 1003.0, 1003.0, 1004.0]
     assert [line[i] for line in table[2:]] == [15.0, 20.0, 25.0, 25.0, 5.0]
     readback = spilled(ENTRY["util_ReadHandle"](results))
-    assert readback[2][-12:-8] == [60.0, 24.0, 65.0, "USD"]
+    assert readback[2][-13:-8] == [60.0, 24.0, 65.0, 0.0, "USD"]
     # The same rows without the column: the same value and risk, nought of marketing.
     plain_rows = [line[:-1] for line in MARKETING_ROWS]
     plain_trades, _, plain = ete_state(
         fees["index"], fees["template"], plain_rows, "2026-12-02", {}, (28.0, 29.0)
     )
     assert valued(plain) == valued(results)
-    assert reserved(plain)[2] == [60.0, 24.0, 0.0, "USD"]
+    assert reserved(plain)[2] == [60.0, 24.0, 0.0, 0.0, "USD"]
     assert "marketing_reserve" not in spilled(ENTRY["util_ReadHandle"](plain_trades))[0]
     # A duplicate of the first row counts again; a template's seven books once per row; a tick,
     # a fixing and payment leave the booked amounts where they were.
@@ -4257,13 +4265,13 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_
         (28.0, 29.0),
         MARKETING_HEADERS,
     )
-    assert reserved(doubled)[2] == [80.0, 32.0, 80.0, "USD"]
+    assert reserved(doubled)[2] == [80.0, 32.0, 80.0, 0.0, "USD"]
     seven = a_template_of(
         ("quantity_per", *ETE_FIELDS, "broker", "marketing_reserve"),
         ("month", "cleared", "financial", "ETE Clearing", "+1bd", "ION", 7.0),
     )
     _, _, templated = ete_state(fees["index"], seven, RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0))
-    assert reserved(templated)[2] == [50.0, 20.0, 28.0, "USD"]
+    assert reserved(templated)[2] == [50.0, 20.0, 28.0, 0.0, "USD"]
     _, _, paid = ete_state(
         fees["index"], seven, RESERVE_ROWS, "2027-01-04", {"2026-12-31": 27.0}, (30.0,)
     )
@@ -4271,6 +4279,7 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_
         50.0,
         20.0,
         28.0,
+        0.0,
         "USD",
     ]
 
@@ -4305,6 +4314,127 @@ def test_a_marketing_reserve_is_refused_by_its_row_its_cell_or_its_template(
         "#ERROR _CreateTrades: ValueError: marketing_reserve is supplied by the template and by "
         "the ticket, expected by one of them"
     )
+
+
+# A signed CVA reserve, cva-reserve.md: the ticket's rows on the same index, 2 LOT of Z26 at 25,
+# -2 LOT of the strip Z26-F27 at -40 and 0 LOT of Z26 at 0, book -15 once per row, the strip's two
+# components carrying its one amount, over 60 of brokerage and 24 of clearing and no marketing;
+# the same rows without the column value the same and book nought.
+CVA_HEADERS = (*ETE_HEADERS, "cva_reserve")
+CVA_ROWS: list[list[object]] = [
+    [1001.0, serial("2026-11-20"), "Z26", 2.0, "LOT", 25.0, "lastday", 25.0],
+    [1002.0, serial("2026-11-20"), "Z26-F27", -2.0, "LOT", 25.0, "lastday", -40.0],
+    [1003.0, serial("2026-11-20"), "Z26", 0.0, "LOT", 25.0, "lastday", 0.0],
+]
+
+
+def a_cva_template_of(amount: float) -> str:
+    return a_template_of(
+        ("quantity_per", *ETE_FIELDS, "broker", "cva_reserve"),
+        ("month", "cleared", "financial", "ETE Clearing", "+1bd", "ION", amount),
+    )
+
+
+def test_the_tickets_rows_book_minus_fifteen_of_cva_once_per_row_through_the_seam(
+    fees: dict[str, Any],
+) -> None:
+    trades, _, results = ete_state(
+        fees["index"], fees["template"], CVA_ROWS, "2026-12-02", {}, (28.0, 29.0), CVA_HEADERS
+    )
+    assert reserved(results) == [
+        RESERVE_SPILL[0],
+        RESERVE_SPILL[1],
+        [60.0, 24.0, 0.0, -15.0, "USD"],
+    ]
+    table = spilled(ENTRY["util_ReadHandle"](trades))
+    i = table[0].index("cva_reserve")
+    assert table[0][i - 1] == "payment_date" and table[0][i + 1] == "entered_contract_code"
+    assert "marketing_reserve" not in table[0]
+    assert table[1][i] == "float64"
+    # Four components, the strip's two carrying the one signed amount the row booked.
+    assert [line[1] for line in table[2:]] == [1001.0, 1002.0, 1002.0, 1003.0]
+    assert [line[i] for line in table[2:]] == [25.0, -40.0, -40.0, 0.0]
+    readback = spilled(ENTRY["util_ReadHandle"](results))
+    assert readback[0][-13:-8] == RESERVE_HEADERS
+    assert readback[2][-13:-8] == [60.0, 24.0, 0.0, -15.0, "USD"]
+    assert [line[-13:-8] for line in readback[3:]] == [["-"] * 5] * (len(readback) - 3)
+    # The same rows without the column: the same value and risk, nought of CVA.
+    plain_rows = [line[:-1] for line in CVA_ROWS]
+    plain_trades, _, plain = ete_state(
+        fees["index"], fees["template"], plain_rows, "2026-12-02", {}, (28.0, 29.0)
+    )
+    assert valued(plain) == valued(results)
+    assert spilled(ENTRY["_ReportRisk"](plain, "all", "year")) == spilled(
+        ENTRY["_ReportRisk"](results, "all", "year")
+    )
+    assert reserved(plain)[2] == [60.0, 24.0, 0.0, 0.0, "USD"]
+    assert "cva_reserve" not in spilled(ENTRY["util_ReadHandle"](plain_trades))[0]
+    # Both columns, marketing then CVA, each once per row; a duplicate of the first row counts
+    # again; a template's -40 books once per row; a tick, a fixing and payment leave the booked
+    # amounts where they were.
+    both_headers = (*MARKETING_HEADERS, "cva_reserve")
+    both_rows = [
+        [*line, cva] for line, cva in zip(MARKETING_ROWS, (25.0, -40.0, 0.0, 5.0), strict=True)
+    ]
+    both_trades, _, both = ete_state(
+        fees["index"], fees["template"], both_rows, "2026-12-02", {}, (28.0, 29.0), both_headers
+    )
+    assert reserved(both)[2] == [60.0, 24.0, 65.0, -10.0, "USD"]
+    headings = spilled(ENTRY["util_ReadHandle"](both_trades))[0]
+    assert headings.index("cva_reserve") == headings.index("marketing_reserve") + 1
+    _, _, doubled = ete_state(
+        fees["index"],
+        fees["template"],
+        [*CVA_ROWS, CVA_ROWS[0]],
+        "2026-12-02",
+        {},
+        (28.0, 29.0),
+        CVA_HEADERS,
+    )
+    assert reserved(doubled)[2] == [80.0, 32.0, 0.0, 10.0, "USD"]
+    forty = a_cva_template_of(-40.0)
+    _, _, templated = ete_state(fees["index"], forty, RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0))
+    assert reserved(templated)[2] == [50.0, 20.0, 0.0, -160.0, "USD"]
+    _, _, paid = ete_state(
+        fees["index"], forty, RESERVE_ROWS, "2027-01-04", {"2026-12-31": 27.0}, (30.0,)
+    )
+    assert valued(paid)[1] == pytest.approx(840.0)
+    assert reserved(paid)[2] == [50.0, 20.0, 0.0, -160.0, "USD"]
+
+
+def test_a_cva_reserve_is_refused_by_its_row_its_cell_its_template_or_its_total(
+    fees: dict[str, Any],
+) -> None:
+    create = ENTRY["_CreateTrades"]
+    index, template = fees["index"], fees["template"]
+    infinite = [[*line[:-1], float("inf")] if line[0] == 1002.0 else line for line in CVA_ROWS]
+    assert create(index, row(*CVA_HEADERS), rows(*infinite), template) == (
+        "#ERROR _CreateTrades: ValueError: cva_reserve row 2 is inf, expected a finite amount"
+    )
+    blank = [[*line[:-1], None] if line[0] == 1003.0 else line for line in CVA_ROWS]
+    assert create(index, row(*CVA_HEADERS), rows(*blank), template) == (
+        "#ERROR _CreateTrades: trade_rows cell (3, 8) is blank, expected number"
+    )
+    worded = [[*line[:-1], "ten"] if line[0] == 1001.0 else line for line in CVA_ROWS]
+    assert create(index, row(*CVA_HEADERS), rows(*worded), template) == (
+        "#ERROR _CreateTrades: trade_rows cell (1, 8) is text 'ten', expected number"
+    )
+    assert templated(["cva_reserve"], [float("nan")]) == (
+        "#ERROR _CreateTradeTemplate: ValueError: cva_reserve is nan, expected a finite amount"
+    )
+    assert create(index, row(*CVA_HEADERS), rows(*CVA_ROWS), a_cva_template_of(-40.0)) == (
+        "#ERROR _CreateTrades: ValueError: cva_reserve is supplied by the template and by the "
+        "ticket, expected by one of them"
+    )
+    # Amounts each finite summing past the largest number in either direction are refused for
+    # the batch, naming the reserve and no row.
+    for sign, text in ((1.0, "inf"), (-1.0, "-inf")):
+        huge = [[*line[:-1], sign * 9e307] for line in CVA_ROWS[:2]]
+        assert create(index, row(*CVA_HEADERS), rows(*huge), template) == (
+            f"#ERROR _CreateTrades: ValueError: the batch has {text} of cva reserve in all, "
+            "expected a finite amount of USD; the rows' amounts, each finite, sum past the "
+            "largest number"
+        )
 
 
 def test_a_bilateral_batch_names_its_counterparty_and_is_refused_at_evaluation_as_before(
@@ -4409,6 +4539,7 @@ RESULT_COLUMNS = [
     "brokerage_reserve",
     "clearing_reserve",
     "marketing_reserve",
+    "cva_reserve",
     "currency",
     "contract_cross_gamma",
     "cross_gamma_unit",
@@ -4595,12 +4726,12 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         [serial(A_YEAR_OUT), 0.0, 0.0, pytest.approx(-0.0095), 0.0],
         [serial(TWO_YEARS_OUT), 0.0, 0.0, pytest.approx(0.018), 0.0],
     ]
-    assert spilled(ENTRY["_ReportReserves"](results))[2] == [0.0, 0.0, 10.0, "USD"]
+    assert spilled(ENTRY["_ReportReserves"](results))[2] == [0.0, 0.0, 10.0, 0.0, "USD"]
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert table[0] == RESULT_COLUMNS
     assert table[1] == ["str", "str", "datetime64[D]", "datetime64[D]", "bool"] + [
         "float64"
-    ] * 7 + ["str", "str"] + ["float64"] * 7 + ["str", "float64", "str", "str", "str"] + [
+    ] * 7 + ["str", "str"] + ["float64"] * 8 + ["str", "float64", "str", "str", "str"] + [
         "float64",
         "float64",
         "str",
@@ -4623,6 +4754,7 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         0.0,
         0.0,
         10.0,
+        0.0,
         "USD",
         pytest.approx(0.00085),  # since #197 the contract's cross-gamma, on both its rows
         "lots of UNIT (1 BBL) per basis point",
@@ -4640,7 +4772,7 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         pytest.approx(-100.0),
         pytest.approx(-90.0),
         pytest.approx(0.018),
-        *["-"] * 4,
+        *["-"] * 5,
         pytest.approx(0.00085),
         "lots of UNIT (1 BBL) per basis point",
         "SOFR",
@@ -4678,7 +4810,7 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         [serial(TWO_YEARS_OUT), pytest.approx(0.0184)],
     ]
     for handle in (ticked, replaced):
-        assert spilled(ENTRY["_ReportReserves"](handle))[2] == [0.0, 0.0, 10.0, "USD"]
+        assert spilled(ENTRY["_ReportReserves"](handle))[2] == [0.0, 0.0, 10.0, 0.0, "USD"]
 
 
 def test_the_one_receivable_values_through_its_life_on_the_sheet(unit: dict[str, Any]) -> None:
@@ -4726,7 +4858,7 @@ def test_the_one_receivable_values_through_its_life_on_the_sheet(unit: dict[str,
         table = spilled(ENTRY["util_ReadHandle"](paid))
         assert table[2][4:5] == [True]  # fixed
         assert table[2][14:18] == [1.0, pytest.approx(120.0), 0.0, 0.0]
-        assert spilled(ENTRY["_ReportReserves"](paid))[2] == [0.0, 0.0, 5.0, "USD"]
+        assert spilled(ENTRY["_ReportReserves"](paid))[2] == [0.0, 0.0, 5.0, 0.0, "USD"]
     _, _, _, cleared = unit_state(
         unit, unit["one_cleared"], UNIT_AS_OF, (80.0, 50.0), bridge.MISSING
     )
@@ -4737,7 +4869,7 @@ def test_the_one_receivable_values_through_its_life_on_the_sheet(unit: dict[str,
         *risk_head(UNIT_AS_OF, CLEARED_DV01),
         ["Total", 0.0],
     ]
-    assert spilled(ENTRY["_ReportReserves"](cleared))[2] == [0.0, 0.0, 5.0, "USD"]
+    assert spilled(ENTRY["_ReportReserves"](cleared))[2] == [0.0, 0.0, 5.0, 0.0, "USD"]
 
 
 def test_the_curves_rules_reach_the_sheet_and_publish_nothing(unit: dict[str, Any]) -> None:
@@ -5204,27 +5336,27 @@ def test_each_fee_is_charged_where_the_booking_says_so_through_the_seam(
         _, results = fee_state(index, template, lines, route == "bilateral", headers)
         return reserved(results)[2]
 
-    assert booked("bilateral", None) == [0.0, 0.0, 0.0, "USD"]
-    assert booked("bilateral", "ION") == [100.0, 0.0, 0.0, "USD"]
-    assert booked("cleared", None) == [0.0, 40.0, 0.0, "USD"]
-    assert booked("cleared", "ION") == [100.0, 40.0, 0.0, "USD"]
+    assert booked("bilateral", None) == [0.0, 0.0, 0.0, 0.0, "USD"]
+    assert booked("bilateral", "ION") == [100.0, 0.0, 0.0, 0.0, "USD"]
+    assert booked("cleared", None) == [0.0, 40.0, 0.0, 0.0, "USD"]
+    assert booked("cleared", "ION") == [100.0, 40.0, 0.0, 0.0, "USD"]
     for token in ("None", "none", "NONE"):
-        assert booked("bilateral", token) == [0.0, 0.0, 0.0, "USD"]
-        assert booked("cleared", token) == [0.0, 40.0, 0.0, "USD"]
+        assert booked("bilateral", token) == [0.0, 0.0, 0.0, 0.0, "USD"]
+        assert booked("cleared", token) == [0.0, 40.0, 0.0, 0.0, "USD"]
     sold: list[list[object]] = [[1.0, serial("2026-11-20"), "Z26", -10.0, "LOT", 25.0, "lastday"]]
-    assert booked("cleared", "ION", sold) == [100.0, 40.0, 0.0, "USD"]
-    assert booked("cleared", "ION", [*TEN_LOTS, *sold]) == [200.0, 80.0, 0.0, "USD"]
+    assert booked("cleared", "ION", sold) == [100.0, 40.0, 0.0, 0.0, "USD"]
+    assert booked("cleared", "ION", [*TEN_LOTS, *sold]) == [200.0, 80.0, 0.0, 0.0, "USD"]
     # The broker in the ticket's column instead: the same; a column mixing a broker and none
     # charges the brokered row alone, every row clearing on the cleared route.
     with_broker = (*ETE_HEADERS, "broker")
     brokered: list[list[object]] = [[*TEN_LOTS[0], "ION"]]
-    assert booked("cleared", None, brokered, with_broker) == [100.0, 40.0, 0.0, "USD"]
+    assert booked("cleared", None, brokered, with_broker) == [100.0, 40.0, 0.0, 0.0, "USD"]
     mixed: list[list[object]] = [
         [*TEN_LOTS[0], "ION"],
         [2.0, serial("2026-11-20"), "Z26", 10.0, "LOT", 25.0, "lastday", "None"],
     ]
-    assert booked("cleared", None, mixed, with_broker) == [100.0, 80.0, 0.0, "USD"]
-    assert booked("bilateral", None, mixed, with_broker) == [100.0, 0.0, 0.0, "USD"]
+    assert booked("cleared", None, mixed, with_broker) == [100.0, 80.0, 0.0, 0.0, "USD"]
+    assert booked("bilateral", None, mixed, with_broker) == [100.0, 0.0, 0.0, 0.0, "USD"]
     # The texts stand as typed in the readback, and neither value nor risk moves with the broker.
     trades, results = fee_state(index, fee_template("cleared"), mixed, False, with_broker)
     table = spilled(ENTRY["util_ReadHandle"](trades))

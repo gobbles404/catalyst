@@ -180,7 +180,10 @@ class ResolvedTrades:
     case, the desk's word for a screen trade, reserve-fee-applicability.md; marketing_reserve[i]
     since #175 the marketing cost the row booked once, a finite amount of zero or more in the
     settlement currency, None as a whole when neither the template nor the ticket supplied it,
-    read by the reserves alone; discount_curve_key[i], since named-curves-slice-3.md, the
+    read by the reserves alone; cva_reserve[i] since cva-reserve.md the credit valuation
+    adjustment reserve the row booked once, a finite amount of either sign in the settlement
+    currency, None as a whole when neither supplied it, read by the reserves alone;
+    discount_curve_key[i], since named-curves-slice-3.md, the
     exact name of the curve the row's payments discount on, one per occurrence for a bilateral
     batch and None as a whole for a cleared one, read by the encoding for the groups and by the
     evaluation to select the curve, never a curve itself. Per component, the contract months the
@@ -232,6 +235,7 @@ class ResolvedTrades:
     component_quantity: NDArray[np.float64]
     fixed_price: NDArray[np.float64]
     marketing_reserve: NDArray[np.float64] | None
+    cva_reserve: NDArray[np.float64] | None
     payment: PaymentTerms | None
     legs: tuple[LegTerms, ...]
 
@@ -282,6 +286,7 @@ def resolved_trades(
     schedule_month: NDArray[np.int64] | None = None,
     counterparty: tuple[str, ...] | None = None,
     marketing_reserve: NDArray[np.float64] | None = None,
+    cva_reserve: NDArray[np.float64] | None = None,
     discount_curve_key: tuple[str, ...] | None = None,
     second_leg: LegInputs | None = None,
 ) -> ResolvedTrades:
@@ -357,6 +362,7 @@ def resolved_trades(
         discount_curve_key,
         broker,
         marketing_reserve,
+        cva_reserve,
     )
     _the_keys(route, discount_curve_key)
     _the_selections(
@@ -415,6 +421,7 @@ def resolved_trades(
         _the_component_quantity(quantity_per, quantities, days, trade_ids, occurrence),
         _frozen_numbers(fixed_price),
         None if marketing_reserve is None else _frozen_numbers(marketing_reserve),
+        None if cva_reserve is None else _frozen_numbers(cva_reserve),
         pays,
         legs,
     )
@@ -788,8 +795,9 @@ def _the_occurrences(
     discount_curve_key: tuple[str, ...] | None,
     broker: tuple[str, ...] | None,
     marketing_reserve: NDArray[np.float64] | None,
+    cva_reserve: NDArray[np.float64] | None,
 ) -> int:
-    """One or more, a date each and, for the IDs, each label tuple and the marketing reserves
+    """One or more, a date each and, for the IDs, each label tuple and each entered reserve
     given, one each: their count."""
     occurrences = trade_dates.size
     if occurrences == 0:
@@ -808,11 +816,11 @@ def _the_occurrences(
             raise ValueError(
                 f"{name} has {len(texts)} texts, expected {occurrences}, one per occurrence"
             )
-    if marketing_reserve is not None and marketing_reserve.size != occurrences:
-        raise ValueError(
-            f"marketing_reserve has {marketing_reserve.size} amounts, expected {occurrences}, "
-            "one per occurrence"
-        )
+    for name, amounts in (("marketing_reserve", marketing_reserve), ("cva_reserve", cva_reserve)):
+        if amounts is not None and amounts.size != occurrences:
+            raise ValueError(
+                f"{name} has {amounts.size} amounts, expected {occurrences}, one per occurrence"
+            )
     return occurrences
 
 
