@@ -1,9 +1,9 @@
 # A rolling nearby contract for futures averages
 
-**Status:** Agreed with the owner on 13 November 2026 for
+**Status:** The first slice built in #245. Agreed with the owner on 13 November 2026 for
 [issue #238](https://github.com/gobbles404/catalyst/issues/238), this page in the first slice's
 first commit; three pull requests stacked from main after #242. The first, the fixings and the
-history holding a settle for more than one nearby, is the slice this page opens;
+history holding a settle for more than one nearby, is #245, the slice this page opens;
 the second, the `nearby` field required of every template and priced on trades, and the third,
 quotes and requests for quote, follow on it. It builds on
 [calendar-driven-asian-references.md](calendar-driven-asian-references.md), #165, which gave an
