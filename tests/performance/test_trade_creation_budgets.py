@@ -698,7 +698,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "_the_fixed_leg": 1,  # two-index-one-price.md: the trade's fixed leg, once
         "_the_group_offsets": 1,  # the trade's fixed legs by group
         "_the_exposures": 1,  # the leg's slots' exposures
-        "_distinct": 2,  # the groups by contract and day, the slots by group and day
+        "_distinct": 2,  # the groups by period and day, the slots by group, day and contract
         "_the_references": 1,
         "observation_references": 1,  # the reader shared with a quote, template-based-quoting.md
         "requires_booked_reference": 1,  # the methods' fact the references read, once

@@ -37,7 +37,7 @@ from catalyst.market.market_history import MarketHistory, market_history
 from catalyst.market_data.futures_fixings import futures_fixings
 from catalyst.market_data.iferc_fixings import iferc_fixings
 from catalyst.market_data.price_vector import price_vector
-from catalyst.trades.encoding import encoded
+from catalyst.trades.encoding import Encoded, encoded
 from catalyst.trades.evaluation import trade_results
 from catalyst.trades.observations import Observations, observations, observed
 from catalyst.trades.preparation import PreparedTrades, prepared_trades
@@ -200,6 +200,15 @@ def paying(pays: NDArray[np.datetime64], occurrences: int, lag: int = 2) -> Paym
         (PAYMENT_CALENDAR,) * occurrences,
         pays,
     )
+
+
+def day_contracts(enc: Encoded) -> list[str]:
+    """The contract read on each observation day of the first leg, by day and then by contract:
+    one code per day where every slot of a day reads one contract, as a first-nearby batch's do."""
+    leg = enc.legs[0]
+    codes = leg.leg.schedule.codes
+    read = {(int(d), int(r)) for d, r in zip(leg.day_of_slot, leg.slot_reference, strict=True)}
+    return [codes[r] for _, r in sorted(read)]
 
 
 def terms_of(
@@ -5127,9 +5136,7 @@ def test_day_buckets_follow_the_observation_and_month_buckets_the_pricing_contra
         "2027-02-01",
         "2027-02-02",
     ]
-    assert [WTI.schedule.codes[int(r)] for r in enc.legs[0].day_reference] == ["G27"] * 4 + [
-        "H27"
-    ] * 2
+    assert day_contracts(enc) == ["G27"] * 4 + ["H27"] * 2
     assert [str(m) for m in enc.legs[0].contract_months] == ["2027-02-01", "2027-03-01"]
     assert [str(y) for y in enc.legs[0].contract_years] == ["2027-01-01"]
     np.testing.assert_array_equal(enc.legs[0].contract_month_of_reference, [0, 1])
@@ -5177,8 +5184,7 @@ def test_a_lastday_f27_observed_in_december_counts_in_january_and_the_asian_by_i
     live, _ = wti_valued("2026-12-18", (72.0, 75.0))
     days, daily, months, monthly, years, yearly = views(live.prepared)
     assert days == list(WTI_WINDOW) and daily == pytest.approx([0.2] * 6)
-    references = [WTI.schedule.codes[int(r)] for r in live.prepared.encoded.legs[0].day_reference]
-    assert references == ["F27"] * 2 + ["G27"] * 4
+    assert day_contracts(live.prepared.encoded) == ["F27"] * 2 + ["G27"] * 4
     assert (months, years) == (["2027-01-01", "2027-02-01"], ["2027-01-01"])
     assert monthly == pytest.approx([0.4, 0.8]) and yearly == pytest.approx([1.2])
     rolled, _ = wti_valued("2026-12-22", (75.0,))

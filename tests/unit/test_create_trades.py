@@ -2842,7 +2842,7 @@ def test_the_asian_and_pen_share_one_december_axis_of_22_days_one_month_and_one_
     assert [str(d) for d in batch.resolved.payment.date] == ["2027-01-04", "2026-12-31"]
     assert len(DECEMBER_PRICING_DAYS) == 22
     assert [str(d) for d in enc.legs[0].days] == DECEMBER_PRICING_DAYS
-    assert [MONTHLY.schedule.codes[int(r)] for r in enc.legs[0].day_reference] == ["Z26"] * 22
+    assert [MONTHLY.schedule.codes[int(r)] for r in enc.legs[0].slot_reference] == ["Z26"] * 23
     assert [str(m) for m in enc.legs[0].contract_months] == ["2026-12-01"]
     assert [str(y) for y in enc.legs[0].contract_years] == ["2026-01-01"]
     np.testing.assert_array_equal(enc.legs[0].contract_month_of_reference, [0])
