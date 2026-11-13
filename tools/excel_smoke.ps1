@@ -368,8 +368,10 @@ $formulas = [ordered]@{
     # the first nearby's 80.5 and 5,000 at the second's 82.5; the second row alone in XV26:XV28;
     # the batch refused by the history of the prompt alone, which holds no settle of N26 on a day
     # M26 is prompt; a nearby the schedule lists no contract for, a number that is no position,
-    # the field left out and the field in both refused when the batch is made; and a quote
-    # template's later nearby, in XV51, refused when it is quoted, the first, in XV52, quoting 80.5.
+    # the field left out and the field in both refused when the batch is made; and since the
+    # ticket's third slice a quote template's nearby priced as a row's is, the second nearby in
+    # XV51 quoting 82.5 and the first in XV52 80.5, a later nearby under lastday, in XV53,
+    # refused by name.
     '=MID(XV23,FIND(":",XV23)+1,12)'     = "trades:ROLL:"
     "=ROWS(util_ReadHandle(XV23))"      = "4"
     "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23)))" = "nearby"
@@ -392,7 +394,8 @@ $formulas = [ordered]@{
     "=_CreateTrades(XV5,XQ39:XW39,XQ45:XW45,XV22)" = "#ERROR _CreateTrades: trade_rows cell (1, 7) is text 'second', expected number"
     "=_CreateTrades(XV5,XQ39:XV39,XQ40:XV41,XV22)" = "#ERROR _CreateTrades: ValueError: nearby is missing, expected a value in the template or a column in the ticket"
     "=_CreateTrades(XV5,XQ39:XW39,XQ40:XW41,XV13)" = "#ERROR _CreateTrades: ValueError: nearby is supplied by the template and by the ticket, expected by one of them"
-    "=_QuoteByDates(XV17,XS34,XT34,XV51)" = "#ERROR _QuoteByDates: ValueError: nearby is 2, expected 1 in a quote template; a quote and a request for quote price the prompt contract's days, and a later nearby is booked as a trade"
+    "=_QuoteByDates(XV17,XS34,XT34,XV51)" = "82.5"
+    '=_Quote(XV17,"N26",XV53)'          = "#ERROR _Quote: ValueError: nearby of the quote is 2, expected 1 under schedule_method = lastday; the expiry-based methods take their own contract's days, and a later nearby is priced under asian"
     "=_QuoteByDates(XV17,XS34,XT34,XV52)" = "80.5"
     # The IFERC fixings: a creator over a column of contract codes, the newest month first as the
     # creator requires, a column of indices and the index in EE2, whose schedule holds those four
@@ -2336,7 +2339,7 @@ $formulas = [ordered]@{
     '=TEXT(_QuoteRFQ(VA7,XD2,VN6),"0.0000")' = "52.4570"
     '=TEXT(_QuoteRFQ(VA7,XD3),"0.0000")'     = "51.9130"
     "=ROWS(util_ReadHandle(XD1))"        = "4"
-    "=COLUMNS(util_ReadHandle(XD1))"     = "14"
+    "=COLUMNS(util_ReadHandle(XD1))"     = "15"
     "=INDEX(util_ReadHandle(XD1),1,1)"   = "row"
     "=INDEX(util_ReadHandle(XD1),1,2)"   = "period"
     "=INDEX(util_ReadHandle(XD1),3,14)"  = "monthly"
@@ -3906,7 +3909,8 @@ $cells = [ordered]@{
     # in XQ39:XW39 with nearby its last, two rows in XQ40:XW41, and rows for the creator to
     # refuse, a fourth nearby in row 43, nought in row 44 and text in row 45; the batch, its
     # preparation and its values in XV23:XV25, the second row alone in XV26:XV28, and two quote
-    # templates over the window's terms, a later nearby in XV51 and the first in XV52.
+    # templates over the window's terms, the second nearby in XV51 and the first in XV52, and
+    # one under lastday by the month with a second nearby, row 50, in XV53.
     "XV22" = '=_CreateTradeTemplate("fixed_float",XQ30:XY30,XQ31:XY31)'
     "XQ39" = "trade_id"; "XR39" = "trade_date"; "XS39" = "start_date"; "XT39" = "end_date"; "XU39" = "quantity"; "XV39" = "fixed_price"; "XW39" = "nearby"
     "XQ40" = "1"; "XR40" = "1-Jun-2026"; "XS40" = "15-Jun-2026"; "XT40" = "16-Jun-2026"; "XU40" = "2000"; "XV40" = "80"; "XW40" = "1"
@@ -3925,6 +3929,8 @@ $cells = [ordered]@{
     "XQ49" = "cleared"; "XR49" = "financial"; "XS49" = "asian"; "XT49" = "period"; "XU49" = "onetime"; "XV49" = "18-Jun-2026"; "XW49" = "=XV2"; "XX49" = "1"
     "XV51" = '=_CreateQuoteTemplate("fixed_float",XQ47:XX47,XQ48:XX48)'
     "XV52" = '=_CreateQuoteTemplate("fixed_float",XQ47:XX47,XQ49:XX49)'
+    "XQ50" = "cleared"; "XR50" = "financial"; "XS50" = "lastday"; "XT50" = "month"; "XU50" = "monthly"; "XV50" = "+2bd"; "XW50" = "=XV2"; "XX50" = "2"
+    "XV53" = '=_CreateQuoteTemplate("fixed_float",XQ47:XX47,XQ50:XX50)'
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January

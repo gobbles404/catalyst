@@ -368,9 +368,9 @@ FIXED_FLOAT = Instrument(
             "1 is the prompt contract on each observation day, the listed contract nearest its "
             "expiry, 2 the next the schedule lists and so on, found afresh for every day by the "
             "calendar's own roll, the expiry day the expiring contract's; a number above 1 is "
-            "booked under asian on one futures index, financially settled, and refused by name "
-            "under another method, on an IFERC index, with two indexes, under a physical "
-            "settlement and by a quote or a request for quote",
+            "booked and quoted under asian on one futures index, financially settled, and refused "
+            "by name under another method, on an IFERC index, with two indexes and under a "
+            "physical settlement",
             quote_allowed=True,
             quote_required=True,
         ),

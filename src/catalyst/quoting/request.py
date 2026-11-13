@@ -70,6 +70,7 @@ from catalyst.trades.terms import (
     SettlementFrequency,
     frequency_rules,
     month_bounds,
+    nearby_rules,
     payments_after_observations,
     period_words,
 )
@@ -92,7 +93,7 @@ class Terms:
     """The template's terms as a quote reads them: the five codes as their enums, since
     dated-quotes.md the frequency among them, monthly or onetime, read and held to the kernel's
     rules by the_frequency; since nearby-selection.md the nearby, the contract each observation
-    day is priced by counted from the day's prompt, 1 alone until a quote prices a later one;
+    day is priced by counted from the day's prompt, held to the kernel's rules by the_nearby;
     for a financial settlement the payment day, since
     payment-day-date-or-rule.md a date as entered or a rule read whole with its text, the other
     None, and both None for a request paying on its own dates under a template without one,
@@ -170,8 +171,8 @@ def the_terms(
     template: QuoteTemplate, counter: WorkCounter, request_dates: bool | None = None
 ) -> Terms:
     """The template's terms, complete for a quote: each field the definition always requires of a
-    quote present, the four codes read as their enums, the nearby 1, since nearby-selection.md
-    required of every quote template and a later one refused by name until a quote prices it,
+    quote present, the four codes read as their enums, the nearby as the whole number the
+    template read, since nearby-selection.md required of every quote template,
     a physical settlement on the cleared route
     alone, and each conditional field present exactly when its condition holds, the condition
     the definition's own words; then the payment day for a financial settlement, a date as it is
@@ -193,11 +194,6 @@ def the_terms(
         "settlement_frequency", _text(values, "settlement_frequency")
     )
     nearby = cast(int, values["nearby"])
-    if nearby != 1:
-        raise ValueError(
-            f"nearby is {nearby}, expected 1 in a quote template; a quote and a request for "
-            "quote price the prompt contract's days, and a later nearby is booked as a trade"
-        )
     if route is Route.BILATERAL and settlement is Settlement.PHYSICAL:
         raise ValueError(
             "settlement_method is 'physical', expected 'financial' with route = bilateral; a "
@@ -251,6 +247,23 @@ def the_frequency(terms: Terms, kind: Kind, who: str) -> None:
     frequency_rules(
         np.array([FREQUENCIES.index(terms.frequency)], dtype=np.intp),
         np.array([BASES.index(terms.quantity_per)], dtype=np.intp),
+        np.array([METHODS.index(terms.method)], dtype=np.intp),
+        terms.settlement,
+        kind,
+        False,
+        lambda _: who,
+    )
+
+
+def the_nearby(terms: Terms, kind: Kind, who: str) -> None:
+    """The template's nearby with the terms it stands under, since nearby-selection.md the
+    kernel's one rule, nearby_rules, over the template's one set of terms on one index, named
+    as the quote or the request in a refusal: a nearby above 1, a contract after the day's
+    prompt, on a futures index alone, financially settled and under the asian method. Whether
+    the schedule lists a contract that far on is the reference rule's, day by day, a fixing
+    the history's reader's and a live price the market's."""
+    nearby_rules(
+        np.array([terms.nearby], dtype=np.intp),
         np.array([METHODS.index(terms.method)], dtype=np.intp),
         terms.settlement,
         kind,

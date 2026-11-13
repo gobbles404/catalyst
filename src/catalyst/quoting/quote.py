@@ -26,6 +26,7 @@ from catalyst.quoting.request import (
     the_curve,
     the_frequency,
     the_method,
+    the_nearby,
     the_period,
     the_request,
     the_terms,
@@ -119,6 +120,7 @@ def _priced(
     index = calendar.index
     as_of = calendar.valuation_date.as_of
     the_frequency(terms, index.kind, "the quote")
+    the_nearby(terms, index.kind, "the quote")
     curve = the_curve(terms, curve_set, as_of, counter)
     schedule = trade_schedule_of(index)
     the_method(terms, schedule)

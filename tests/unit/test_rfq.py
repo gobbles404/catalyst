@@ -208,6 +208,7 @@ HEADINGS = [
     "quote_unit",
     "discount_curve_key",
     "settlement_frequency",
+    "nearby",
 ]
 
 
@@ -246,6 +247,7 @@ def test_the_tickets_cases_by_hand() -> None:
     assert under(table, "quote_unit") == ["USD per BBL"] * 2
     assert under(table, "discount_curve_key") == ["SOFR", "SOFR"]
     assert under(table, "settlement_frequency") == ["monthly", "monthly"]
+    assert under(table, "nearby") == [1.0, 1.0]
     by_template = grid(request(template=otc()))
     assert under(by_template, "payment_source") == ["template", "template"]
     assert under(by_template, "payment_date") == [serial("2027-02-05"), serial("2027-03-05")]
@@ -1023,6 +1025,7 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "USD per BBL",
         "SOFR",
         "monthly",
+        1.0,
     ]
     assert table[3][5:7] == ["request", serial("2027-03-08")]
     assert spilled(ENTRY["util_ReadHandle"](saved))[2][5:7] == ["template", serial("2027-02-05")]

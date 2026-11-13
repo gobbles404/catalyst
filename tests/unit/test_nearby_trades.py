@@ -424,7 +424,8 @@ def test_a_later_nearby_is_refused_by_name_where_it_is_not_priced() -> None:
     nearby_rules(np.ones(2, dtype=np.intp), lastday, Settlement.PHYSICAL, Kind.IFERC, True, named)
 
 
-def test_a_quote_template_holds_the_field_and_prices_the_first_nearby_alone() -> None:
+def test_a_quote_template_is_required_to_hold_the_field() -> None:
+    # What a quote prices under the field is tests/unit/test_nearby_quotes.py's.
     market = quoted(history_on(JUNE_17, 2), 81.5, 83.5)
     terms: dict[str, object] = {
         "route": "cleared",
@@ -439,11 +440,5 @@ def test_a_quote_template_holds_the_field_and_prices_the_first_nearby_alone() ->
     with pytest.raises(ValueError) as refusal:
         quote_by_dates(market, start, end, a_quote_template(**terms), None, WorkCounter())
     assert str(refusal.value) == "nearby is missing, expected it in the quote template"
-    with pytest.raises(ValueError) as refusal:
-        quote_by_dates(market, start, end, a_quote_template(**terms, nearby=2), None, WorkCounter())
-    assert str(refusal.value) == (
-        "nearby is 2, expected 1 in a quote template; a quote and a request for quote price the "
-        "prompt contract's days, and a later nearby is booked as a trade"
-    )
     first = a_quote_template(**terms, nearby=1)
     assert quote_by_dates(market, start, end, first, None, WorkCounter()) == 80.5

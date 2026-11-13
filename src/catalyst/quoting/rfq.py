@@ -38,6 +38,7 @@ from catalyst.quoting.request import (
     the_curve,
     the_frequency,
     the_method,
+    the_nearby,
     the_payments,
     the_terms,
 )
@@ -121,6 +122,7 @@ def rfq(index: Index, ticket: FieldValues, template: QuoteTemplate, counter: Wor
     dated = ticket.has("payment_day")
     terms = the_terms(template, counter, dated)
     the_frequency(terms, index.kind, "the request")
+    the_nearby(terms, index.kind, "the request")
     schedule = trade_schedule_of(index)
     the_method(terms, schedule)
     if dated and terms.settlement is Settlement.PHYSICAL:

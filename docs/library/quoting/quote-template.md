@@ -20,7 +20,7 @@ The ticket's bilateral example, seven fields:
 | 2 | bilateral | financial | asian | calday | +5bd | `30512:holiday_calendar:13` | SOFR | monthly | 1 |
 | 3 | `=_CreateQuoteTemplate("fixed_float", A1:I1, A2:I2)` | shows `30512:quote_template:41` | | | | | | | |
 
-`nearby`, since [nearby-selection.md](../../engineering-tickets/trade-valuation-pipeline/nearby-selection.md), is the contract each observation day is priced by, counted from the day's prompt, required of every quote template as `settlement_frequency` is; a quote and a request for quote price `1`, the prompt contract's days, and refuse another number by name, [quote.md](quote.md).
+`nearby`, since [nearby-selection.md](../../engineering-tickets/trade-valuation-pipeline/nearby-selection.md), is the contract each observation day is priced by, counted from the day's prompt, required of every quote template as `settlement_frequency` is; a quote, a quote by dates and a request for quote price it as a batch does, a number above 1 under `asian` on a futures index, financially settled, [quote.md](quote.md).
 
 A cleared financial template has `route` cleared, no `discount_curve_key` and otherwise the same terms; a cleared physical one `settlement_method` physical, `schedule_method` lastday and no payment fields.
 
