@@ -108,6 +108,7 @@ NG_TEMPLATE: dict[str, object] = {
     "quantity_unit": "NYMEX NG",
     "quantity_per": "month",
     "settlement_frequency": "monthly",
+    "nearby": 1.0,
     "schedule_method": "lastday",
     "route": "cleared",
     "settlement_method": "physical",
@@ -1853,7 +1854,7 @@ def test_the_batch_fields_are_read_in_the_pages_order_the_unit_first() -> None:
     # supplies every batch field wrong at once, every row agreeing, since a template reads its
     # own values when it is made and would name the first wrong one in its row's order. The
     # unit is named, and each field put right names the next, until the batch is made.
-    template = {"clearing_house": "CME Clearing", "settlement_frequency": "monthly"}
+    template = {"clearing_house": "CME Clearing", "settlement_frequency": "monthly", "nearby": 1.0}
     ticket: dict[str, list[object]] = {
         **NG_TICKET,
         "quantity_unit": ["ICE PHH"] * 5,
@@ -2182,6 +2183,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "coefficient",
         "offset",
         "settlement_frequency",
+        "nearby",
     ]
     assert table[1] == [
         "int64",
@@ -2205,6 +2207,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "float64",
         "float64",
         "str",
+        "int64",
     ]
     first = [
         1.0,
@@ -2228,6 +2231,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         100_000.0,
         -310_000.0,
         "monthly",
+        1.0,
     ]
     assert table[2] == first
     assert table[3][3] == "Z26"  # the schedule's spelling, where the ticket typed z26
@@ -2242,8 +2246,8 @@ def test_the_spill_shows_the_batchs_facts_wherever_they_came_from(sheet: dict[st
     # three are read back, the counterparty between the clearing house's place and the broker's.
     template = ENTRY["_CreateTradeTemplate"](
         "fixed_float",
-        row("quantity_unit", "quantity_per", "schedule_method", "settlement_frequency"),
-        row("NYMEX NG", "month", "lastday", "monthly"),
+        row("quantity_unit", "quantity_per", "schedule_method", "settlement_frequency", "nearby"),
+        row("NYMEX NG", "month", "lastday", "monthly", 1.0),
     )
     handle = ENTRY["_CreateTrades"](
         sheet["index"],
@@ -2317,6 +2321,7 @@ def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any
         "coefficient",
         "offset",
         "settlement_frequency",
+        "nearby",
     ]
     assert [line[0] for line in table[2:]] == [1.0, 1.0]
     assert [line[14] for line in table[2:]] == ["Z26-F27", "Z26-F27"]  # the strip as typed
@@ -2339,7 +2344,7 @@ def test_a_row_kept_ready_crosses_the_seam_as_a_number_and_reads_back_at_nothing
     assert len(table) == 4  # two heading rows and both components, the second kept at nothing
     assert table[3][:4] == [2.0, 1002.0, 46301.0, "F27"]
     assert table[3][8] == 0.0
-    assert table[3][12:] == ["F27", 46388.0, 46418.0, 31.0, 0.0, 0.0, 0.0, 0.0, "monthly"]
+    assert table[3][12:] == ["F27", 46388.0, 46418.0, 31.0, 0.0, 0.0, 0.0, 0.0, "monthly", 1.0]
     # Zero is a number: the seam's words for anything else stand, and text is never coerced.
     create = ENTRY["_CreateTrades"]
     for cell, words in (
@@ -2388,6 +2393,7 @@ def test_the_spill_keeps_the_entered_quantity_beside_the_days_and_the_months_qua
         "coefficient",
         "offset",
         "settlement_frequency",
+        "nearby",
     ]
     assert table[1][13:17] == ["datetime64[D]", "datetime64[D]", "int64", "float64"]
     assert [line[13] for line in table[2:]] == [46357.0, 46357.0, 46388.0, 46388.0, 46357.0]
@@ -2534,6 +2540,7 @@ MIXED_TEMPLATE: dict[str, object] = {
     "payment_day": "+1bd",
     "payment_holiday_calendar": holiday_calendar(dates("2027-01-01")),
     "settlement_frequency": "monthly",
+    "nearby": 1.0,
 }
 MIXED_TICKET: dict[str, list[object]] = {
     "trade_id": [1, 2, 3, 4],
@@ -2634,6 +2641,7 @@ def test_a_mixed_tickets_refusals_name_the_first_offending_row() -> None:
         "trade_date": day("2026-11-30"),
         "fixed_price": 10.0,
         "settlement_frequency": "monthly",
+        "nearby": 1.0,
     }
     assert refused(MIXED, MIXED_TICKET, physical) == (
         "settlement_method is 'physical', expected 'financial' with the penultimate method of "
@@ -2897,6 +2905,7 @@ WAHA_TEMPLATE: dict[str, object] = {
     "quantity_unit": "LOT",
     "quantity_per": "month",
     "settlement_frequency": "monthly",
+    "nearby": 1.0,
     "schedule_method": "lastday",
     "route": "cleared",
     "settlement_method": "financial",

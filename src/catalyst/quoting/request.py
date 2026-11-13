@@ -91,7 +91,9 @@ PRICE_REDUCTIONS: Final = "price_reductions"  # the reductions formed: the month
 class Terms:
     """The template's terms as a quote reads them: the five codes as their enums, since
     dated-quotes.md the frequency among them, monthly or onetime, read and held to the kernel's
-    rules by the_frequency; for a financial settlement the payment day, since
+    rules by the_frequency; since nearby-selection.md the nearby, the contract each observation
+    day is priced by counted from the day's prompt, 1 alone until a quote prices a later one;
+    for a financial settlement the payment day, since
     payment-day-date-or-rule.md a date as entered or a rule read whole with its text, the other
     None, and both None for a request paying on its own dates under a template without one,
     rfq-quoting.md, and the calendar; and the curve key on the bilateral route."""
@@ -101,6 +103,7 @@ class Terms:
     method: ScheduleMethod
     quantity_per: QuantityPer
     frequency: SettlementFrequency
+    nearby: int
     payment_day: np.datetime64 | None
     payment_rule: tuple[Instruction, ...] | None
     payment_rule_text: str | None
@@ -167,7 +170,9 @@ def the_terms(
     template: QuoteTemplate, counter: WorkCounter, request_dates: bool | None = None
 ) -> Terms:
     """The template's terms, complete for a quote: each field the definition always requires of a
-    quote present, the four codes read as their enums, a physical settlement on the cleared route
+    quote present, the four codes read as their enums, the nearby 1, since nearby-selection.md
+    required of every quote template and a later one refused by name until a quote prices it,
+    a physical settlement on the cleared route
     alone, and each conditional field present exactly when its condition holds, the condition
     the definition's own words; then the payment day for a financial settlement, a date as it is
     or a rule read whole, with its calendar, and the key for a bilateral route. For a request for
@@ -187,6 +192,12 @@ def the_terms(
     frequency = settlement_frequency_of(
         "settlement_frequency", _text(values, "settlement_frequency")
     )
+    nearby = cast(int, values["nearby"])
+    if nearby != 1:
+        raise ValueError(
+            f"nearby is {nearby}, expected 1 in a quote template; a quote and a request for "
+            "quote price the prompt contract's days, and a later nearby is booked as a trade"
+        )
     if route is Route.BILATERAL and settlement is Settlement.PHYSICAL:
         raise ValueError(
             "settlement_method is 'physical', expected 'financial' with route = bilateral; a "
@@ -210,6 +221,7 @@ def the_terms(
         method,
         quantity_per,
         frequency,
+        nearby,
         payment_day,
         rule,
         rule_text,
@@ -457,7 +469,13 @@ def the_request(
     )
     counter.hit(OBSERVATIONS_MADE, observations.component.size)
     references = observation_references(
-        schedule, index.holiday_calendar, observations, period.contract, method, component
+        schedule,
+        index.holiday_calendar,
+        observations,
+        period.contract,
+        method,
+        np.full(n, terms.nearby, dtype=np.intp),
+        component,
     )
     return Request(
         index,

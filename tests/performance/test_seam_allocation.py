@@ -1159,11 +1159,25 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
                 "payment_day",
                 "payment_holiday_calendar",
                 "settlement_frequency",
+                "nearby",
             ]
         ]
     )
     values = Cells.from_rows(
-        [["lot", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays, "monthly"]]
+        [
+            [
+                "lot",
+                "month",
+                "lastday",
+                "cleared",
+                "financial",
+                "TEST",
+                "+2bd",
+                holidays,
+                "monthly",
+                1.0,
+            ]
+        ]
     )
     # Since payment-day-date-or-rule.md the payment day's column is typed cell by cell, its two
     # masks, its dates and its record beside the texts: within six slacks, four before.
@@ -1183,11 +1197,12 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
                 "payment_holiday_calendar",
                 "discount_curve_key",
                 "settlement_frequency",
+                "nearby",
             ]
         ]
     )
     quote_values = Cells.from_rows(
-        [["bilateral", "financial", "asian", "calday", "+5bd", holidays, "SOFR", "monthly"]]
+        [["bilateral", "financial", "asian", "calday", "+5bd", holidays, "SOFR", "monthly", 1.0]]
     )
 
     def a_quote() -> object:
@@ -1214,8 +1229,9 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
     peak = least_peak(created)
     # 280 before the bounds and the frequency, 321 with them, and since onetime-averaging.md's
     # third slice 324, three one-byte masks a row, which rows are a window and which components,
-    # 811,252 at 2,500 rows.
-    assert peak <= 324 * rows + 2 * SLACK
+    # 811,252 at 2,500 rows; since nearby-selection.md 332, each row's nearby held as one whole
+    # number of eight bytes, 829,917 at 2,500 rows.
+    assert peak <= 332 * rows + 2 * SLACK
 
 
 # A combination keeps its distinct days and nothing of its sources: two calendars of the same

@@ -173,7 +173,13 @@ def rfq(index: Index, ticket: FieldValues, template: QuoteTemplate, counter: Wor
     observations = observed(method, index, contract, start, end, named, booked=booked)
     counter.hit(OBSERVATIONS_MADE, observations.component.size)
     references = observation_references(
-        schedule, index.holiday_calendar, observations, contract, method, component
+        schedule,
+        index.holiday_calendar,
+        observations,
+        contract,
+        method,
+        np.full(components, terms.nearby, dtype=np.intp),
+        component,
     )
     references.setflags(write=False)
     if not dated:

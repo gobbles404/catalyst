@@ -72,6 +72,7 @@ def sheet() -> dict[str, Any]:
         "payment_day",
         "payment_holiday_calendar",
         "settlement_frequency",
+        "nearby",
     ]
     template = PATH["_CreateTradeTemplate"](
         "fixed_float",
@@ -88,6 +89,7 @@ def sheet() -> dict[str, Any]:
                     "+2bd",
                     holidays,
                     "monthly",
+                    1.0,
                 ]
             ]
         ),
@@ -143,6 +145,7 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
         "payment_day",
         "payment_holiday_calendar",
         "settlement_frequency",
+        "nearby",
     ]
     template = PATH["_CreateTradeTemplate"](
         "fixed_float",
@@ -160,6 +163,7 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
                     "+2bd",
                     holidays,
                     "monthly",
+                    1.0,
                 ]
             ]
         ),
@@ -667,6 +671,7 @@ def test_a_combined_payment_calendar_adds_no_work_after_creation(
                 "payment_day",
                 "payment_holiday_calendar",
                 "settlement_frequency",
+                "nearby",
             ]
         ]
     )
@@ -685,6 +690,7 @@ def test_a_combined_payment_calendar_adds_no_work_after_creation(
                     "+2bd",
                     combined,
                     "monthly",
+                    1.0,
                 ]
             ]
         ),

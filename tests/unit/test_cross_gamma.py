@@ -128,6 +128,7 @@ def trades_on(
         FIXED_FLOAT, ix, spec(n), route, settlement,
         *picks(method, QuantityPer.MONTH, n),
         one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, n),
+        np.ones(n, dtype=np.intp),
         ids(*range(1001, 1001 + n)),
         None, None,
         dates(*[as_of] * n), np.arange(n, dtype=np.intp), contract, numbers(*quantities),

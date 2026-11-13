@@ -115,6 +115,7 @@ TEMPLATE_FIELDS: dict[str, object] = {
     "quantity_unit": "lot",
     "quantity_per": "month",
     "settlement_frequency": "monthly",
+    "nearby": 1.0,
     "schedule_method": "lastday",
     "route": "cleared",
     "settlement_method": "financial",
@@ -146,6 +147,7 @@ def a_template(method: str = "lastday", basis: str = "month") -> TradeTemplate:
         "schedule_method": method,
         "quantity_per": basis,
         "settlement_frequency": "monthly",
+        "nearby": 1.0,
     }
     return trade_template(one_row(fields))
 
@@ -308,11 +310,13 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_monthly_components": 1,  # each monthly component in one calendar month
         "choice": 5,
         "_Fields.one_text": 2,  # the route and the settlement, one each for the batch
-        "_Fields.has": 23,  # the required fields, the code the first period field found, and
+        "_Fields.has": 24,  # the required fields, the nearby among them since
+        # nearby-selection.md, the code the first period field found, and
         # since #175 the counterparty's condition and the marketing reserve looked for, since
         # slice 3 the key's condition and the key itself, since two-index-one-price.md the
         # second leg's one field and no second price, since cva-reserve.md the CVA reserve
-        "_Fields.rows": 10,  # the rows asked once less: the periods count their own since
+        "_Fields.rows": 11,  # the template's nearby repeated over the rows, nearby-selection.md;
+        # the rows asked once less: the periods count their own since
         # dated-quotes.md, a request's rows resolving through the same rule
         "_Fields.texts": 5,  # the four row fields' columns read once each, the codes apart
         # and the payment day, read through days_or_rules
@@ -323,6 +327,9 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_Fields.amounts": 2,  # the marketing reserve since #175 and the CVA reserve since
         # cva-reserve.md, each None when neither supplies it
         "_Fields.ids": 1,  # the trade IDs, whole numbers since #168, none in this ticket
+        "_Fields.nearbys": 1,  # each row's nearby, the template's one, nearby-selection.md
+        "_the_nearbys": 1,  # one per occurrence and 1 or more
+        "nearby_rules": 1,  # a later nearby under asian on one futures index alone
         "_Fields.numbers": 2,
         "_Fields.dates": 1,
         "_Fields.objects": 1,
@@ -352,7 +359,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "finite_prices": 1,
         "_the_payment": 1,
         "_frozen_days": 4,  # the trade dates, the payment days, the starts and the ends
-        "_frozen_rows": 6,  # the occurrence, the contract and the four selections
+        "_frozen_rows": 7,  # the occurrence, the contract, the four selections and the nearby
         "_frozen_numbers": 2,
         "_the_component_quantity": 1,  # each component's quantity by the basis
         "_the_calculation_periods": 1,  # each component's period, since onetime-averaging.md
@@ -382,7 +389,7 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
     return {
         "generic.astype": 2 * contracts,  # each distinct code's two months as counts
         "ndarray.all": 1,
-        "ndarray.any": 32,  # three the selections in range, two the methods present, since
+        "ndarray.any": 34,  # three the selections in range, two the methods present, since
         # onetime-averaging.md six the frequency rules', two by the resolution ahead of the
         # periods and two by the kernel that owns them, one whether any component is a window
         # and one again for its period, one
@@ -390,7 +397,8 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
         # one the
         # payment instruction's look at the sheet's calendar, since #181, one the
         # basis, two each component's end on or after its start and in one month, three the
-        # periods' since #172
+        # periods' since #172, and since nearby-selection.md two the nearbys', each 1 or more and
+        # whether any is a later one
         "ndarray.argsort": 15,  # two per distinct read, the texts and their first rows, five reads,
         # and the rule-and-calendar groups' unique, since #181
         "ndarray.astype": 24,  # the month bounds four, the one-month look two, the days one, the
@@ -411,30 +419,33 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
         "ndarray.reshape": 9,  # one more within the groups' unique, since #181
         "ndarray.round": 1,
         "ndarray.searchsorted": 1,  # each component's last observation, its payment's anchor
-        "ndarray.setflags": 21,  # the kernel's twelve copies, the two period bounds since
+        "ndarray.setflags": 22,  # the kernel's thirteen copies, the nearbys' among them since
+        # nearby-selection.md, the two period bounds since
         # onetime-averaging.md, the three selections among them, the
         # schedule's months since #186,
         # rule kept as text since #181 and frozen by no one,
         # the observations' three, the rows that entered a code
         "ndarray.sort": 1,  # the methods present, numpy's unique over the components' codes
         "numpy._unique_hash": 1,  # numpy's own look within that unique
-        "numpy.array": 28,  # the four distinct reads' texts and three of their values, the rules
+        "numpy.array": 29,  # the four distinct reads' texts and three of their values, the rules
         # and the terms' copy of the schedule's months since #186,
         # kept as text since #181, the coded rows' texts
         # and their spans, the three selections copied into the kernel's record, two of them the
-        # dates copied, the mask of the rows that entered a code
+        # dates copied, the mask of the rows that entered a code, and the nearbys copied into the
+        # kernel's record, nearby-selection.md
         "numpy.asanyarray": 23,  # two more within the groups' unique, since #181
         "numpy.asarray": 1,  # the stray days' NaT fill, read for its type, since #181
         "numpy.arange": 4,  # one of them the components counted off for the anchor search; the
         # lastday days take their components from the methods' positions, not a count
-        "numpy.empty": 30,  # among them each row's first month and the month after its last, the
+        "numpy.empty": 31,  # among them each row's first month and the month after its last, the
         # two dates' empty values, and since #181 the payment days, the stray instruction and the
-        # stray day of the shift and of the resolution, and the groups' unique
+        # stray day of the shift and of the resolution, the groups' unique, and the template's
+        # nearby repeated over the rows, nearby-selection.md
         "numpy.fromiter": 1,
         "numpy.normalize_axis_index": 1,
         "numpy.zeros": 4,  # the two dates supplied by no row; since #188 the rows of no broker;
         # the template's rule on every row, no row dated, since payment-day-date-or-rule.md
-        "ufunc.reduce": 35,  # one per look
+        "ufunc.reduce": 37,  # one per look
     }
 
 
@@ -442,7 +453,7 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
 # does, two conversions of its month and one look; the asian method, which takes a part of a
 # month, has no such look.
 WHOLE_MONTHS = {"_whole_months": 1}
-WHOLE_MONTHS_NUMPY = {"ndarray.any": 33, "ndarray.astype": 27, "ufunc.reduce": 36}
+WHOLE_MONTHS_NUMPY = {"ndarray.any": 35, "ndarray.astype": 27, "ufunc.reduce": 38}
 
 
 @pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
@@ -495,8 +506,8 @@ def test_the_penultimate_method_adds_one_look_at_the_expiries_and_nothing_per_ro
     assert numpy_calls(lambda: resolved((GAS,), ticket, template, WorkCounter())) == {
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
-        "ndarray.any": 34,  # and whether any expiry is closed
-        "ufunc.reduce": 37,
+        "ndarray.any": 36,  # and whether any expiry is closed
+        "ufunc.reduce": 39,
     }
 
 
@@ -541,11 +552,11 @@ def test_the_last3day_method_gives_three_days_per_component_and_one_payment_afte
     assert numpy_calls(lambda: resolved((GAS,), ticket, template, WorkCounter())) == {
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
-        "ndarray.any": 34,  # and whether any expiry is closed
+        "ndarray.any": 36,  # and whether any expiry is closed
         "ndarray.repeat": 2,  # each component three times, for its three observations
         "ndarray.ravel": 5,  # the three days of each component laid out in one column
         "numpy.asarray": 2,  # the three offsets as an array for the offset, and the NaT fill
-        "ufunc.reduce": 37,
+        "ufunc.reduce": 39,
     }
 
 
@@ -594,13 +605,13 @@ def test_the_asian_method_gives_a_month_of_days_per_component_and_one_payment_af
     }
     assert numpy_calls(lambda: resolved((ASIAN_GAS,), ticket, template, WorkCounter())) == {
         **resolution_numpy(contracts),
-        "ndarray.any": 33,  # whether any component has no pricing day
+        "ndarray.any": 35,  # whether any component has no pricing day
         "ndarray.cumsum": 14,  # where each component's observations start
         "ndarray.repeat": 5,  # the components, their starts, their first days and their weights
         "ndarray.sum": 1,  # how many observations in all
         "numpy.arange": 5,  # the place of each observation within its component
-        "numpy.empty": 29,  # one fewer: no array of ones for the weights
-        "ufunc.reduce": 37,
+        "numpy.empty": 30,  # one fewer: no array of ones for the weights
+        "ufunc.reduce": 39,
     }
 
 
@@ -763,15 +774,19 @@ def test_the_template_creator_reads_each_value_once_and_publishes_once(
         # payment-day-date-or-rule.md: its two looks
         "_not_dates": 1,
         "_as_days": 1,
+        "_field_numbers": 1,  # the nearby, the template's one number, nearby-selection.md
         "_field_handles": 1,
         "_resolve": 1,  # the one handle cell
         "_CreateTradeTemplate": 1,
         "trade_template": 1,
-        "_holds": 9,  # whether the row supplied each field's value, since #172
-        "field_value": 9,  # one per field
-        "FieldValues.field": 9,
-        "FieldValues.field.<locals>.<genexpr>": 18,
+        "_holds": 10,  # whether the row supplied each field's value, since #172
+        "field_value": 10,  # one per field, the nearby the tenth
+        "FieldValues.field": 10,
+        "FieldValues.field.<locals>.<genexpr>": 20,
         "FieldValues.texts": 7,
+        "FieldValues.numbers": 1,
+        "nearby_of": 1,  # the nearby read for its rule when the template is made
+        "whole_nearbys": 1,
         "FieldValues.dates_or_texts": 1,
         "FieldValues.objects": 1,
         "route_of": 1,
@@ -808,10 +823,10 @@ def test_the_calday_basis_counts_the_days_once_over_the_schedule_and_multiplies_
     assert numpy_calls(lambda: resolved((GAS,), ticket, template, WorkCounter())) == {
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
-        "ndarray.any": 34,  # and whether any product would outrun the largest number
-        "ndarray.setflags": 22,  # the product frozen, the brokered rows since #188, the periods
+        "ndarray.any": 36,  # and whether any product would outrun the largest number
+        "ndarray.setflags": 23,  # the product frozen, the brokered rows since #188, the periods
         "numpy._make_extobj": 1,  # the error state set once, the overflow this rule's to catch
-        "ufunc.reduce": 37,
+        "ufunc.reduce": 39,
     }
 
 
@@ -859,11 +874,11 @@ def dated_ledger(contracts: int) -> dict[str, int]:
     return {
         **ledger,
         "_Fields.where": 7,  # the lag and the six batch fields, no code named
-        "_Fields.has": 24,  # the three period fields looked for, the two dates found; the
+        "_Fields.has": 25,  # the three period fields looked for, the two dates found; the
         # second leg's one field since two-index-one-price.md, the CVA reserve since
         # cva-reserve.md
         "_the_required.<locals>.<genexpr>": 3,
-        "_Fields.rows": 9,  # one less since dated-quotes.md, the periods counting their own rows
+        "_Fields.rows": 10,  # one less since dated-quotes.md, the periods counting their own rows
         "_Fields.dates": 1,  # the trade dates; the two dates come through the periods' own read
         "FieldValues.has": 17,
         "FieldValues.dates": 3,
@@ -879,7 +894,7 @@ def dated_numpy(contracts: int) -> dict[str, int]:
     del numpy["generic.astype"]
     return {
         **numpy,
-        "numpy.empty": 29,  # the codes' empty values, no dates' empty values
+        "numpy.empty": 30,  # the codes' empty values, no dates' empty values
         "numpy.zeros": 3,  # the rows of no broker since #188
     }
 
@@ -936,13 +951,13 @@ def test_a_part_of_each_month_under_asian_observes_its_own_days_and_nothing_per_
     }
     assert numpy_calls(lambda: resolved((ASIAN_GAS,), ticket, template, WorkCounter())) == {
         **dated_numpy(contracts),
-        "ndarray.any": 33,  # and whether any component has no pricing day
+        "ndarray.any": 35,  # and whether any component has no pricing day
         "ndarray.cumsum": 14,  # where each component's observations start
         "ndarray.repeat": 5,  # the components, their starts, their first days and their weights
         "ndarray.sum": 1,  # how many observations in all
         "numpy.arange": 5,  # the place of each observation within its component
-        "numpy.empty": 28,  # no array of ones for the weights
-        "ufunc.reduce": 37,
+        "numpy.empty": 29,  # no array of ones for the weights
+        "ufunc.reduce": 39,
     }
 
 
@@ -980,6 +995,7 @@ def window_template() -> TradeTemplate:
         "schedule_method": "asian",
         "quantity_per": "period",
         "settlement_frequency": "onetime",
+        "nearby": 1.0,
     }
     return trade_template(one_row(fields))
 
@@ -1023,7 +1039,7 @@ def test_a_onetime_window_is_one_component_across_its_month_end_and_nothing_runs
     }
     assert numpy_calls(lambda: resolved((ASIAN_GAS,), ticket, template, WorkCounter())) == {
         **dated_numpy(contracts),
-        "ndarray.any": 38,  # the part-month asian ticket's 33, the frequency's two looks under
+        "ndarray.any": 40,  # the part-month asian ticket's 33, the frequency's two looks under
         # onetime, the method and the basis, in each of its two runs, and whether any window
         # opens after the last day the schedule's contracts price
         "ndarray.astype": 28,  # and the windows' ends, two conversions, and the periods' two
@@ -1033,8 +1049,8 @@ def test_a_onetime_window_is_one_component_across_its_month_end_and_nothing_runs
         # first day, one search over the windows
         "ndarray.sum": 1,
         "numpy.arange": 5,
-        "numpy.empty": 29,  # and the components' rows, the months' and the windows' placed
-        "ufunc.reduce": 42,
+        "numpy.empty": 30,  # and the components' rows, the months' and the windows' placed
+        "ufunc.reduce": 44,
     }
     terms, (observations,), _ = resolved((ASIAN_GAS,), ticket, template, WorkCounter())
     months, (by_month,), _ = resolved((ASIAN_GAS,), ticket, a_template("asian"), WorkCounter())
@@ -1160,7 +1176,7 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "choice": 9,  # the methods, the bases, the frequency, the route and the settlement
         "_Fields.where": contracts + 12,  # five more distinct texts named
         "_each_distinct.<locals>.<lambda>": 9,  # likewise
-        "_Fields.rows": 7,  # three fewer than the resolution's: the ticket's three columns, no
+        "_Fields.rows": 8,  # three fewer than the resolution's: the ticket's three columns, no
         # template value repeated
         "FieldValues.has": 19,  # three columns more looked for, the second price no field
         "FieldValues.texts": 4,  # and read
@@ -1171,21 +1187,21 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
     assert numpy_calls(lambda: resolved((MIXED_GAS,), ticket, template, WorkCounter())) == {
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
-        "ndarray.any": 36,  # the open expiries, the asian pricing days and the calday products
+        "ndarray.any": 38,  # the open expiries, the asian pricing days and the calday products
         "ndarray.astype": 28,  # the observations' days as counts, to put them back in order,
         # and the periods' six since onetime-averaging.md
         "ndarray.cumsum": 14,  # where each asian component's observations start
         "ndarray.nonzero": 7,  # the components of each of the four methods
         "ndarray.ravel": 8,  # the same, and the last3day days laid out in one column
         "ndarray.repeat": 6,  # last3day's components, asian's four repeats
-        "ndarray.setflags": 22,  # the calday products frozen, the brokered rows, the periods
+        "ndarray.setflags": 23,  # the calday products frozen, the brokered rows, the periods
         "ndarray.sum": 1,  # how many asian observations in all
         "numpy._make_extobj": 1,  # the error state set once for the calday products
         "numpy.arange": 5,  # the place of each asian observation within its component
         "numpy.asanyarray": 26,
         "numpy.asarray": 2,  # the three last3day offsets taken as an array, the NaT fill
-        "numpy.empty": 32,
-        "ufunc.reduce": 40,
+        "numpy.empty": 33,
+        "ufunc.reduce": 42,
     }
 
 
@@ -1227,7 +1243,7 @@ IFERC_RESOLUTION_NUMPY = {
     for name, count in {
         **resolution_numpy(1),
         **WHOLE_MONTHS_NUMPY,
-        "ndarray.any": 31,  # one fewer: the IFERC rule is read as every row supported, one all
+        "ndarray.any": 33,  # one fewer: the IFERC rule is read as every row supported, one all
         "numpy.arange": 5,  # the components counted off for the anchor search, the futures' own
         # since iferc-publication-payment-anchor.md, beside the observations' places
         "ndarray.all": 3,  # in place of any row other than lastday, since the rule has one owner

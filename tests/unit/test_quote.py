@@ -127,6 +127,7 @@ def financial(
         "schedule_method": method,
         "quantity_per": per,
         "settlement_frequency": "monthly",
+        "nearby": 1.0,
         "payment_day": DayOrRule(None, lag)
         if day is None
         else DayOrRule(np.datetime64(day, "D"), None),
@@ -155,6 +156,7 @@ def physical(method: str = "lastday", per: str = "month") -> QuoteTemplate:
         schedule_method=method,
         quantity_per=per,
         settlement_frequency="monthly",
+        nearby=1.0,
     )
 
 
@@ -540,6 +542,7 @@ def test_a_physical_quote_takes_lastday_before_the_expiry_alone() -> None:
             schedule_method="lastday",
             quantity_per="month",
             settlement_frequency="monthly",
+            nearby=1.0,
             discount_curve_key="SOFR",
         ),
         "settlement_method is 'physical', expected 'financial' with route = bilateral; a physical "
@@ -644,6 +647,7 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             settlement_method="financial",
             quantity_per="month",
             settlement_frequency="monthly",
+            nearby=1.0,
         ),
         f"schedule_method is missing, {in_template}",
     )
@@ -670,6 +674,7 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             schedule_method="asian",
             quantity_per="month",
             settlement_frequency="monthly",
+            nearby=1.0,
             payment_day=DayOrRule(None, "+1bd"),
         ),
         f"payment_holiday_calendar is missing, {in_template} when settlement_method = financial",
@@ -683,6 +688,7 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             schedule_method="lastday",
             quantity_per="month",
             settlement_frequency="monthly",
+            nearby=1.0,
             payment_day=DayOrRule(None, "+1bd"),
         ),
         "payment_day is '+1bd', expected none in the quote template unless "
@@ -697,6 +703,7 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             schedule_method="lastday",
             quantity_per="month",
             settlement_frequency="monthly",
+            nearby=1.0,
             payment_holiday_calendar=WEEKENDS_ONLY,
         ),
         "payment_holiday_calendar is a holiday calendar, expected none in the quote template "
@@ -844,6 +851,7 @@ def test_an_equivalent_trade_booked_at_the_quote_marks_zero_with_every_payment_a
             Settlement.FINANCIAL,
             *picks(ScheduleMethod.ASIAN, QuantityPer.MONTH, 2),
             one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 2),
+            np.ones(2, dtype=np.intp),
             ids(1, 2),
             None,
             None,
@@ -1008,6 +1016,7 @@ def test_an_equivalent_trade_booked_on_the_balances_dates_marks_zero() -> None:
                 Settlement.FINANCIAL,
                 *picks(ScheduleMethod.ASIAN, basis, 2),
                 one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 2),
+                np.ones(2, dtype=np.intp),
                 ids(1, 2),
                 None,
                 None,
@@ -1059,11 +1068,12 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "payment_holiday_calendar",
         "discount_curve_key",
         "settlement_frequency",
+        "nearby",
     )
     otc = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         fields,
-        row("bilateral", "financial", "asian", "calday", "+1bd", weekends, "SOFR", "monthly"),
+        row("bilateral", "financial", "asian", "calday", "+1bd", weekends, "SOFR", "monthly", 1.0),
     )
     cleared = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
@@ -1075,8 +1085,9 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
             "payment_day",
             "payment_holiday_calendar",
             "settlement_frequency",
+            "nearby",
         ),
-        row("cleared", "financial", "asian", "calday", "+1bd", weekends, "monthly"),
+        row("cleared", "financial", "asian", "calday", "+1bd", weekends, "monthly", 1.0),
     )
     sofr = ENTRY["_CreateDiscountCurve"](
         "SOFR",

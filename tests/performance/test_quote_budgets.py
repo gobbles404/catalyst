@@ -46,6 +46,7 @@ TEMPLATE_FIELDS: dict[str, object] = {
     "schedule_method": "asian",
     "quantity_per": "calday",
     "settlement_frequency": "monthly",
+    "nearby": 1.0,
     "payment_day": "+5bd",
     "payment_holiday_calendar": None,
     "discount_curve_key": "SOFR",
@@ -90,15 +91,20 @@ def test_the_quote_template_creator_reads_each_value_once_and_publishes_once(
         # payment-day-date-or-rule.md: its two looks
         "_not_dates": 1,
         "_as_days": 1,
+        "_field_numbers": 1,  # the nearby, the template's one number
         "_field_handles": 1,
         "_resolve": 1,  # the one handle cell
         "_CreateQuoteTemplate": 1,
         "quote_template": 1,
         "quote_template.<locals>.<genexpr>": 7,  # the instrument's fields up to its first quoted
-        "FieldValues.field": 16,  # each field once for its header's rule, once for its value's type
-        "FieldValues.field.<locals>.<genexpr>": 32,
-        "field_value": 8,  # one per field, no mask of supplied cells to read
+        "FieldValues.field": 18,  # each field once for its header's rule, once for its value's type
+        "FieldValues.field.<locals>.<genexpr>": 36,
+        "field_value": 9,  # one per field, the nearby the ninth since nearby-selection.md, no mask
+        # of supplied cells to read
         "FieldValues.texts": 6,
+        "FieldValues.numbers": 1,
+        "nearby_of": 1,  # the nearby read for its rule when the template is made
+        "whole_nearbys": 1,
         "FieldValues.dates_or_texts": 1,
         "FieldValues.objects": 1,
         "route_of": 1,
@@ -156,6 +162,7 @@ def a_template(route: str) -> QuoteTemplate:
         "schedule_method": "asian",
         "quantity_per": "month",
         "settlement_frequency": "monthly",
+        "nearby": 1.0,
         "payment_day": DayOrRule(None, "+1bd"),  # the rule as the template holds it
         "payment_holiday_calendar": WEEKENDS_ONLY,
     }
@@ -199,7 +206,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
         "payment_shifts": 1,
         "price_reductions": 4,
         "schedule_codes_read": 13,
-        "template_fields_read": 8,
+        "template_fields_read": 9,
     }
     # The year: 261 observations, 118 of them fixed, seven live contracts read once each, twelve
     # payment days of which seven are ahead and read off the curve; the cleared quote reads no
@@ -216,11 +223,11 @@ def test_a_month_and_a_strip_report_their_work() -> None:
         "payment_shifts": 1,
         "price_reductions": 4,
         "schedule_codes_read": 13,
-        "template_fields_read": 8,
+        "template_fields_read": 9,
     }
     cleared = counted("CAL27", CLEARED, None)
     assert "curves_selected" not in cleared and "payment_factors_read" not in cleared
-    assert cleared["template_fields_read"] == 7
+    assert cleared["template_fields_read"] == 8
     # The balance of the year: June from its eleven live days and the six months after, no
     # fixing read, every payment ahead.
     assert counted("BALCAL27", BILATERAL, RATES) == {
@@ -235,7 +242,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
         "payment_shifts": 1,
         "price_reductions": 4,
         "schedule_codes_read": 13,
-        "template_fields_read": 8,
+        "template_fields_read": 9,
     }
     paid = counted("F27-K27", BILATERAL, RATES)
     assert (paid["live_prices_read"], paid["payment_factors_read"]) == (0, 0)
@@ -381,7 +388,7 @@ def test_a_window_reports_its_work_and_the_same_dates_under_monthly_the_balances
         "payment_rules_read": 1,
         "payment_shifts": 1,
         "price_reductions": 4,
-        "template_fields_read": 8,
+        "template_fields_read": 9,
         "windows_resolved": 1,
     }
     counter = WorkCounter()

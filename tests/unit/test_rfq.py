@@ -418,6 +418,7 @@ def test_a_trade_booked_at_the_request_price_marks_zero_with_every_payment_ahead
             Settlement.FINANCIAL,
             *picks(ScheduleMethod.ASIAN, QuantityPer.MONTH, 2),
             one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 2),
+            np.ones(2, dtype=np.intp),
             ids(1, 2),
             None,
             None,
@@ -455,6 +456,7 @@ def no_payment_day(route: str = "cleared") -> QuoteTemplate:
         "schedule_method": "asian",
         "quantity_per": "month",
         "settlement_frequency": "monthly",
+        "nearby": 1.0,
         "payment_holiday_calendar": WEEKENDS_ONLY,
     }
     if route == "bilateral":
@@ -621,6 +623,7 @@ def test_windows_weigh_by_quantity_and_factor_and_match_the_booked_portfolio() -
         "quantity_unit": "BBL",
         "quantity_per": "period",
         "settlement_frequency": "onetime",
+        "nearby": 1.0,
         "schedule_method": "asian",
         "settlement_method": "financial",
         "payment_holiday_calendar": WEEKENDS_ONLY,
@@ -836,6 +839,7 @@ def test_the_template_the_index_and_the_market_refuse_as_a_quote_does() -> None:
             schedule_method="asian",
             quantity_per="month",
             settlement_frequency="monthly",
+            nearby=1.0,
             payment_day=otc().values["payment_day"],
             payment_holiday_calendar=WEEKENDS_ONLY,
         ),
@@ -928,11 +932,12 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "payment_holiday_calendar",
         "discount_curve_key",
         "settlement_frequency",
+        "nearby",
     )
     otc_template = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         fields,
-        row("bilateral", "financial", "asian", "month", "+5bd", weekends, "SOFR", "monthly"),
+        row("bilateral", "financial", "asian", "month", "+5bd", weekends, "SOFR", "monthly", 1.0),
     )
     cleared_template = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
@@ -944,13 +949,14 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
             "payment_day",
             "payment_holiday_calendar",
             "settlement_frequency",
+            "nearby",
         ),
-        row("cleared", "financial", "asian", "month", "+5bd", weekends, "monthly"),
+        row("cleared", "financial", "asian", "month", "+5bd", weekends, "monthly", 1.0),
     )
     onetime_template = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         fields,
-        row("bilateral", "financial", "asian", "period", "+5bd", weekends, "SOFR", "onetime"),
+        row("bilateral", "financial", "asian", "period", "+5bd", weekends, "SOFR", "onetime", 1.0),
     )
     sofr = ENTRY["_CreateDiscountCurve"](
         "SOFR",

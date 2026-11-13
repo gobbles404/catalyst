@@ -859,13 +859,15 @@ def _the_references(
     terms: ResolvedTrades, leg: LegTerms, observations: Observations
 ) -> NDArray[np.intp]:
     """Each observation's reference for a leg: observation_references over the leg's schedule,
-    holiday calendar, contracts and methods, each component named as the terms name its trade."""
+    holiday calendar, contracts and methods and the trade's nearbys, each component named as
+    the terms name its trade."""
     return observation_references(
         leg.schedule,
         leg.index.holiday_calendar,
         observations,
         leg.contract,
         leg.schedule_method[terms.occurrence],
+        terms.nearby[terms.occurrence],
         terms.named,
     )
 
@@ -876,14 +878,20 @@ def observation_references(
     observations: Observations,
     contract: NDArray[np.intp],
     method: NDArray[np.intp],
+    nearby: NDArray[np.intp],
     named: Callable[[int], str],
 ) -> NDArray[np.intp]:
     """Each observation's reference, the contract pricing its day, for a batch of trades and
-    since template-based-quoting.md for a quote alike: contract[k] and method[k] the k-th
-    component's schedule row and method, and named(k) the words a refusal gives it. On a futures
-    index: the day open on the index's market, within the schedule, and under the expiry-based
-    methods the component's own contract; under asian whichever contract the calendar gives,
-    one gather of the methods onto the observations. On an IFERC index, since #167: the
+    since template-based-quoting.md for a quote alike: contract[k], method[k] and nearby[k] the
+    k-th component's schedule row, method and nearby, and named(k) the words a refusal gives
+    it. On a futures index: the day open on the index's market, within the schedule, and under
+    the expiry-based methods the component's own contract; under asian whichever contract the
+    calendar gives, one gather of the methods onto the observations. Since nearby-selection.md
+    the contract is the component's nearby counted from the day's prompt, the calendar's
+    contract for the day: the prompt's row plus the nearby less one, the prompt itself at 1,
+    found afresh for every day so that it moves on the day after an expiry; a nearby the
+    schedule lists no contract for on a day is refused by the trade, the day, the day's
+    prompt and the schedule's last contract. On an IFERC index, since #167: the
     component's own contract, whose index publishes on that very day, else refused, an IFERC
     month pricing once; no calendar is read, an IFERC index having none."""
     match schedule:
@@ -912,13 +920,26 @@ def observation_references(
             f"{named(int(observations.component[j]))} observes {observations.date[j]}, "
             "a day the index's market is closed; no settle exists or will"
         )
-    reference = contract_on(schedule, observations.date)
+    reference = contract_on(schedule, observations.date)  # each day's prompt, then its nearby
     beyond = reference >= len(codes)
     if beyond.any():
         j = int(beyond.argmax())
         raise ValueError(
             f"{named(int(observations.component[j]))} observes {observations.date[j]}, "
             f"after the schedule's last expiry, {schedule.future_expiry[-1]}; nothing prices it"
+        )
+    position = nearby[observations.component]
+    reference += position
+    reference -= 1
+    unlisted = reference >= len(codes)
+    if unlisted.any():
+        j = int(unlisted.argmax())
+        prompt = int(reference[j]) - int(position[j]) + 1
+        raise ValueError(
+            f"{named(int(observations.component[j]))} observes {observations.date[j]} at nearby "
+            f"{int(position[j])}, expected at most {len(codes) - prompt} that day, "
+            f"{codes[prompt]!r} being prompt and {codes[-1]!r} the schedule's last contract; the "
+            "schedule lists no contract for a later nearby"
         )
     of_observation = method[observations.component]
     own = requires_booked_reference(of_observation)

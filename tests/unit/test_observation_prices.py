@@ -39,6 +39,7 @@ CLEARED: dict[str, object] = {
     "quantity_unit": "LB",
     "quantity_per": "month",
     "settlement_frequency": "monthly",
+    "nearby": 1.0,
     "schedule_method": "asian",
     "route": "cleared",
     "settlement_method": "financial",

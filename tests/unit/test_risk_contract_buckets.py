@@ -36,6 +36,7 @@ FIELDS = (
     "payment_day",
     "payment_holiday_calendar",
     "settlement_frequency",
+    "nearby",
 )
 # An NG-like index, one lot a unit: V26 the boundary, X26 observing 28 October, Z26 25 November and
 # F27 29 December, each its month's last trading day under lastday.
@@ -76,6 +77,7 @@ def a_template(
         lag,
         calendar,
         "monthly",
+        1.0,
     ]
     if lag is None:
         k = fields.index("payment_day")

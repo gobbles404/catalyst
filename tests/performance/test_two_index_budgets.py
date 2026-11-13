@@ -103,6 +103,7 @@ TEMPLATE: dict[str, object] = {
     "quantity_unit": "MMBTU",
     "quantity_per": "month",
     "settlement_frequency": "monthly",
+    "nearby": 1.0,
     "schedule_method": "lastday",
     "second_schedule_method": "lastday",
     "route": "bilateral",
