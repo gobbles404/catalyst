@@ -1,10 +1,10 @@
 # A rolling nearby contract for futures averages
 
-**Status:** The first slice built in #245. Agreed with the owner on 13 November 2026 for
+**Status:** The first slice built in #245 and the second in #246. Agreed with the owner on 13 November 2026 for
 [issue #238](https://github.com/gobbles404/catalyst/issues/238), this page in the first slice's
 first commit; three pull requests stacked from main after #242. The first, the fixings and the
 history holding a settle for more than one nearby, is #245, the slice this page opens;
-the second, the `nearby` field required of every template and priced on trades, and the third,
+the second, the `nearby` field required of every template and priced on trades, is #246, and the third,
 quotes and requests for quote, follow on it. It builds on
 [calendar-driven-asian-references.md](calendar-driven-asian-references.md), #165, which gave an
 asian observation the calendar's contract for its day, and on
@@ -108,6 +108,27 @@ settles a day refuses it.
   past the live prices by the market's reader, as today.
 - Quotes and requests accept `nearby = 1` and refuse another number by name until the third
   slice prices it.
+
+As built in #246:
+
+- The field is the trade's, one per row, `ResolvedTrades.nearby`, and not a leg's: a pair takes `1`, and
+  nothing of a second leg's nearby is built.
+- The number is read by `whole_nearbys`, whole, 1 or more and of at most 15 digits, the digits a cell
+  carries exactly, as a trade ID's are; whether the schedule lists a contract that far on is the reference
+  rule's, day by day, so the bound is the cell's and no count of contracts.
+- `nearby_rules` in `terms.py` is the kernel's rule for a number above 1: an IFERC index, two indexes, a
+  physical settlement and another method than `asian` refused in that order, the first row at fault named.
+- The schedule's refusal names the trade, the day, the nearby, how far the schedule reaches that day, the
+  day's prompt and the schedule's last contract: `trade 2 at row 2 observes 2026-08-17 at nearby 2,
+  expected at most 1 that day, 'U26' being prompt and 'U26' the schedule's last contract; the schedule
+  lists no contract for a later nearby`.
+- Every existing template on a sheet takes `nearby = 1` through `HSTACK` in its creating formula, in the
+  smoke, the lifetime script and the kept workbook alike, its typed cells as they were; a new block types
+  a `nearby` column. The kept workbook's three date-and-settle tables that stood where a readback grew
+  moved one column right, with the two notes that cite them.
+- A quote template holding another number than `1` is refused when it is quoted, by `_Quote`,
+  `_QuoteByDates` and `_CreateRFQ` alike: `nearby is 2, expected 1 in a quote template; a quote and a
+  request for quote price the prompt contract's days, and a later nearby is booked as a trade`.
 
 ## Quotes and requests, the third slice
 
