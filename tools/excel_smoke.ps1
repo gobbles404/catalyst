@@ -2375,6 +2375,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(XD5),4,14)"  = "onetime"
     '=INDEX(util_ReadHandle(_CreateRFQ(UX5,XE1:XF1,{"F27-G27",7},VF3)),4,2)' = "G27"
     '=_CreateRFQ(UX5,{"trade_id","quantity"},{1,100000},VF3)' = "#ERROR _CreateRFQ: ValueError: trade_id is a field of booking alone, expected one a request's rows hold: contract_code, start_date, end_date, quantity, payment_day"
+    '=_CreateRFQ(UX5,{"contract_code","quantity","nearby"},{"F27",100000,2},VF3)' = "#ERROR _CreateRFQ: ValueError: nearby is a field of the quote template, expected one a request's rows hold: contract_code, start_date, end_date, quantity, payment_day; supply nearby on the quote template"
     '=_CreateRFQ(UX5,XE1:XF1,{"F27","ten"},VF3)' = "#ERROR _CreateRFQ: rows cell (1, 2) is text 'ten', expected number"
     '=_CreateRFQ(UX5,XE1:XG1,{"F27",100000,"+2bd"},VF3)' = "#ERROR _CreateRFQ: ValueError: payment_day row 1 is '+2bd', expected a date; a request's rows pay on dates, and a rule is the template's to hold"
     '=_CreateRFQ(UX5,XE1:XF1,{"H27",1},VF3)' = "#ERROR _CreateRFQ: ValueError: contract_code row 1 is 'H27', expected months the index's schedule has a contract for; it has none for 2027-03"

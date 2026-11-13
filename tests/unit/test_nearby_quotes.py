@@ -3,7 +3,8 @@ quote template's nearby is priced as a batch's is, through the reference rule th
 and the history's reader. The ticket's two days across an expiry quote 80.5 at the first nearby
 and 82.5 at the second off one history; a label's month and a request's row read the next
 contract on every day, across the roll inside the month; a quote booked as a trade at its price
-marks nothing; and the refusals, a later nearby where it is not priced, a nearby the schedule
+marks nothing while every payment is ahead, and once a month has paid its mark and its cash are
+equal and opposite; and the refusals, a later nearby where it is not priced, a nearby the schedule
 lists no contract for, and a history or a market that holds no price of it."""
 
 import pytest
@@ -94,6 +95,68 @@ def test_a_second_nearby_quote_booked_as_a_trade_marks_nothing(
     ticket: dict[str, list[object]] = {**rows_over((2.0,)), "fixed_price": [price]}
     batch, _ = created(ROLL, ticket, WINDOW)
     assert valued(batch, market).mark == pytest.approx(0.0, abs=1e-9)
+
+
+def test_once_a_month_has_paid_the_mark_and_the_cash_are_equal_and_opposite() -> None:
+    # The zero mark holds while every payment is ahead, quote.md's condition. A June and July
+    # strip at the second nearby, valued Monday 6 July with N26 at 81, Q26 at 83 and U26 at 85.
+    # June fixed whole, twenty days at 72 and the two across the expiry at 82 and 83, 1,605/22,
+    # and paid on 2 July; July three days fixed at 72, eight at Q26's 83 and twelve at U26's 85,
+    # 1,900/23. A cleared quote of two months weighs each one: their mean, 77.78162055. A barrel
+    # a month booked at it has paid June's shortfall in cash and marks July's excess, the same
+    # amount, 4.82707510, so the two sum to nothing and neither is nothing alone.
+    market = quoted(history_on("2026-07-06", 2), 81.0, 83.0, 85.0)
+    june, july = 1_605 / 22, 1_900 / 23
+    price = quote(market, "M26-N26", monthly_quote(2), None, WorkCounter())
+    assert price == pytest.approx((june + july) / 2) and price == pytest.approx(77.78162055)
+    terms: dict[str, object] = {
+        "quantity_unit": "BBL",
+        "quantity_per": "month",
+        "settlement_frequency": "monthly",
+        "nearby": 2.0,
+        "schedule_method": "asian",
+        "route": "cleared",
+        "settlement_method": "financial",
+        "clearing_house": "CME Clearing",
+        "payment_day": "+2bd",
+        "payment_holiday_calendar": ROLL.holiday_calendar,
+    }
+    ticket: dict[str, list[object]] = {
+        "trade_id": [1],
+        "trade_date": ["2026-05-20"],
+        "contract_code": ["M26-N26"],
+        "quantity": [1.0],
+        "fixed_price": [price],
+    }
+    batch, _ = created(ROLL, ticket, terms)
+    results = valued(batch, market)
+    assert results.mark == pytest.approx(july - price) and results.mark == pytest.approx(4.82707510)
+    assert results.cash == pytest.approx(june - price) and results.cash == pytest.approx(
+        -4.82707510
+    )
+    assert results.mark + results.cash == pytest.approx(0.0, abs=1e-9)
+    # The same strip quoted and booked on 12 June, June part fixed and both payments ahead:
+    # nothing of mark and nothing of cash.
+    early = quoted(history_on(JUNE_12, 2), 80.0, 81.0, 83.0, 85.0)
+    fair = quote(early, "M26-N26", monthly_quote(2), None, WorkCounter())
+    ahead, _ = created(ROLL, {**ticket, "fixed_price": [fair]}, terms)
+    before = valued(ahead, early)
+    assert (before.mark, before.cash) == (pytest.approx(0.0, abs=1e-9), 0.0)
+
+
+def test_a_requests_row_is_told_to_supply_nearby_on_the_quote_template() -> None:
+    with pytest.raises(ValueError) as refusal:
+        rfq(
+            ROLL,
+            a_ticket({"contract_code": ["N26"], "quantity": [1_000.0], "nearby": [2.0]}),
+            monthly_quote(2),
+            WorkCounter(),
+        )
+    assert str(refusal.value) == (
+        "nearby is a field of the quote template, expected one a request's rows hold: "
+        "contract_code, start_date, end_date, quantity, payment_day; supply nearby on the quote "
+        "template"
+    )
 
 
 def test_a_label_and_a_request_read_the_next_contract_on_every_day_of_the_month() -> None:

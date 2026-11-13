@@ -1348,6 +1348,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("2027-02-01 to 2027-02-12", byDates[3, 1]);
             Assert.Equal("onetime", byDates[3, 13]);
             Assert.Equal("#ERROR _CreateRFQ: ValueError: trade_id is a field of booking alone, expected one a request's rows hold: contract_code, start_date, end_date, quantity, payment_day", Seam.Call("_CreateRFQ", index, Row("trade_id", "quantity"), Row(1.0, 100000.0), otc));
+            Assert.Equal("#ERROR _CreateRFQ: ValueError: nearby is a field of the quote template, expected one a request's rows hold: contract_code, start_date, end_date, quantity, payment_day; supply nearby on the quote template", Seam.Call("_CreateRFQ", index, Row("contract_code", "quantity", "nearby"), Row("F27", 100000.0, 2.0), otc));
             Assert.Equal("#ERROR _CreateRFQ: rows cell (2, 2) is text 'ten', expected number", Seam.Call("_CreateRFQ", index, byCode, new object[,] { { "F27", 1.0 }, { "G27", "ten" } }, otc));
             Assert.Equal($"#ERROR _CreateRFQ: template is market handle '{market}', expected quote template handle", Seam.Call("_CreateRFQ", index, byCode, ticket, market));
             Assert.Equal("#ERROR _CreateRFQ: ValueError: payment_day row 1 is '+2bd', expected a date; a request's rows pay on dates, and a rule is the template's to hold", Seam.Call("_CreateRFQ", index, withDays, Row("F27", 100000.0, "+2bd"), otc));

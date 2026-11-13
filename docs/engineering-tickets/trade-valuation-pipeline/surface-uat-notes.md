@@ -890,7 +890,11 @@ the refusal; type a nearby past the schedule's last contract, a `0`, a `1.5` and
 read each refusal. The kept workbook's block is rows 3267 to 3289.
 
 UAT, the third slice: type `2` under `nearby` in a quote template of asian terms and quote
-the same days by `_QuoteByDates`, a month by `_Quote` and a row by `_CreateRFQ` and
-`_QuoteRFQ`; find each at the next contract's average, and a trade booked at the quote
-marking nothing; type `2` under a `lastday` template and read the quote's refusal. The kept
-workbook's block is rows 3291 to 3302.
+the two days by `_QuoteByDates`, rows 3291 to 3302 of the kept workbook: 82.5 at the second
+nearby and 80.5 at the first, a trade booked at the quote marking nothing while its payment
+is ahead, and `2` under a `lastday` template refused by name. Then July by its label, rows
+3304 to 3318: a market whose prices run through U26, since July's second nearby rolls from
+Q26 into U26 inside the month, and a template by the month under `asian`; `_Quote` in
+L3311 and `_QuoteRFQ` over a request of the same month in L3314 show the same 84.5435, and
+L3315 their difference, nothing. Type a `nearby` column on a request's row and read the
+refusal that says to supply it on the quote template, B3316.

@@ -226,12 +226,20 @@ def quote_rfq(
 
 def _the_fields(ticket: FieldValues) -> None:
     """The ticket's headers each one of the five a request's rows hold, the first other named by
-    the field it is; a quantity column, since every row has one; and one row at least."""
+    the field it is and by where it belongs, the definition's own fact: a field a quote template
+    holds, nearby or a code of the terms, is the template's, every row's as its terms are, and
+    the refusal says to supply it there; any other is a field of booking. A quantity column,
+    since every row has one; and one row at least."""
     for name in ticket.names:
         if name not in REQUEST_FIELDS:
+            held = ", ".join(REQUEST_FIELDS)
+            if ticket.field(name).quote_allowed:
+                raise ValueError(
+                    f"{name} is a field of the quote template, expected one a request's rows "
+                    f"hold: {held}; supply {name} on the quote template"
+                )
             raise ValueError(
-                f"{name} is a field of booking alone, expected one a request's rows hold: "
-                f"{', '.join(REQUEST_FIELDS)}"
+                f"{name} is a field of booking alone, expected one a request's rows hold: {held}"
             )
     if not ticket.has("quantity"):
         raise ValueError("quantity is missing, expected a column of the request, one per row")

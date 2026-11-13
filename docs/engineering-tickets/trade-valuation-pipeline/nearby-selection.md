@@ -133,14 +133,18 @@ As built in #246:
 
 `_Quote`, `_QuoteByDates` and `_CreateRFQ` with `_QuoteRFQ` price a template's `nearby` as the
 batch does, through the shared reference rule and the history's reader; a fair price booked as
-a trade values to zero within rounding.
+a trade values to zero within rounding while every payment is ahead, and once a month has paid
+its mark and its cash are equal and opposite.
 
 As built in #247: the refusal that held a quote template to `1` is gone and nothing replaced it but the
 kernel's own rule, `the_nearby` in `quoting/request.py` calling `nearby_rules` with the quote or the request
 named in the trade's place, beside `the_frequency`; the references were already the shared rule's, so a
 fixed day is read by day and contract and a live day by contract with no other change. The request's
 readback shows `nearby` last. The two days of the example quote 80.5 and 82.5; July by its label, the roll
-inside the month, 82.0435 and 84.0435 with N26 at 81, Q26 at 83 and U26 at 85.
+inside the month, 82.0435 and 84.0435 with N26 at 81, Q26 at 83 and U26 at 85. A quote template's field
+on a request's row, `nearby` or a code of the terms, is refused as the template's, with where to supply
+it. The zero mark of a quote booked as a trade holds while every payment is ahead; once a month has
+paid, its mark and its cash are equal and opposite.
 
 ## Also pin
 

@@ -761,6 +761,21 @@ def test_each_row_takes_its_period_by_the_bookings_rule() -> None:
         "trade_id is a field of booking alone, expected one a request's rows hold: contract_code, "
         "start_date, end_date, quantity, payment_day"
     )
+    # A field the quote template holds is the template's, every row's as its terms are: the
+    # refusal says so and where to supply it, by the definition's own fact and no list here.
+    for name, value in (("nearby", 2.0), ("schedule_method", "asian")):
+        columns: dict[str, list[object]] = {
+            "contract_code": ["F27"],
+            "quantity": [1.0],
+            name: [value],
+        }
+        with pytest.raises(ValueError) as template_field:
+            rfq(STRIP, a_ticket(columns), cleared(), WorkCounter())
+        assert str(template_field.value) == (
+            f"{name} is a field of the quote template, expected one a request's rows hold: "
+            "contract_code, start_date, end_date, quantity, payment_day; "
+            f"supply {name} on the quote template"
+        )
     with pytest.raises(ValueError) as unweighted:
         rfq(STRIP, a_ticket({"contract_code": ["F27"]}), cleared(), WorkCounter())
     assert str(unweighted.value) == (
