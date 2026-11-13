@@ -420,9 +420,9 @@ def test_the_futures_fixings_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateFuturesFixings"]
     assert not hidden
     assert description == (
-        "Creates the futures fixings of one index from the days it fixed and their settles, "
-        "checked against the holiday calendar of its index, and shows its handle, the text "
-        "other formulas take as the fixings."
+        "Creates the futures fixings of one index from the days it fixed and their settles, a "
+        "column for each nearby contract, checked against the holiday calendar of its index, "
+        "and shows its handle, the text other formulas take as the fixings."
     )
     assert arguments == [
         (
@@ -430,7 +430,11 @@ def test_the_futures_fixings_creator_explains_itself() -> None:
             "The column of days the index fixed, newest first, such as A2:A5 holding 6-May-2026 "
             "down to 1-May-2026, one for every business day between them.",
         ),
-        ("settle", "The column of settles beside the days, such as B2:B5, one per day."),
+        (
+            "settle",
+            "The settles beside the days, such as B2:B5, one row per day; a wider range, such "
+            "as B2:C5, holds a column for each nearby contract, the prompt's first.",
+        ),
         (
             "index",
             "The index handle: the cell showing _CreateIndex's result, such as D3, or a name for "

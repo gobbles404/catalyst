@@ -295,7 +295,7 @@ $formulas = [ordered]@{
     # the index left out and a number in its place, the seam's.
     '=MID(BK1,FIND(":",BK1)+1,16)' = "futures_fixings:"
     '=MID(BK2,FIND(":",BK2)+1,16)' = "futures_fixings:"
-    "=INDEX(util_ReadHandle(BK1),1,2)" = "settle"
+    "=INDEX(util_ReadHandle(BK1),1,2)" = "nearby_1"
     "=INDEX(util_ReadHandle(BK1),2,1)" = "datetime64[D]"
     "=INDEX(util_ReadHandle(BK1),3,1)" = "46148"
     "=INDEX(util_ReadHandle(BK1),3,2)" = "95.08"
@@ -305,7 +305,7 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(BK2))"      = "3"
     '=MID(BK3,FIND(":",BK3)+1,16)' = "futures_fixings:"
     "=AND(util_ReadHandle(BK3)=util_ReadHandle(BK1))" = "TRUE"
-    "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ4,EB1)" = "#ERROR _CreateFuturesFixings: ValueError: settle has 3 settles, expected 4, one per date"
+    "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ4,EB1)" = "#ERROR _CreateFuturesFixings: ValueError: settle has 3 rows, expected 4, one per date"
     "=_CreateFuturesFixings(BL2:BL3,BM2:BM3,EB1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-06, expected a date before row 1's 2026-05-05"
     "=_CreateFuturesFixings(BL4:BL5,BM4:BM5,EB1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-01, expected 2026-05-04, the business day before row 1's 2026-05-05"
     "=_CreateFuturesFixings(BL6,BM6,EB1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 1 is 2026-05-02, a Saturday, expected a business day"
@@ -314,6 +314,52 @@ $formulas = [ordered]@{
     "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5)" = "#ERROR _CreateFuturesFixings: index is missing, expected index handle"
     "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5,BJ2)" = "#ERROR _CreateFuturesFixings: index is number 95.08, expected index handle"
     "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5,EB3)" = "#ERROR _CreateFuturesFixings: ValueError: index is a Gas Daily index, expected a futures index"
+    # The fixings of more than one nearby, nearby-selection.md: the ROLL index in XV5, K26 expiring 15
+    # May 2026 and bounding the calendar, M26 on Monday 15 June, N26 on 15 July, Q26 on 14 August and
+    # U26 on 15 September, valued 17 June; its fixings two settle columns wide in XV8 over the dates
+    # generated in XX and the settles in XY:XZ, 80 and 82 on the expiry day and 81 and 83 the day
+    # after, read back under nearby_1 and nearby_2; the history in XV9 reading back, beside the
+    # prompt's fixing_price, the second nearby's contract and settle on each day, N26 on the expiry
+    # day and Q26 after it, a Saturday closed and the valuation day unfixed; the prompt's column
+    # alone in XV10 and its history in XV11, five columns as always; one day's row of two settles in
+    # XV12; a row of settles beside two dates refused by the count; and a first-nearby window over
+    # the two days, 2,000 barrels against 80 paid 18 June, marking 1,000 at the 80.5 average
+    # against the wide history in XV18 and against the prompt's alone in XV20.
+    '=MID(XV8,FIND(":",XV8)+1,21)' = "futures_fixings:ROLL:"
+    "=ROWS(util_ReadHandle(XV8))"       = "24"
+    "=COLUMNS(util_ReadHandle(XV8))"    = "3"
+    "=INDEX(util_ReadHandle(XV8),1,2)"  = "nearby_1"
+    "=INDEX(util_ReadHandle(XV8),1,3)"  = "nearby_2"
+    "=INDEX(util_ReadHandle(XV8),2,3)"  = "float64"
+    "=INDEX(util_ReadHandle(XV8),3,1)"  = "46189"
+    "=INDEX(util_ReadHandle(XV8),3,2)"  = "81"
+    "=INDEX(util_ReadHandle(XV8),3,3)"  = "83"
+    "=INDEX(util_ReadHandle(XV8),4,2)"  = "80"
+    "=INDEX(util_ReadHandle(XV8),4,3)"  = "82"
+    "=COLUMNS(util_ReadHandle(XV10))"   = "2"
+    "=ROWS(util_ReadHandle(XV12))"      = "3"
+    "=COLUMNS(util_ReadHandle(XV12))"   = "3"
+    "=COLUMNS(util_ReadHandle(XV9))"    = "7"
+    "=INDEX(util_ReadHandle(XV9),1,5)"  = "fixing_price"
+    "=INDEX(util_ReadHandle(XV9),1,6)"  = "nearby_2_contract"
+    "=INDEX(util_ReadHandle(XV9),1,7)"  = "nearby_2_fixing_price"
+    "=INDEX(util_ReadHandle(XV9),33,1)" = "46188"
+    "=INDEX(util_ReadHandle(XV9),33,2)" = "M26"
+    "=INDEX(util_ReadHandle(XV9),33,5)" = "80"
+    "=INDEX(util_ReadHandle(XV9),33,6)" = "N26"
+    "=INDEX(util_ReadHandle(XV9),33,7)" = "82"
+    "=INDEX(util_ReadHandle(XV9),34,2)" = "N26"
+    "=INDEX(util_ReadHandle(XV9),34,5)" = "81"
+    "=INDEX(util_ReadHandle(XV9),34,6)" = "Q26"
+    "=INDEX(util_ReadHandle(XV9),34,7)" = "83"
+    "=INDEX(util_ReadHandle(XV9),35,5)" = "unfixed"
+    "=INDEX(util_ReadHandle(XV9),35,7)" = "unfixed"
+    "=INDEX(util_ReadHandle(XV9),31,7)" = "closed"
+    "=COLUMNS(util_ReadHandle(XV11))"   = "5"
+    "=INDEX(util_ReadHandle(XV11),33,5)" = "80"
+    "=_CreateFuturesFixings(XX1:XX2,XY1:XZ1,XV5)" = "#ERROR _CreateFuturesFixings: ValueError: settle has 1 row, expected 2, one per date"
+    "=INDEX(_ReportValues(XV18),3,1)"   = "1000"
+    "=INDEX(_ReportValues(XV20),3,1)"   = "1000"
     # The IFERC fixings: a creator over a column of contract codes, the newest month first as the
     # creator requires, a column of indices and the index in EE2, whose schedule holds those four
     # months the other way up, read back through util_ReadHandle newest first; the creator again
@@ -3776,6 +3822,47 @@ $cells = [ordered]@{
     "XH7" = "bilateral"; "XI7" = "financial"; "XJ7" = "asian"; "XK7" = "period"; "XL7" = "+1bd"; "XM7" = "=VE1"; "XN7" = "SOFR"; "XO7" = "onetime"
     "XH8" = '=_CreateQuoteTemplate("fixed_float",VF1:VM1,XH7:XO7)'
     "XD5" = "=_CreateRFQ(UX5,XE3:XH3,XE4:XH5,XH8)"
+    # The fixings of more than one nearby, nearby-selection.md: the ROLL index's schedule in XQ1:XR5,
+    # its one holiday and the valuation day in XS1:XS2, its barrel specification in XQ7:XU7 under
+    # the headers in EI1:EM1, and its objects down XV: the schedule, the holiday calendar, the
+    # conventions, the specifications, the index, the valuation date and the calendar in XV1:XV7;
+    # the fixings two columns wide in XV8 and the prompt's column alone in XV10, typed below with
+    # the generated rows; their histories in XV9 and XV11; one day's row of two settles in XV12.
+    # A first-nearby window over the two days across M26's expiry: the template in XQ30:XY31, the
+    # ticket in XQ33:XV34, the quotes of N26 and Q26 in XQ36:XQ37, the template, the batch, its
+    # preparation against each history, the price vector, the two markets and the two results in
+    # XV13:XV21.
+    "XQ1" = "K26"; "XR1" = "15-May-2026"
+    "XQ2" = "M26"; "XR2" = "15-Jun-2026"
+    "XQ3" = "N26"; "XR3" = "15-Jul-2026"
+    "XQ4" = "Q26"; "XR4" = "14-Aug-2026"
+    "XQ5" = "U26"; "XR5" = "15-Sep-2026"
+    "XS1" = "1-Jan-2027"; "XS2" = "17-Jun-2026"
+    "XQ7" = "BBL"; "XR7" = "1"; "XS7" = "BBL"; "XT7" = "0"; "XU7" = "0"
+    "XV1" = "=_CreateFuturesSchedule(XQ1:XQ5,XR1:XR5)"
+    "XV2" = "=_CreateHolidayCalendar(XS1)"
+    "XV3" = '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
+    "XV4" = "=_CreateContractSpecifications(EI1:EM1,XQ7:XU7)"
+    "XV5" = '=_CreateIndex("ROLL","A futures index expiring mid-month",XV1,XV3,XV4,XV2,"BBL")'
+    "XV6" = "=_CreateValuationDate(XS2,0.5)"
+    "XV7" = "=_CreateCalendar(XV6,XV5)"
+    "XV9" = "=_CreateMarketHistory(XV7,XV8)"
+    "XV11" = "=_CreateMarketHistory(XV7,XV10)"
+    "XV12" = "=_CreateFuturesFixings(XX1,XY1:XZ1,XV5)"
+    "XQ30" = "quantity_unit"; "XR30" = "quantity_per"; "XS30" = "settlement_frequency"; "XT30" = "schedule_method"; "XU30" = "route"; "XV30" = "settlement_method"; "XW30" = "clearing_house"; "XX30" = "payment_day"; "XY30" = "payment_holiday_calendar"
+    "XQ31" = "BBL"; "XR31" = "period"; "XS31" = "onetime"; "XT31" = "asian"; "XU31" = "cleared"; "XV31" = "financial"; "XW31" = "CME Clearing"; "XX31" = "18-Jun-2026"; "XY31" = "=XV2"
+    "XQ33" = "trade_id"; "XR33" = "trade_date"; "XS33" = "start_date"; "XT33" = "end_date"; "XU33" = "quantity"; "XV33" = "fixed_price"
+    "XQ34" = "1"; "XR34" = "1-Jun-2026"; "XS34" = "15-Jun-2026"; "XT34" = "16-Jun-2026"; "XU34" = "2000"; "XV34" = "80"
+    "XQ36" = "81.5"; "XQ37" = "83.5"
+    "XV13" = '=_CreateTradeTemplate("fixed_float",XQ30:XY30,XQ31:XY31)'
+    "XV14" = "=_CreateTrades(XV5,XQ33:XV33,XQ34:XV34,XV13)"
+    "XV15" = "=_PrepareTrades(XV14,XV9)"
+    "XV16" = '=_CreatePriceVector("ROLL",XQ36:XQ37)'
+    "XV17" = "=_CreateMarket(XV9,XV16)"
+    "XV18" = "=_EvaluateTrades(XV15,XV17)"
+    "XV19" = "=_PrepareTrades(XV14,XV11)"
+    "XV20" = "=_EvaluateTrades(XV19,XV21)"
+    "XV21" = "=_CreateMarket(XV11,XV16)"
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January
@@ -3808,6 +3895,24 @@ while ($quoteDay -ge [datetime]"2026-12-16") {
 }
 $quoteRows = $quoteRow - 1
 $cells["VA4"] = "=_CreateFuturesFixings(VB1:VB$quoteRows,VC1:VC$quoteRows,UX5)"
+# The ROLL index's fixings, nearby-selection.md: every business day from 18 May to 16 June 2026,
+# newest first down XX, the prompt's settle in XY and the second nearby's in XZ, 70 and 72 but the
+# two days across M26's expiry, 80 and 82 on 15 June and 81 and 83 on the 16th; the creator over
+# both settle columns in XV8 and over the prompt's alone in XV10.
+$rollDay = [datetime]"2026-06-16"
+$rollRow = 1
+while ($rollDay -ge [datetime]"2026-05-18") {
+    if ($rollDay.DayOfWeek -ne "Saturday" -and $rollDay.DayOfWeek -ne "Sunday") {
+        $cells["XX$rollRow"] = $rollDay.ToString("dd-MMM-yyyy", [Globalization.CultureInfo]::InvariantCulture)
+        $cells["XY$rollRow"] = $(if ($rollDay -eq [datetime]"2026-06-16") { "81" } elseif ($rollDay -eq [datetime]"2026-06-15") { "80" } else { "70" })
+        $cells["XZ$rollRow"] = $(if ($rollDay -eq [datetime]"2026-06-16") { "83" } elseif ($rollDay -eq [datetime]"2026-06-15") { "82" } else { "72" })
+        $rollRow++
+    }
+    $rollDay = $rollDay.AddDays(-1)
+}
+$rollRows = $rollRow - 1
+$cells["XV8"] = "=_CreateFuturesFixings(XX1:XX$rollRows,XY1:XZ$rollRows,XV5)"
+$cells["XV10"] = "=_CreateFuturesFixings(XX1:XX$rollRows,XY1:XY$rollRows,XV5)"
 
 # --- build the host and tell it where Python is -----------------------------
 

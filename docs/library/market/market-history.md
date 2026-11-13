@@ -69,6 +69,18 @@ Two handles, both required, neither with a default: the index's calendar and the
 
 The fifth column is a number, the price as the fixings hold it, zero and below included, on every period that is fixed and priced; on every other period it is a word, `closed` where the calendar does not price the day, a futures weekend or holiday, fixed or not, and `unfixed` where it prices but has not fixed, the days to come on a futures or a Gas Daily calendar and the months not yet published on an IFERC one. The words are display, not values: they say why the period has no price, no number stands for the absence of one, so a price of zero is a price, and no cell is blank. The row of types says `float64`, the type of what the column holds where it holds anything. The first four columns are the calendar's own, as [calendar.md](../calendar/calendar.md) shows them.
 
+A futures history whose fixings carry more than one nearby, [nearby-selection.md](../../engineering-tickets/trade-valuation-pipeline/nearby-selection.md), holds each fixed day's settles by position, the prompt's first, and spills two columns more for each further nearby: `nearby_2_contract`, the contract that settle is of on each day, the one after the day's prompt, and `nearby_2_fixing_price`, its settle where the day is fixed and priced and the same words elsewhere; a dash stands under the contract where the schedule lists none. On a schedule whose M26 expires on Monday 15 June 2026 and N26 on 15 July, valued 17 June, with 80 and 82 settled on the 15th and 81 and 83 on the 16th:
+
+| date | contract | is_priced | is_fixed | fixing_price | nearby_2_contract | nearby_2_fixing_price |
+|---|---|---|---|---|---|---|
+| datetime64[D] | str | bool | bool | float64 | str | float64 |
+| 13-Jun-2026 | M26 | FALSE | TRUE | closed | N26 | closed |
+| 15-Jun-2026 | M26 | TRUE | TRUE | 80 | N26 | 82 |
+| 16-Jun-2026 | N26 | TRUE | TRUE | 81 | Q26 | 83 |
+| 17-Jun-2026 | N26 | TRUE | FALSE | unfixed | Q26 | unfixed |
+
+The second nearby is N26 on M26's expiry day and Q26 the day after: the expiry day is the expiring contract's, and every nearby moves on with the prompt. A history of the prompt alone, and an IFERC or a Gas Daily one, spills the five columns above and no more.
+
 ## Excel help
 
 Quoted from the declaration in `src/catalyst/excel/market.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
@@ -94,6 +106,7 @@ With a futures calendar, two of the three rules of #84, the argument named as it
 |---|---|
 | every fixing is historical: none is dated on or after the valuation date's day, inside the calendar's days or outside them, whatever fraction of the day has elapsed | `fixings date 2026-05-26 is on or after valuation date 2026-05-26, expected dates before the valuation date` |
 | every fixed and priced day of the calendar has a fixing dated exactly on it, the first and the last as much as the days between | `fixings has no fixing for 2026-05-22, expected a fixing for every fixed day in calendar` |
+| every nearby the fixings carry a settle of is a contract the schedule lists, on every fixed day, a settle past the schedule's last contract having no contract to be the settle of | `fixings has 2 settles on 2026-08-17, expected at most 1, the contracts the schedule lists from 'U26', prompt that day, through 'U26', its last; a later nearby names no listed contract` |
 
 With a Gas Daily calendar, two rules, every flow day being priced:
 
@@ -113,9 +126,16 @@ The calendar's days are consecutive and the fixings' dates increase, so on a fut
 
 Boundary cases the rules decide: a calendar entirely fixed needs a fixing on every priced period it has; a calendar with no fixed period, valued on or before its first day or, for futures, whose fixed days are all closed, is a history with no price, both handles still required and the fixings still on the fixed side, which for an IFERC calendar with no month published yet means no index at all, a column the sheet cannot paste, so that calendar has no history until its first index prints; futures weekends and holidays stay in the calendar without a price, as do the periods to come; futures fixings whole under their own calendar can still leave a day of this one uncovered, when the series stops short; a Gas Daily print for the valuation day itself is required, since the day is fixed; an IFERC index for the month published on the valuation day is refused, since that month is not fixed until the day after; two `_CreateIndex` cells with the same arguments, live at once, share one index, so a calendar over one and fixings over the other pass, as [handles.md](../../seam/handles.md#shared-objects-and-shared-dependencies) says; and an index made again from the same inputs after the first was released is another index, so a calendar and fixings made over the two are refused until both are made over one, as a full calculation makes them, and the desk keeps them on one cell.
 
+**Reading a fixing.** A batch's preparation and a quote's pricing read a fixing through the history's own reader, by the period's row and the contract, as they read a live price through the market's: the fixing is held by its period and its position, the contract's row less the row of the contract the calendar gives the period, nothing for the prompt and one for the second nearby. A contract further on than the fixings carry a settle of, or before the calendar's own, is refused by its code, its day and that day's prompt, and never answered with another nearby's settle, another day's or a quote:
+
+| Asked | Message |
+|---|---|
+| a nearby the history holds no settle of | `requested fixing of 'Q26' on 2026-06-15 is the 3rd nearby's, 'M26' being prompt that day, beyond the 2 settles a day the history holds; expected fixings with a settle column for it` |
+| a contract before the day's own | `requested fixing of 'M26' on 2026-06-16 is of a contract before 'N26', the contract the calendar gives that day; a history holds the settle of that contract and of those after it` |
+
 ## Tests
 
-The examples and properties below are `tests/unit/test_market_history.py`; the seam's texts and the handle are `tests/unit/test_market_creators.py`, which reads the history back through `util_ReadHandle`; the spill and the kinds it carries are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs, for each of the three kinds, and that neither creating a history nor reading it back makes anything of the calendar again, is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`. The market's tests build histories of the three kinds through this creator and move with it; since #106 the market takes any of them.
+The examples and properties below are `tests/unit/test_market_history.py`; the fixings of more than one nearby, the reader and its refusals are `tests/unit/test_nearby_fixings.py`; the seam's texts and the handle are `tests/unit/test_market_creators.py`, which reads the history back through `util_ReadHandle`; the spill and the kinds it carries are `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`. What a call costs, for each of the three kinds, and that neither creating a history nor reading it back makes anything of the calendar again, is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`. The market's tests build histories of the three kinds through this creator and move with it; since #106 the market takes any of them.
 
 | Case | Kind |
 |---|---|
@@ -144,6 +164,7 @@ The examples and properties below are `tests/unit/test_market_history.py`; the s
 | a fixing on the valuation date, a fixed day without one, a print after the valuation day, an index for an unfixed month, and fixings over another index, the library's words; each argument left out, blank, a number, text naming no live object, a creator's failure relayed, or a handle of another kind where the calendar should be, the seam's words, the history's own handle included | example, through the seam |
 | a failed construction publishes no object and no handle; two histories from one calendar each read their own prices; a dead history handle cannot be read | example, with handles |
 | the spill: five headers, five types, a row of the calendar's kinds and a number where the period fixed, text where it did not, for each of the three kinds | example |
+| the ticket's two days across an expiry off one history two settle columns wide, 80 and 81 for the first nearby and 82 and 83 for the second, read by day and contract in any order; the third nearby, the second off a history of the prompt alone and a contract before the prompt refused by code, day and prompt; a settle for a nearby past the schedule's last contract refused when the history is made, by the first fixed day at fault; a first-nearby window's batch and quote reading the prompt's column at 80.5 whatever the width; the spill's two columns more for each further nearby, a dash where none is listed | example |
 | the creator's handle read back in a real workbook, 34 days over a two-contract futures schedule with a price, `closed` and `unfixed` read, a Gas Daily history over the schedule page's three months and an IFERC history over its three, a price and `unfixed` read from each, the futures refusals, a Gas Daily print after the valuation day, and fixings over another index of the same name and IFERC fixings with a Gas Daily calendar, both refused naming the indices | Excel smoke |
 
 ## Not here

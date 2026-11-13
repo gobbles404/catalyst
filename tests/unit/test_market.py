@@ -92,7 +92,7 @@ def a_history(
     days = np.arange(first, day(as_of), dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=holidays.holiday)]
     settles = 70.0 + np.arange(days.size, dtype=np.float64)
-    fixings = futures_fixings(days[::-1], settles[::-1], made.index)
+    fixings = futures_fixings(days[::-1], settles[::-1, None], made.index)
     return market_history(made, fixings)
 
 
@@ -549,10 +549,10 @@ def test_iferc_months_given_newest_first_price_the_history_and_the_market() -> N
     assert indices.codes == ("V26", "X26") and indices.prices.tolist() == [1.85, 2.10]
     history = market_history(made, indices)
     assert history.fixed_rows.tolist() == [0, 1]
-    assert history.fixing_prices.tolist() == [1.85, 2.10]
+    assert history.fixing_prices[:, 0].tolist() == [1.85, 2.10]
     view = market(history, a_vector(2.20))
     assert view.first_contract == 2 and view.last_contract == 2
-    assert view.market_history.fixing_prices.tolist() == [1.85, 2.10]
+    assert view.market_history.fixing_prices[:, 0].tolist() == [1.85, 2.10]
     assert view.live_prices(np.array([2], dtype=np.intp)).tolist() == [2.20]
 
 
@@ -613,7 +613,7 @@ def any_history(data: st.DataObject) -> MarketHistory:
     days = np.arange(made.dates[0] - np.timedelta64(10, "D"), as_of, dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=listed)]
     settles = 60.0 + np.arange(days.size, dtype=np.float64)
-    fixings = futures_fixings(days[::-1], settles[::-1], made.index)  # newest first, as given
+    fixings = futures_fixings(days[::-1], settles[::-1, None], made.index)  # newest first, as given
     return market_history(made, fixings)
 
 

@@ -191,7 +191,7 @@ def a_history(as_of: str = AS_OF, ix: Index = GAS) -> MarketHistory:
     cal = calendar(valuation_date(np.datetime64(as_of, "D"), 0.5), ix)
     priced = cal.dates[cal.is_fixed & cal.is_priced]
     settles = 3.0 + (np.arange(priced.size) % 11) / 100
-    return market_history(cal, futures_fixings(priced[::-1].copy(), settles[::-1].copy(), ix))
+    return market_history(cal, futures_fixings(priced[::-1].copy(), settles[::-1, None].copy(), ix))
 
 
 def a_market(history: MarketHistory) -> Market:
@@ -293,8 +293,11 @@ PREPARATION_NUMPY = {
     # first days, three a bucket
     "ndarray.cumsum": 1,
     "ndarray.flatten": 1,
+    "ndarray.max": 1,  # since nearby-selection.md the history's reader: no fixing asked of a
+    # contract past the settles a day it holds
+    "ndarray.min": 1,  # nor of one before the day's own
     "ndarray.nonzero": 3,  # the live slots, and since #186 the two looks for lots before the start
-    "ndarray.ravel": 3,
+    "ndarray.ravel": 4,  # and the reader's flat view of the prices, read by row and position
     "ndarray.reshape": 1,
     "ndarray.searchsorted": 3,  # the fixed rows, and since #186 the contract periods' places, one
     # a bucket
@@ -308,7 +311,7 @@ PREPARATION_NUMPY = {
     "numpy.asanyarray": 5,
     "numpy.zeros": 1,
     "numpy.empty": 2,
-    "ufunc.reduce": 13,  # the nine looks among them
+    "ufunc.reduce": 15,  # the nine looks and the reader's two among them
 }
 
 
@@ -437,6 +440,7 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "MarketHistory.fixed_prices": 1,  # each fixed slot's settle, by its day and its contract
         "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
@@ -554,6 +558,7 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "MarketHistory.fixed_prices": 1,  # each fixed slot's settle, by its day and its contract
         "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
@@ -609,6 +614,7 @@ def test_a_last3day_batch_prepares_and_ticks_with_the_same_functions_as_a_lastda
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "MarketHistory.fixed_prices": 1,  # each fixed slot's settle, by its day and its contract
         "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
@@ -765,6 +771,7 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "MarketHistory.fixed_prices": 1,  # each fixed slot's settle, by its day and its contract
         "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
@@ -847,6 +854,7 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "MarketHistory.fixed_prices": 1,  # each fixed slot's settle, by its day and its contract
         "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
@@ -962,6 +970,7 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "MarketHistory.fixed_prices": 1,  # each fixed slot's settle, by its day and its contract
         "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
@@ -1166,6 +1175,7 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "MarketHistory.fixed_prices": 1,  # each fixed slot's settle, by its day and its contract
         "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
@@ -1319,6 +1329,7 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "MarketHistory.fixed_prices": 1,  # each fixed slot's settle, by its day and its contract
         "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
@@ -1437,7 +1448,7 @@ IFERC_PREPARATION_NUMPY = {
     **PREPARATION_NUMPY,
     "ndarray.any": 8,
     "ndarray.searchsorted": 4,
-    "ufunc.reduce": 12,
+    "ufunc.reduce": 14,
 }
 
 
@@ -1489,6 +1500,7 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "MarketHistory.fixed_prices": 1,  # each fixed slot's settle, by its day and its contract
         "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite

@@ -1414,12 +1414,13 @@ def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
 
 
 # A year of fixings at the column path, given newest first, with the index by handle: the date
-# column through its look and its conversion to days, the settle column accepted on the host's
-# summary alone, the handle's text rule and its one lookup, then the builder's kind check, the
+# column through its look and its conversion to days, the settles accepted on the host's
+# summary alone, a grid of any width since nearby-selection.md and so no look at their shape,
+# the handle's text rule and its one lookup, then the builder's kind check, the
 # holiday calendar read off the index, its count, its two looks, the order of the dates and the
 # days the market is closed, its count of the business days from the last row's date to the
 # first's and the one look at that count, its two copies, each read from the last row back, and
-# one publication. Twenty-one calls across seventeen functions, the accept rule once per
+# one publication. Eighteen calls across sixteen functions, the accept rule once per
 # argument. The three business-day calls, the calendar, is_busday and busday_count, raise no
 # event the numpy fixture reads, so only their looks are in its count: the ledger reads as it
 # did when the gaps were a look over the business day after each date, and as it did when the
@@ -1439,9 +1440,8 @@ def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out
         "_arguments": 1,
         "_validate": 3,
         "_date_column": 1,
-        "_column": 1,
-        "_one_column": 2,
-        "_shape": 2,
+        "_one_column": 1,  # the date column alone: the settles are a grid of any width
+        "_shape": 1,
         "_dates": 1,
         "_not_dates": 1,
         "_as_days": 1,
@@ -1681,7 +1681,9 @@ def history_sources(contracts: int) -> tuple[object, object]:
 # one lookup, the builder's dispatch to the futures binder, its one comparison of the fixings'
 # index with the calendar's, its two looks, a fixing on or after the valuation date and a fixed
 # day without one, its rows from one subtraction over the fixings' days, the days covered in one
-# zeros, the two columns frozen, and one publication. Fifteen calls across twelve functions, the
+# zeros, since nearby-selection.md the one look that every held nearby is a listed contract and
+# the fixed rows of settles copied as one slice, the two columns frozen, and one publication.
+# Sixteen calls across thirteen functions, the
 # accept rule once per argument; no arange, no searchsorted and no look at a holiday, since the
 # calendar is taken as it is and nothing of it is made again, and no look for a closed day, both
 # having been checked against one holiday calendar.
@@ -1701,16 +1703,20 @@ def test_a_market_history_is_two_handles_in_and_the_calendar_kept(
         "futures_history": 1,
         "_over_the_calendars_index": 1,
         "_every_fixed_day": 1,
+        "_every_nearby_listed": 1,  # each held nearby a listed contract, nearby-selection.md
         "_frozen": 1,
         "_publish": 1,
     }
     calls = numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings))
     assert calls == {
-        "ndarray.any": 2,  # the builder's two looks
+        "ndarray.any": 3,  # the builder's two looks, and since nearby-selection.md the one at
+        # the last fixed day's prompt, every held nearby a listed contract
         "ndarray.astype": 1,  # the fixings' days to rows of the calendar
+        "numpy.array": 1,  # the run's rows of settles copied as one slice, a column a nearby
+        "numpy.count_nonzero": 1,  # where the fixings' run inside the calendar begins
         "numpy.zeros": 1,  # the rows covered
         "ndarray.setflags": 2,  # the two columns frozen
-        "ufunc.reduce": 2,
+        "ufunc.reduce": 3,
     }
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
 
@@ -1837,7 +1843,7 @@ def test_reading_a_market_history_back_rebuilds_nothing(
         "_resolve": 1,
         "util_ReadHandle": 1,
         "market_history_table": 1,
-        "_priced_column": 1,  # the fifth column, through the helper the market's reader shares
+        "_priced_columns": 1,  # the fifth column, through the helper the market's reader shares
         "calendar_table": 1,  # the calendar's own table, as the calendar shows
         "MixedArray.table": 1,
         "_table_column": 3,
@@ -2038,7 +2044,7 @@ def test_reading_a_market_back_rebuilds_nothing(
         "market_table": 1,
         "Market.last_contract": 1,  # where the coverage ends, read off the vector's length
         "Market.live_prices": 1,  # the quotes of the live rows' contracts, the coverage checked
-        "_priced_column": 1,
+        "_priced_columns": 1,
         "calendar_table": 1,  # the calendar's own table, cut at the last row covered
         "MixedArray.table": 1,
         "_table_column": 3,

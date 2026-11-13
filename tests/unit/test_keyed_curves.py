@@ -609,7 +609,7 @@ def history_with(ix: Index, as_of: str, settles: dict[str, float]) -> MarketHist
     prices = np.full(priced.size, 3.0)
     for text, settle in settles.items():
         prices[priced == np.datetime64(text)] = settle
-    return market_history(cal, futures_fixings(priced[::-1].copy(), prices[::-1].copy(), ix))
+    return market_history(cal, futures_fixings(priced[::-1].copy(), prices[::-1, None].copy(), ix))
 
 
 def tau_from(as_of: str) -> float:

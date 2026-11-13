@@ -168,7 +168,9 @@ def in_june() -> Market:
     cal = calendar(valuation_date(JUNE_16, 0.5), CAL)
     priced = cal.dates[cal.is_fixed & cal.is_priced]
     settles = np.where(priced >= np.datetime64("2027-06-01", "D"), 38.0, 30.0)
-    history = market_history(cal, futures_fixings(priced[::-1].copy(), settles[::-1].copy(), CAL))
+    history = market_history(
+        cal, futures_fixings(priced[::-1].copy(), settles[::-1, None].copy(), CAL)
+    )
     return market(history, price_vector("CAL", np.array([42.0, *[40.0] * 6])))
 
 
@@ -298,6 +300,7 @@ LEDGER = {
     "requires_booked_reference": 1,
     "calendar_rows": 1,
     "_the_prices": 1,
+    "MarketHistory.fixed_prices": 1,  # each fixed day's settle, by its day and its contract
     "Market.live_prices": 1,
     "_the_quantities": 1,
     "the_payments": 1,

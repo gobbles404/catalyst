@@ -226,7 +226,7 @@ def test_futures_fixings_spill_their_columns_with_dates_as_serials_and_settles_e
         "_CreateFuturesFixings", [days, settles, an_index(a_two_contract_schedule(), calendar)]
     )
     assert rows(read(handle)) == [
-        ["date", "settle"],
+        ["date", "nearby_1"],
         ["datetime64[D]", "float64"],
         [46146.0, 106.42],
         [46143.0, 101.94],
@@ -1281,7 +1281,9 @@ def test_every_day_of_a_market_shows_its_fixing_its_prompts_quote_or_closed(
     assert [row[:4] for row in body] == rows(
         (days.kinds, days.numeric_slots, "\0".join(days.texts))
     )[2 : 2 + covered]
-    fixed = dict(zip(history.fixed_rows.tolist(), history.fixing_prices.tolist(), strict=True))
+    fixed = dict(
+        zip(history.fixed_rows.tolist(), history.fixing_prices[:, 0].tolist(), strict=True)
+    )
     for row, (shown_row, open_, past, prompt) in enumerate(
         zip(
             body,

@@ -536,7 +536,7 @@ def _the_prepared_leg(
     index = leg.leg.index
     codes = leg.leg.schedule.codes
     fixed_rows = slot_rows[is_fixed]
-    settles = history.fixing_prices[np.searchsorted(history.fixed_rows, fixed_rows)]
+    settles = history.fixed_prices(fixed_rows, leg.slot_reference[is_fixed])
     conventions = index.conventions
     currency = conventions.currency_unit
     # Since #190 each number made here is finite before the record is made, the arithmetic
