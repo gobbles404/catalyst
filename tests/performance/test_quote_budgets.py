@@ -273,6 +273,8 @@ LEDGER = {
     "read_offset": 1,
     "by_the_month": 1,  # a label names months, since dated-quotes.md
     "the_frequency": 1,  # the kernel's rule over the template's one set of terms
+    "the_nearby": 1,  # the nearby.s, nearby-selection.md, over the same terms
+    "nearby_rules": 1,
     "frequency_rules": 1,
     "the_curve": 1,
     "the_curve.<locals>.<genexpr>": 2,  # the collection searched to SOFR, its first curve

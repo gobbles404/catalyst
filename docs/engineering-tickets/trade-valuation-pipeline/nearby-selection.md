@@ -1,11 +1,11 @@
 # A rolling nearby contract for futures averages
 
-**Status:** The first slice built in #245 and the second in #246. Agreed with the owner on 13 November 2026 for
+**Status:** Built in #245, #246 and #247, a slice each. Agreed with the owner on 13 November 2026 for
 [issue #238](https://github.com/gobbles404/catalyst/issues/238), this page in the first slice's
 first commit; three pull requests stacked from main after #242. The first, the fixings and the
 history holding a settle for more than one nearby, is #245, the slice this page opens;
 the second, the `nearby` field required of every template and priced on trades, is #246, and the third,
-quotes and requests for quote, follow on it. It builds on
+quotes and requests for quote, is #247. It builds on
 [calendar-driven-asian-references.md](calendar-driven-asian-references.md), #165, which gave an
 asian observation the calendar's contract for its day, and on
 [onetime-averaging.md](onetime-averaging.md) and [dated-quotes.md](dated-quotes.md).
@@ -126,15 +126,25 @@ As built in #246:
   smoke, the lifetime script and the kept workbook alike, its typed cells as they were; a new block types
   a `nearby` column. The kept workbook's three date-and-settle tables that stood where a readback grew
   moved one column right, with the two notes that cite them.
-- A quote template holding another number than `1` is refused when it is quoted, by `_Quote`,
-  `_QuoteByDates` and `_CreateRFQ` alike: `nearby is 2, expected 1 in a quote template; a quote and a
-  request for quote price the prompt contract's days, and a later nearby is booked as a trade`.
+- A quote template holds the field as a trade template does, read by the same reader; what a quote
+  prices under it is the third slice's, below.
 
 ## Quotes and requests, the third slice
 
 `_Quote`, `_QuoteByDates` and `_CreateRFQ` with `_QuoteRFQ` price a template's `nearby` as the
 batch does, through the shared reference rule and the history's reader; a fair price booked as
-a trade values to zero within rounding.
+a trade values to zero within rounding while every payment is ahead, and once a month has paid
+its mark and its cash are equal and opposite.
+
+As built in #247: the refusal that held a quote template to `1` is gone and nothing replaced it but the
+kernel's own rule, `the_nearby` in `quoting/request.py` calling `nearby_rules` with the quote or the request
+named in the trade's place, beside `the_frequency`; the references were already the shared rule's, so a
+fixed day is read by day and contract and a live day by contract with no other change. The request's
+readback shows `nearby` last. The two days of the example quote 80.5 and 82.5; July by its label, the roll
+inside the month, 82.0435 and 84.0435 with N26 at 81, Q26 at 83 and U26 at 85. A quote template's field
+on a request's row, `nearby` or a code of the terms, is refused as the template's, with where to supply
+it. The zero mark of a quote booked as a trade holds while every payment is ahead; once a month has
+paid, its mark and its cash are equal and opposite.
 
 ## Also pin
 

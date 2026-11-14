@@ -166,6 +166,8 @@ def test_creation_runs_the_resolution_once_and_nothing_of_the_pricing(
         "payment_rule_of": 1,
         "read_offset": 1,
         "the_frequency": 1,  # the kernel's rule over the template's one set of terms
+        "the_nearby": 1,  # the nearby.s, nearby-selection.md, over the same terms
+        "nearby_rules": 1,
         "frequency_rules": 1,
         "trade_schedule_of": 2,  # the request's own read and the observations'
         "the_method": 1,

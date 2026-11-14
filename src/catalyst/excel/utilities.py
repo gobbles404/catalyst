@@ -436,7 +436,8 @@ def rfq_table(obj: Rfq) -> MixedArray:
     request, and `payment_date`, the component's effective day, a dash for both on a physical
     request; then the request's facts on every row so that a row reads whole, `index`,
     `schedule_method`, `route`, `settlement_method`, `quote_unit`, `discount_curve_key`, a dash
-    on the cleared route, and `settlement_frequency`. Saved facts alone: nothing is priced and no
+    on the cleared route, `settlement_frequency` and, since nearby-selection.md, `nearby`. Saved
+    facts alone: nothing is priced and no
     factor is shown."""
     request = obj.request
     terms = request.terms
@@ -483,6 +484,7 @@ def rfq_table(obj: Rfq) -> MixedArray:
             ),
             _words_on("discount_curve_key", on_every("-" if terms.key is None else terms.key)),
             _words_on("settlement_frequency", on_every(terms.frequency.value)),
+            _numbers_on("nearby", np.full(n, float(terms.nearby)), every, "int64"),
         ]
     )
 

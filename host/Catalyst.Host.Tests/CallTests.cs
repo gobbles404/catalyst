@@ -1323,7 +1323,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(597.0 / 11.5, (double)Seam.Call("_QuoteRFQ", market, daily, ExcelMissing.Value), 12);
             var shown = (object[,])Seam.Call("util_ReadHandle", dated);
             Assert.Equal(4, shown.GetLength(0));
-            Assert.Equal(14, shown.GetLength(1));
+            Assert.Equal(15, shown.GetLength(1));  // nearby last, since nearby-selection.md
             Assert.Equal("row", shown[0, 0]);
             Assert.Equal("period", shown[0, 1]);
             Assert.Equal("payment_source", shown[0, 5]);
@@ -1348,6 +1348,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("2027-02-01 to 2027-02-12", byDates[3, 1]);
             Assert.Equal("onetime", byDates[3, 13]);
             Assert.Equal("#ERROR _CreateRFQ: ValueError: trade_id is a field of booking alone, expected one a request's rows hold: contract_code, start_date, end_date, quantity, payment_day", Seam.Call("_CreateRFQ", index, Row("trade_id", "quantity"), Row(1.0, 100000.0), otc));
+            Assert.Equal("#ERROR _CreateRFQ: ValueError: nearby is a field of the quote template, expected one a request's rows hold: contract_code, start_date, end_date, quantity, payment_day; supply nearby on the quote template", Seam.Call("_CreateRFQ", index, Row("contract_code", "quantity", "nearby"), Row("F27", 100000.0, 2.0), otc));
             Assert.Equal("#ERROR _CreateRFQ: rows cell (2, 2) is text 'ten', expected number", Seam.Call("_CreateRFQ", index, byCode, new object[,] { { "F27", 1.0 }, { "G27", "ten" } }, otc));
             Assert.Equal($"#ERROR _CreateRFQ: template is market handle '{market}', expected quote template handle", Seam.Call("_CreateRFQ", index, byCode, ticket, market));
             Assert.Equal("#ERROR _CreateRFQ: ValueError: payment_day row 1 is '+2bd', expected a date; a request's rows pay on dates, and a rule is the template's to hold", Seam.Call("_CreateRFQ", index, withDays, Row("F27", 100000.0, "+2bd"), otc));
@@ -2130,8 +2131,9 @@ namespace Catalyst.Host.Tests
         // N26 read on the 15th and N26 and Q26 on the 16th; the first row averages 80.5 and the
         // second 82.5, 5,000 and 25,000 of mark. A nearby the schedule lists no contract for, a number
         // that is no position, text, and the field left out are refused when the batch is made, a
-        // third nearby the history holds no settle of when it is prepared, and a quote template's
-        // later nearby when it is quoted.
+        // third nearby the history holds no settle of when it is prepared. A quote template's nearby is
+        // priced as a row's is, since the ticket's third slice: the window quotes 80.5 at the first
+        // nearby and 82.5 at the second, and a later nearby under lastday is refused by name.
         [Fact]
         public void a_row_reads_the_nearby_it_names_and_a_second_nearby_averages_the_next_contract()
         {
@@ -2193,7 +2195,9 @@ namespace Catalyst.Host.Tests
             var quoteFields = Row("route", "settlement_method", "schedule_method", "quantity_per", "settlement_frequency", "payment_day", "payment_holiday_calendar", "nearby");
             var later = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", quoteFields, Row("cleared", "financial", "asian", "period", "onetime", 46191.0, holidays, 2.0));
             Assert.StartsWith(Pid + ":quote_template:", later);
-            Assert.Equal("#ERROR _QuoteByDates: ValueError: nearby is 2, expected 1 in a quote template; a quote and a request for quote price the prompt contract's days, and a later nearby is booked as a trade", Seam.Call("_QuoteByDates", market, 46188.0, 46189.0, later, ExcelMissing.Value));
+            Assert.Equal(82.5, (double)Seam.Call("_QuoteByDates", market, 46188.0, 46189.0, later, ExcelMissing.Value), 12);
+            var expiry = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", quoteFields, Row("cleared", "financial", "lastday", "month", "monthly", "+2bd", holidays, 2.0));
+            Assert.Equal("#ERROR _Quote: ValueError: nearby of the quote is 2, expected 1 under schedule_method = lastday; the expiry-based methods take their own contract's days, and a later nearby is priced under asian", Seam.Call("_Quote", market, "N26", expiry, ExcelMissing.Value));
             var prompt = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", quoteFields, Row("cleared", "financial", "asian", "period", "onetime", 46191.0, holidays, 1.0));
             Assert.Equal(80.5, (double)Seam.Call("_QuoteByDates", market, 46188.0, 46189.0, prompt, ExcelMissing.Value), 12);
         }

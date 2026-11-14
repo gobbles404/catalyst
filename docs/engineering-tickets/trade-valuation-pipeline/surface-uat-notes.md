@@ -863,7 +863,7 @@ the right of where they were.
 
 ## 32. A rolling nearby contract for futures averages
 
-Agreed 13 November 2026, issue #238, the first slice built in #245 and the second in #246:
+Agreed 13 November 2026, issue #238, built in #245, #246 and #247, a slice each:
 [nearby-selection.md](nearby-selection.md), three pull requests stacked from main. A swap can
 float on the average of the second nearby futures contract, the contract after the prompt,
 found afresh for each observation day by the
@@ -887,5 +887,14 @@ out and read the refusal that names it; type a `nearby` column in a ticket, `1` 
 it and find two contracts read on each day, the prompt and the one after it; value it and
 find each row at its own average; prepare it against fixings one settle column wide and read
 the refusal; type a nearby past the schedule's last contract, a `0`, a `1.5` and a word and
-read each refusal; type `2` in a quote template and read the quote's refusal. The kept
-workbook's block is rows 3267 to 3289.
+read each refusal. The kept workbook's block is rows 3267 to 3289.
+
+UAT, the third slice: type `2` under `nearby` in a quote template of asian terms and quote
+the two days by `_QuoteByDates`, rows 3291 to 3302 of the kept workbook: 82.5 at the second
+nearby and 80.5 at the first, a trade booked at the quote marking nothing while its payment
+is ahead, and `2` under a `lastday` template refused by name. Then July by its label, rows
+3304 to 3318: a market whose prices run through U26, since July's second nearby rolls from
+Q26 into U26 inside the month, and a template by the month under `asian`; `_Quote` in
+L3311 and `_QuoteRFQ` over a request of the same month in L3314 show the same 84.5435, and
+L3315 their difference, nothing. Type a `nearby` column on a request's row and read the
+refusal that says to supply it on the quote template, B3316.

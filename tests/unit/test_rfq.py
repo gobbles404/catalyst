@@ -208,6 +208,7 @@ HEADINGS = [
     "quote_unit",
     "discount_curve_key",
     "settlement_frequency",
+    "nearby",
 ]
 
 
@@ -246,6 +247,7 @@ def test_the_tickets_cases_by_hand() -> None:
     assert under(table, "quote_unit") == ["USD per BBL"] * 2
     assert under(table, "discount_curve_key") == ["SOFR", "SOFR"]
     assert under(table, "settlement_frequency") == ["monthly", "monthly"]
+    assert under(table, "nearby") == [1.0, 1.0]
     by_template = grid(request(template=otc()))
     assert under(by_template, "payment_source") == ["template", "template"]
     assert under(by_template, "payment_date") == [serial("2027-02-05"), serial("2027-03-05")]
@@ -759,6 +761,21 @@ def test_each_row_takes_its_period_by_the_bookings_rule() -> None:
         "trade_id is a field of booking alone, expected one a request's rows hold: contract_code, "
         "start_date, end_date, quantity, payment_day"
     )
+    # A field the quote template holds is the template's, every row's as its terms are: the
+    # refusal says so and where to supply it, by the definition's own fact and no list here.
+    for name, value in (("nearby", 2.0), ("schedule_method", "asian")):
+        columns: dict[str, list[object]] = {
+            "contract_code": ["F27"],
+            "quantity": [1.0],
+            name: [value],
+        }
+        with pytest.raises(ValueError) as template_field:
+            rfq(STRIP, a_ticket(columns), cleared(), WorkCounter())
+        assert str(template_field.value) == (
+            f"{name} is a field of the quote template, expected one a request's rows hold: "
+            "contract_code, start_date, end_date, quantity, payment_day; "
+            f"supply {name} on the quote template"
+        )
     with pytest.raises(ValueError) as unweighted:
         rfq(STRIP, a_ticket({"contract_code": ["F27"]}), cleared(), WorkCounter())
     assert str(unweighted.value) == (
@@ -1023,6 +1040,7 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "USD per BBL",
         "SOFR",
         "monthly",
+        1.0,
     ]
     assert table[3][5:7] == ["request", serial("2027-03-08")]
     assert spilled(ENTRY["util_ReadHandle"](saved))[2][5:7] == ["template", serial("2027-02-05")]
