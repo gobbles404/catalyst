@@ -4000,6 +4000,10 @@ $cells["XV10"] = "=_CreateFuturesFixings(XX1:XX$rollRows,XY1:XY$rollRows,XV5)"
 . (Join-Path $PSScriptRoot "host_build.ps1")
 . (Join-Path $PSScriptRoot "hidden_excel.ps1")
 $xll = Build-HostAddIn -Root $root
+# The build's own config as the build just wrote it, the file a person's Excel reads. Staging and
+# both Excels below must leave it as it is, to the byte.
+$ownConfig = Join-Path (Split-Path $xll -Parent) "catalyst.cfg"
+$ownBytes = [IO.File]::ReadAllBytes($ownConfig)
 $endUserFolder = Join-Path ([IO.Path]::GetTempPath()).TrimEnd("\") "catalyst-end-user-$PID"
 $endUserBuild = Copy-HostForEndUser -Root $root -Xll $xll -Folder $endUserFolder
 $probesFolder = Join-Path ([IO.Path]::GetTempPath()).TrimEnd("\") "catalyst-with-probes-$PID"
@@ -4109,15 +4113,19 @@ try {
     Test-Formulas "an end user's Excel: the library alone, from a folder of its own" $endUserBuild $typed $endUserFolder
     Test-Folder "after"
     Test-Formulas "the add-in staged with the probes" $probesBuild $probed
-    # The build itself is what a person loads: neither Excel was given it, and its config still
-    # names no probe.
-    $own = Get-Content -LiteralPath (Join-Path (Split-Path $xll -Parent) "catalyst.cfg")
-    if ($own -match "probes|test_support") {
-        $failures++
-        Write-Host "FAIL the build's own config names the probes: $($own -join ' | ')"
-    }
 }
 finally {
+    # The build itself is what a person loads: neither Excel was given it, and its config is the
+    # file the build wrote, byte for byte, whether the run above passed or stopped. The bytes are
+    # compared and not read for a word, since the checkout's own path may hold any word.
+    $ownNow = if (Test-Path -LiteralPath $ownConfig -PathType Leaf) { [IO.File]::ReadAllBytes($ownConfig) } else { [byte[]]@() }
+    if (-not [Linq.Enumerable]::SequenceEqual([byte[]]$ownBytes, [byte[]]$ownNow)) {
+        $failures++
+        Write-Host "FAIL the build's own config changed during the run"
+        Write-Host "     as built  $([Text.Encoding]::ASCII.GetString($ownBytes).Trim() -replace '\r?\n', ' | ')"
+        Write-Host "     now       $([Text.Encoding]::ASCII.GetString($ownNow).Trim() -replace '\r?\n', ' | ')"
+    }
+    else { Write-Host "ok   the build's own config is as the build wrote it, $($ownBytes.Length) bytes" }
     Write-ExcelBusyReport
     Remove-Item -LiteralPath $endUserFolder, $probesFolder -Recurse -Force -ErrorAction SilentlyContinue
 }
