@@ -246,8 +246,8 @@ The host runner is the program that times each probe through the host, with Pyth
 | the tests without Excel | `Python.cs`, `StartupTests.cs`, `CallTests.cs`, `MarshalTests.cs` in `host/Catalyst.Host.Tests/` |
 | the pins | `tests/performance/HostWorkBudgets.cs` |
 | the Python pins on owning a range, and the test that a Cells keeps its copy | `tests/performance/test_seam_budgets.py`, `tests/unit/test_bridge.py` |
-| the build and where its config file lands, and the two folders staged from it, an end user's and the add-in with the probes | `Build-HostAddIn`, `Copy-HostForEndUser`, `Copy-HostWithProbes` in `tools/host_build.ps1`; the file sits beside `host/Catalyst.Host/bin/Release/net48/Catalyst.xll` |
-| the test with Excel, in an end user's build and in the build with the probes, the check of a release's folder, and Excel by hand | `tools/excel_smoke.ps1`, `tools/release_check.ps1`, `tools/excel_dev.ps1` |
+| the build and where its config file lands, the two folders staged from it, an end user's and the add-in with the probes, and the inventory of an end user's folder | `Build-HostAddIn`, `Copy-HostForEndUser`, `Copy-HostWithProbes`, `Test-EndUserFolder` in `tools/host_build.ps1`; the file sits beside `host/Catalyst.Host/bin/Release/net48/Catalyst.xll` |
+| the test with Excel, in an end user's build and in the build with the probes, and Excel by hand | `tools/excel_smoke.ps1`, `tools/excel_dev.ps1` |
 | waiting for a busy Excel, the property read that keeps its failure, and their proof without Excel | `Invoke-ExcelCall`, `Read-ExcelProperty` in `tools/hidden_excel.ps1`; `tools/excel_busy_selftest.ps1` |
 | starting and ending a hidden Excel, and the proof without Excel that a failed start still ends it | `Start-HiddenExcel`, `Get-HiddenExcelProcess`, `Stop-HiddenExcel` in `tools/hidden_excel.ps1`; `tools/excel_session_selftest.ps1` |
 | the host runner | `Program.cs`, `Scenarios.cs`, `Measurements.cs` in `tools/performance/Catalyst.Host.Measure/` |

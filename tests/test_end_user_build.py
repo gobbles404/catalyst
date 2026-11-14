@@ -1,10 +1,12 @@
 """The end user's build holds no probe: the `catalyst` package alone, copied to a folder of its
 own and loaded by a Python that is given that folder and the installed libraries and nothing
 else, as the host is given its `pythonpath`. Every other test runs with the probes registered,
-so this is the one place a function list is read as an end user's Excel would read it.
+so this is the one place a function list is read as an end user's Excel would read it. Below
+that, the inventory the smoke takes of an end user's folder, on folders made here.
 """
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -108,7 +110,104 @@ def test_the_names_read_off_the_package_are_the_probes() -> None:
 
 
 def test_the_library_holds_no_file_named_for_the_probes() -> None:
-    """Source alone: bytecode a run left behind is the release check's to find, in the folder a
-    release was assembled into."""
+    """Source alone: bytecode a run left behind is the inventory's to find, in a folder laid out
+    for an end user."""
     package = Path(catalyst.__file__).parent
     assert [p for p in package.rglob("*probes*") if "__pycache__" not in p.parts] == []
+
+
+# `Test-EndUserFolder` in `tools/host_build.ps1`, the inventory the smoke takes of the end user's
+# folder before its first Excel starts, on folders made here. It reads names, so empty files do.
+RUNS_ON = (
+    "Catalyst.xll",
+    "Catalyst.dna",
+    "Catalyst.Host.dll",
+    "Python.Runtime.dll",
+    "ExcelDna.IntelliSense.dll",
+    "catalyst.cfg",
+    "catalyst/__init__.py",
+    "catalyst/py.typed",
+    "catalyst/excel/bridge.py",
+    "catalyst/instrumentation/__init__.py",
+)
+
+
+def laid_out(folder: Path, *more: str) -> Path:
+    """Every file the add-in runs on, and `more` beside them."""
+    for name in (*RUNS_ON, *more):
+        (folder / name).parent.mkdir(parents=True, exist_ok=True)
+        (folder / name).touch()
+    return folder
+
+
+def inventory(folder: Path) -> tuple[int, str]:
+    """The number of faults the inventory found in `folder`, and what it printed."""
+    ran = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            ". $env:HOST_BUILD; exit (Test-EndUserFolder -Folder $env:END_USER_FOLDER)",
+        ],
+        env={
+            **os.environ,
+            "HOST_BUILD": str(ROOT / "tools" / "host_build.ps1"),
+            "END_USER_FOLDER": str(folder),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return ran.returncode, ran.stdout
+
+
+def test_the_inventory_passes_a_folder_laid_out_for_an_end_user(tmp_path: Path) -> None:
+    """The library's own bytecode is counted and is no fault: a release may be handed over
+    with it."""
+    faults, said = inventory(laid_out(tmp_path, "catalyst/__pycache__/__init__.cpython-313.pyc"))
+    assert faults == 0, said
+    assert "FAIL" not in said
+    assert "ok   catalyst\\excel\\bridge.py" in said
+    assert "ok   nothing named for the probes" in said
+    assert "11 files, 1 __pycache__ folders, 0 faults" in said
+
+
+def test_the_inventory_names_a_file_the_add_in_runs_on_that_is_missing(tmp_path: Path) -> None:
+    (laid_out(tmp_path) / "Python.Runtime.dll").unlink()
+    faults, said = inventory(tmp_path)
+    assert faults == 1, said
+    assert "FAIL Python.Runtime.dll is not in the folder" in said
+
+
+@pytest.mark.parametrize(
+    ("shipped", "named"),
+    [
+        pytest.param(
+            "catalyst/excel/probes.py",
+            ["catalyst\\excel\\probes.py"],
+            id="the_probes_old_source",
+        ),
+        pytest.param(
+            "catalyst/excel/__pycache__/probes.cpython-313.pyc",
+            ["catalyst\\excel\\__pycache__\\probes.cpython-313.pyc"],
+            id="the_bytecode_of_it",
+        ),
+        pytest.param("catalyst_probes/__init__.py", ["catalyst_probes"], id="the_probes_package"),
+        pytest.param(
+            "test_support/catalyst_probes/__init__.py",
+            ["test_support", "test_support\\catalyst_probes"],
+            id="the_probes_folder",
+        ),
+        pytest.param("Catalyst.Probes.dll", ["Catalyst.Probes.dll"], id="the_floors_library"),
+    ],
+)
+def test_the_inventory_names_whatever_is_named_for_the_probes(
+    tmp_path: Path, shipped: str, named: list[str]
+) -> None:
+    faults, said = inventory(laid_out(tmp_path, shipped))
+    assert faults == len(named), said
+    for name in named:
+        assert f"FAIL named for the probes: {name}\n" in said
+    assert "ok   nothing named for the probes" not in said

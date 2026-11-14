@@ -3993,9 +3993,9 @@ $cells["XV10"] = "=_CreateFuturesFixings(XX1:XX$rollRows,XY1:XY$rollRows,XV5)"
 # formula a person types is checked there, and every formula that calls a probe must show
 # #NAME? there: the name unknown to that Excel, not merely unlisted. The second is the same
 # compiled add-in staged with the probes, their package named in its config and HostAdd's
-# library beside the host, where the probe formulas show what they are pinned to.
-# tools\release_check.ps1 reads the end user's folder before Excel first loads the add-in from
-# it and again after.
+# library beside the host, where the probe formulas show what they are pinned to. Before the
+# first Excel starts, Test-EndUserFolder takes the inventory of the end user's folder as staged:
+# the files the add-in runs on, and nothing named for the probes, source, library or bytecode.
 
 . (Join-Path $PSScriptRoot "host_build.ps1")
 . (Join-Path $PSScriptRoot "hidden_excel.ps1")
@@ -4097,21 +4097,15 @@ function Test-Formulas([string]$What, [string]$Xll, $Expected, [string]$LibraryF
     }
 }
 
-function Test-Folder([string]$When) {
-    Write-Host "--- the end user's folder, $When ---"
-    & (Join-Path $PSScriptRoot "release_check.ps1") -Folder $endUserFolder
-    $script:failures += $LASTEXITCODE
-}
-
 try {
-    Test-Folder "before Excel first loads the add-in from it"
+    Write-Host "--- the end user's folder, before Excel first loads the add-in from it ---"
+    $failures += Test-EndUserFolder -Folder $endUserFolder
     $packed = @(Get-ChildItem -LiteralPath $endUserFolder -Recurse -Directory -Filter "__pycache__").Count
     if ($packed) {
         $failures++
         Write-Host "FAIL the end user's folder was laid out with $packed __pycache__ folder(s); a clean copy holds none"
     }
     Test-Formulas "an end user's Excel: the library alone, from a folder of its own" $endUserBuild $typed $endUserFolder
-    Test-Folder "after"
     Test-Formulas "the add-in staged with the probes" $probesBuild $probed
 }
 finally {

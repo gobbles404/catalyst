@@ -49,7 +49,7 @@ function Read-HostConfig([string]$Xll) {
 # bytecode with it, and a config that names that folder and the installed libraries, no checkout
 # folder and no probes. It is the smoke's stand-in for a release, so the functions a person types
 # are checked as an end user's Excel loads them; the release itself is assembled elsewhere, by
-# its own script, and tools\release_check.ps1 reads either folder.
+# its own script, and Test-EndUserFolder below takes the inventory of either folder.
 function Copy-HostForEndUser([string]$Root, [string]$Xll, [string]$Folder) {
     Copy-HostFiles -Xll $Xll -Folder $Folder
     $package = Join-Path $Root "src\catalyst"
@@ -67,6 +67,39 @@ function Copy-HostForEndUser([string]$Root, [string]$Xll, [string]$Folder) {
         "pythonpath=$Folder;$($built.Searched[-1])"
     )
     return Join-Path $Folder (Split-Path $Xll -Leaf)
+}
+
+# Test-EndUserFolder takes the inventory of a folder laid out for an end user, the one staged
+# above or a release unzipped, and returns the number of faults, a line printed for each: a file
+# the add-in runs on that is not there, and anything named for the probes, which are test support
+# and no part of what an end user is handed, by their source, by HostAdd's library or by the
+# bytecode a run left of either. It reads names and nothing else, and changes nothing. What the
+# config says and which library Excel loads are Excel's to show, in =CatalystStatus() and =Ping().
+# Take it before Excel first loads the add-in from the folder: the __pycache__ folders it counts
+# are then the ones the folder was handed over with, and not what that Excel's Python wrote.
+function Test-EndUserFolder([string]$Folder) {
+    $top = (Resolve-Path -LiteralPath $Folder -ErrorAction Stop).Path.TrimEnd("\")
+    $runsOn = "Catalyst.xll", "Catalyst.dna", "Catalyst.Host.dll", "Python.Runtime.dll", "ExcelDna.IntelliSense.dll", "catalyst.cfg",
+        "catalyst\__init__.py", "catalyst\py.typed", "catalyst\excel\bridge.py", "catalyst\instrumentation\__init__.py"
+    $faults = 0
+    foreach ($file in $runsOn) {
+        if (Test-Path -LiteralPath (Join-Path $top $file) -PathType Leaf) { Write-Host "ok   $file" }
+        else {
+            $faults++
+            Write-Host "FAIL $file is not in the folder"
+        }
+    }
+    $held = @(Get-ChildItem -LiteralPath $top -Recurse -Force)
+    $named = @($held | Where-Object { $_.Name -like "*probes*" -or $_.Name -eq "test_support" })
+    foreach ($one in $named) {
+        $faults++
+        Write-Host "FAIL named for the probes: $($one.FullName.Substring($top.Length + 1))"
+    }
+    if (-not $named) { Write-Host "ok   nothing named for the probes" }
+    $caches = @($held | Where-Object { $_.PSIsContainer -and $_.Name -eq "__pycache__" }).Count
+    $files = @($held | Where-Object { -not $_.PSIsContainer }).Count
+    Write-Host "inventory of ${top}: $files files, $caches __pycache__ folders, $faults faults"
+    return $faults
 }
 
 # Copy-HostWithProbes stages the built add-in with the probes and returns the path of the .xll in
