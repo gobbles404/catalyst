@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -49,6 +50,37 @@ namespace Catalyst.Host.Tests
             var config = Config.Load(path);
             Assert.True(config.TryGetValue("probes", out var probes));
             Assert.Equal("catalyst_probes", probes);
+        }
+
+        // Two configs that stop the add-in before Python starts, which tools\release_check.ps1 reads
+        // by these same rules and calls faults. A line that is neither blank nor a comment and has
+        // no = stops the load itself.
+        [Fact]
+        public void a_line_with_no_equals_sign_stops_the_config_from_loading()
+        {
+            var path = Path.GetTempFileName();
+            File.WriteAllLines(path, new[]
+            {
+                "pythondll=C:\\python\\python313.dll",
+                "where the library is",
+                "pythonpath=C:\\repo\\src",
+            });
+            Assert.ThrowsAny<Exception>(() => Config.Load(path));
+        }
+
+        // And a key is held as written: one in capitals is not the key the host asks for.
+        [Fact]
+        public void a_key_in_capitals_is_not_the_key_the_host_asks_for()
+        {
+            var path = Path.GetTempFileName();
+            File.WriteAllLines(path, new[]
+            {
+                "pythondll=C:\\python\\python313.dll",
+                "PYTHONPATH=C:\\repo\\src",
+            });
+            var config = Config.Load(path);
+            Assert.True(config.ContainsKey("PYTHONPATH"));
+            Assert.False(config.ContainsKey("pythonpath"));
         }
 
         // The bridge imported and nothing more, where an end user's build stops: Excel is told of
