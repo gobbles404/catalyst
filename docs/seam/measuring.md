@@ -23,7 +23,7 @@ Every measurement drives the probes in `test_support/catalyst_probes`, test supp
 | `RowSums(values)` | one answer per input row, the shape of pricing every row |
 | `Grid(rows, cols)` | cells out from two numbers in |
 | `EchoText`, `EchoBoolean`, `EchoRow`, `Fail` | correctness rows; not run for capacity |
-| `HostAdd(a, b)` | the floor under every probe: a C# function with the host's argument shape and no Python, so Excel and Excel-DNA's share of a call is measured beside the seam's; it lives in `AddIn.cs`, hidden like the probes and registered only where they are loaded |
+| `HostAdd(a, b)` | the floor under every probe: a C# function with the host's argument shape and no Python, so Excel and Excel-DNA's share of a call is measured beside the seam's; it lives in `test_support/Catalyst.Probes`, a library of its own that only an add-in staged with the probes loads, hidden like them |
 
 ## Counts, as tests
 
@@ -62,7 +62,7 @@ Each runner warms once, checks the answer, calibrates the number of calls until 
 | `.\tools\performance\before_after.ps1` | the three runners above, on the base of the change and on this tree, one runner at a time on each | every row of every layer, side by side, in `profiles/compare.md` | nothing; a row that moved where the change did not aim is the finding |
 | `uv run python tools/performance/profile_workload.py` | a sampling profiler over repeated calls | where a probe's time goes, as an HTML report per probe | how long one call took |
 
-`measure.ps1` runs the Python side: the profiler, the Python runner, and the summary. The host runner and the Excel runner have their own commands above; run the summary again after either, and it adds their columns. CI runs `measure.ps1` and uploads `profiles/`; the host runner is built in CI so it keeps compiling and is never run there.
+`measure.ps1` runs the Python side: the profiler, the Python runner, and the summary. The host runner and the Excel runner have their own commands above; run the summary again after either, and it adds their columns. CI runs `measure.ps1` and uploads `profiles/`; the host runner is built in CI so it keeps compiling and is never run there, and `HostAdd`'s library is built beside it. The Excel runner loads the add-in from a folder staged for its run, the compiled add-in with the probes, and never from the build's own folder.
 
 Sizes: 1, 100, 1,000, 10,000 and 100,000 cells. One hundred cells per call and a thousand calls per recalculation is the working workload; 100,000 is the control that shows scaling without defining the ordinary case. Rejections are timed as their own scenarios, because early failure does less work.
 

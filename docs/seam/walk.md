@@ -150,7 +150,8 @@ Every layer charges per call, and only the scan, the copies that own the range, 
 
 | To see | Go to |
 |---|---|
-| the host: start, the call, the scan, the way out, and `HostAdd` | `host/Catalyst.Host/AddIn.cs`, the Bridge, Marshal, Registration and Floor classes |
+| the host: start, the call, the scan, the way out | `host/Catalyst.Host/AddIn.cs`, the Bridge, Marshal and Registration classes |
+| `HostAdd`, the same call with no Python | `test_support/Catalyst.Probes/Floor.cs` |
 | the versions of Excel-DNA and pythonnet | `host/Catalyst.Host/Catalyst.Host.csproj` |
 | the counters and what each name means | `host/Catalyst.Host/WorkCounter.cs` |
 | the bridge: Cells, `cells_from_buffers`, the accept rules, the result rules, `Registered.run` | `src/catalyst/excel/bridge.py` |

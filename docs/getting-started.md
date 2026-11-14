@@ -79,17 +79,17 @@ It shows the 8.0.4xx version the repository will use.
 
 This builds the add-in in Release, writes `catalyst.cfg` beside it so that Excel finds this clone's `src` and this environment's Python, and opens a fresh, visible Excel with the add-in loaded. The first run takes a minute or two while NuGet restores packages; later runs take seconds. Run it again after a change: it closes the Excel it opened last time, offers to save, and opens a new one.
 
-In the sheet, type each of these in a cell:
+In the sheet, type each of these in the cell named:
 
-| Formula | Shows | Which proves |
-|---|---|---|
-| `=CatalystStatus()` | `ok: python started and functions registered` | the add-in loaded and started Python |
-| `=Ping()` | `catalyst` and a version, then `from` and a path inside this clone's `src\catalyst` | this clone's code is the one running |
-| `=Add(1,2)` | `3` | a call crosses to Python and comes back |
-| `=_CreateValuationDate(DATE(2026,9,11),0.5)` | `valuation_date:` followed by two numbers | the library's first creator works |
-| `=util_ReadHandle(A4)`, with the creator in A4 | the object spilled as a small table | a handle resolves and spills |
+| In | Formula | Shows | Which proves |
+|---|---|---|---|
+| A1 | `=CatalystStatus()` | `ok: python started and functions registered` | the add-in loaded and started Python |
+| A2 | `=Ping()` | `catalyst` and a version, then `from` and a path inside this clone's `src\catalyst` | this clone's code is the one running |
+| A3 | `=_CreateValuationDate(DATE(2026,9,11),0.5)` | `valuation_date:` followed by two numbers | the library's first creator works |
+| A4 | `=util_ReadHandle(A3)` | the object spilled as a small table under A4 | a handle resolves and spills |
+| C1 | `=_ListInstruments()` | a table spilled from C1, three rows by two columns: the headings `instrument` and `description`, then `fixed_float` and `cashflow`, each with a sentence beside it | a call crosses to Python and comes back |
 
-`Add` is a probe of the seam, so Excel's function wizard does not offer it; type it in full. Typing `_` in a cell lists the library's own functions. To see every function on a real sheet, open the shared workbook instead, recalculated so that its handles belong to your session:
+`_ListInstruments` has a column to itself because its table needs the cells below and beside it empty. `=Add(1,2)` and `=HostAdd(1,2)` both show `#NAME?` here, and should: they are probes, test-only functions that this build, the one an end user loads, does not hold. Typing `_` in a cell lists the library's own functions. To see every function on a real sheet, open the shared workbook instead, recalculated so that its handles belong to your session:
 
 ```powershell
 .\tools\excel_dev.ps1 workbooks\handles.xlsx
