@@ -169,7 +169,10 @@ class ResolvedTrades:
     quantity_per[i] the basis its quantity is stated per, the position of the member among
     BASES; settlement_frequency[i] since onetime-averaging.md how many calculation periods its
     days make, the position among FREQUENCIES, monthly the one this version books, read by the
-    rules here and kept for the readback; trade_dates[i] the day the deal was struck,
+    rules here and kept for the readback; nearby[i] since nearby-selection.md which listed
+    contract prices each of its observation days, counted from the day's prompt contract, 1
+    the prompt and 2 the next the schedule lists, a whole number of 1 or more read by the
+    encoding's reference rule; trade_dates[i] the day the deal was struck,
     trade_ids[i] its trade_id, the source
     system's whole number of at most 15 digits held as an int64 since #168, clearing_house[i] its
     clearing organization, counterparty[i] since #175 the counterparty it faces and broker[i] its
@@ -218,6 +221,7 @@ class ResolvedTrades:
     settlement: Settlement
     quantity_per: NDArray[np.intp]
     settlement_frequency: NDArray[np.intp]
+    nearby: NDArray[np.intp]
     trade_ids: NDArray[np.int64] | None
     clearing_house: tuple[str, ...] | None
     counterparty: tuple[str, ...] | None
@@ -271,6 +275,7 @@ def resolved_trades(
     schedule_method: NDArray[np.intp],
     quantity_per: NDArray[np.intp],
     settlement_frequency: NDArray[np.intp],
+    nearby: NDArray[np.intp],
     trade_ids: NDArray[np.int64] | None,
     clearing_house: tuple[str, ...] | None,
     broker: tuple[str, ...] | None,
@@ -309,7 +314,11 @@ def resolved_trades(
     specifications, since the lot size and the lot unit are read there, its quantities counting
     it, whatever the desk's word for it, an exchange lot or a bare unit the index defines with a
     size of one, the method and the basis positions among their members, the first row out of
-    range refused. A penultimate, last3day or asian row settles financially, each being cash
+    range refused. Each occurrence has a nearby, since nearby-selection.md, a whole number of 1
+    or more the caller read by whole_nearbys, the contract its observation days are priced
+    by counted from each day's prompt: a number above 1 stands on one futures index, under a
+    financial settlement and the asian method, nearby_rules, the first row elsewhere refused
+    by name. A penultimate, last3day or asian row settles financially, each being cash
     settled against settles on or before its contract's expiry, and a physical settlement would
     say a delivery the contract does not make: a physical batch takes lastday rows alone, the
     first other row refused by its method and named by its row. The components are aligned, one
@@ -377,6 +386,15 @@ def resolved_trades(
         second_leg is not None,
         partial(named_trade, trade_ids),
     )
+    _the_nearbys(nearby, occurrences)
+    nearby_rules(
+        nearby,
+        schedule_method,
+        settlement,
+        index.kind,
+        second_leg is not None,
+        partial(named_trade, trade_ids),
+    )
     _the_method(schedule_method, settlement, trade_ids, index.kind)
     _the_components(occurrence, quantity, start_date, end_date, trade_ids, occurrences)
     onetime = settlement_frequency[occurrence] == FREQUENCIES.index(SettlementFrequency.ONETIME)
@@ -404,6 +422,7 @@ def resolved_trades(
         settlement,
         _frozen_rows(quantity_per),
         _frozen_rows(settlement_frequency),
+        _frozen_rows(nearby),
         None if trade_ids is None else _frozen_ids(trade_ids),
         clearing_house,
         counterparty,
@@ -653,6 +672,67 @@ def frequency_rules(
             f"quantity_per of {first(period)} is 'period', expected 'month' or 'calday' under "
             "settlement_frequency = monthly; period is the total of a onetime period and says "
             "nothing of a month"
+        )
+
+
+def _the_nearbys(nearby: NDArray[np.intp], occurrences: int) -> None:
+    """Each occurrence's nearby, one per occurrence and 1 or more, the first other refused by
+    its row: a position is counted from the prompt, and nothing stands before it."""
+    if nearby.size != occurrences:
+        raise ValueError(
+            f"nearby has {nearby.size} rows, expected {occurrences}, one per occurrence"
+        )
+    before = nearby < 1
+    if before.any():
+        i = int(before.argmax())
+        raise ValueError(
+            f"nearby row {i + 1} is {nearby[i]}, expected 1 or more, 1 the prompt contract and "
+            "2 the next the schedule lists"
+        )
+
+
+def nearby_rules(
+    nearby: NDArray[np.intp],
+    schedule_method: NDArray[np.intp],
+    settlement: Settlement,
+    kind: Kind,
+    paired: bool,
+    named: Callable[[int], str],
+) -> None:
+    """Each occurrence's nearby with the terms it stands under, since nearby-selection.md, the
+    kernel's rule. A nearby above 1, a contract after the day's prompt, is priced on a futures
+    index alone, an IFERC month having one index and no contract after it to count; on one
+    index, a later nearby on a pair not being built; under a financial settlement, a physical
+    position delivering its own contract; and under the asian method, the expiry-based methods
+    taking their own contract's days. Everywhere else the nearby is 1. The first occurrence
+    that breaks a rule is refused in the words `named` gives it, the rules in this order."""
+    later = nearby > 1
+    if not later.any():
+        return
+    k = int(later.argmax())
+    if kind is Kind.IFERC:
+        raise ValueError(
+            f"nearby of {named(k)} is {int(nearby[k])}, expected 1 on an IFERC index; an IFERC "
+            "month has one index, published once, and no contract after the prompt to count"
+        )
+    if paired:
+        raise ValueError(
+            f"nearby of {named(k)} is {int(nearby[k])}, expected 1 with two indexes; a later "
+            "nearby on a pair is not built"
+        )
+    if settlement is Settlement.PHYSICAL:
+        raise ValueError(
+            f"nearby of {named(k)} is {int(nearby[k])}, expected 1 under settlement_method = "
+            "physical; a physical position delivers its own contract, and a later nearby is "
+            "cash settled on its average"
+        )
+    unaveraged = later & (schedule_method != METHODS.index(ScheduleMethod.ASIAN))
+    if unaveraged.any():
+        k = int(unaveraged.argmax())
+        raise ValueError(
+            f"nearby of {named(k)} is {int(nearby[k])}, expected 1 under schedule_method = "
+            f"{METHODS[int(schedule_method[k])].value}; the expiry-based methods take their own "
+            "contract's days, and a later nearby is priced under asian"
         )
 
 
@@ -972,6 +1052,31 @@ def whole_trade_ids(values: NDArray[np.float64], where: Callable[[int], str]) ->
     ids = values.astype(np.int64)
     ids.setflags(write=False)
     return ids
+
+
+def whole_nearbys(values: NDArray[np.float64], where: Callable[[int], str]) -> NDArray[np.intp]:
+    """Each nearby a whole number of 1 or more, since nearby-selection.md: a position counted
+    from the prompt contract, 1 the prompt itself, finite, whole, at least 1 and of at most 15
+    digits, the digits a cell carries exactly; the first that is not is refused in the
+    caller's words for its position, the row in a ticket and the field in a template. Then
+    the values converted once to whole positions, the one form every later reader takes;
+    whether the schedule lists a contract that far on is the reference rule's, day by day."""
+    bad = (
+        ~np.isfinite(values)
+        | (values != np.round(values))
+        | (values < 1)
+        | (values > TRADE_ID_LIMIT)
+    )
+    if bad.any():
+        k = int(bad.argmax())
+        value = float(values[k])
+        whole = np.isfinite(value) and value == round(value) and abs(value) <= TRADE_ID_LIMIT
+        shown = str(int(value)) if whole else repr(value)
+        raise ValueError(
+            f"{where(k)} is {shown}, expected a whole number of 1 or more, of at most "
+            f"{TRADE_ID_DIGITS} digits: 1 the prompt contract, 2 the next the schedule lists"
+        )
+    return values.astype(np.intp)
 
 
 def finite_prices(prices: NDArray[np.float64], where: Callable[[int], str]) -> None:

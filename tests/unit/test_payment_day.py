@@ -100,6 +100,7 @@ BILATERAL: dict[str, object] = {
     "quantity_unit": "MMBTU",
     "quantity_per": "month",
     "settlement_frequency": "monthly",
+    "nearby": 1.0,
     "schedule_method": "lastday",
     "route": "bilateral",
     "settlement_method": "financial",
@@ -502,6 +503,7 @@ def test_a_dated_quote_template_prices_the_strip_on_one_factor_that_cancels() ->
             Settlement.FINANCIAL,
             *picks(ScheduleMethod.ASIAN, QuantityPer.MONTH, 2),
             one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, 2),
+            np.ones(2, dtype=np.intp),
             ids(1, 2),
             None,
             None,
@@ -546,6 +548,7 @@ def test_a_quote_template_takes_the_date_through_the_seam(syn: dict[str, Any]) -
         "schedule_method": "lastday",
         "quantity_per": "month",
         "settlement_frequency": "monthly",
+        "nearby": 1.0,
         "payment_day": serial("2027-03-15"),
         "payment_holiday_calendar": syn["calendar"],
     }

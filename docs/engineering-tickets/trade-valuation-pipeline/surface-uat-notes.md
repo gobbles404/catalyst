@@ -863,7 +863,7 @@ the right of where they were.
 
 ## 32. A rolling nearby contract for futures averages
 
-Agreed 13 November 2026, issue #238, the first slice built in #245:
+Agreed 13 November 2026, issue #238, the first slice built in #245 and the second in #246:
 [nearby-selection.md](nearby-selection.md), three pull requests stacked from main. A swap can
 float on the average of the second nearby futures contract, the contract after the prompt,
 found afresh for each observation day by the
@@ -880,3 +880,12 @@ the contract moving on the day after an expiry; leave the sheets with one settle
 they are and see every number stand; paste a second column on a day whose prompt is the
 schedule's last contract and read the refusal. The kept workbook's block is rows 3226 to
 3265.
+
+UAT, the second slice: add `nearby` to a template, `1`, and see every number stand; leave it
+out and read the refusal that names it; type a `nearby` column in a ticket, `1` on one row and
+`2` on the next over the same days, and read the batch back, each row's nearby last; prepare
+it and find two contracts read on each day, the prompt and the one after it; value it and
+find each row at its own average; prepare it against fixings one settle column wide and read
+the refusal; type a nearby past the schedule's last contract, a `0`, a `1.5` and a word and
+read each refusal; type `2` in a quote template and read the quote's refusal. The kept
+workbook's block is rows 3267 to 3289.

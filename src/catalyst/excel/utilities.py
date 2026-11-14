@@ -630,6 +630,9 @@ def trades_table(obj: Trades) -> MixedArray:
     # encoding's columns so that no column before it moves, as the observation columns of #229
     # were appended: each row's own word, monthly or onetime.
     text("settlement_frequency", tuple(FREQUENCY_NAMES[terms.settlement_frequency[rows]]))
+    # nearby after it, since nearby-selection.md, appended the same way: each row's own number,
+    # the contract its days are priced by counted from the prompt.
+    numbers("nearby", "int64", terms.nearby[rows])
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
 

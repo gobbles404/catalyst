@@ -35,6 +35,7 @@ from catalyst.trades.terms import (
     SettlementFrequency,
     finite_prices,
     marketing_reserves,
+    whole_nearbys,
     whole_quantities,
     whole_trade_ids,
 )
@@ -197,6 +198,13 @@ def trade_id_of(where: str, number: float) -> int:
     return int(whole_trade_ids(np.array([number]), lambda _: where)[0])
 
 
+def nearby_of(where: str, number: float) -> int:
+    """A nearby by the kernel's rule, a whole number of 1 or more, named by its field, since
+    nearby-selection.md: the one position a template holds, read once here and repeated for
+    every row of a batch, or held by every quote, made under it."""
+    return int(whole_nearbys(np.array([number]), lambda _: where)[0])
+
+
 def marketing_reserve_of(where: str, number: float) -> float:
     """A marketing reserve by the reserves' rule, finite and zero or more, named by its field,
     since #175: the one amount a template holds, read once here and booked once by every row of
@@ -259,6 +267,7 @@ NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float | int]]] = Mappi
         "fixed_price": price_of,
         "marketing_reserve": marketing_reserve_of,
         "cva_reserve": cva_reserve_of,  # signed, since cva-reserve.md
+        "nearby": nearby_of,  # a position from the prompt, nearby-selection.md
         "amount": amount_of,  # the cashflow instrument's, since #200
     }
 )

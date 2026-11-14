@@ -45,14 +45,17 @@ ACROSS = {"2026-06-15": (80.0, 82.0, 84.0), "2026-06-16": (81.0, 83.0, 85.0)}
 JUNE_17 = "2026-06-17"
 
 
-def history_on(as_of: str, nearbys: int) -> MarketHistory:
+def history_on(
+    as_of: str, nearbys: int, across: dict[str, tuple[float, float, float]] = ACROSS
+) -> MarketHistory:
     """The index's history valued that day, its fixings a grid that many nearbys wide: every
-    business day from Monday 18 May, the calendar's first priced day, to the day before."""
+    business day from Monday 18 May, the calendar's first priced day, to the day before, the
+    ticket's settles on the two days across the expiry or the ones given in their place."""
     days = np.busday_offset(
         "2026-05-18", np.arange(np.busday_count("2026-05-18", as_of)), roll="forward"
     )
     grid = np.tile(np.array([70.0, 72.0, 74.0]), (days.size, 1))
-    for on, settles in ACROSS.items():
+    for on, settles in across.items():
         grid[days == np.datetime64(on)] = settles
     fixings = futures_fixings(days[::-1].copy(), grid[::-1, :nearbys].copy(), ROLL)
     return market_history(calendar(valuation_date(np.datetime64(as_of), 0.5), ROLL), fixings)
@@ -154,6 +157,7 @@ def test_a_first_nearby_average_reads_the_prompts_column_whatever_the_width(near
         "quantity_unit": "BBL",
         "quantity_per": "period",
         "settlement_frequency": "onetime",
+        "nearby": 1.0,
         "schedule_method": "asian",
         "route": "cleared",
         "settlement_method": "financial",
@@ -185,6 +189,7 @@ def test_a_first_nearby_average_reads_the_prompts_column_whatever_the_width(near
         schedule_method="asian",
         quantity_per="period",
         settlement_frequency="onetime",
+        nearby=1.0,
         payment_day=DayOrRule(day("2026-06-18"), None),
         payment_holiday_calendar=ROLL.holiday_calendar,
     )

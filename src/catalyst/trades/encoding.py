@@ -138,9 +138,12 @@ class EncodedLeg:
     under asian, whichever contract the calendar prices the day with, F27 and then G27 for a
     December booked as Z26 on a schedule whose contracts expire the month before;
     slot_exposure[s], the sum over the slot's observations of the component's coefficient times
-    the observation's weight, what every price of the slot multiplies. The slots are in group
-    order and by date within a group, so a group's slots are together with its last observation
-    last, and one day observed by two groups of one contract is two slots. slot_of_observation[j]
+    the observation's weight, what every price of the slot multiplies. A slot is a group, a day
+    and a contract, since nearby-selection.md, where it was a group and a day: two observations
+    of one group on one day that read two contracts are two slots, two exposures. The slots
+    are in group order, by date within a group and by contract within a day, so a group's
+    slots are together with its last observation day last, and one day observed by two groups
+    of one contract is two slots. slot_of_observation[j]
     places each observation. references[r], the distinct slot references, increasing, is the
     leg's delta axis, each contract once whatever groups hold it, and reference_of_slot[s] each
     slot's place on it. A slot's position is its position in this list and nothing else: not a
@@ -148,8 +151,8 @@ class EncodedLeg:
     being two slots.
 
     Then the time axes a delta report is summed onto, static for the leg: since #166 days[d],
-    the distinct observation days, increasing, day_of_slot[s] each slot's day and
-    day_reference[d] the contract pricing each day, one per day by the calendar's rule; and
+    the distinct observation days, increasing, and day_of_slot[s] each slot's day, a day
+    holding the slots of whatever contracts are read on it; and
     since #186, risk-contract-month-bucketing.md, contract_months[m], the first day of the
     calendar month of each distinct contract among the references, increasing, the month the
     contract is named for and not the month its days are observed in,
@@ -179,7 +182,6 @@ class EncodedLeg:
     reference_of_slot: NDArray[np.intp]
     days: NDArray[np.datetime64]
     day_of_slot: NDArray[np.intp]
-    day_reference: NDArray[np.intp]
     contract_months: NDArray[np.datetime64]
     contract_month_of_reference: NDArray[np.intp]
     contract_years: NDArray[np.datetime64]
@@ -414,7 +416,7 @@ def encoded(
             slot_reference,
         )
         references, reference_of_slot = np.unique(slot_reference, return_inverse=True)
-        days = _the_day_axis(slot_date, slot_reference)
+        days = _the_day_axis(slot_date)
         periods = _the_contract_periods(leg.schedule_month[references])
         if payment_date is not None:
             _payments_after_observations(terms, leg, heads, payment_date, slot_group, slot_date)
@@ -857,13 +859,15 @@ def _the_references(
     terms: ResolvedTrades, leg: LegTerms, observations: Observations
 ) -> NDArray[np.intp]:
     """Each observation's reference for a leg: observation_references over the leg's schedule,
-    holiday calendar, contracts and methods, each component named as the terms name its trade."""
+    holiday calendar, contracts and methods and the trade's nearbys, each component named as
+    the terms name its trade."""
     return observation_references(
         leg.schedule,
         leg.index.holiday_calendar,
         observations,
         leg.contract,
         leg.schedule_method[terms.occurrence],
+        terms.nearby[terms.occurrence],
         terms.named,
     )
 
@@ -874,14 +878,20 @@ def observation_references(
     observations: Observations,
     contract: NDArray[np.intp],
     method: NDArray[np.intp],
+    nearby: NDArray[np.intp],
     named: Callable[[int], str],
 ) -> NDArray[np.intp]:
     """Each observation's reference, the contract pricing its day, for a batch of trades and
-    since template-based-quoting.md for a quote alike: contract[k] and method[k] the k-th
-    component's schedule row and method, and named(k) the words a refusal gives it. On a futures
-    index: the day open on the index's market, within the schedule, and under the expiry-based
-    methods the component's own contract; under asian whichever contract the calendar gives,
-    one gather of the methods onto the observations. On an IFERC index, since #167: the
+    since template-based-quoting.md for a quote alike: contract[k], method[k] and nearby[k] the
+    k-th component's schedule row, method and nearby, and named(k) the words a refusal gives
+    it. On a futures index: the day open on the index's market, within the schedule, and under
+    the expiry-based methods the component's own contract; under asian whichever contract the
+    calendar gives, one gather of the methods onto the observations. Since nearby-selection.md
+    the contract is the component's nearby counted from the day's prompt, the calendar's
+    contract for the day: the prompt's row plus the nearby less one, the prompt itself at 1,
+    found afresh for every day so that it moves on the day after an expiry; a nearby the
+    schedule lists no contract for on a day is refused by the trade, the day, the day's
+    prompt and the schedule's last contract. On an IFERC index, since #167: the
     component's own contract, whose index publishes on that very day, else refused, an IFERC
     month pricing once; no calendar is read, an IFERC index having none."""
     match schedule:
@@ -910,13 +920,26 @@ def observation_references(
             f"{named(int(observations.component[j]))} observes {observations.date[j]}, "
             "a day the index's market is closed; no settle exists or will"
         )
-    reference = contract_on(schedule, observations.date)
+    reference = contract_on(schedule, observations.date)  # each day's prompt, then its nearby
     beyond = reference >= len(codes)
     if beyond.any():
         j = int(beyond.argmax())
         raise ValueError(
             f"{named(int(observations.component[j]))} observes {observations.date[j]}, "
             f"after the schedule's last expiry, {schedule.future_expiry[-1]}; nothing prices it"
+        )
+    position = nearby[observations.component]
+    reference += position
+    reference -= 1
+    unlisted = reference >= len(codes)
+    if unlisted.any():
+        j = int(unlisted.argmax())
+        prompt = int(reference[j]) - int(position[j]) + 1
+        raise ValueError(
+            f"{named(int(observations.component[j]))} observes {observations.date[j]} at nearby "
+            f"{int(position[j])}, expected at most {len(codes) - prompt} that day, "
+            f"{codes[prompt]!r} being prompt and {codes[-1]!r} the schedule's last contract; the "
+            "schedule lists no contract for a later nearby"
         )
     of_observation = method[observations.component]
     own = requires_booked_reference(of_observation)
@@ -936,14 +959,14 @@ def observation_references(
 
 
 def _the_day_axis(
-    date: NDArray[np.datetime64], reference: NDArray[np.intp]
-) -> tuple[NDArray[np.datetime64], NDArray[np.intp], NDArray[np.intp]]:
+    date: NDArray[np.datetime64],
+) -> tuple[NDArray[np.datetime64], NDArray[np.intp]]:
     """The day axis a delta report by day is summed onto, static for the batch: the distinct
-    observation days, increasing, with each slot's day and each day's pricing contract, its first
-    slot's, the calendar giving a day one contract. One unique over the slots, nothing per trade
-    and no day without an observation."""
-    days, first, day_of_slot = np.unique(date, return_index=True, return_inverse=True)
-    return days, day_of_slot, reference[first]
+    observation days, increasing, with each slot's day. One unique over the slots, nothing per
+    trade and no day without an observation; no contract per day, since nearby-selection.md,
+    a day being read on whatever contracts its slots name."""
+    days, day_of_slot = np.unique(date, return_inverse=True)
+    return days, day_of_slot
 
 
 def _the_contract_periods(
@@ -1024,10 +1047,11 @@ def _the_pair_axes(leg_days: list[NDArray[np.datetime64]], counter: WorkCounter)
 def _the_slots(
     group: NDArray[np.intp], date: NDArray[np.datetime64], reference: NDArray[np.intp]
 ) -> tuple[NDArray[np.intp], NDArray[np.intp], NDArray[np.datetime64], NDArray[np.intp]]:
-    """The distinct pairs of group and day among the observations, in group order and by day
-    within a group, and each observation's slot; a slot's group, day and reference are its first
-    observation's."""
-    slot_of_observation, heads = _distinct(group, date.astype(np.int64))
+    """The distinct triples of group, day and contract among the observations, since
+    nearby-selection.md, in group order, by day within a group and by contract within a day,
+    and each observation's slot; a slot's group, day and reference are its first
+    observation's, and every observation of the slot shares them."""
+    slot_of_observation, heads = _distinct(group, date.astype(np.int64), reference)
     return slot_of_observation, group[heads], date[heads], reference[heads]
 
 

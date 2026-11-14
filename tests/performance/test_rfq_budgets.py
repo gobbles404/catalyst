@@ -84,7 +84,7 @@ def test_creation_resolves_once_and_reads_no_market(n: int, observations: int) -
         "payment_rules_read": 1,
         "payment_shifts": 1,
         "schedule_codes_read": 13,
-        "template_fields_read": 8,
+        "template_fields_read": 9,
         "ticket_codes_read": n,  # each distinct code of the rows, read once, since dated-quotes.md
     }
     by_request = counted(lambda c: made(n, BILATERAL, DATES, c))
@@ -272,8 +272,9 @@ def on_the_sheet() -> tuple[object, object, object, object, object]:
             "payment_holiday_calendar",
             "discount_curve_key",
             "settlement_frequency",
+            "nearby",
         ),
-        row("bilateral", "financial", "asian", "month", "+5bd", weekends, "SOFR", "monthly"),
+        row("bilateral", "financial", "asian", "month", "+5bd", weekends, "SOFR", "monthly", 1.0),
     )
     curve = PATH["_CreateDiscountCurve"](
         "SOFR",
@@ -429,7 +430,7 @@ def test_a_request_of_windows_resolves_each_row_once_and_reprices_resolving_noth
         "payment_rules_read": 1,
         "payment_shifts": 1,
         "schedule_codes_read": 13,
-        "template_fields_read": 8,
+        "template_fields_read": 9,
         "ticket_codes_read": 0,
         "windows_resolved": 12,
     }

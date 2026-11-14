@@ -69,6 +69,7 @@ from catalyst.trades.terms import (
     reporting_lot_of,
     resolved_trades,
     trade_schedule_of,
+    whole_nearbys,
     whole_trade_ids,
 )
 
@@ -325,6 +326,7 @@ def resolved(
         schedule_method,
         quantity_per,
         settlement_frequency,
+        fields.nearbys("nearby"),
         trade_ids,
         fields.labels("clearing_house"),
         fields.labels("broker"),
@@ -449,6 +451,15 @@ class _Fields:
         if name in self.template.defaults:
             return np.full(self.rows, cast(int, self.template.defaults[name]), dtype=np.int64)
         return whole_trade_ids(self.ticket.numbers(name), lambda k: self.where(name, k))
+
+    def nearbys(self, name: str) -> NDArray[np.intp]:
+        """The nearbys per occurrence, whole numbers of 1 or more since nearby-selection.md:
+        the template's one, read for the rule when the template was made and repeated here, or
+        the ticket's column read for it now, the first bad row named by the field and the
+        row. Required, so one of the two holds it."""
+        if name in self.template.defaults:
+            return np.full(self.rows, cast(int, self.template.defaults[name]), dtype=np.intp)
+        return whole_nearbys(self.ticket.numbers(name), lambda k: self.where(name, k))
 
     def amounts(
         self, name: str, rule: Callable[[NDArray[np.float64], Callable[[int], str]], object]

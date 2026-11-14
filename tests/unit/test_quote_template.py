@@ -128,13 +128,14 @@ BILATERAL: dict[str, object] = {
     "schedule_method": "asian",
     "quantity_per": "calday",
     "settlement_frequency": "monthly",
+    "nearby": 1.0,
     "payment_day": "+5bd",
     "payment_holiday_calendar": None,
     "discount_curve_key": "SOFR",
 }
 ALLOWED = (
     "schedule_method, route, settlement_method, discount_curve_key, quantity_per, "
-    "payment_day, payment_holiday_calendar, settlement_frequency"
+    "payment_day, payment_holiday_calendar, settlement_frequency, nearby"
 )
 
 
@@ -347,7 +348,7 @@ def test_the_reader_spills_the_instrument_and_each_value_under_its_field() -> No
     handle = create("fixed_float", row(*BILATERAL), row(*bilateral_values(a_calendar())))
     assert spilled(handle) == [
         ["instrument", *BILATERAL],
-        ["str"] * 9,
+        ["str"] * 6 + ["float64"] + ["str"] * 3,  # the nearby a number among the words
         [
             "fixed_float",
             "bilateral",
@@ -355,6 +356,7 @@ def test_the_reader_spills_the_instrument_and_each_value_under_its_field() -> No
             "asian",
             "calday",
             "monthly",
+            1.0,
             "+5bd",
             "a holiday calendar",
             "SOFR",

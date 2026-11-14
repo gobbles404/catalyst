@@ -39,11 +39,13 @@ def column(values: NDArray[Any] | list[float]) -> Cells:
 def templated(fields: list[object], values: list[object]) -> object:
     """A trade template through the seam over those fields and values, settlement_frequency
     appended as monthly where the test's fields leave it out, since onetime-averaging.md's
-    second slice made the field one every template or ticket must carry: the tests' field
-    tuples and the slices over them stand as they were, the field being no test's subject
-    here."""
+    second slice made the field one every template or ticket must carry, and nearby as 1 the
+    same way since nearby-selection.md's: the tests' field tuples and the slices over them stand
+    as they were, neither field being a test's subject here."""
     if "settlement_frequency" not in fields:
         fields, values = [*fields, "settlement_frequency"], [*values, "monthly"]
+    if "nearby" not in fields:
+        fields, values = [*fields, "nearby"], [*values, 1.0]
     return ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*values))
 
 
@@ -63,6 +65,7 @@ NG_TEMPLATE = {
     "quantity_unit": "NYMEX NG",
     "quantity_per": "month",
     "settlement_frequency": "monthly",
+    "nearby": 1.0,
     "schedule_method": "lastday",
     "route": "cleared",
     "settlement_method": "physical",
@@ -3514,6 +3517,7 @@ def waha() -> dict[str, Any]:
         "quantity_unit": "LOT",
         "quantity_per": "month",
         "settlement_frequency": "monthly",
+        "nearby": 1.0,
         "schedule_method": "lastday",
         "route": "cleared",
         "settlement_method": "financial",

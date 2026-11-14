@@ -133,6 +133,7 @@ def bilateral_terms(
         Route.BILATERAL, Settlement.FINANCIAL, one_choice(METHODS, method, components),
         one_choice(BASES, QuantityPer.MONTH, components),
         one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, components),
+        np.ones(components, dtype=np.intp),
         None,
         None,
         None,

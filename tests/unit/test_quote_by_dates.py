@@ -81,6 +81,7 @@ def terms(
         "schedule_method": method,
         "quantity_per": per,
         "settlement_frequency": frequency,
+        "nearby": 1.0,
     }
     if settlement == "financial":
         values["payment_day"] = payment
@@ -157,7 +158,7 @@ def test_the_same_dates_quote_by_the_templates_frequency() -> None:
         "payment_rules_read": 0,
         "payment_shifts": 0,
         "price_reductions": 4,
-        "template_fields_read": 7,
+        "template_fields_read": 8,
         "windows_resolved": 1,
     }
     assert counts_of(MARKET, terms("monthly", "month")) == {
@@ -170,7 +171,7 @@ def test_the_same_dates_quote_by_the_templates_frequency() -> None:
         "payment_shifts": 0,
         "price_reductions": 4,
         "schedule_codes_read": 12,
-        "template_fields_read": 7,
+        "template_fields_read": 8,
     }
 
 
@@ -274,6 +275,7 @@ def test_a_trade_booked_at_the_quote_marks_zero_on_either_route() -> None:
                 **booking,
                 "quantity_per": per,
                 "settlement_frequency": frequency,
+                "nearby": 1.0,
                 "payment_day": "+2bd",
             }
             ticket: dict[str, list[object]] = {
@@ -392,16 +394,17 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "payment_day",
         "payment_holiday_calendar",
         "settlement_frequency",
+        "nearby",
     )
     onetime = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         fields,
-        row("cleared", "financial", "asian", "period", "+2bd", holidays, "onetime"),
+        row("cleared", "financial", "asian", "period", "+2bd", holidays, "onetime", 1.0),
     )
     monthly = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         fields,
-        row("cleared", "financial", "asian", "month", "+2bd", holidays, "monthly"),
+        row("cleared", "financial", "asian", "month", "+2bd", holidays, "monthly", 1.0),
     )
     start, end = serial("2026-05-26"), serial("2026-06-25")
     assert ENTRY["_QuoteByDates"](market, start, end, onetime, bridge.MISSING) == pytest.approx(
