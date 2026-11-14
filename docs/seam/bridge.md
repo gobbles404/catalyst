@@ -8,7 +8,7 @@ The host uses seven names from the bridge and nothing else. When Excel loads the
 
 The host keeps each prepared path beside the C# function it registers with Excel under that name; how that function is built is in [host.md](host.md). A call after that hands the prepared path the arguments and nothing else; the host never again asks Python for anything by name. A pin is a test that holds a fact still, a count or a message, so a change that moves it fails; `tests/performance/HostWorkBudgets.cs` pins that at zero name lookups per call, and [baseline.md](baseline.md) records the counts, the host's own tally of what it did on one call.
 
-Importing the bridge imports the package `catalyst.excel` first, whose `__init__.py` is the catalogue: the module that imports every module of worksheet functions, the bridge, the globals and then the probes. A probe is a hidden worksheet function, one absent from Excel's function wizard but still callable by name in a formula, that does no work beyond crossing the seam, so its cost is the seam's own cost; `Add(1, 2)` is one. So every module of worksheet functions has run, and every function is registered, before the host asks for the list. A new module of worksheet functions is added to the catalogue and nowhere else. What registers at import is `Ping`, the bridge's own; the sixteen probes; and the library's functions, one module per group, the globals, the index definitions and the market data today, each of which the library's pages describe.
+Importing the bridge imports the package `catalyst.excel` first, whose `__init__.py` is the catalogue: the module that imports every module of worksheet functions, the bridge and the library's, and no other. A probe is a hidden worksheet function, one absent from Excel's function wizard but callable by name in a formula where it is registered, that does no work beyond crossing the seam, so its cost is the seam's own cost; `Add(1, 2)` is one. The probes are not in the catalogue: they are test support, the `catalyst_probes` package in `test_support`, outside the library, and importing that package is what registers them, which a test, a measurement runner or a host whose config names it does and an end user's host never does. So every module of worksheet functions has run, and every function is registered, before the host asks for the list. A new module of worksheet functions is added to the catalogue and nowhere else. What registers at import is `Ping`, the bridge's own, and the library's functions, one module per group, each of which the library's pages describe.
 
 `function_specs()` returns one tuple per function, a fixed list Python cannot change, in registration order, and the host reads each by position: the name, the description, one pair per argument holding the label Excel shows and its help, whether the function is hidden, and whether it creates a handle, which sends its calls down the observed path. Every probe is hidden; `Ping` and the library's functions are not; `tests/unit/test_bridge.py` pins both.
 
@@ -23,7 +23,7 @@ def Scale(values: NumberColumn, factor: float = 1.0) -> NumberColumn:
     return NumberColumn(values * factor)
 ```
 
-`excel_function` registers a function that Excel lists in its wizard; the probes use `probe`, from the probes module, which registers hidden. Both are one call to `register`, and both run when the decorator is applied, at import. So every check in this section happens once, and a bad declaration stops the host's start-up instead of failing later in a cell: the add-in still loads, `=CatalystStatus()` shows the error, and no worksheet function reaches a cell.
+`excel_function` registers a function that Excel lists in its wizard; the probes use `probe`, from their own package, which registers hidden. Both are one call to `register`, and both run when the decorator is applied, at import. So every check in this section happens once, and a bad declaration stops the host's start-up instead of failing later in a cell: the add-in still loads, `=CatalystStatus()` shows the error, and no worksheet function reaches a cell.
 
 Registration reads four things: the function's own name, which becomes the worksheet name; its parameters, each with whether it is positional, its annotation, and its default; its return annotation; and its docstring, the quoted sentence under its first line, `"""Every value times the factor."""` in the example, with surrounding spaces removed, which becomes the description Excel shows, or empty text when there is none. It refuses, with a `TypeError` naming the function, and the parameter where one is at fault:
 
@@ -297,7 +297,7 @@ It is the only value that takes a default: `Rate(None)` is `x is blank, expected
 
 ## The probes and what each proves
 
-The probes are the eighteen hidden worksheet functions in the probes module, `EchoFieldRow` and `CountFieldRows` among them since #138. Each proves one thing the host can tell apart, on the way in or the way out, or one rule the bridge applies to what the host cannot. Together they are the knobs a capacity run turns: how many calls, how many cells in, how many cells out. They ship in the build everyone loads and stay as long as the seam does.
+The probes are the hidden worksheet functions of the `catalyst_probes` package, `EchoFieldRow` and `CountFieldRows` among them since #138. Each proves one thing the host can tell apart, on the way in or the way out, or one rule the bridge applies to what the host cannot. Together they are the knobs a capacity run turns: how many calls, how many cells in, how many cells out. They are test support and no part of an end user's build: the package lives outside `src`, the library never imports it, and [host.md](host.md) says how a test or a measurement build loads it. They stay as long as the seam does.
 
 | Probe | In and out | Proves |
 |---|---|---|
@@ -341,7 +341,7 @@ No keyword arguments, because the host passes every argument by position. No `No
 | To find | Look in |
 |---|---|
 | the bridge itself: the declared types, `Cells` and `cells_from_buffers`, `MISSING`, the accept and result rules, the handle store and its two rules, registration, the prepared path and the three failures it catches, `describe`, `Ping` | `src/catalyst/excel/bridge.py` |
-| the probes | `src/catalyst/excel/probes.py` |
+| the probes, test support outside the library | `test_support/catalyst_probes/__init__.py` |
 | the globals' creators | `src/catalyst/excel/globals.py` |
 | the index definitions' creators | `src/catalyst/excel/index_definitions.py` |
 | the market data's creators | `src/catalyst/excel/market_data.py` |

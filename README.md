@@ -33,4 +33,4 @@ The host finds Python through `catalyst.cfg` beside the `.xll`, two lines:
     pythondll=C:\...\python313.dll
     pythonpath=C:\...\catalyst\src;C:\...\site-packages
 
-`tools\excel_dev.ps1` and `tools\excel_smoke.ps1` write it from the project's own environment. An add-in deployed elsewhere needs one written by hand.
+`tools\excel_dev.ps1` and `tools\excel_smoke.ps1` write it from the project's own environment. An add-in deployed elsewhere needs one written by hand. `.\tools\release_check.ps1 -Folder <the deployed folder>` reads such a folder, changing nothing, and says whether the library is whole and none of the test-only probes is in it.

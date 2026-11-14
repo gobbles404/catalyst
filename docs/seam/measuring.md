@@ -6,7 +6,7 @@ The rule from AGENTS.md holds throughout: work is measured by counts, and counts
 
 ## The probes
 
-Every measurement drives the probes in `src/catalyst/excel/probes.py`: hidden worksheet functions, one per thing the host can tell apart or one rule the bridge applies to what it cannot, each doing no work beyond proving its fact, so its cost is the seam's cost. Where a rule needs a control to be read against, the control is a probe too. The knobs are how many calls, how many cells in, and how many cells out.
+Every measurement drives the probes in `test_support/catalyst_probes`, test support that no end user's build holds and that each runner loads for itself: hidden worksheet functions, one per thing the host can tell apart or one rule the bridge applies to what it cannot, each doing no work beyond proving its fact, so its cost is the seam's cost. Where a rule needs a control to be read against, the control is a probe too. The knobs are how many calls, how many cells in, and how many cells out.
 
 | Probe | Knob |
 |---|---|
@@ -23,7 +23,7 @@ Every measurement drives the probes in `src/catalyst/excel/probes.py`: hidden wo
 | `RowSums(values)` | one answer per input row, the shape of pricing every row |
 | `Grid(rows, cols)` | cells out from two numbers in |
 | `EchoText`, `EchoBoolean`, `EchoRow`, `Fail` | correctness rows; not run for capacity |
-| `HostAdd(a, b)` | the floor under every probe: a C# function with the host's argument shape and no Python, so Excel and Excel-DNA's share of a call is measured beside the seam's; it lives in `AddIn.cs`, hidden like the probes |
+| `HostAdd(a, b)` | the floor under every probe: a C# function with the host's argument shape and no Python, so Excel and Excel-DNA's share of a call is measured beside the seam's; it lives in `AddIn.cs`, hidden like the probes and registered only where they are loaded |
 
 ## Counts, as tests
 
