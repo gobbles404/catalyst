@@ -130,7 +130,7 @@ def test_the_iferc_and_gas_daily_samples_carry_no_holiday_calendar() -> None:
 
 def test_an_object_that_is_not_a_schedule_is_refused_naming_what_it_is() -> None:
     made = calendar(valuation_date(day("2026-06-01"), 0.5), an_index())
-    fixings = futures_fixings(dates("2026-05-29"), np.array([2.9]), an_index())
+    fixings = futures_fixings(dates("2026-05-29"), np.array([[2.9]]), an_index())
     for wrong, what in (
         (HOLIDAYS, "a holiday calendar"),
         (made, "a calendar"),

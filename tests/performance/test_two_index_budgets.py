@@ -177,7 +177,7 @@ def history_a() -> MarketHistory:
     priced = cal.dates[cal.is_fixed & cal.is_priced]
     settles = np.full(priced.size, 3.0)
     settles[priced == schedule.future_expiry[schedule.codes.index("F27")]] = 3.55
-    return market_history(cal, futures_fixings(priced[::-1].copy(), settles[::-1].copy(), A))
+    return market_history(cal, futures_fixings(priced[::-1].copy(), settles[::-1, None].copy(), A))
 
 
 def history_b() -> MarketHistory:

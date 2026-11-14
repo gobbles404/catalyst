@@ -119,7 +119,7 @@ def the_index() -> str:
 @probe
 def ReadFuturesFixings(fixings: Handle[FuturesFixings]) -> str:
     days = " ".join(str(day) for day in fixings.dates)
-    return f"{days} | {' '.join(repr(float(s)) for s in fixings.settles)}"
+    return f"{days} | {' '.join(repr(float(s)) for s in fixings.settles[:, 0])}"
 
 
 def the_fixings(days: object, settles: object) -> str:
@@ -164,8 +164,7 @@ def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
             DATES,
             Cells.from_rows([[101.94], [106.42], [102.27]]),
             THE_CALENDAR,
-            "#ERROR _CreateFuturesFixings: ValueError: settle has 3 settles, expected 4, "
-            "one per date",
+            "#ERROR _CreateFuturesFixings: ValueError: settle has 3 rows, expected 4, one per date",
         ),
         (
             Cells.from_rows([[MAY_1], [MAY_4]]),
@@ -242,7 +241,7 @@ def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
             DATES,
             Cells.from_rows([[101.94, 106.42]]),
             THE_CALENDAR,
-            "#ERROR _CreateFuturesFixings: settle is 1x2 array, expected column of numbers",
+            "#ERROR _CreateFuturesFixings: ValueError: settle has 1 row, expected 4, one per date",
         ),
         (
             MISSING,
@@ -254,7 +253,7 @@ def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
             DATES,
             MISSING,
             THE_CALENDAR,
-            "#ERROR _CreateFuturesFixings: settle is missing, expected column of numbers",
+            "#ERROR _CreateFuturesFixings: settle is missing, expected array of numbers",
         ),
         (
             None,
@@ -266,7 +265,7 @@ def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
             DATES,
             None,
             THE_CALENDAR,
-            "#ERROR _CreateFuturesFixings: settle is blank, expected column of numbers",
+            "#ERROR _CreateFuturesFixings: settle is blank, expected array of numbers",
         ),
         (
             Cells.from_rows([[MAY_1], [None]]),
@@ -344,7 +343,7 @@ def test_a_failed_fixings_construction_publishes_no_object_and_no_handle() -> No
     before = number(the_fixings(DATES, SETTLES), FIXINGS)
     gap = Cells.from_rows([[MAY_5], [MAY_1]])
     assert bridge.call("_CreateFuturesFixings", [gap, SETTLES, the_index()]) == (
-        "#ERROR _CreateFuturesFixings: ValueError: settle has 4 settles, expected 2, one per date"
+        "#ERROR _CreateFuturesFixings: ValueError: settle has 4 rows, expected 2, one per date"
     )
     two = Cells.from_rows([[102.27], [101.94]])
     assert bridge.call("_CreateFuturesFixings", [gap, two, the_index()]) == (
@@ -954,7 +953,7 @@ def test_a_futures_fixings_spill_fed_back_to_its_creator_makes_equal_fixings() -
     first = the_fixings(DATES, SETTLES)
     spilled = rows(read(first))
     assert spilled == [
-        ["date", "settle"],
+        ["date", "nearby_1"],
         ["datetime64[D]", "float64"],
         [MAY_6, 95.08],
         [MAY_5, 102.27],
@@ -967,6 +966,35 @@ def test_a_futures_fixings_spill_fed_back_to_its_creator_makes_equal_fixings() -
     kept = bridge.call("ReadFuturesFixings", [second])
     assert kept == bridge.call("ReadFuturesFixings", [first])
     assert kept == "2026-05-01 2026-05-04 2026-05-05 2026-05-06 | 101.94 106.42 102.27 95.08"
+
+
+# A settle range two columns wide, nearby-selection.md: a row per day and a column per nearby, the
+# prompt's first. The spill heads each column with the word a trade's nearby reads it by, and its
+# columns handed back make the same fixings; one day with two nearbys is a row of settles beside
+# one date.
+def test_a_settle_range_two_columns_wide_keeps_a_column_for_each_nearby() -> None:
+    grid = Cells.from_rows([[95.08, 96.5], [102.27, 103.5], [106.42, 107.5], [101.94, 102.5]])
+    spilled = rows(read(the_fixings(DATES, grid)))
+    assert spilled == [
+        ["date", "nearby_1", "nearby_2"],
+        ["datetime64[D]", "float64", "float64"],
+        [MAY_6, 95.08, 96.5],
+        [MAY_5, 102.27, 103.5],
+        [MAY_4, 106.42, 107.5],
+        [MAY_1, 101.94, 102.5],
+    ]
+    body = spilled[2:]
+    again = the_fixings(
+        Cells.from_rows([[line[0]] for line in body]), Cells.from_rows([line[1:] for line in body])
+    )
+    assert rows(read(again)) == spilled
+    one_day = the_fixings(Cells.from_rows([[MAY_6]]), Cells.from_rows([[95.08, 96.5]]))
+    assert rows(read(one_day))[2:] == [[MAY_6, 95.08, 96.5]]
+    # A text or a blank among the settles is the seam's to refuse, by its cell.
+    holed = Cells.from_rows([[95.08, 96.5], [102.27, None], [106.42, 107.5], [101.94, 102.5]])
+    assert bridge.call("_CreateFuturesFixings", [DATES, holed, the_index()]) == (
+        "#ERROR _CreateFuturesFixings: settle cell (2, 2) is blank, expected number"
+    )
 
 
 def test_a_gas_daily_fixings_spill_fed_back_to_its_creator_makes_equal_fixings() -> None:

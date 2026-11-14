@@ -14,6 +14,7 @@ from typing import Annotated
 from catalyst.excel.bridge import (
     DateColumn,
     Handle,
+    NumberArray,
     NumberColumn,
     TextColumn,
     excel_function,
@@ -42,8 +43,9 @@ def _CreateFuturesFixings(
         "down to 1-May-2026, one for every business day between them.",
     ],
     settle: Annotated[
-        NumberColumn,
-        "The column of settles beside the days, such as B2:B5, one per day.",
+        NumberArray,
+        "The settles beside the days, such as B2:B5, one row per day; a wider range, such as "
+        "B2:C5, holds a column for each nearby contract, the prompt's first.",
     ],
     index: Annotated[
         Handle[Index],
@@ -51,9 +53,9 @@ def _CreateFuturesFixings(
         "it; a futures index, whose holiday calendar the days are checked against.",
     ],
 ) -> Handle[FuturesFixings]:
-    """Creates the futures fixings of one index from the days it fixed and their settles, checked
-    against the holiday calendar of its index, and shows its handle, the text other formulas
-    take as the fixings."""
+    """Creates the futures fixings of one index from the days it fixed and their settles, a
+    column for each nearby contract, checked against the holiday calendar of its index, and
+    shows its handle, the text other formulas take as the fixings."""
     return futures_fixings(date, settle, index)
 
 

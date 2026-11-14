@@ -598,8 +598,10 @@ def _the_prices(
     is_fixed: NDArray[np.bool_],
     counter: WorkCounter,
 ) -> NDArray[np.float64]:
-    """Each observation's price: a fixed day's settle off the history, which holds one for every
-    fixed priced day of the calendar, one search over its rows; a live day's quote off the market
+    """Each observation's price: a fixed day's settle off the history, its pricing contract's,
+    read through the history's own reader since nearby-selection.md, which holds the prompt's
+    for every fixed priced day of the calendar, one search over its rows; a live day's quote off
+    the market
     for its pricing contract, each distinct contract asked for once, the market refusing one
     outside its coverage by name. A fixed observation asks nothing of the market, so an expired
     contract is never requested. Work: the fixings read, one per fixed observation, and the live
@@ -607,7 +609,7 @@ def _the_prices(
     history = market.market_history
     prices = np.empty(rows.size)
     fixed_rows = rows[is_fixed]
-    prices[is_fixed] = history.fixing_prices[np.searchsorted(history.fixed_rows, fixed_rows)]
+    prices[is_fixed] = history.fixed_prices(fixed_rows, references[is_fixed])
     counter.hit(FIXINGS_READ, fixed_rows.size)
     live = ~is_fixed
     distinct, inverse = np.unique(references[live], return_inverse=True)

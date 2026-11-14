@@ -170,7 +170,7 @@ def a_history(ix: Index, as_of: str, settle: Settle) -> MarketHistory:
     settles = np.array(
         [settle(d) if callable(settle) else settle for d in priced], dtype=np.float64
     )
-    return market_history(cal, futures_fixings(priced[::-1].copy(), settles[::-1].copy(), ix))
+    return market_history(cal, futures_fixings(priced[::-1].copy(), settles[::-1, None].copy(), ix))
 
 
 def priced(ix: Index, as_of: str, settle: Settle, *quotes: float) -> Market:

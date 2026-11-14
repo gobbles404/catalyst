@@ -244,7 +244,7 @@ def history_on(ix: Index, as_of: str, finals: dict[str, float]) -> MarketHistory
     settles = np.full(priced.size, 3.0)
     for code, price in finals.items():
         settles[priced == schedule.future_expiry[schedule.codes.index(code)]] = price
-    return market_history(cal, futures_fixings(priced[::-1].copy(), settles[::-1].copy(), ix))
+    return market_history(cal, futures_fixings(priced[::-1].copy(), settles[::-1, None].copy(), ix))
 
 
 def quoted(history: MarketHistory, *quotes: float) -> Market:
@@ -1125,7 +1125,7 @@ def history_by_day(ix: Index, as_of: str, settles: dict[str, float]) -> MarketHi
     prices = np.full(priced.size, 3.0)
     for text, price in settles.items():
         prices[priced == day(text)] = price
-    return market_history(cal, futures_fixings(priced[::-1].copy(), prices[::-1].copy(), ix))
+    return market_history(cal, futures_fixings(priced[::-1].copy(), prices[::-1, None].copy(), ix))
 
 
 def pen_evaluated(
@@ -1481,7 +1481,9 @@ def daily_history(as_of: str, settles: dict[str, float]) -> MarketHistory:
     prices = np.full(priced.size, 70.0)
     for text, price in settles.items():
         prices[priced == day(text)] = price
-    return market_history(cal, futures_fixings(priced[::-1].copy(), prices[::-1].copy(), DAILY))
+    return market_history(
+        cal, futures_fixings(priced[::-1].copy(), prices[::-1, None].copy(), DAILY)
+    )
 
 
 SETTLES = {"2026-12-01": 71.0, "2026-12-02": 75.0, "2026-12-03": 73.0}
@@ -4568,7 +4570,7 @@ def wti_history(
     prices = np.full(priced.size, default)
     for text, price in settles.items():
         prices[priced == day(text)] = price
-    return market_history(cal, futures_fixings(priced[::-1].copy(), prices[::-1].copy(), ix))
+    return market_history(cal, futures_fixings(priced[::-1].copy(), prices[::-1, None].copy(), ix))
 
 
 def wti_valued(

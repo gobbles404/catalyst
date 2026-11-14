@@ -642,7 +642,8 @@ def history_sources(contracts: int) -> tuple[object, object]:
 # A history keeps two columns, 16 bytes per fixed business day, the row and the price, and
 # nothing per day of the calendar, which it keeps as it is; on the way it pays the builder's
 # looks, a byte or so per fixing and per day for the days covered and the flags combined:
-# measured 3,681 bytes at 360 days with 76 fixings on 2026-09-19, 16,641 at 3,600 days and
+# measured 3,681 bytes at 360 days with 76 fixings on 2026-09-19, 3,504 on 2026-11-13 once the
+# fixed rows of settles, a column a nearby, are copied as one slice, 16,641 at 3,600 days and
 # 148,641 at 36,600, 4 bytes per day. Reading it back pays the calendar's table and then the
 # fifth column, the words made once, the wider kinds and slots, the codes paired with the
 # words, and the mixed road's masks over five columns: measured 53,627 at 360 days on

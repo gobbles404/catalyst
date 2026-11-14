@@ -6,7 +6,7 @@ what it shows about that argument as a person types the formula. How to write a 
 docs/library/conventions.md under Excel help; the pages quote the lines.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from functools import singledispatch
 from typing import Annotated, Any, assert_never, cast
 
@@ -178,53 +178,79 @@ def calendar_table(obj: Calendar, rows: int | None = None) -> MixedArray:
     )
 
 
-def _priced_column(
-    base: MixedArray,
-    header: str,
-    words: NDArray[Any] | str,
-    *priced: tuple[NDArray[np.intp], NDArray[np.float64]],
-) -> MixedArray:
-    """A calendar's table widened by one column that holds a number on some days and a word on
-    the others: each priced pair names calendar rows and the prices on them, and the word, one
-    for every day or one per day, shows on the rest. The words are display, not values, and a
-    column holding numbers on some rows and words on others is not one the table builder takes,
-    so the column is written by kind: its kinds, its slots, and its words into the texts. The
-    calendar's own table stands as it is, nothing rebuilt.
+type _Priced = tuple[NDArray[np.intp], NDArray[np.float64]]
+type _PricedColumn = tuple[str, str, NDArray[Any] | str, tuple[_Priced, ...]]
 
-    The texts in sheet order: each heading row's four then this column's, and each day's code
-    then, on a day without a price, its word; the calendar's body texts are its codes alone, one
-    per day, in the same order.
+
+def _priced_columns(base: MixedArray, columns: Sequence[_PricedColumn]) -> MixedArray:
+    """A calendar's table widened by columns that hold a number on some days and a word on the
+    others, or a word on every day: each column is its header, the word for its type, its
+    words, one for every day or one per day, and its priced pairs, each naming calendar rows
+    and the prices on them, the words showing on the rest; a column with no pair is text
+    throughout. The words are display, not values, and a column holding numbers on some rows
+    and words on others is not one the table builder takes, so each column is written by kind:
+    its kinds, its slots, and its words into the texts. The calendar's own table stands as it
+    is, nothing rebuilt.
+
+    The texts in sheet order: each heading row's four then the columns', and each day's code
+    then, for each column in order, its word on a day it holds no price; the calendar's body
+    texts are its codes alone, one per day, in the same order.
     """
     rows, width = base.shape
-    kinds = np.empty((rows, width + 1), dtype=np.uint8)
+    added = len(columns)
+    kinds = np.empty((rows, width + added), dtype=np.uint8)
     kinds[:, :width] = base.kinds
-    kinds[:, width] = TEXT_CODE
-    slots = np.full((rows, width + 1), np.nan)
+    kinds[:, width:] = TEXT_CODE
+    slots = np.full((rows, width + added), np.nan)
     slots[:, :width] = base.numeric_slots
-    pairs = np.empty((rows - 2, 2), dtype=object)
-    pairs[:, 0] = base.texts[2 * width :]
-    pairs[:, 1] = words
-    worded = np.ones((rows - 2, 2), dtype=bool)
-    for on, prices in priced:  # the pairs, not the prices: one or two of them
-        kinds[on + 2, width] = NUMBER_CODE
-        slots[on + 2, width] = prices
-        worded[on, 1] = False
-    headings = (*base.texts[:width], header, *base.texts[width : 2 * width], "float64")
-    return MixedArray(kinds, slots, (*headings, *pairs[worded]))
+    cells = np.empty((rows - 2, 1 + added), dtype=object)
+    cells[:, 0] = base.texts[2 * width :]
+    worded = np.ones((rows - 2, 1 + added), dtype=bool)
+    for c, (_, _, words, priced) in enumerate(columns):  # the columns, not the days
+        cells[:, c + 1] = words
+        for on, prices in priced:  # the pairs, not the prices: none, one or two of them
+            kinds[on + 2, width + c] = NUMBER_CODE
+            slots[on + 2, width + c] = prices
+            worded[on, c + 1] = False
+    headings = (
+        *base.texts[:width],
+        *[header for header, _, _, _ in columns],
+        *base.texts[width : 2 * width],
+        *[kind for _, kind, _, _ in columns],
+    )
+    return MixedArray(kinds, slots, (*headings, *cells[worded]))
 
 
 @shown.register
 def market_history_table(obj: MarketHistory) -> MixedArray:
     # The calendar's four columns, then fixing_price: the price fixed on each fixed and priced
-    # period, a number, and a word on every other, closed where the calendar does not price the
-    # day and unfixed where it prices but has not fixed, whatever the market.
+    # period for the calendar's own contract, a number, and a word on every other, closed where
+    # the calendar does not price the day and unfixed where it prices but has not fixed,
+    # whatever the market. Then, since nearby-selection.md, two columns for each further nearby
+    # a futures history holds a settle of: nearby_N_contract, the code of the contract N less
+    # one places after the day's prompt, the contract that settle is of, on every day, a dash
+    # where the schedule lists none; and nearby_N_fixing_price, its settle where the day is
+    # fixed and priced and the same words elsewhere. A history of the prompt alone, and an
+    # IFERC or a Gas Daily one, spills the five columns it always did.
     calendar = obj.calendar
     words = np.empty(calendar.dates.size, dtype=object)
     words[:] = "closed"
     words[calendar.is_priced] = "unfixed"
-    return _priced_column(
-        calendar_table(calendar), "fixing_price", words, (obj.fixed_rows, obj.fixing_prices)
-    )
+    prices = obj.fixing_prices
+    columns: list[_PricedColumn] = [
+        ("fixing_price", "float64", words, ((obj.fixed_rows, prices[:, 0]),))
+    ]
+    codes = calendar.index.schedule.codes
+    for n in range(1, prices.shape[1]):  # the further nearbys, not the days
+        contract = calendar.contract + n
+        listed = contract < len(codes)
+        names = np.full(calendar.dates.size, "-", dtype=object)
+        names[listed] = np.array(codes, dtype=object)[contract[listed]]
+        columns.append((f"nearby_{n + 1}_contract", "str", names, ()))
+        columns.append(
+            (f"nearby_{n + 1}_fixing_price", "float64", words, ((obj.fixed_rows, prices[:, n]),))
+        )
+    return _priced_columns(calendar_table(calendar), columns)
 
 
 @shown.register
@@ -242,22 +268,31 @@ def market_table(obj: Market) -> MixedArray:
     calendar = history.calendar
     rows = int(calendar.contract.searchsorted(obj.last_contract, side="right"))
     live = np.flatnonzero(calendar.is_priced[:rows] & ~calendar.is_fixed[:rows])
-    return _priced_column(
-        calendar_table(calendar, rows),
-        "price",
-        "closed",
-        (history.fixed_rows, history.fixing_prices),
-        (live, obj.live_prices(calendar.contract[live])),
+    # The price of each day's own contract: the history's first column on the fixed side,
+    # whatever further nearbys it holds, since nearby-selection.md.
+    fixed = (history.fixed_rows, history.fixing_prices[:, 0])
+    quoted = (live, obj.live_prices(calendar.contract[live]))
+    return _priced_columns(
+        calendar_table(calendar, rows), [("price", "float64", "closed", (fixed, quoted))]
     )
 
 
 @shown.register
 def futures_fixings_table(obj: FuturesFixings) -> MixedArray:
-    # Newest first, as the creator takes them: the columns are kept oldest first, and each is
-    # read here from its last row back, a view and no copy, date beside its own settle, so the
-    # spill pasted back into the creator makes the same fixings.
+    # Newest first, as the creator takes them: the dates and the settles are kept oldest first,
+    # and each column is read here from its last row back, a view and no copy, a date beside
+    # its own settles, so the spill pasted back into the creator makes the same fixings. One
+    # column per nearby the series carries, since nearby-selection.md, headed by the word a
+    # trade's nearby field reads it by: nearby_1 the prompt contract's settle, nearby_2 the
+    # next listed contract's.
+    nearbys = obj.settles.shape[1]
     return MixedArray.table(
-        [("date", "settle"), ("datetime64[D]", "float64")], obj.dates[::-1], obj.settles[::-1]
+        [
+            ("date", *[f"nearby_{n + 1}" for n in range(nearbys)]),
+            ("datetime64[D]", *["float64"] * nearbys),
+        ],
+        obj.dates[::-1],
+        *[obj.settles[::-1, n] for n in range(nearbys)],
     )
 
 

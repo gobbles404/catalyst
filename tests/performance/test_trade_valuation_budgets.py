@@ -195,6 +195,7 @@ def test_preparing_resolves_two_handles_and_runs_the_kernels_preparation_alone(
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "MarketHistory.fixed_prices": 1,  # each fixed slot's settle, by its day and its contract
         "_the_histories": 1,  # two-index-fixed-float.md: the histories matched to the legs by index
         "_the_prepared_leg": 1,  # the leg prepared against its history
         "_the_sensitivity": 1,  # the sensitivity by contract, finite

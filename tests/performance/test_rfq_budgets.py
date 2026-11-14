@@ -123,6 +123,7 @@ QUOTE_LEDGER = {
     "priced": 1,
     "calendar_rows": 1,
     "_the_prices": 1,
+    "MarketHistory.fixed_prices": 1,  # each fixed day's settle, by its day and its contract
     "Market.live_prices": 1,
     "_the_factors": 1,
     "factors_on": 1,

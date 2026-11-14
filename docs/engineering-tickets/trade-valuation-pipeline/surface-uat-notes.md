@@ -860,3 +860,23 @@ amount once; compare the mark and the risk report with the column and without; t
 blank cell, a word and the field on both the template and the ticket and read the
 refusals; read a results handle back and find `currency` and the columns after it one to
 the right of where they were.
+
+## 32. A rolling nearby contract for futures averages
+
+Agreed 13 November 2026, issue #238, the first slice built in #245:
+[nearby-selection.md](nearby-selection.md), three pull requests stacked from main. A swap can
+float on the average of the second nearby futures contract, the contract after the prompt,
+found afresh for each observation day by the
+calendar's own roll: `nearby` on the `fixed_float`, `1` the prompt and `2` the next listed,
+required on every template. The settles of each nearby are entered beside one date column in
+the one fixings object, `=_CreateFuturesFixings(A2:A30, B2:C30, D3)`, and a fixing is read by
+its day and its contract, never substituted. The first slice is the fixings and the history;
+the field on trades and then quotes follow.
+
+UAT, the first slice: widen a settle range to two columns and read the fixings back,
+`nearby_1` and `nearby_2` under their dates; read the history back and find, beside the
+prompt's `fixing_price`, the second nearby's contract and its settle on each fixed day,
+the contract moving on the day after an expiry; leave the sheets with one settle column as
+they are and see every number stand; paste a second column on a day whose prompt is the
+schedule's last contract and read the refusal. The kept workbook's block is rows 3226 to
+3265.

@@ -26,7 +26,8 @@ def dates(*texts: str) -> NDArray[np.datetime64]:
 
 
 def settles(*values: float) -> NDArray[np.float64]:
-    return np.array(values, dtype=np.float64)
+    """A series of the prompt alone: one column of settles, a row per day."""
+    return np.array(values, dtype=np.float64).reshape(-1, 1)
 
 
 # The page's sample as the desk keeps it, the newest day in the first row: four days of May
@@ -87,7 +88,8 @@ def test_the_sample_is_kept_oldest_first_with_every_settle_beside_its_date() -> 
         fixings.dates.tolist()
         == dates("2026-05-01", "2026-05-04", "2026-05-05", "2026-05-06").tolist()
     )
-    assert fixings.settles.tolist() == [101.94, 106.42, 102.27, 95.08]
+    assert fixings.settles.shape == (4, 1)  # one column, the prompt's
+    assert fixings.settles[:, 0].tolist() == [101.94, 106.42, 102.27, 95.08]
     assert dict(zip(fixings.dates.tolist(), fixings.settles.tolist(), strict=True)) == dict(
         zip(DATES.tolist(), SETTLES.tolist(), strict=True)
     )
@@ -99,10 +101,10 @@ def test_the_sample_is_kept_oldest_first_with_every_settle_beside_its_date() -> 
 def test_one_fixing_is_a_series() -> None:
     fixings = futures_fixings(DATES[:1], SETTLES[:1], an_index(HOLIDAYS))
     assert np.array_equal(fixings.dates, DATES[:1])
-    assert fixings.settles.tolist() == [95.08]
+    assert fixings.settles.tolist() == [[95.08]]
     oldest = futures_fixings(DATES[-1:], SETTLES[-1:], an_index(HOLIDAYS))
     assert oldest.dates.tolist() == dates("2026-05-01").tolist()
-    assert oldest.settles.tolist() == [101.94]
+    assert oldest.settles.tolist() == [[101.94]]
 
 
 # Tuesday 26 May back to Friday 22 May 2026: the holiday on the Monday and the weekend are the
@@ -129,7 +131,7 @@ def test_a_settle_at_or_below_zero_is_kept() -> None:
         settles(39.27, 0.0, -37.63),
         an_index(HOLIDAYS),
     )
-    assert fixings.settles.tolist() == [-37.63, 0.0, 39.27]
+    assert fixings.settles[:, 0].tolist() == [-37.63, 0.0, 39.27]
     assert fixings.dates[0] == np.datetime64("2020-04-20")
 
 
@@ -342,14 +344,18 @@ def test_a_series_that_cannot_be_made_says_why(
 @pytest.mark.parametrize(
     ("given", "given_settles", "message"),
     [
-        (DATES, SETTLES[:3], "settle has 3 settles, expected 4, one per date"),
-        (DATES, np.append(SETTLES, 90.0), "settle has 5 settles, expected 4, one per date"),
-        (DATES, SETTLES[:1], "settle has 1 settle, expected 4, one per date"),
-        (DATES[:1], SETTLES, "settle has 4 settles, expected 1, one per date"),
+        (DATES, SETTLES[:3], "settle has 3 rows, expected 4, one per date"),
+        (
+            DATES,
+            np.vstack([SETTLES, [[90.0]]]),
+            "settle has 5 rows, expected 4, one per date",
+        ),
+        (DATES, SETTLES[:1], "settle has 1 row, expected 4, one per date"),
+        (DATES[:1], SETTLES, "settle has 4 rows, expected 1, one per date"),
         (
             dates("2026-05-01", "2026-05-04"),
             SETTLES[:1],
-            "settle has 1 settle, expected 2, one per date",
+            "settle has 1 row, expected 2, one per date",
         ),
     ],
     ids=[
@@ -387,9 +393,9 @@ def test_any_run_of_business_days_and_their_settles_are_kept_aligned(
     run_settles = np.array(
         data.draw(st.lists(st.floats(-1e6, 1e6), min_size=count, max_size=count)), dtype=np.float64
     )
-    fixings = futures_fixings(run[::-1], run_settles[::-1], an_index(holidays))
+    fixings = futures_fixings(run[::-1], run_settles[::-1, None], an_index(holidays))
     assert np.array_equal(fixings.dates, run)
-    assert np.array_equal(fixings.settles, run_settles)
+    assert np.array_equal(fixings.settles[:, 0], run_settles)
 
 
 # Any such run given oldest first, of two rows or more, is refused at its second row: one
@@ -405,7 +411,7 @@ def test_any_run_given_oldest_first_is_refused_at_its_second_row(
     calendar = np.busdaycalendar(holidays=holidays)
     run = np.busday_offset(start, np.arange(count), roll="forward", busdaycal=calendar)
     with pytest.raises(ValueError) as failure:
-        futures_fixings(run, np.zeros(count), an_index(holidays))
+        futures_fixings(run, np.zeros((count, 1)), an_index(holidays))
     assert str(failure.value) == (
         f"date row 2 is {run[1]}, expected a date before row 1's {run[0]}"
     )
@@ -426,7 +432,7 @@ def test_a_run_of_business_days_with_one_left_out_names_the_missing_day(
     left_out = data.draw(st.integers(1, count - 2))
     newest_first = np.delete(run, left_out)[::-1]
     with pytest.raises(ValueError) as failure:
-        futures_fixings(newest_first, np.zeros(count - 1), an_index(holidays))
+        futures_fixings(newest_first, np.zeros((count - 1, 1)), an_index(holidays))
     assert str(failure.value) == (
         f"date row {count - left_out} is {run[left_out - 1]}, expected {run[left_out]}, "
         f"the business day before row {count - left_out - 1}'s {run[left_out + 1]}"
@@ -448,10 +454,63 @@ def test_the_fixings_own_their_columns_and_leave_the_inputs_as_given() -> None:
     given_dates[-1] = np.datetime64("2030-01-01")
     given_settles[-1] = 0.0
     assert fixings.dates[0] == np.datetime64("2026-05-01")
-    assert fixings.settles[0] == 101.94
+    assert fixings.settles[0, 0] == 101.94
     assert fixings.dates.flags.owndata and fixings.dates.flags.c_contiguous
     assert fixings.settles.flags.owndata and fixings.settles.flags.c_contiguous
     assert not fixings.dates.flags.writeable
     assert not fixings.settles.flags.writeable
     with pytest.raises(ValueError):
         fixings.settles[0] = 0.0
+
+
+# --- a column for each nearby, nearby-selection.md ------------------------------
+
+
+# The settles as a grid, a row per day and a column per nearby, the prompt's first: kept oldest
+# first as a series of one column is, each row of settles still beside its own day.
+def test_a_wider_grid_keeps_a_column_for_each_nearby_beside_its_day() -> None:
+    grid = np.array([[95.08, 96.0], [102.27, 103.0], [106.42, 107.0], [101.94, 102.5]])
+    fixings = futures_fixings(DATES, grid, an_index(HOLIDAYS))
+    assert fixings.settles.shape == (4, 2)
+    assert fixings.settles[:, 0].tolist() == [101.94, 106.42, 102.27, 95.08]
+    assert fixings.settles[:, 1].tolist() == [102.5, 107.0, 103.0, 96.0]
+    assert fixings.settles.flags.owndata and fixings.settles.flags.c_contiguous
+    assert not fixings.settles.flags.writeable and not np.shares_memory(fixings.settles, grid)
+    one_day = futures_fixings(DATES[:1], grid[:1], an_index(HOLIDAYS))
+    assert one_day.settles.tolist() == [[95.08, 96.0]]
+
+
+# The rows are counted against the dates whatever the width: a row of settles where a column of
+# them should be is one row, refused by the count.
+def test_a_grids_rows_are_counted_against_the_dates_whatever_its_width() -> None:
+    across = np.array([[95.08, 102.27, 106.42, 101.94]])
+    with pytest.raises(ValueError) as failure:
+        futures_fixings(DATES, across, an_index(HOLIDAYS))
+    assert str(failure.value) == "settle has 1 row, expected 4, one per date"
+    with pytest.raises(ValueError) as failure:
+        futures_fixings(DATES, np.ones((3, 2)), an_index(HOLIDAYS))
+    assert str(failure.value) == "settle has 3 rows, expected 4, one per date"
+
+
+# Any run of business days with any number of nearbys beside it, given newest first: kept oldest
+# first, every row of settles beside its own day and every column in its place.
+@settings(deadline=None)
+@given(count=st.integers(1, 120), nearbys=st.integers(1, 5), data=st.data())
+def test_any_grid_of_settles_is_kept_row_for_row_and_column_for_column(
+    count: int, nearbys: int, data: st.DataObject
+) -> None:
+    start = np.datetime64("2000-01-01") + np.timedelta64(data.draw(st.integers(0, 36_000)), "D")
+    run = np.busday_offset(start, np.arange(count), roll="forward")
+    grid = np.array(
+        data.draw(
+            st.lists(
+                st.lists(st.floats(-1e6, 1e6), min_size=nearbys, max_size=nearbys),
+                min_size=count,
+                max_size=count,
+            )
+        ),
+        dtype=np.float64,
+    )
+    fixings = futures_fixings(run[::-1], grid[::-1], an_index(ELSEWHERE))
+    assert np.array_equal(fixings.dates, run)
+    assert np.array_equal(fixings.settles, grid)

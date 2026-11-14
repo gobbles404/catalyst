@@ -361,7 +361,7 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46146.0, 46143.0), Column(106.42, 101.94), 101.94 }, "#ERROR _CreateFuturesFixings: index is number 101.94, expected index handle" };
             yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46146.0, 46143.0), Column(106.42, 101.94), "x" }, "#ERROR _CreateFuturesFixings: index is text 'x' naming no live object, expected index handle" };
             yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46146.0, 46143.0), Column(106.42, ExcelEmpty.Value), "x" }, "#ERROR _CreateFuturesFixings: settle cell (2, 1) is blank, expected number" };
-            yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46146.0, 46143.0), Row(106.42, 101.94), "x" }, "#ERROR _CreateFuturesFixings: settle is 1x2 array, expected column of numbers" };
+            yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46146.0, 46143.0), new object[,] { { 106.42, "x" }, { 101.94, 102.5 } }, "x" }, "#ERROR _CreateFuturesFixings: settle cell (1, 2) is text 'x', expected number" };
             // The IFERC fixings: a column of contract codes, a column of indices and the index by handle. A blank among the prices, a number among the codes, the prices left out, the index left out or a number in its place, and a row where a column is expected fail in the seam's words; the library's rules, which need a live index, are in the fact below.
             yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "G26"), Column(1.85, 2.10), ExcelMissing.Value }, "#ERROR _CreateIfercFixings: index is missing, expected index handle" };
             yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "G26"), Column(1.85, 2.10), 1.85 }, "#ERROR _CreateIfercFixings: index is number 1.85, expected index handle" };
@@ -2013,7 +2013,7 @@ namespace Catalyst.Host.Tests
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(4, spill.GetLength(0));
             Assert.Equal(2, spill.GetLength(1));
-            Assert.Equal("settle", spill[0, 1]);
+            Assert.Equal("nearby_1", spill[0, 1]);  // the prompt contract's settle, nearby-selection.md
             Assert.Equal("datetime64[D]", spill[1, 0]);
             Assert.Equal(46146.0, spill[2, 0]);
             Assert.Equal(106.42, spill[2, 1]);
@@ -2025,7 +2025,7 @@ namespace Catalyst.Host.Tests
             var oneDay = (string)Seam.Call("_CreateFuturesFixings", 46143.0, 101.94, index);
             Assert.NotEqual(handle, oneDay);
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneDay)).GetLength(0));
-            Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: settle has 1 settle, expected 2, one per date", Seam.Call("_CreateFuturesFixings", Column(46146.0, 46143.0), Column(106.42), index));
+            Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: settle has 1 row, expected 2, one per date", Seam.Call("_CreateFuturesFixings", Column(46146.0, 46143.0), Column(106.42), index));
             Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-06, expected a date before row 1's 2026-05-05", Seam.Call("_CreateFuturesFixings", Column(46147.0, 46148.0), Column(102.27, 95.08), index));
             Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-01, expected 2026-05-04, the business day before row 1's 2026-05-05", Seam.Call("_CreateFuturesFixings", Column(46147.0, 46143.0), Column(102.27, 101.94), index));
             Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: date row 1 is 2026-05-02, a Saturday, expected a business day", Seam.Call("_CreateFuturesFixings", Column(46144.0, 46143.0), Column(100.0, 101.94), index));
@@ -2033,6 +2033,93 @@ namespace Catalyst.Host.Tests
             var gasDaily = Index(Seam.Call("_CreateGasDailySchedule", Column("U26"), Column(46266.0), Column(46295.0)), ExcelMissing.Value);
             Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: index is a Gas Daily index, expected a futures index", Seam.Call("_CreateFuturesFixings", 46143.0, 101.94, gasDaily));
             Assert.Equal("#ERROR _CreateFuturesFixings: index is futures fixings handle '" + handle + "', expected index handle", Seam.Call("_CreateFuturesFixings", 46143.0, 101.94, handle));
+            // nearby-selection.md: a settle range two columns wide keeps a column for each nearby contract, the
+            // prompt's first, read back under nearby_1 and nearby_2; a row of settles beside one date is that day's
+            // nearbys, and beside two dates it is one row short.
+            var wide = (string)Seam.Call("_CreateFuturesFixings", Column(46146.0, 46143.0), new object[,] { { 106.42, 107.5 }, { 101.94, 102.5 } }, index);
+            var wideSpill = (object[,])Seam.Call("util_ReadHandle", wide);
+            Assert.Equal(4, wideSpill.GetLength(0));
+            Assert.Equal(3, wideSpill.GetLength(1));
+            Assert.Equal("nearby_1", wideSpill[0, 1]);
+            Assert.Equal("nearby_2", wideSpill[0, 2]);
+            Assert.Equal(106.42, wideSpill[2, 1]);
+            Assert.Equal(107.5, wideSpill[2, 2]);
+            Assert.Equal(102.5, wideSpill[3, 2]);
+            Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateFuturesFixings", 46143.0, Row(101.94, 102.5), index))).GetLength(1));
+            Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: settle has 1 row, expected 2, one per date", Seam.Call("_CreateFuturesFixings", Column(46146.0, 46143.0), Row(106.42, 101.94), index));
+        }
+
+        // The fixings of more than one nearby, nearby-selection.md: the ROLL index, K26 expiring 15 May 2026
+        // and bounding the calendar, M26 on Monday 15 June, N26 on 15 July, Q26 on 14 August and U26 on 15
+        // September, valued 17 June; a settle on each of the 22 business days from 18 May to 16 June, the
+        // prompt's and the second nearby's, 80 and 82 on the expiry day and 81 and 83 the day after. The
+        // history reads back the calendar's four columns, the prompt's fixing_price, and for the second
+        // nearby the contract its settle is of on each day, N26 on the expiry day and Q26 after it, and the
+        // settle; a Saturday closed, a day to come unfixed, and a dash where the schedule lists no second
+        // nearby. A history of the prompt's column alone reads back its five columns as it always did.
+        [Fact]
+        public void a_history_holds_a_settle_for_each_nearby_and_reads_back_the_contract_it_is_of()
+        {
+            var schedule = Seam.Call("_CreateFuturesSchedule", Column("K26", "M26", "N26", "Q26", "U26"), Column(46157.0, 46188.0, 46218.0, 46248.0, 46280.0), ExcelMissing.Value);
+            var index = Index(schedule, (string)Seam.Call("_CreateHolidayCalendar", 46388.0), "ROLL");
+            var days = new List<double>();
+            for (var serial = 46189.0; serial >= 46160.0; serial--)
+            {
+                if (serial % 7 > 1)  // a serial divisible by 7 is a Saturday, the next a Sunday
+                {
+                    days.Add(serial);
+                }
+            }
+            Assert.Equal(22, days.Count);
+            var dates = new object[days.Count, 1];
+            var settles = new object[days.Count, 2];
+            var prompt = new object[days.Count, 1];
+            for (var i = 0; i < days.Count; i++)
+            {
+                dates[i, 0] = days[i];
+                settles[i, 0] = days[i] == 46189.0 ? 81.0 : days[i] == 46188.0 ? 80.0 : 70.0;
+                settles[i, 1] = days[i] == 46189.0 ? 83.0 : days[i] == 46188.0 ? 82.0 : 72.0;
+                prompt[i, 0] = settles[i, 0];
+            }
+            var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46190.0, 0.5), index);
+            var fixings = (string)Seam.Call("_CreateFuturesFixings", dates, settles, index);
+            var spill = (object[,])Seam.Call("util_ReadHandle", fixings);
+            Assert.Equal(24, spill.GetLength(0));
+            Assert.Equal("nearby_2", spill[0, 2]);
+            Assert.Equal(46189.0, spill[2, 0]);
+            Assert.Equal(83.0, spill[2, 2]);
+            var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
+            Assert.StartsWith(Pid + ":market_history:ROLL:", history);
+            var read = (object[,])Seam.Call("util_ReadHandle", history);
+            Assert.Equal(7, read.GetLength(1));
+            Assert.Equal("fixing_price", read[0, 4]);
+            Assert.Equal("nearby_2_contract", read[0, 5]);
+            Assert.Equal("nearby_2_fixing_price", read[0, 6]);
+            Assert.Equal("str", read[1, 5]);
+            Assert.Equal("float64", read[1, 6]);
+            Assert.Equal(46158.0, read[2, 0]);  // the calendar begins the day after K26 expires
+            Assert.Equal(46188.0, read[32, 0]);  // Monday 15 June, M26's expiry day
+            Assert.Equal("M26", read[32, 1]);
+            Assert.Equal(80.0, read[32, 4]);
+            Assert.Equal("N26", read[32, 5]);
+            Assert.Equal(82.0, read[32, 6]);
+            Assert.Equal("N26", read[33, 1]);  // the day after, N26 prompt and Q26 the second nearby
+            Assert.Equal(81.0, read[33, 4]);
+            Assert.Equal("Q26", read[33, 5]);
+            Assert.Equal(83.0, read[33, 6]);
+            Assert.Equal("unfixed", read[34, 4]);  // the valuation day
+            Assert.Equal("Q26", read[34, 5]);
+            Assert.Equal("unfixed", read[34, 6]);
+            Assert.Equal("closed", read[30, 4]);  // Saturday 13 June
+            Assert.Equal("closed", read[30, 6]);
+            var last = read.GetLength(0) - 1;
+            Assert.Equal(46280.0, read[last, 0]);  // U26's expiry day, the schedule's last
+            Assert.Equal("U26", read[last, 1]);
+            Assert.Equal("-", read[last, 5]);
+            var alone = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateMarketHistory", calendar, (string)Seam.Call("_CreateFuturesFixings", dates, prompt, index)));
+            Assert.Equal(5, alone.GetLength(1));
+            Assert.Equal(80.0, alone[32, 4]);
+            Assert.Equal(81.0, alone[33, 4]);
         }
 
         // The calendar: the valuation date and the index of a three-contract schedule with a one-day
