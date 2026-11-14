@@ -34,6 +34,7 @@ New-Item -ItemType Directory -Force -Path $reports | Out-Null
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "host_build.ps1")
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "hidden_excel.ps1")
 $xll = Build-HostAddIn -Root $root
+Add-HostProbes -Root $root -Xll $xll   # what is measured; taken away again when the run ends
 $copies = 100   # how many times a single-formula case is placed
 $suffix = if ($Rows -eq 1000) { "" } else { "-rows$Rows" }   # the working workload keeps the plain name
 
@@ -330,7 +331,7 @@ try {
         revision = (git -C $root rev-parse HEAD).Trim()
         host_sha256 = (Get-FileHash -LiteralPath (Join-Path (Split-Path $xll -Parent) "Catalyst.Host.dll") -Algorithm SHA256).Hash.ToLower()
         bridge_sha256 = (Get-FileHash -LiteralPath (Join-Path $root "src/catalyst/excel/bridge.py") -Algorithm SHA256).Hash.ToLower()
-        probes_sha256 = (Get-FileHash -LiteralPath (Join-Path $root "src/catalyst/excel/probes.py") -Algorithm SHA256).Hash.ToLower()
+        probes_sha256 = (Get-FileHash -LiteralPath (Join-Path $root "test_support/catalyst_probes/__init__.py") -Algorithm SHA256).Hash.ToLower()
         excel_version = $excel.Version
         excel_build = $excel.Build
         excel_multithreaded_calculation = $threads.Enabled
@@ -348,5 +349,6 @@ try {
 catch { $scriptError = $_; throw }
 finally {
     Stop-HiddenExcel $session $owned $book -AddInLoaded:$loaded -FailureInFlight:($null -ne $scriptError)
+    Remove-HostProbes -Root $root -Xll $xll
 }
 Write-Host "Results: profiles/excel-timing$suffix.csv"
