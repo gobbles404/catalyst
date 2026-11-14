@@ -33,7 +33,10 @@ namespace Catalyst.Host.Measure
                 var root = RepoRoot();
                 var output = args.Length == 0 ? Path.Combine(root, "profiles", "host-measure") : Path.GetFullPath(args[1]);
                 var python = Ask(root, "import sys, sysconfig; print(sys.base_prefix); print(sysconfig.get_paths()['purelib']); print(f'python{sys.version_info.major}{sys.version_info.minor}.dll'); print(sys.version.split()[0])");
-                Bridge.Start(Path.Combine(python[0], python[2]), new[] { Path.Combine(root, "src"), python[1] });
+                // The probes are what is measured: their folder on the path and their package loaded,
+                // as an add-in whose config names it loads them.
+                Bridge.Start(Path.Combine(python[0], python[2]), new[] { Path.Combine(root, "src"), Path.Combine(root, "test_support"), python[1] });
+                Bridge.LoadProbes("catalyst_probes");
                 var measurements = new Measurements();
                 Scenarios.Run(measurements);
                 Directory.CreateDirectory(output);
@@ -64,7 +67,7 @@ namespace Catalyst.Host.Measure
                 Pair("revision", Git(root, "rev-parse HEAD")),
                 Pair("host_sha256", Sha256(typeof(Bridge).Assembly.Location)),
                 Pair("bridge_sha256", Sha256(Path.Combine(root, "src", "catalyst", "excel", "bridge.py"))),
-                Pair("probes_sha256", Sha256(Path.Combine(root, "src", "catalyst", "excel", "probes.py"))),
+                Pair("probes_sha256", Sha256(Path.Combine(root, "test_support", "catalyst_probes", "__init__.py"))),
                 Pair("configuration", Configuration()),
                 Pair("python", pythonVersion),
                 Pair("numpy", numpyVersion),

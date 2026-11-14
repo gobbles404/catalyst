@@ -5,6 +5,7 @@ using ExcelDna.Integration;
 using ExcelDna.IntelliSense;
 using Python.Runtime;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Catalyst.Host.Tests")]
@@ -12,7 +13,11 @@ using System.Runtime.CompilerServices;
 
 namespace Catalyst.Host
 {
-    /// <summary>Runs once when Excel loads the add-in: read config, start Python, import the bridge.</summary>
+    /// <summary>
+    /// Runs once when Excel loads the add-in: read config, start Python, import the bridge. A config
+    /// that names the probes' package under <c>probes</c> has them imported too, a test or a
+    /// measurement build; an end user's config has no such line, and its Excel knows no probe.
+    /// </summary>
     public class AddIn : IExcelAddIn
     {
         private static bool helpShown;
@@ -24,6 +29,7 @@ namespace Catalyst.Host
             {
                 var config = Config.Load(Path.Combine(Path.GetDirectoryName(ExcelDnaUtil.XllPath), "catalyst.cfg"));
                 Bridge.Start(config["pythondll"], config["pythonpath"].Split(';'));
+                if (config.TryGetValue("probes", out var probes)) Bridge.LoadProbes(probes);
                 Registration.RegisterAll();
                 // The help beside the formula as a person types it, from what was just registered. Excel's
                 // own fx dialog reads the same registration and needs nothing more.
@@ -88,6 +94,7 @@ namespace Catalyst.Host
         public static PyObject CellsFromBuffers;
         public static PyObject EmptyText;
         public static string StartupError;
+        public static bool ProbesLoaded;
 
         /// <summary>Start Python once, put the package on its path, and import the bridge.</summary>
         public static void Start(string pythonDll, string[] pythonPath)
@@ -111,6 +118,20 @@ namespace Catalyst.Host
                     BoolType = builtins.GetAttr("bool");
                 }
             }
+        }
+
+        /// <summary>
+        /// Import the probes' package, which registers each probe with the bridge as any worksheet
+        /// function is registered. The package is test support and no part of the library: it is on
+        /// the path only where a config put it. Called once, after Start and before registration.
+        /// </summary>
+        public static void LoadProbes(string package)
+        {
+            using (Py.GIL())
+            {
+                Py.Import(package).Dispose();
+            }
+            ProbesLoaded = true;
         }
 
         /// <summary>A function's prepared path, fetched from the seam once, by name, at registration.</summary>
@@ -683,6 +704,17 @@ namespace Catalyst.Host
         {
             var (delegates, attributes, argumentAttributes) = Describe();
             ExcelIntegration.RegisterDelegates(delegates, attributes, argumentAttributes);
+            if (Bridge.ProbesLoaded) RegisterFloor();
+        }
+
+        // The floor is a probe, written here because it has no Python: Excel is told of it where
+        // the probes were loaded and nowhere else, as a method, the way a marked one is exported.
+        private static void RegisterFloor()
+        {
+            ExcelIntegration.RegisterMethods(
+                new List<MethodInfo> { typeof(Floor).GetMethod(nameof(Floor.HostAdd)) },
+                new List<object> { new ExcelFunctionAttribute { Name = nameof(Floor.HostAdd), IsHidden = true, Description = Floor.Description } },
+                new List<List<object>> { new List<object> { new ExcelArgumentAttribute { Name = "a" }, new ExcelArgumentAttribute { Name = "b" } } });
         }
 
         /// <summary>
@@ -776,11 +808,13 @@ namespace Catalyst.Host
     /// <summary>
     /// The floor under every probe: a function with the host's argument shape and no Python, so
     /// what Excel and Excel-DNA charge for a call is measured beside what the seam adds. Hidden
-    /// from the function wizard like the probes.
+    /// from the function wizard like the probes, and like them no part of an end user's build:
+    /// it carries no export mark, so only the registration that follows the probes names it.
     /// </summary>
     public static class Floor
     {
-        [ExcelFunction(IsHidden = true, Description = "Probe: a number in and out with no Python; the Excel-DNA floor.")]
+        public const string Description = "Probe: a number in and out with no Python; the Excel-DNA floor.";
+
         public static object HostAdd(object a, object b)
         {
             return (double)a + (double)b;
