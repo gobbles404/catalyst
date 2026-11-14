@@ -22,7 +22,7 @@ from catalyst.excel.bridge import (
     TextRow,
     register,
 )
-from catalyst.excel.probes import probe
+from catalyst_probes import probe
 
 # --- one function per declared range type and Date, the fixtures of this matrix --------
 # SumArray is a probe and needs no fixture here.

@@ -13,7 +13,7 @@ from catalyst.excel.bridge import (
     excel_function,
     register,
 )
-from catalyst.excel.probes import probe
+from catalyst_probes import probe
 
 SPECS = {
     name: (description, arguments, hidden)

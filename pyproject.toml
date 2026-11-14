@@ -36,9 +36,13 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "C90"]
 [tool.ruff.lint.mccabe]
 max-complexity = 12
 
+# The probes are ours though they live outside src: test support, never in the built package.
+[tool.ruff.lint.isort]
+known-first-party = ["catalyst_probes"]
+
 [tool.pyright]
-include = ["src", "tests", "tools"]
-extraPaths = ["src", "tools"]
+include = ["src", "tests", "tools", "test_support"]
+extraPaths = ["src", "tools", "test_support"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 reportUnnecessaryIsInstance = "error"
@@ -52,5 +56,5 @@ reportUnknownArgumentType = "warning"
 [tool.pytest.ini_options]
 addopts = "-q -ra --strict-markers"
 testpaths = ["tests"]
-pythonpath = ["tools"]
+pythonpath = ["tools", "test_support"]
 filterwarnings = ["error"]

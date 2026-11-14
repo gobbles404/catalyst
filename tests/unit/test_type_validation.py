@@ -17,7 +17,7 @@ from catalyst.excel.bridge import (
     TextRow,
     excel_function,
 )
-from catalyst.excel.probes import probe
+from catalyst_probes import probe
 
 
 @probe

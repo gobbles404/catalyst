@@ -14,11 +14,11 @@ from test_utilities import read, rows
 
 from catalyst.excel import bridge
 from catalyst.excel.bridge import MISSING, Cells, Handle
-from catalyst.excel.probes import probe
 from catalyst.market_data.futures_fixings import FuturesFixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings
 from catalyst.market_data.iferc_fixings import IfercFixings
 from catalyst.market_data.price_vector import PriceVector
+from catalyst_probes import probe
 
 PID = os.getpid()  # leads every handle this Python publishes
 
