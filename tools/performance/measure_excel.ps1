@@ -33,8 +33,11 @@ $reports = Join-Path $root "profiles"
 New-Item -ItemType Directory -Force -Path $reports | Out-Null
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "host_build.ps1")
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "hidden_excel.ps1")
-$xll = Build-HostAddIn -Root $root
-Add-HostProbes -Root $root -Xll $xll   # what is measured; taken away again when the run ends
+# The probes are what is measured, and they are no part of the build a person loads: the same
+# compiled add-in is staged with them in a folder of this run's own, and Excel loads it from
+# there, so a run that fails, or two at once, leave the build and its config as they were.
+$staged = Join-Path ([IO.Path]::GetTempPath()).TrimEnd("\") "catalyst-measure-$PID"
+$xll = Copy-HostWithProbes -Root $root -Xll (Build-HostAddIn -Root $root) -Folder $staged
 $copies = 100   # how many times a single-formula case is placed
 $suffix = if ($Rows -eq 1000) { "" } else { "-rows$Rows" }   # the working workload keeps the plain name
 
@@ -349,6 +352,6 @@ try {
 catch { $scriptError = $_; throw }
 finally {
     Stop-HiddenExcel $session $owned $book -AddInLoaded:$loaded -FailureInFlight:($null -ne $scriptError)
-    Remove-HostProbes -Root $root -Xll $xll
+    Remove-Item -LiteralPath $staged -Recurse -Force -ErrorAction SilentlyContinue
 }
 Write-Host "Results: profiles/excel-timing$suffix.csv"

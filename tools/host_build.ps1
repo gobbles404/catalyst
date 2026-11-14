@@ -21,47 +21,37 @@ function Build-HostAddIn([string]$Root) {
     return Join-Path $out "Catalyst.xll"
 }
 
-# The config Build-HostAddIn writes is an end user's: the library and the installed libraries,
-# and no probe. The probes are test support, test_support\catalyst_probes, outside the library.
-# A smoke or a measurement that calls them says so with Add-HostProbes, which names their folder
-# on the config's path and their package on a probes line of its own, and takes both away again
-# with Remove-HostProbes when it ends, so the build is left as an end user loads it.
-function Add-HostProbes([string]$Root, [string]$Xll) {
-    Remove-HostProbes -Root $Root -Xll $Xll
-    $path = Join-Path (Split-Path $Xll -Parent) "catalyst.cfg"
-    $config = Get-Content -LiteralPath $path
-    $searched = ($config | Where-Object { $_ -like "pythonpath=*" }).Substring("pythonpath=".Length)
-    Set-Content -Path $path -Encoding ascii -Value @(
-        ($config | Where-Object { $_ -like "pythondll=*" }),
-        "pythonpath=$Root\test_support;$searched",
-        "probes=catalyst_probes"
-    )
+# The build above is the one a person loads, and its config an end user's: the library, the
+# installed libraries and no probe. Nothing below writes to that folder. A check that needs
+# another arrangement stages one in a folder of its own, from the same compiled files, so a run
+# that fails, or two runs at once, leave the build as it was.
+
+# The compiled add-in, the same files, in an emptied folder: all but its config.
+function Copy-HostFiles([string]$Xll, [string]$Folder) {
+    if (Test-Path -LiteralPath $Folder) { Remove-Item -LiteralPath $Folder -Recurse -Force }
+    [void](New-Item -ItemType Directory -Path $Folder)
+    Get-ChildItem -LiteralPath (Split-Path $Xll -Parent) -File |
+        Where-Object { $_.Extension -notin ".cfg", ".pdb" } |
+        Copy-Item -Destination $Folder
 }
 
-function Remove-HostProbes([string]$Root, [string]$Xll) {
-    $path = Join-Path (Split-Path $Xll -Parent) "catalyst.cfg"
-    $config = Get-Content -LiteralPath $path
-    $searched = ($config | Where-Object { $_ -like "pythonpath=*" }).Substring("pythonpath=".Length) -split ";" |
-        Where-Object { $_ -ne "$Root\test_support" }
-    Set-Content -Path $path -Encoding ascii -Value @(
-        ($config | Where-Object { $_ -like "pythondll=*" }),
-        "pythonpath=$($searched -join ';')"
-    )
+# What the build's own config names: Python's DLL, and the folders searched, in order.
+function Read-HostConfig([string]$Xll) {
+    $config = Get-Content -LiteralPath (Join-Path (Split-Path $Xll -Parent) "catalyst.cfg")
+    return @{
+        Dll      = ($config | Where-Object { $_ -like "pythondll=*" }).Substring("pythondll=".Length)
+        Searched = ($config | Where-Object { $_ -like "pythonpath=*" }).Substring("pythonpath=".Length) -split ";"
+    }
 }
 
-# Copy-HostForEndUser lays a built add-in out the way an end user's folder is laid out and returns
+# Copy-HostForEndUser stages the built add-in the way an end user's folder is laid out and returns
 # the path of the .xll in it: the host's files beside a clean copy of the catalyst package, no
 # bytecode with it, and a config that names that folder and the installed libraries, no checkout
 # folder and no probes. It is the smoke's stand-in for a release, so the functions a person types
 # are checked as an end user's Excel loads them; the release itself is assembled elsewhere, by
 # its own script, and tools\release_check.ps1 reads either folder.
 function Copy-HostForEndUser([string]$Root, [string]$Xll, [string]$Folder) {
-    if (Test-Path -LiteralPath $Folder) { Remove-Item -LiteralPath $Folder -Recurse -Force }
-    [void](New-Item -ItemType Directory -Path $Folder)
-    $bin = Split-Path $Xll -Parent
-    Get-ChildItem -LiteralPath $bin -File |
-        Where-Object { $_.Extension -notin ".cfg", ".pdb" } |
-        Copy-Item -Destination $Folder
+    Copy-HostFiles -Xll $Xll -Folder $Folder
     $package = Join-Path $Root "src\catalyst"
     foreach ($file in Get-ChildItem -LiteralPath $package -Recurse -File) {
         if ($file.FullName -match "\\__pycache__\\") { continue }
@@ -71,11 +61,41 @@ function Copy-HostForEndUser([string]$Root, [string]$Xll, [string]$Folder) {
     }
     # The same Python and the same installed libraries the build's own config names, the last
     # entry of its path; the library's folder is this one, not the checkout's.
-    $config = Get-Content -LiteralPath (Join-Path $bin "catalyst.cfg")
-    $libraries = (($config | Where-Object { $_ -like "pythonpath=*" }) -split ";")[-1]
+    $built = Read-HostConfig -Xll $Xll
     Set-Content -Path (Join-Path $Folder "catalyst.cfg") -Encoding ascii -Value @(
-        ($config | Where-Object { $_ -like "pythondll=*" }),
-        "pythonpath=$Folder;$libraries"
+        "pythondll=$($built.Dll)",
+        "pythonpath=$Folder;$($built.Searched[-1])"
     )
-    return Join-Path $Folder "Catalyst.xll"
+    return Join-Path $Folder (Split-Path $Xll -Leaf)
+}
+
+# Copy-HostWithProbes stages the built add-in with the probes and returns the path of the .xll in
+# it, for a smoke or a measurement that calls them. The probes are test support and no part of the
+# host or the library: the Python ones are test_support\catalyst_probes, which the staged config
+# names on a probes line with their folder on its path, and HostAdd, which has no Python, is
+# test_support\Catalyst.Probes, a library of its own built here, copied beside the host and named
+# in the staged copy of the add-in's .dna file so the same .xll loads it.
+function Copy-HostWithProbes([string]$Root, [string]$Xll, [string]$Folder) {
+    Push-Location $Root
+    try {
+        dotnet build test_support\Catalyst.Probes -c Release --nologo -v q | Out-Host
+        if ($LASTEXITCODE) { throw "the probes' library did not build" }
+    }
+    finally {
+        Pop-Location
+    }
+    Copy-HostFiles -Xll $Xll -Folder $Folder
+    Copy-Item -LiteralPath (Join-Path $Root "test_support\Catalyst.Probes\bin\Release\net48\Catalyst.Probes.dll") -Destination $Folder
+    $dna = Join-Path $Folder ([IO.Path]::ChangeExtension((Split-Path $Xll -Leaf), ".dna"))
+    $libraries = [IO.File]::ReadAllText($dna)
+    $close = "</DnaLibrary>"
+    if (($libraries -split [regex]::Escape($close)).Count -ne 2) { throw "$dna does not close its one DnaLibrary" }
+    [IO.File]::WriteAllText($dna, $libraries.Replace($close, "  <ExternalLibrary Path=`"Catalyst.Probes.dll`" ExplicitExports=`"true`" LoadFromBytes=`"true`" />`r`n$close"))
+    $built = Read-HostConfig -Xll $Xll
+    Set-Content -Path (Join-Path $Folder "catalyst.cfg") -Encoding ascii -Value @(
+        "pythondll=$($built.Dll)",
+        "pythonpath=$Root\test_support;$($built.Searched -join ';')",
+        "probes=catalyst_probes"
+    )
+    return Join-Path $Folder (Split-Path $Xll -Leaf)
 }

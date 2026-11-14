@@ -3986,24 +3986,29 @@ $cells["XV8"] = "=_CreateFuturesFixings(XX1:XX$rollRows,XY1:XZ$rollRows,XV5)"
 $cells["XV10"] = "=_CreateFuturesFixings(XX1:XX$rollRows,XY1:XY$rollRows,XV5)"
 
 # --- the two builds ----------------------------------------------------------
-# The add-in is built once and loaded twice, each time in a hidden Excel of our own; nothing the
-# user has open is touched. The first is an end user's: the host's files and a clean copy of the
-# library in a folder of their own, under a config that names no checkout folder and no probes.
-# Every formula a person types is checked there, and every formula that calls a probe must show
-# #NAME? there: the name unknown to that Excel, not merely unlisted. The second is the build
-# with the probes, their package named in its config for that Excel alone, where the probe
-# formulas show what they are pinned to. tools\release_check.ps1 reads the end user's folder
-# before Excel first loads the add-in from it and again after.
+# The add-in is built once and loaded twice, each time in a hidden Excel of our own and each
+# time from a folder staged for that Excel alone; nothing the user has open is touched, and the
+# build's own folder is written by neither. The first is an end user's: the host's files and a
+# clean copy of the library, under a config that names no checkout folder and no probes. Every
+# formula a person types is checked there, and every formula that calls a probe must show
+# #NAME? there: the name unknown to that Excel, not merely unlisted. The second is the same
+# compiled add-in staged with the probes, their package named in its config and HostAdd's
+# library beside the host, where the probe formulas show what they are pinned to.
+# tools\release_check.ps1 reads the end user's folder before Excel first loads the add-in from
+# it and again after.
 
 . (Join-Path $PSScriptRoot "host_build.ps1")
 . (Join-Path $PSScriptRoot "hidden_excel.ps1")
 $xll = Build-HostAddIn -Root $root
 $endUserFolder = Join-Path ([IO.Path]::GetTempPath()).TrimEnd("\") "catalyst-end-user-$PID"
 $endUserBuild = Copy-HostForEndUser -Root $root -Xll $xll -Folder $endUserFolder
+$probesFolder = Join-Path ([IO.Path]::GetTempPath()).TrimEnd("\") "catalyst-with-probes-$PID"
+$probesBuild = Copy-HostWithProbes -Root $root -Xll $xll -Folder $probesFolder
 
 # A formula calls a probe, or the host's own floor, when it names one, wherever in it the name is.
 # The names are read off the probes' package, each registered function it defines, so a probe
-# added there is known here; HostAdd, which has no Python, is named by hand.
+# added there is known here; HostAdd, which has no Python and a library of its own, is named
+# by hand.
 Push-Location $root
 try {
     $probes = @(& uv run python -c "import sys; sys.path.insert(0, 'test_support'); import catalyst_probes as p; from catalyst.excel import bridge; print('\n'.join(n for n, *_ in bridge.function_specs() if getattr(vars(p).get(n), '__module__', None) == p.__name__))")
@@ -4103,13 +4108,18 @@ try {
     }
     Test-Formulas "an end user's Excel: the library alone, from a folder of its own" $endUserBuild $typed $endUserFolder
     Test-Folder "after"
-    Add-HostProbes -Root $root -Xll $xll
-    Test-Formulas "the build with the probes" $xll $probed
+    Test-Formulas "the add-in staged with the probes" $probesBuild $probed
+    # The build itself is what a person loads: neither Excel was given it, and its config still
+    # names no probe.
+    $own = Get-Content -LiteralPath (Join-Path (Split-Path $xll -Parent) "catalyst.cfg")
+    if ($own -match "probes|test_support") {
+        $failures++
+        Write-Host "FAIL the build's own config names the probes: $($own -join ' | ')"
+    }
 }
 finally {
-    Remove-HostProbes -Root $root -Xll $xll
     Write-ExcelBusyReport
-    Remove-Item -LiteralPath $endUserFolder -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $endUserFolder, $probesFolder -Recurse -Force -ErrorAction SilentlyContinue
 }
 Write-Host "excel smoke: $($typed.Count) formulas in an end user's Excel, $($probed.Count) with the probes, $failures failed"
 exit $failures
