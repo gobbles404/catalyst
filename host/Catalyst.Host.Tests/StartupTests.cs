@@ -1,5 +1,6 @@
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using ExcelDna.Integration;
 using Xunit;
 
@@ -77,7 +78,6 @@ namespace Catalyst.Host.Tests
             Assert.Contains(("Zero", true), added);
             Assert.Contains(("Add", true), added);
             Assert.Contains(("Fail", true), added);
-            Assert.True(Bridge.ProbesLoaded);
         }
 
         [Fact]
@@ -93,6 +93,17 @@ namespace Catalyst.Host.Tests
         {
             Assert.Equal(2, Registration.MakeDelegate(Bridge.Prepare("Add"), 2).GetType().GetMethod("Invoke").GetParameters().Length);
             Assert.Empty(Registration.MakeDelegate(Bridge.Prepare("Ping"), 0).GetType().GetMethod("Invoke").GetParameters());
+        }
+
+        // The floor is test support, a library of its own: the host's assembly holds no HostAdd,
+        // marked or not, for Excel or any caller to reach.
+        [Fact]
+        public void the_host_assembly_holds_no_floor()
+        {
+            var every = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+            var methods = typeof(Bridge).Assembly.GetTypes().SelectMany(type => type.GetMethods(every));
+            Assert.DoesNotContain(methods, method => method.Name == "HostAdd");
+            Assert.Null(typeof(Bridge).Assembly.GetType("Catalyst.Host.Floor"));
         }
 
         // The help beside each parameter reaches the argument's registration attribute, with an

@@ -5,8 +5,7 @@
     <LangVersion>10.0</LangVersion>
     <!-- One place uses a pointer: the copy of an array out of Python's buffer into the array Excel receives. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <!-- Only [ExcelFunction] methods and the functions registered from Python reach the sheet;
-         HostAdd, unmarked, reaches it only where the probes were loaded. -->
+    <!-- Only [ExcelFunction] methods and the functions registered from Python reach the sheet. -->
     <ExcelAddInExplicitExports>true</ExcelAddInExplicitExports>
     <!-- The add-in is named for the product, not for the assembly: the build makes one 64-bit
          Catalyst.xll with its Catalyst.dna, loading Catalyst.Host.dll beside them, and Excel's

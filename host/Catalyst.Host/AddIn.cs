@@ -5,7 +5,6 @@ using ExcelDna.Integration;
 using ExcelDna.IntelliSense;
 using Python.Runtime;
 using System.Linq.Expressions;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Catalyst.Host.Tests")]
@@ -94,7 +93,6 @@ namespace Catalyst.Host
         public static PyObject CellsFromBuffers;
         public static PyObject EmptyText;
         public static string StartupError;
-        public static bool ProbesLoaded;
 
         /// <summary>Start Python once, put the package on its path, and import the bridge.</summary>
         public static void Start(string pythonDll, string[] pythonPath)
@@ -131,7 +129,6 @@ namespace Catalyst.Host
             {
                 Py.Import(package).Dispose();
             }
-            ProbesLoaded = true;
         }
 
         /// <summary>A function's prepared path, fetched from the seam once, by name, at registration.</summary>
@@ -704,17 +701,6 @@ namespace Catalyst.Host
         {
             var (delegates, attributes, argumentAttributes) = Describe();
             ExcelIntegration.RegisterDelegates(delegates, attributes, argumentAttributes);
-            if (Bridge.ProbesLoaded) RegisterFloor();
-        }
-
-        // The floor is a probe, written here because it has no Python: Excel is told of it where
-        // the probes were loaded and nowhere else, as a method, the way a marked one is exported.
-        private static void RegisterFloor()
-        {
-            ExcelIntegration.RegisterMethods(
-                new List<MethodInfo> { typeof(Floor).GetMethod(nameof(Floor.HostAdd)) },
-                new List<object> { new ExcelFunctionAttribute { Name = nameof(Floor.HostAdd), IsHidden = true, Description = Floor.Description } },
-                new List<List<object>> { new List<object> { new ExcelArgumentAttribute { Name = "a" }, new ExcelArgumentAttribute { Name = "b" } } });
         }
 
         /// <summary>
@@ -802,22 +788,6 @@ namespace Catalyst.Host
         {
             var (live, priceBytes) = Bridge.LiveHandles();
             return Lifetime.Report(live, priceBytes);
-        }
-    }
-
-    /// <summary>
-    /// The floor under every probe: a function with the host's argument shape and no Python, so
-    /// what Excel and Excel-DNA charge for a call is measured beside what the seam adds. Hidden
-    /// from the function wizard like the probes, and like them no part of an end user's build:
-    /// it carries no export mark, so only the registration that follows the probes names it.
-    /// </summary>
-    public static class Floor
-    {
-        public const string Description = "Probe: a number in and out with no Python; the Excel-DNA floor.";
-
-        public static object HostAdd(object a, object b)
-        {
-            return (double)a + (double)b;
         }
     }
 
