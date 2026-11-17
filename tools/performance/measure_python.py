@@ -22,6 +22,7 @@ import tracemalloc
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from importlib import import_module
 from pathlib import Path
 from time import perf_counter_ns
 from typing import Any, cast
@@ -32,10 +33,16 @@ from numpy.typing import NDArray
 from catalyst.excel import bridge
 from catalyst.excel.bridge import MISSING, Cells
 
+ROOT = Path(__file__).resolve().parents[2]
+
+# The probes are test support, outside the library: a runner names their folder and imports
+# their package, which is what registers them, before it asks which functions exist.
+sys.path.insert(0, str(ROOT / "test_support"))
+import_module("catalyst_probes")
+
 # Each function's prepared path, fetched once as the host does at registration.
 ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
 
-ROOT = Path(__file__).resolve().parents[2]
 REPORTS = ROOT / "profiles"
 SIZES = (1, 100, 1_000, 10_000, 100_000)  # 100 is the working size; 100,000 the control
 BATCH_MS = 50.0
@@ -483,7 +490,7 @@ def environment() -> dict[str, object]:
         "timestamp_utc": datetime.now(UTC).isoformat(),
         "revision": revision,
         "bridge_sha256": sha256(ROOT / "src" / "catalyst" / "excel" / "bridge.py"),
-        "probes_sha256": sha256(ROOT / "src" / "catalyst" / "excel" / "probes.py"),
+        "probes_sha256": sha256(ROOT / "test_support" / "catalyst_probes" / "__init__.py"),
         "python": sys.version,
         "numpy": np.__version__,
         "machine": platform.machine(),

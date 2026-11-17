@@ -22,7 +22,6 @@ from catalyst.excel.bridge import (
     Cells,
     Handle,
 )
-from catalyst.excel.probes import probe
 from catalyst.excel.utilities import shown
 from catalyst.globals.discount_curve import DiscountCurve
 from catalyst.globals.valuation_date import ValuationDate
@@ -40,6 +39,7 @@ from catalyst.market_data.gas_daily_fixings import GasDailyFixings
 from catalyst.market_data.iferc_fixings import IfercFixings
 from catalyst.market_data.price_vector import PriceVector
 from catalyst.quoting.rfq import Rfq
+from catalyst_probes import probe
 
 PID = os.getpid()  # leads every handle this Python publishes
 

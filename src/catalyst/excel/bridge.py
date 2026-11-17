@@ -2266,7 +2266,7 @@ def publish(name: str, args: Sequence[object]) -> tuple[object, bool]:
     return _FUNCTIONS[name].publish(*args)
 
 
-# --- the bridge's own worksheet function; the probes live in probes.py --------
+# --- the bridge's own worksheet function; the probes are test support, outside src ---
 
 
 @excel_function

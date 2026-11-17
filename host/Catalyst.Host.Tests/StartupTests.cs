@@ -1,4 +1,6 @@
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using ExcelDna.Integration;
 using Xunit;
 
@@ -8,6 +10,13 @@ namespace Catalyst.Host.Tests
     [Collection("python")]
     public class StartupTests
     {
+        private readonly PythonFixture python;
+
+        public StartupTests(PythonFixture python)
+        {
+            this.python = python;
+        }
+
         [Fact]
         public void the_config_file_is_key_equals_value_with_comments_and_blank_lines()
         {
@@ -23,6 +32,52 @@ namespace Catalyst.Host.Tests
             Assert.Equal("C:\\python\\python313.dll", config["pythondll"]);
             Assert.Equal("C:\\repo\\src;C:\\repo\\.venv\\Lib\\site-packages", config["pythonpath"]);
             Assert.Equal(2, config.Count);
+            Assert.False(config.TryGetValue("probes", out _));  // an end user's config: no probe is loaded
+        }
+
+        // A test or a measurement build names the probes' package on a line of its own.
+        [Fact]
+        public void a_config_that_names_the_probes_holds_their_package()
+        {
+            var path = Path.GetTempFileName();
+            File.WriteAllLines(path, new[]
+            {
+                "pythondll=C:\\python\\python313.dll",
+                "pythonpath=C:\\repo\\src;C:\\repo\\test_support;C:\\repo\\.venv\\Lib\\site-packages",
+                "probes=catalyst_probes",
+            });
+            var config = Config.Load(path);
+            Assert.True(config.TryGetValue("probes", out var probes));
+            Assert.Equal("catalyst_probes", probes);
+        }
+
+        // The bridge imported and nothing more, where an end user's build stops: Excel is told of
+        // every function a person types, of no probe, and of nothing hidden. The probes' folder was
+        // on the path all the while; being importable registers nothing.
+        [Fact]
+        public void before_the_probes_are_loaded_excel_is_told_of_no_probe_and_nothing_hidden()
+        {
+            var told = python.EndUserFunctions;
+            Assert.DoesNotContain(told, f => f.Hidden);
+            Assert.DoesNotContain(told, f => f.Name == "Add" || f.Name == "Zero" || f.Name == "Fail");
+            Assert.Contains(("Ping", false), told);
+            Assert.Contains(("_CreateValuationDate", false), told);
+            Assert.Contains(("_EvaluateTrades", false), told);
+            Assert.Contains(("util_ReadHandle", false), told);
+        }
+
+        // With the probes loaded Excel is told of each, hidden, after every function it was told of
+        // before, none of which moved or changed: what the probes' package added is hidden to a name.
+        [Fact]
+        public void with_the_probes_loaded_excel_is_told_of_each_hidden_and_of_the_rest_as_before()
+        {
+            var told = PythonFixture.Told();
+            Assert.Equal(python.EndUserFunctions, told.Take(python.EndUserFunctions.Count));
+            var added = told.Skip(python.EndUserFunctions.Count).ToList();
+            Assert.All(added, f => Assert.True(f.Hidden));
+            Assert.Contains(("Zero", true), added);
+            Assert.Contains(("Add", true), added);
+            Assert.Contains(("Fail", true), added);
         }
 
         [Fact]
@@ -38,6 +93,17 @@ namespace Catalyst.Host.Tests
         {
             Assert.Equal(2, Registration.MakeDelegate(Bridge.Prepare("Add"), 2).GetType().GetMethod("Invoke").GetParameters().Length);
             Assert.Empty(Registration.MakeDelegate(Bridge.Prepare("Ping"), 0).GetType().GetMethod("Invoke").GetParameters());
+        }
+
+        // The floor is test support, a library of its own: the host's assembly holds no HostAdd,
+        // marked or not, for Excel or any caller to reach.
+        [Fact]
+        public void the_host_assembly_holds_no_floor()
+        {
+            var every = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+            var methods = typeof(Bridge).Assembly.GetTypes().SelectMany(type => type.GetMethods(every));
+            Assert.DoesNotContain(methods, method => method.Name == "HostAdd");
+            Assert.Null(typeof(Bridge).Assembly.GetType("Catalyst.Host.Floor"));
         }
 
         // The help beside each parameter reaches the argument's registration attribute, with an

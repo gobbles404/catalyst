@@ -23,7 +23,7 @@ from catalyst.excel.bridge import (
     NumberRow,
     excel_function,
 )
-from catalyst.excel.probes import probe
+from catalyst_probes import probe
 
 # One function per declared result type. Each returns whatever the test put in _returns.
 _returns: dict[str, object] = {}

@@ -12,7 +12,11 @@ using System.Runtime.CompilerServices;
 
 namespace Catalyst.Host
 {
-    /// <summary>Runs once when Excel loads the add-in: read config, start Python, import the bridge.</summary>
+    /// <summary>
+    /// Runs once when Excel loads the add-in: read config, start Python, import the bridge. A config
+    /// that names the probes' package under <c>probes</c> has them imported too, a test or a
+    /// measurement build; an end user's config has no such line, and its Excel knows no probe.
+    /// </summary>
     public class AddIn : IExcelAddIn
     {
         private static bool helpShown;
@@ -24,6 +28,7 @@ namespace Catalyst.Host
             {
                 var config = Config.Load(Path.Combine(Path.GetDirectoryName(ExcelDnaUtil.XllPath), "catalyst.cfg"));
                 Bridge.Start(config["pythondll"], config["pythonpath"].Split(';'));
+                if (config.TryGetValue("probes", out var probes)) Bridge.LoadProbes(probes);
                 Registration.RegisterAll();
                 // The help beside the formula as a person types it, from what was just registered. Excel's
                 // own fx dialog reads the same registration and needs nothing more.
@@ -110,6 +115,19 @@ namespace Catalyst.Host
                 {
                     BoolType = builtins.GetAttr("bool");
                 }
+            }
+        }
+
+        /// <summary>
+        /// Import the probes' package, which registers each probe with the bridge as any worksheet
+        /// function is registered. The package is test support and no part of the library: it is on
+        /// the path only where a config put it. Called once, after Start and before registration.
+        /// </summary>
+        public static void LoadProbes(string package)
+        {
+            using (Py.GIL())
+            {
+                Py.Import(package).Dispose();
             }
         }
 
@@ -770,20 +788,6 @@ namespace Catalyst.Host
         {
             var (live, priceBytes) = Bridge.LiveHandles();
             return Lifetime.Report(live, priceBytes);
-        }
-    }
-
-    /// <summary>
-    /// The floor under every probe: a function with the host's argument shape and no Python, so
-    /// what Excel and Excel-DNA charge for a call is measured beside what the seam adds. Hidden
-    /// from the function wizard like the probes.
-    /// </summary>
-    public static class Floor
-    {
-        [ExcelFunction(IsHidden = true, Description = "Probe: a number in and out with no Python; the Excel-DNA floor.")]
-        public static object HostAdd(object a, object b)
-        {
-            return (double)a + (double)b;
         }
     }
 

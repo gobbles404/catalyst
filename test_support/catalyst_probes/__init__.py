@@ -6,7 +6,13 @@ the seam's counts. Where a rule needs a control to be read against, the control 
 probe too, differing from it in the one thing being measured and nothing else. Together
 they are the knobs a capacity run turns: how many calls, how many cells in, how
 many cells out. They are registered hidden, so Excel's function wizard never lists
-them, and they ship in the build everyone loads. They stay as long as the seam does.
+them. They stay as long as the seam does.
+
+This package is test support and no part of the product: it lives outside `src`, so the
+`catalyst` package an end user loads holds none of it, and nothing in `catalyst` imports
+it. Importing it is what registers the probes, through the bridge's own `register`, on
+the one path every worksheet function takes. A test, a measurement runner or a host
+whose config names it under `probes` imports it; an end user's host has no such line.
 """
 
 from collections.abc import Callable

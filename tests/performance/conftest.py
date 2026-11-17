@@ -8,15 +8,21 @@ from pathlib import Path
 import pytest
 
 import catalyst
+import catalyst_probes
 from catalyst.excel.bridge import DateColumn, NumberColumn, TextColumn
-from catalyst.excel.probes import probe
+from catalyst_probes import probe
 
-PACKAGE_DIR = str(Path(catalyst.__file__).parent)
+# The library and the probes that drive it: a ledger counts the functions of both, as it did
+# while the probes lived inside the library, so no count moved when they left it.
+COUNTED_DIRS = (
+    str(Path(catalyst.__file__).parent),
+    str(Path(catalyst_probes.__file__).parent),
+)
 
 
 # The column, date, and text looks have no probe, because the host cannot tell those ranges
 # from any other; these three exist only to count the Python side of each look. Defined
-# here, outside the package, they are not themselves counted, and pytest registers them
+# here, outside both packages, they are not themselves counted, and pytest registers them
 # before any budget module builds its table of prepared paths.
 @probe
 def FirstOfNumbers(values: NumberColumn) -> float:
@@ -34,7 +40,7 @@ def FirstOfNames(names: TextColumn) -> str:
 
 
 def _call_profile(fn: Callable[[], object]) -> dict[str, int]:
-    """Which of the package's own functions ran, and how many times each."""
+    """Which of the library's and the probes' own functions ran, and how many times each."""
     profiler = cProfile.Profile()
     profiler.enable()
     fn()
@@ -44,7 +50,7 @@ def _call_profile(fn: Callable[[], object]) -> dict[str, int]:
         code = entry.code
         if isinstance(code, str):
             continue
-        if code.co_filename.startswith(PACKAGE_DIR):
+        if code.co_filename.startswith(COUNTED_DIRS):
             profile[code.co_qualname] = profile.get(code.co_qualname, 0) + entry.callcount
     return profile
 

@@ -1,6 +1,8 @@
 # Runs the built add-in in a hidden Excel and checks what each formula shows.
 # One row per formula: the exact text its cell must display. Add a row to add a check. In an
 # expected text, {pid} stands for the hidden Excel's process ID, which leads every handle.
+# The rows are run in an end user's Excel, where a formula that calls a probe must show #NAME?,
+# and the probe rows again in the build with the probes; the two builds are at the end.
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 
@@ -3983,62 +3985,143 @@ $rollRows = $rollRow - 1
 $cells["XV8"] = "=_CreateFuturesFixings(XX1:XX$rollRows,XY1:XZ$rollRows,XV5)"
 $cells["XV10"] = "=_CreateFuturesFixings(XX1:XX$rollRows,XY1:XY$rollRows,XV5)"
 
-# --- build the host and tell it where Python is -----------------------------
+# --- the two builds ----------------------------------------------------------
+# The add-in is built once and loaded twice, each time in a hidden Excel of our own and each
+# time from a folder staged for that Excel alone; nothing the user has open is touched, and the
+# build's own folder is written by neither. The first is an end user's: the host's files and a
+# clean copy of the library, under a config that names no checkout folder and no probes. Every
+# formula a person types is checked there, and every formula that calls a probe must show
+# #NAME? there: the name unknown to that Excel, not merely unlisted. The second is the same
+# compiled add-in staged with the probes, their package named in its config and HostAdd's
+# library beside the host, where the probe formulas show what they are pinned to. Before the
+# first Excel starts, Test-EndUserFolder takes the inventory of the end user's folder as staged:
+# the files the add-in runs on, and nothing named for the probes, source, library or bytecode.
 
 . (Join-Path $PSScriptRoot "host_build.ps1")
 . (Join-Path $PSScriptRoot "hidden_excel.ps1")
 $xll = Build-HostAddIn -Root $root
+# The build's own config as the build just wrote it, the file a person's Excel reads. Staging and
+# both Excels below must leave it as it is, to the byte.
+$ownConfig = Join-Path (Split-Path $xll -Parent) "catalyst.cfg"
+$ownBytes = [IO.File]::ReadAllBytes($ownConfig)
+$endUserFolder = Join-Path ([IO.Path]::GetTempPath()).TrimEnd("\") "catalyst-end-user-$PID"
+$endUserBuild = Copy-HostForEndUser -Root $root -Xll $xll -Folder $endUserFolder
+$probesFolder = Join-Path ([IO.Path]::GetTempPath()).TrimEnd("\") "catalyst-with-probes-$PID"
+$probesBuild = Copy-HostWithProbes -Root $root -Xll $xll -Folder $probesFolder
 
-# --- a hidden Excel of our own; nothing the user has open is touched --------
-
+# A formula calls a probe, or the host's own floor, when it names one, wherever in it the name is.
+# The names are read off the probes' package, each registered function it defines, so a probe
+# added there is known here; HostAdd, which has no Python and a library of its own, is named
+# by hand.
+Push-Location $root
 try {
-    $session = Start-HiddenExcel
+    $probes = @(& uv run python -c "import sys; sys.path.insert(0, 'test_support'); import catalyst_probes as p; from catalyst.excel import bridge; print('\n'.join(n for n, *_ in bridge.function_specs() if getattr(vars(p).get(n), '__module__', None) == p.__name__))")
+    if ($LASTEXITCODE -or $probes.Count -lt 2) { throw "could not read the probes' names off test_support\catalyst_probes" }
 }
-catch {
-    Write-Host "Could not start hidden Excel, so the host is unchecked: $_"
-    exit 2
+finally { Pop-Location }
+$probes += "HostAdd"
+$callsProbe = "(?<![A-Za-z0-9_.])(" + ($probes -join "|") + ")\("
+$typed = [ordered]@{}    # what an end user's Excel must show
+$probed = [ordered]@{ "=CatalystStatus()" = $formulas["=CatalystStatus()"] }  # and the build with the probes
+foreach ($formula in $formulas.Keys) {
+    if ($formula -cmatch $callsProbe) {
+        $typed[$formula] = "#NAME?"
+        $probed[$formula] = $formulas[$formula]
+    }
+    else { $typed[$formula] = $formulas[$formula] }
 }
-$excel = $session.Excel
-$owned = [Collections.Generic.List[object]]::new()
-function Own($object) { $owned.Add($object); Write-Output -NoEnumerate $object }
-$loaded = $false
-$scriptError = $null
-$book = $null
+foreach ($probe in $probes) {
+    $calls = "(?<![A-Za-z0-9_.])$probe\("
+    if (-not ($formulas.Keys | Where-Object { $_ -cmatch $calls })) { throw "no formula calls $probe, so nothing would show an end user's Excel does not know it" }
+}
+
 $failures = 0
+function Test-Shown($cell, [string]$address, [string]$formula, [string]$expected, [switch]$Ending) {
+    Invoke-ExcelCall "type formula" { $cell.Formula = $formula } $address
+    $shown = Read-ExcelProperty $cell "Text" $address
+    $ok = if ($Ending) { ([string]$shown).EndsWith($expected) } else { $shown -eq $expected }
+    if (-not $ok) { $script:failures++ }
+    Write-Host ("{0} {1,-28} {2}" -f $(if ($ok) { "ok  " } else { "FAIL" }), $formula, $shown)
+    if (-not $ok) { Write-Host ("     expected                    {0}" -f $expected) }
+}
+
+# One hidden Excel with the add-in loaded from $Xll: the input cells typed, then each formula, and
+# what its cell shows held to the text beside it. $LibraryFrom, when given, is the folder the
+# library must have been loaded from, read off Ping.
+function Test-Formulas([string]$What, [string]$Xll, $Expected, [string]$LibraryFrom = "") {
+    Write-Host "--- $What ---"
+    try {
+        $session = Start-HiddenExcel
+    }
+    catch {
+        Write-Host "Could not start hidden Excel, so the host is unchecked: $_"
+        exit 2
+    }
+    $excel = $session.Excel
+    $owned = [Collections.Generic.List[object]]::new()
+    function Own($object) { $owned.Add($object); Write-Output -NoEnumerate $object }
+    $loaded = $false
+    $scriptError = $null
+    $book = $null
+    try {
+        # Every call into Excel is made through Invoke-ExcelCall: Excel refuses a call while it is
+        # busy, and the refused call is made again until it is taken or its time runs out. Each call
+        # is one operation, so a reference is taken once and registered once it has been handed over.
+        # A property is read through Read-ExcelProperty: read with a dot, a refused read would come
+        # back as nothing and no error, and a formula's text would look empty.
+        if (-not (Invoke-ExcelCall "register the add-in" { $excel.RegisterXLL($Xll) })) { throw "Excel refused to load $Xll" }
+        $loaded = $true
+        $books = Own (Read-ExcelProperty $excel "Workbooks")
+        $book = Own (Invoke-ExcelCall "new workbook" { , $books.Add() })
+        $sheets = Own (Read-ExcelProperty $book "Worksheets")
+        $sheet = Own (Invoke-ExcelCall "first worksheet" { , $sheets.Item(1) })
+        # Formula takes text for everything and lets Excel parse it, as typing into the cell would.
+        foreach ($address in $cells.Keys) {
+            $target = Own (Invoke-ExcelCall "range" { , $sheet.Range($address) } $address)
+            Invoke-ExcelCall "type input" { $target.Formula = $cells[$address] } $address
+        }
+        $row = 1
+        foreach ($formula in $Expected.Keys) {
+            $cell = Own (Invoke-ExcelCall "range" { , $sheet.Range("K$row") } "K$row")
+            Test-Shown $cell "K$row" $formula $Expected[$formula].Replace("{pid}", [string]$session.Process.Id)
+            $row++
+        }
+        if ($LibraryFrom) {
+            $cell = Own (Invoke-ExcelCall "range" { , $sheet.Range("K$row") } "K$row")
+            Test-Shown $cell "K$row" "=Ping()" " from $LibraryFrom\catalyst\__init__.py" -Ending
+        }
+    }
+    catch { $scriptError = $_; throw }
+    finally {
+        Stop-HiddenExcel $session $owned $book -AddInLoaded:$loaded -FailureInFlight:($null -ne $scriptError)
+    }
+}
+
 try {
-    # Every call into Excel is made through Invoke-ExcelCall: Excel refuses a call while it is
-    # busy, and the refused call is made again until it is taken or its time runs out. Each call
-    # is one operation, so a reference is taken once and registered once it has been handed over.
-    # A property is read through Read-ExcelProperty: read with a dot, a refused read would come
-    # back as nothing and no error, and a formula's text would look empty.
-    if (-not (Invoke-ExcelCall "register the add-in" { $excel.RegisterXLL($xll) })) { throw "Excel refused to load $xll" }
-    $loaded = $true
-    $books = Own (Read-ExcelProperty $excel "Workbooks")
-    $book = Own (Invoke-ExcelCall "new workbook" { , $books.Add() })
-    $sheets = Own (Read-ExcelProperty $book "Worksheets")
-    $sheet = Own (Invoke-ExcelCall "first worksheet" { , $sheets.Item(1) })
-    # Formula takes text for everything and lets Excel parse it, as typing into the cell would.
-    foreach ($address in $cells.Keys) {
-        $target = Own (Invoke-ExcelCall "range" { , $sheet.Range($address) } $address)
-        Invoke-ExcelCall "type input" { $target.Formula = $cells[$address] } $address
+    Write-Host "--- the end user's folder, before Excel first loads the add-in from it ---"
+    $failures += Test-EndUserFolder -Folder $endUserFolder
+    $packed = @(Get-ChildItem -LiteralPath $endUserFolder -Recurse -Directory -Filter "__pycache__").Count
+    if ($packed) {
+        $failures++
+        Write-Host "FAIL the end user's folder was laid out with $packed __pycache__ folder(s); a clean copy holds none"
     }
-    $row = 1
-    foreach ($formula in $formulas.Keys) {
-        $cell = Own (Invoke-ExcelCall "range" { , $sheet.Range("K$row") } "K$row")
-        Invoke-ExcelCall "type formula" { $cell.Formula = $formula } "K$row"
-        $shown = Read-ExcelProperty $cell "Text" "K$row"
-        $expected = $formulas[$formula].Replace("{pid}", [string]$session.Process.Id)
-        $ok = ($shown -eq $expected)
-        if (-not $ok) { $failures++ }
-        Write-Host ("{0} {1,-28} {2}" -f $(if ($ok) { "ok  " } else { "FAIL" }), $formula, $shown)
-        if (-not $ok) { Write-Host ("     expected                    {0}" -f $expected) }
-        $row++
-    }
+    Test-Formulas "an end user's Excel: the library alone, from a folder of its own" $endUserBuild $typed $endUserFolder
+    Test-Formulas "the add-in staged with the probes" $probesBuild $probed
 }
-catch { $scriptError = $_; throw }
 finally {
+    # The build itself is what a person loads: neither Excel was given it, and its config is the
+    # file the build wrote, byte for byte, whether the run above passed or stopped. The bytes are
+    # compared and not read for a word, since the checkout's own path may hold any word.
+    $ownNow = if (Test-Path -LiteralPath $ownConfig -PathType Leaf) { [IO.File]::ReadAllBytes($ownConfig) } else { [byte[]]@() }
+    if (-not [Linq.Enumerable]::SequenceEqual([byte[]]$ownBytes, [byte[]]$ownNow)) {
+        $failures++
+        Write-Host "FAIL the build's own config changed during the run"
+        Write-Host "     as built  $([Text.Encoding]::ASCII.GetString($ownBytes).Trim() -replace '\r?\n', ' | ')"
+        Write-Host "     now       $([Text.Encoding]::ASCII.GetString($ownNow).Trim() -replace '\r?\n', ' | ')"
+    }
+    else { Write-Host "ok   the build's own config is as the build wrote it, $($ownBytes.Length) bytes" }
     Write-ExcelBusyReport
-    Stop-HiddenExcel $session $owned $book -AddInLoaded:$loaded -FailureInFlight:($null -ne $scriptError)
+    Remove-Item -LiteralPath $endUserFolder, $probesFolder -Recurse -Force -ErrorAction SilentlyContinue
 }
-Write-Host "excel smoke: $($formulas.Count) formulas, $failures failed"
+Write-Host "excel smoke: $($typed.Count) formulas in an end user's Excel, $($probed.Count) with the probes, $failures failed"
 exit $failures

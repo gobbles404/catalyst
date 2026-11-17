@@ -8,7 +8,7 @@ import pytest
 
 from catalyst.excel import bridge
 from catalyst.excel.bridge import MISSING, Cells, Handle, Handles, Table, TextRow, excel_function
-from catalyst.excel.probes import probe
+from catalyst_probes import probe
 
 PID = os.getpid()  # leads every handle this Python publishes
 

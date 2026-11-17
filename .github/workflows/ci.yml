@@ -62,3 +62,6 @@ jobs:
       - run: dotnet test host\Catalyst.Host.Tests -c Release --nologo
       # The host runner must keep compiling; nobody runs timings in CI.
       - run: dotnet build tools\performance\Catalyst.Host.Measure -c Release --nologo
+      # HostAdd's library is test support the smoke and the Excel runner stage beside the host;
+      # nothing here loads it, and it must keep compiling too.
+      - run: dotnet build test_support\Catalyst.Probes -c Release --nologo

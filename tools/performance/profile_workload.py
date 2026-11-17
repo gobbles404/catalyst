@@ -1,6 +1,8 @@
 """Profile every probe once and save an HTML report of where its time went."""
 
+import sys
 from collections.abc import Callable
+from importlib import import_module
 from pathlib import Path
 from time import perf_counter
 from typing import cast
@@ -12,10 +14,16 @@ from pyinstrument import Profiler
 from catalyst.excel import bridge
 from catalyst.excel.bridge import MISSING, Cells
 
+ROOT = Path(__file__).resolve().parents[2]
+REPORTS = ROOT / "profiles"
+
+# The probes are test support, outside the library: a runner names their folder and imports
+# their package, which is what registers them, before it asks which functions exist.
+sys.path.insert(0, str(ROOT / "test_support"))
+import_module("catalyst_probes")
+
 # Each function's prepared path, fetched once as the host does at registration.
 ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
-
-REPORTS = Path(__file__).resolve().parents[2] / "profiles"
 
 
 def profile_call[T](operation: Callable[[], T], report: Path, seconds: float = 0.5) -> T:
