@@ -114,15 +114,17 @@ workbook's quote cells, every one of which gains the word, with a block of its o
 
 ## Outside this slice
 
-- The monthly prices as an output.
+- The monthly prices as an output, and rounding them: built next, [ftc-monthly-prices.md](ftc-monthly-prices.md), each month rounded alone and the leftover shown.
 - A margin on them.
-- Rounding them to a price grid, and what to do with the leftover.
+- What to do with the leftover.
 - Booking an FTC trade from a quote.
 
 **Still parked: allocating an agreed price into monthly legs.** The earlier form of issue #219
 asked how to split an agreed headline price into monthly fixed prices that follow the curve.
-It is not started, and when it is taken up it is its own issue. What the conversation of 17
-November settled for it: the headline must be a fit-to-curve price and not a flat one, since
+[ftc-monthly-prices.md](ftc-monthly-prices.md) took up its first part for issue #250: the
+monthly prices from an agreed price, the same amount on every month, rounded alone and
+shown with the average they come back to. Fitting them to the price is still parked. What
+the conversation of 17 November settled for it: the headline must be a fit-to-curve price and not a flat one, since
 legs set at the curve are worth the same today as the flat swap and their quantity-weighted
 average is the FTC price; the two only conflict if a flat price is used as the headline. Still
 open: what preserving the curve's shape means, a common shift in price, a common percentage or
