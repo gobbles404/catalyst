@@ -64,7 +64,7 @@ def monthly_quote(nearby: int, method: str = "asian") -> QuoteTemplate:
 
 def dated(as_of: str, nearby: int, *quotes: float) -> float:
     market = quoted(history_on(as_of, 2), *quotes)
-    return quote_by_dates(market, START, END, window_quote(nearby), None, WorkCounter())
+    return quote_by_dates(market, START, END, window_quote(nearby), "flat", None, WorkCounter())
 
 
 def test_the_two_days_quote_80_5_at_the_first_nearby_and_82_5_at_the_second() -> None:
@@ -74,7 +74,7 @@ def test_the_two_days_quote_80_5_at_the_first_nearby_and_82_5_at_the_second() ->
     assert dated(JUNE_17, 2, 81.5, 83.5) == 82.5
     counter = WorkCounter()
     market = quoted(history_on(JUNE_17, 2), 81.5, 83.5)
-    assert quote_by_dates(market, START, END, window_quote(2), None, counter) == 82.5
+    assert quote_by_dates(market, START, END, window_quote(2), "flat", None, counter) == 82.5
     counts = counter.freeze().as_dict()
     assert (counts["fixings_read"], counts["live_prices_read"]) == (2, 0)
     # Nothing fixed on 12 June, M26 quoted 80, N26 81 and Q26 83: 80.5 and 82.
@@ -91,7 +91,7 @@ def test_a_second_nearby_quote_booked_as_a_trade_marks_nothing(
     as_of: str, quotes: tuple[float, ...]
 ) -> None:
     market = quoted(history_on(as_of, 2), *quotes)
-    price = quote_by_dates(market, START, END, window_quote(2), None, WorkCounter())
+    price = quote_by_dates(market, START, END, window_quote(2), "flat", None, WorkCounter())
     ticket: dict[str, list[object]] = {**rows_over((2.0,)), "fixed_price": [price]}
     batch, _ = created(ROLL, ticket, WINDOW)
     assert valued(batch, market).mark == pytest.approx(0.0, abs=1e-9)
@@ -107,7 +107,7 @@ def test_once_a_month_has_paid_the_mark_and_the_cash_are_equal_and_opposite() ->
     # amount, 4.82707510, so the two sum to nothing and neither is nothing alone.
     market = quoted(history_on("2026-07-06", 2), 81.0, 83.0, 85.0)
     june, july = 1_605 / 22, 1_900 / 23
-    price = quote(market, "M26-N26", monthly_quote(2), None, WorkCounter())
+    price = quote(market, "M26-N26", monthly_quote(2), "flat", None, WorkCounter())
     assert price == pytest.approx((june + july) / 2) and price == pytest.approx(77.78162055)
     terms: dict[str, object] = {
         "quantity_unit": "BBL",
@@ -138,7 +138,7 @@ def test_once_a_month_has_paid_the_mark_and_the_cash_are_equal_and_opposite() ->
     # The same strip quoted and booked on 12 June, June part fixed and both payments ahead:
     # nothing of mark and nothing of cash.
     early = quoted(history_on(JUNE_12, 2), 80.0, 81.0, 83.0, 85.0)
-    fair = quote(early, "M26-N26", monthly_quote(2), None, WorkCounter())
+    fair = quote(early, "M26-N26", monthly_quote(2), "flat", None, WorkCounter())
     ahead, _ = created(ROLL, {**ticket, "fixed_price": [fair]}, terms)
     before = valued(ahead, early)
     assert (before.mark, before.cash) == (pytest.approx(0.0, abs=1e-9), 0.0)
@@ -163,8 +163,12 @@ def test_a_label_and_a_request_read_the_next_contract_on_every_day_of_the_month(
     # July by its label, valued 12 June with M26 at 80, N26 at 81, Q26 at 83 and U26 at 85: the
     # roll falls inside the month, and each nearby moves on with the prompt.
     market = quoted(history_on(JUNE_12, 2), 80.0, 81.0, 83.0, 85.0)
-    assert quote(market, "N26", monthly_quote(1), None, WorkCounter()) == pytest.approx(JULY_FIRST)
-    assert quote(market, "N26", monthly_quote(2), None, WorkCounter()) == pytest.approx(JULY_SECOND)
+    assert quote(market, "N26", monthly_quote(1), "flat", None, WorkCounter()) == pytest.approx(
+        JULY_FIRST
+    )
+    assert quote(market, "N26", monthly_quote(2), "flat", None, WorkCounter()) == pytest.approx(
+        JULY_SECOND
+    )
     # The same month as a request's row, the request saved once and priced on the market, and its
     # readback showing the nearby last.
     saved = rfq(
@@ -173,7 +177,7 @@ def test_a_label_and_a_request_read_the_next_contract_on_every_day_of_the_month(
         monthly_quote(2),
         WorkCounter(),
     )
-    assert quote_rfq(market, saved, None, WorkCounter()) == pytest.approx(JULY_SECOND)
+    assert quote_rfq(market, saved, "flat", None, WorkCounter()) == pytest.approx(JULY_SECOND)
     table = shown(saved)
     width = table.kinds.shape[1]
     assert list(table.texts)[width - 2 : width] == ["settlement_frequency", "nearby"]
@@ -183,7 +187,7 @@ def test_a_label_and_a_request_read_the_next_contract_on_every_day_of_the_month(
 def test_a_later_nearby_is_refused_by_name_where_a_quote_does_not_price_it() -> None:
     market = quoted(history_on(JUNE_12, 2), 80.0, 81.0, 83.0, 85.0)
     with pytest.raises(ValueError) as refusal:
-        quote(market, "N26", monthly_quote(2, "lastday"), None, WorkCounter())
+        quote(market, "N26", monthly_quote(2, "lastday"), "flat", None, WorkCounter())
     assert str(refusal.value) == f"nearby of the quote is 2, {NOT_ASIAN}"
     with pytest.raises(ValueError) as refusal:
         rfq(
@@ -202,13 +206,13 @@ def test_a_later_nearby_is_refused_by_name_where_a_quote_does_not_price_it() -> 
         nearby=2,
     )
     with pytest.raises(ValueError) as refusal:
-        quote(market, "N26", physical, None, WorkCounter())
+        quote(market, "N26", physical, "flat", None, WorkCounter())
     assert str(refusal.value) == (
         "nearby of the quote is 2, expected 1 under settlement_method = physical; a physical "
         "position delivers its own contract, and a later nearby is cash settled on its average"
     )
     # The expiry-based methods and a physical quote stand at the first nearby, as they did.
-    assert quote(market, "N26", monthly_quote(1, "lastday"), None, WorkCounter()) == 81.0
+    assert quote(market, "N26", monthly_quote(1, "lastday"), "flat", None, WorkCounter()) == 81.0
 
 
 def test_a_quote_past_the_schedule_the_history_or_the_live_prices_is_refused() -> None:
@@ -218,7 +222,9 @@ def test_a_quote_past_the_schedule_the_history_or_the_live_prices_is_refused() -
         **{**dict(window_quote(2).values), "payment_day": DayOrRule(None, "+2bd")}
     )
     with pytest.raises(ValueError) as refusal:
-        quote_by_dates(market, day("2026-08-14"), day("2026-08-17"), rule, None, WorkCounter())
+        quote_by_dates(
+            market, day("2026-08-14"), day("2026-08-17"), rule, "flat", None, WorkCounter()
+        )
     assert str(refusal.value) == (
         "2026-08-14 to 2026-08-17 observes 2026-08-17 at nearby 2, expected at most 1 that day, "
         "'U26' being prompt and 'U26' the schedule's last contract; the schedule lists no "
@@ -227,7 +233,7 @@ def test_a_quote_past_the_schedule_the_history_or_the_live_prices_is_refused() -
     # A history of the prompt's settles alone holds no settle of the second nearby.
     alone = quoted(history_on(JUNE_17, 1), 81.5, 83.5)
     with pytest.raises(ValueError) as refusal:
-        quote_by_dates(alone, START, END, window_quote(2), None, WorkCounter())
+        quote_by_dates(alone, START, END, window_quote(2), "flat", None, WorkCounter())
     assert str(refusal.value) == (
         "requested fixing of 'N26' on 2026-06-15 is the 2nd nearby's, 'M26' being prompt that "
         "day, beyond the 1 settle a day the history holds; expected fixings with a settle "
@@ -236,5 +242,5 @@ def test_a_quote_past_the_schedule_the_history_or_the_live_prices_is_refused() -
     # Live prices of M26 and N26 alone: the second nearby's 16 June reads Q26.
     short = quoted(history_on(JUNE_12, 2), 80.0, 81.0)
     with pytest.raises(ValueError, match="requested contract 'Q26' is beyond live-price coverage"):
-        quote_by_dates(short, START, END, window_quote(2), None, WorkCounter())
-    assert quote_by_dates(short, START, END, window_quote(1), None, WorkCounter()) == 80.5
+        quote_by_dates(short, START, END, window_quote(2), "flat", None, WorkCounter())
+    assert quote_by_dates(short, START, END, window_quote(1), "flat", None, WorkCounter()) == 80.5

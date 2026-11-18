@@ -99,7 +99,7 @@ def dated(
     end: np.datetime64 = END,
     counter: WorkCounter | None = None,
 ) -> float:
-    return quote_by_dates(market, start, end, template, curves, counter or WorkCounter())
+    return quote_by_dates(market, start, end, template, "flat", curves, counter or WorkCounter())
 
 
 def counts_of(
@@ -370,7 +370,7 @@ def test_the_dates_and_the_terms_are_refused_by_name() -> None:
     # A label names months: _Quote refuses the onetime template and names the function that
     # prices a window.
     with pytest.raises(ValueError) as by_label:
-        quote(MARKET, "K26-M26", terms(), None, WorkCounter())
+        quote(MARKET, "K26-M26", terms(), "flat", None, WorkCounter())
     assert str(by_label.value) == (
         "settlement_frequency is 'onetime', expected 'monthly'; a quote by contract code prices "
         "by the month, and _QuoteByDates prices a onetime period across two dates"
@@ -407,27 +407,27 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         row("cleared", "financial", "asian", "month", "+2bd", holidays, "monthly", 1.0),
     )
     start, end = serial("2026-05-26"), serial("2026-06-25")
-    assert ENTRY["_QuoteByDates"](market, start, end, onetime, bridge.MISSING) == pytest.approx(
-        PROJECTED, **CLOSE
-    )
-    assert ENTRY["_QuoteByDates"](market, start, end, monthly, bridge.MISSING) == pytest.approx(
-        BY_MONTH, **CLOSE
-    )
+    assert ENTRY["_QuoteByDates"](
+        market, start, end, onetime, "flat", bridge.MISSING
+    ) == pytest.approx(PROJECTED, **CLOSE)
+    assert ENTRY["_QuoteByDates"](
+        market, start, end, monthly, "flat", bridge.MISSING
+    ) == pytest.approx(BY_MONTH, **CLOSE)
     # The seam's refusals in signature order, then the library's with its prefix.
-    assert ENTRY["_QuoteByDates"](None, start, end, onetime, bridge.MISSING) == (
+    assert ENTRY["_QuoteByDates"](None, start, end, onetime, "flat", bridge.MISSING) == (
         "#ERROR _QuoteByDates: market is blank, expected market handle"
     )
-    assert ENTRY["_QuoteByDates"](market, None, end, onetime, bridge.MISSING) == (
+    assert ENTRY["_QuoteByDates"](market, None, end, onetime, "flat", bridge.MISSING) == (
         "#ERROR _QuoteByDates: start_date is blank, expected date"
     )
-    assert ENTRY["_QuoteByDates"](market, start, "2026-06-25", onetime, bridge.MISSING) == (
+    assert ENTRY["_QuoteByDates"](market, start, "2026-06-25", onetime, "flat", bridge.MISSING) == (
         "#ERROR _QuoteByDates: end_date is text '2026-06-25', expected date"
     )
-    assert ENTRY["_QuoteByDates"](market, end, start, onetime, bridge.MISSING) == (
+    assert ENTRY["_QuoteByDates"](market, end, start, onetime, "flat", bridge.MISSING) == (
         "#ERROR _QuoteByDates: ValueError: end_date is 2026-05-26, expected a day on or after "
         "start_date, 2026-06-25"
     )
-    assert ENTRY["_Quote"](market, "K26-M26", onetime, bridge.MISSING) == (
+    assert ENTRY["_Quote"](market, "K26-M26", onetime, "flat", bridge.MISSING) == (
         "#ERROR _Quote: ValueError: settlement_frequency is 'onetime', expected 'monthly'; a "
         "quote by contract code prices by the month, and _QuoteByDates prices a onetime period "
         "across two dates"

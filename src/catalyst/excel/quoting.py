@@ -5,7 +5,9 @@ named discount curves when the template's route is bilateral; since dated-quotes
 dates, the same price for the days between two dates, one average over the window under a
 onetime template; and since rfq-quoting.md the request for quote, a saved quantity and payment
 schedule on one index under a template's terms, and its price on a market by the quote's
-calculation. docs/library/quoting/ holds a page per function.
+calculation; since fit-to-curve-price.md each of the three quotes takes the pricing, flat or
+ftc, the one fixed price or the fit-to-curve one. docs/library/quoting/ holds a page per
+function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
 what it shows about that argument as a person types the formula. How to write a line is
@@ -70,17 +72,23 @@ def _Quote(
         "The quote-template handle: the cell showing _CreateQuoteTemplate's result, such as B3, "
         "or a name for it, which supplies the quote's terms.",
     ],
+    pricing: Annotated[
+        str,
+        "The price to quote, flat or ftc: flat is one fixed price for the whole period, each "
+        "month weighed by its quantity and its payment's discount factor; ftc, fit to curve, is "
+        "the months' own prices averaged by quantity alone.",
+    ],
     discount_curve_set: Annotated[
         Handle[DiscountCurveSet] | None,
-        "The collection handle for a bilateral quote: the cell showing _CollectDiscountCurves's "
-        "result, such as I13, or a name for it, holding the curve the template names; left out "
-        "for a cleared quote.",
+        "The collection handle for a bilateral quote, under either pricing: the cell showing "
+        "_CollectDiscountCurves's result, such as I13, or a name for it, holding the curve the "
+        "template names; left out for a cleared quote.",
     ] = None,
 ) -> float:
-    """Quotes one whole-period fixed price for a contract or strip on one market from a quote
-    template's terms, fixings for the observations that have passed and the day's quotes for the
-    rest, a bilateral payment discounted on the template's curve."""
-    return quote(market, contract_code, template, discount_curve_set, WorkCounter())
+    """Quotes one fixed price, flat or fit to curve, for a contract or strip on a market from a
+    quote template's terms, fixings for the observations that have passed and the day's quotes
+    for the rest, a flat bilateral price discounted on the template's curve."""
+    return quote(market, contract_code, template, pricing, discount_curve_set, WorkCounter())
 
 
 @excel_function
@@ -101,17 +109,25 @@ def _QuoteByDates(
         "or a name for it, whose settlement_frequency makes the days one average or a strip by "
         "the month.",
     ],
+    pricing: Annotated[
+        str,
+        "The price to quote, flat or ftc: flat is one fixed price for the days, each component "
+        "weighed by its quantity and its payment's discount factor; ftc, fit to curve, is the "
+        "components' own prices averaged by quantity alone.",
+    ],
     discount_curve_set: Annotated[
         Handle[DiscountCurveSet] | None,
-        "The collection handle for a bilateral quote: the cell showing _CollectDiscountCurves's "
-        "result, such as I13, or a name for it, holding the curve the template names; left out "
-        "for a cleared quote.",
+        "The collection handle for a bilateral quote, under either pricing: the cell showing "
+        "_CollectDiscountCurves's result, such as I13, or a name for it, holding the curve the "
+        "template names; left out for a cleared quote.",
     ] = None,
 ) -> float:
-    """Quotes one fixed price from start_date to end_date on one market from a quote template's
-    terms, one average over the window under onetime and a strip by the month under monthly,
-    fixings for the days passed and the day's quotes for the rest."""
-    return quote_by_dates(market, start_date, end_date, template, discount_curve_set, WorkCounter())
+    """Quotes one fixed price, flat or fit to curve, from start_date to end_date on a market
+    under a quote template, one average over the window under onetime and a strip by the month
+    under monthly, fixings for days passed and the day's quotes for the rest."""
+    return quote_by_dates(
+        market, start_date, end_date, template, pricing, discount_curve_set, WorkCounter()
+    )
 
 
 @excel_function
@@ -154,14 +170,20 @@ def _QuoteRFQ(
         Handle[Rfq],
         "The request handle: the cell showing _CreateRFQ's result, such as B5, or a name for it.",
     ],
+    pricing: Annotated[
+        str,
+        "The price to quote, flat or ftc: flat is one fixed price for the request, each component "
+        "weighed by its quantity and its payment's discount factor; ftc, fit to curve, is the "
+        "components' own prices averaged by quantity alone.",
+    ],
     discount_curve_set: Annotated[
         Handle[DiscountCurveSet] | None,
-        "The collection handle for a bilateral request: the cell showing _CollectDiscountCurves's "
-        "result, such as I13, or a name for it, holding the curve the template names; left out "
-        "for a cleared request.",
+        "The collection handle for a bilateral request, under either pricing: the cell showing "
+        "_CollectDiscountCurves's result, such as I13, or a name for it, holding the curve the "
+        "template names; left out for a cleared request.",
     ] = None,
 ) -> float:
-    """Quotes one fixed price for a saved request on one market, each month at its quantity,
-    fixings for the observations that have passed and the day's quotes for the rest, a bilateral
-    payment discounted on the template's curve on each month's own day."""
-    return quote_rfq(market, rfq, discount_curve_set, WorkCounter())
+    """Quotes one fixed price, flat or fit to curve, for a saved request on one market, each
+    month at its quantity, fixings for the observations that have passed and the day's quotes
+    for the rest, a flat bilateral price discounted on each month's own day."""
+    return quote_rfq(market, rfq, pricing, discount_curve_set, WorkCounter())

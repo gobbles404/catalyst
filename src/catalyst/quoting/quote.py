@@ -7,7 +7,9 @@ observations are made by the template's method through the batch pipeline's own 
 quantity one or its calendar days and its payment day the template's; the request is priced at
 once on the market by request.py's calculation, every component of the period in both sums
 whether its payment has passed or not, the agreed full-period convention: a paid month at its
-realized price and factor one, never dropped, renormalized or turned into a balance. Nothing is
+realized price and factor one, never dropped, renormalized or turned into a balance. Since
+fit-to-curve-price.md every quote says which price it asks for, flat or ftc, the one fixed price
+or the fit-to-curve one, the months' own prices averaged by quantity alone. Nothing is
 booked, retained or reported. docs/library/quoting/quote.md and
 docs/library/quoting/quote-by-dates.md are the pages."""
 
@@ -20,9 +22,11 @@ from catalyst.index_definitions.periods import end_date, start_date
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market.market import Market
 from catalyst.quoting.request import (
+    Pricing,
     Terms,
     by_the_month,
     priced,
+    pricing_of,
     the_curve,
     the_frequency,
     the_method,
@@ -41,15 +45,17 @@ def quote(
     market: Market,
     contract_code: str,
     template: QuoteTemplate,
+    pricing: str,
     curve_set: DiscountCurveSet | None,
     counter: WorkCounter,
 ) -> float:
     """The price of the period on the market under the template's terms, the rules in this
-    order, the first failure being the message: the template holds every term a completed quote
-    requires and none it refuses, and the terms agree; the template's frequency is monthly,
-    since a label names months and _QuoteByDates prices a window, and its basis month or calday,
-    the kernel's rule; the collection is supplied for a bilateral quote and left out for a
-    cleared one, the key bound to the curve of that exact name and the curve starting on the
+    order, the first failure being the message: since fit-to-curve-price.md the pricing is
+    flat or ftc, read once; the template holds every term a completed quote requires and none
+    it refuses, and the terms agree; the template's frequency is monthly, since a label names
+    months and _QuoteByDates prices a window, and its basis month or calday, the kernel's rule;
+    the collection is supplied for a bilateral quote and left out for a cleared one, under
+    either pricing, the key bound to the curve of that exact name and the curve starting on the
     valuation day; the market's index takes the terms, a futures index the four methods and an
     IFERC index lastday with a financial settlement, a physical settlement lastday alone; the
     period, a label or since balance-of-period-quotes.md the balance of one from the valuation
@@ -58,13 +64,15 @@ def quote(
     every month or its rule's day from each month's last observation, after each month's last
     observation, within the sheet's calendar; then the request priced on the market, its
     calendar rows, a fixed day's price off the history and a live day's off the market's quotes,
-    a physical quote's contracts not yet expired, and the selected curve covering every payment
-    after the valuation day."""
+    a physical quote's contracts not yet expired, and under flat the selected curve covering
+    every payment after the valuation day, which ftc, reading no factor, asks of no curve."""
+    chosen = pricing_of(pricing)
     terms = the_terms(template, counter)
     by_the_month(terms, "a quote by contract code")
     return _priced(
         market,
         terms,
+        chosen,
         curve_set,
         lambda as_of: _the_span(contract_code, as_of),
         lambda: f"contract_code is {contract_code!r}",
@@ -77,12 +85,14 @@ def quote_by_dates(
     start: np.datetime64,
     end: np.datetime64,
     template: QuoteTemplate,
+    pricing: str,
     curve_set: DiscountCurveSet | None,
     counter: WorkCounter,
 ) -> float:
     """The price of the days from start to end on the market under the template's terms, since
     dated-quotes.md, the quote's rules in the quote's order but for the period, which the two
-    dates give: the terms complete and agreeing; the frequency with the terms it stands under,
+    dates give: the pricing flat or ftc, as a quote's; the terms complete and agreeing; the
+    frequency with the terms it stands under,
     the kernel's rule, a onetime period on a futures index alone, financially settled, under
     asian and in a quantity of period or calday, and a monthly one in a quantity of month or
     calday; the collection as the route takes it; the index taking the terms; then the period,
@@ -93,11 +103,14 @@ def quote_by_dates(
     days, a window opening after the last day the schedule's contracts price refused; the
     observations, the payments, from the window's final observation under onetime, and the
     request priced as a quote's is. Under monthly the same dates quote a dated strip, each month
-    its own average; under onetime one average over every pricing day of the window."""
+    its own average; under onetime one average over every pricing day of the window, one
+    component, whose price is the same under either pricing."""
+    chosen = pricing_of(pricing)
     terms = the_terms(template, counter)
     return _priced(
         market,
         terms,
+        chosen,
         curve_set,
         lambda _: _the_dates(start, end),
         lambda: f"start_date is {start} and end_date {end}",
@@ -108,14 +121,15 @@ def quote_by_dates(
 def _priced(
     market: Market,
     terms: Terms,
+    pricing: Pricing,
     curve_set: DiscountCurveSet | None,
     span: Callable[[np.datetime64], Span],
     period_of: Callable[[], str],
     counter: WorkCounter,
 ) -> float:
-    """The steps a label and two dates share once the terms are read: the frequency's rules, the
-    curve, the index's kind, the span read with the valuation day, resolved under the frequency
-    and priced."""
+    """The steps a label and two dates share once the pricing and the terms are read: the
+    frequency's rules, the curve, the index's kind, the span read with the valuation day,
+    resolved under the frequency and priced under the pricing."""
     calendar = market.market_history.calendar
     index = calendar.index
     as_of = calendar.valuation_date.as_of
@@ -127,7 +141,7 @@ def _priced(
     first_day, last_day = span(as_of)
     period = the_period(first_day, last_day, terms.frequency, schedule, period_of, counter)
     request = the_request(index, schedule, terms, period, counter)
-    return priced(request, market, curve, counter)
+    return priced(request, market, curve, pricing, counter)
 
 
 # --- the span ------------------------------------------------------------------------------------

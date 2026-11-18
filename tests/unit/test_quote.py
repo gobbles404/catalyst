@@ -187,7 +187,7 @@ def quote_on(
     curves: DiscountCurveSet | None = None,
     counter: WorkCounter | None = None,
 ) -> float:
-    return quote(market, code, template, curves, counter or WorkCounter())
+    return quote(market, code, template, "flat", curves, counter or WorkCounter())
 
 
 def refused(
@@ -715,7 +715,7 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
         "F27",
         bilateral(),
         "discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' "
-        "with route = bilateral, whose payments it discounts",
+        "with route = bilateral, under flat and ftc alike",
     )
     refused(
         m,
@@ -1095,34 +1095,34 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         cells_of([serial(DEC_31), 1.0], [serial("2027-02-01"), 0.99], [serial("2027-03-01"), 0.98]),
     )
     rates = ENTRY["_CollectDiscountCurves"](cells_of([sofr]))
-    assert ENTRY["_Quote"](market, "F27-G27", cleared, bridge.MISSING) == pytest.approx(
+    assert ENTRY["_Quote"](market, "F27-G27", cleared, "flat", bridge.MISSING) == pytest.approx(
         CALDAY_CLEARED, **CLOSE
     )
-    assert ENTRY["_Quote"](market, "F27-G27", otc, rates) == pytest.approx(
+    assert ENTRY["_Quote"](market, "F27-G27", otc, "flat", rates) == pytest.approx(
         CALDAY_BILATERAL, **CLOSE
     )
     # The seam's refusals in signature order, then the library's with its prefix; a trade
     # template is refused by its kind, and a blank fourth cell is not a left-out one.
     assert (
-        ENTRY["_Quote"](None, "F27", cleared, bridge.MISSING)
+        ENTRY["_Quote"](None, "F27", cleared, "flat", bridge.MISSING)
         == "#ERROR _Quote: market is blank, expected market handle"
     )
-    assert ENTRY["_Quote"](market, 1.0, cleared, bridge.MISSING) == (
+    assert ENTRY["_Quote"](market, 1.0, cleared, "flat", bridge.MISSING) == (
         "#ERROR _Quote: contract_code is number 1.0, expected text"
     )
     trade = ENTRY["_CreateTradeTemplate"]("fixed_float", row("route"), row("cleared"))
-    assert ENTRY["_Quote"](market, "F27", trade, bridge.MISSING) == (
+    assert ENTRY["_Quote"](market, "F27", trade, "flat", bridge.MISSING) == (
         f"#ERROR _Quote: template is trade template handle {trade!r}, expected quote template "
         "handle"
     )
-    assert ENTRY["_Quote"](market, "F27", otc, None) == (
+    assert ENTRY["_Quote"](market, "F27", otc, "flat", None) == (
         "#ERROR _Quote: discount_curve_set is blank, expected discount curve set handle"
     )
-    assert ENTRY["_Quote"](market, "F27", otc, bridge.MISSING) == (
+    assert ENTRY["_Quote"](market, "F27", otc, "flat", bridge.MISSING) == (
         "#ERROR _Quote: ValueError: discount_curve_set is missing, expected a collection of "
-        "discount curves holding 'SOFR' with route = bilateral, whose payments it discounts"
+        "discount curves holding 'SOFR' with route = bilateral, under flat and ftc alike"
     )
-    assert ENTRY["_Quote"](market, "CAL28", cleared, bridge.MISSING) == (
+    assert ENTRY["_Quote"](market, "CAL28", cleared, "flat", bridge.MISSING) == (
         "#ERROR _Quote: ValueError: contract_code is 'CAL28', expected months the index's "
         "schedule has a contract for; it has none for 2028-01"
     )

@@ -438,7 +438,7 @@ def test_a_quote_template_is_required_to_hold_the_field() -> None:
     }
     start, end = day("2026-06-15"), day("2026-06-16")
     with pytest.raises(ValueError) as refusal:
-        quote_by_dates(market, start, end, a_quote_template(**terms), None, WorkCounter())
+        quote_by_dates(market, start, end, a_quote_template(**terms), "flat", None, WorkCounter())
     assert str(refusal.value) == "nearby is missing, expected it in the quote template"
     first = a_quote_template(**terms, nearby=1)
-    assert quote_by_dates(market, start, end, first, None, WorkCounter()) == 80.5
+    assert quote_by_dates(market, start, end, first, "flat", None, WorkCounter()) == 80.5

@@ -10,8 +10,9 @@ the payment days made from the template or taken from the request, exactly and n
 and the request's pricing form retained, request.py's, with no history, price, factor or
 valuation day. Priced on any market over the request's exact index by the quote's own
 calculation, each component at its quantity, the market supplying the day, the history and the
-quotes on each call. Read back with its entered and resolved facts and the source of its payment
-days, and nothing priced. docs/library/quoting/rfq.md is the page."""
+quotes on each call, and since fit-to-curve-price.md the caller the pricing, flat or ftc, one
+saved request serving both. Read back with its entered and resolved facts and the source of its
+payment days, and nothing priced. docs/library/quoting/rfq.md is the page."""
 
 from dataclasses import dataclass
 from enum import Enum
@@ -35,6 +36,7 @@ from catalyst.quoting.request import (
     Request,
     component_words,
     priced,
+    pricing_of,
     the_curve,
     the_frequency,
     the_method,
@@ -202,14 +204,21 @@ def rfq(index: Index, ticket: FieldValues, template: QuoteTemplate, counter: Wor
 
 
 def quote_rfq(
-    market: Market, request: Rfq, curve_set: DiscountCurveSet | None, counter: WorkCounter
+    market: Market,
+    request: Rfq,
+    pricing: str,
+    curve_set: DiscountCurveSet | None,
+    counter: WorkCounter,
 ) -> float:
-    """The price of a saved request on a market: the market's index is the request's, the one
-    object, before any data is gathered; the collection is supplied for a bilateral request and
-    left out for a cleared one, the key bound to the curve of that exact name and the curve
-    starting on the valuation day; then the retained form priced on the market by the quote's
-    calculation, nothing of the period, the observations or the payments made again. Work: the
-    curve selected, the fixings and live prices read and the factors read, as a quote's."""
+    """The price of a saved request on a market: since fit-to-curve-price.md the pricing is flat
+    or ftc, read once, the request the same under either and saved knowing neither; the market's
+    index is the request's, the one object, before any data is gathered; the collection is
+    supplied for a bilateral request and left out for a cleared one, under either pricing, the
+    key bound to the curve of that exact name and the curve starting on the valuation day; then
+    the retained form priced on the market by the quote's calculation, nothing of the period,
+    the observations or the payments made again. Work: the curve selected, the fixings and live
+    prices read and, under flat, the factors read, as a quote's."""
+    chosen = pricing_of(pricing)
     index = market.market_history.calendar.index
     mine = request.request.index
     if index is not mine:
@@ -218,7 +227,7 @@ def quote_rfq(
         )
     as_of = market.market_history.calendar.valuation_date.as_of
     curve = the_curve(request.request.terms, curve_set, as_of, counter)
-    return priced(request.request, market, curve, counter)
+    return priced(request.request, market, curve, chosen, counter)
 
 
 # --- the ticket --------------------------------------------------------------------------------

@@ -1477,9 +1477,9 @@ $quotes = {
     Put $state $sheet "W3" "23-Jun-2026"; Put $state $sheet "X3" "0.98"
     Put $state $sheet "W4" "22-Jul-2026"; Put $state $sheet "X4" "0.98"
     Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",HSTACK(K26:P26,R26,"nearby"),HSTACK(K27:P27,R27,1))'
-    Put $state $sheet "D27" '=_Quote(D11,"n26-q26",D26)'
+    Put $state $sheet "D27" '=_Quote(D11,"n26-q26",D26,"flat")'
     Put $state $sheet "D28" '=TEXT(D27,"0.0000")'
-    Put $state $sheet "D34" '=_QuoteByDates(D11,DATE(2026,7,1),DATE(2026,8,31),D26)'
+    Put $state $sheet "D34" '=_QuoteByDates(D11,DATE(2026,7,1),DATE(2026,8,31),D26,"flat")'
     $id = Id $state
     $template = Text $state $sheet "D26"
     Check "the template's cell shows its handle, the kind and the count alone" ($template.StartsWith("${id}:quote_template:")) $template
@@ -1514,7 +1514,7 @@ $quotes = {
     Put $state $sheet "D29" '=_CreateQuoteTemplate("fixed_float",HSTACK(K26:R26,"nearby"),HSTACK(K28:R28,1))'
     Put $state $sheet "D30" '=_CreateDiscountCurve("SOFR",W1:X1,W2:X4)'
     Put $state $sheet "E30" "=_CollectDiscountCurves(D30)"
-    Put $state $sheet "D31" '=_Quote(D11,"n26-q26",D29,E30)'
+    Put $state $sheet "D31" '=_Quote(D11,"n26-q26",D29,"flat",E30)'
     Put $state $sheet "D32" '=TEXT(D31,"0.0000")'
     Check "the bilateral template, the curve and the collection show their kinds" ((Text $state $sheet "D29").StartsWith("${id}:quote_template:") -and (Text $state $sheet "D30").StartsWith("${id}:discount_curve:SOFR:") -and (Text $state $sheet "E30").StartsWith("${id}:discount_curve_set:")) ((Text $state $sheet "D29") + " " + (Text $state $sheet "E30"))
     Check "one factor on both payments cancels: the bilateral strip quotes the cleared 72.45" ((Text $state $sheet "D31") -eq "72.45") (Text $state $sheet "D31")
@@ -1707,10 +1707,10 @@ $rfq = {
     Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",HSTACK(K26:Q26,"nearby"),HSTACK(K27:Q27,1))'
     Put $state $sheet "K29" "contract_code"; Put $state $sheet "L29" "quantity"; Put $state $sheet "M29" "payment_day"
     Put $state $sheet "D33" "=_CreateRFQ(D5,K29:L29,K30:L31,D26)"
-    Put $state $sheet "D34" "=_QuoteRFQ(D11,D33)"
+    Put $state $sheet "D34" '=_QuoteRFQ(D11,D33,"flat")'
     Put $state $sheet "D35" "=INDEX(util_ReadHandle(D33),4,5)"
     Put $state $sheet "D36" "=_CreateRFQ(D5,K29:M29,K30:M31,D26)"
-    Put $state $sheet "D37" "=_QuoteRFQ(D11,D36)"
+    Put $state $sheet "D37" '=_QuoteRFQ(D11,D36,"flat")'
     Put $state $sheet "D38" "=INDEX(util_ReadHandle(D36),3,6)"
     $id = Id $state
     $saved = Text $state $sheet "D33"

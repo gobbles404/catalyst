@@ -11,13 +11,17 @@ components, and the pricing of a resolved request on a market:
     K   = sum(q_i D_i P_i) / sum(q_i D_i)
 
 in the index's quote units, every component in both sums whether its payment has passed or
-not, the agreed full-period convention. A quote resolves its period to a request on each call
+not, the agreed full-period convention. Since fit-to-curve-price.md the caller says which of
+two prices it asks for: flat, the one fixed price above, and ftc, fit to curve, the same sums
+with every D_i taken as 1, the components' own prices averaged by quantity alone, which reads
+no factor of any curve. A quote resolves its period to a request on each call
 and prices it at once, quote.py; a request for quote retains one and prices it on each market,
 rfq.py. docs/library/quoting/quote.md owns the calculation, docs/library/quoting/quote-by-dates.md
 the dated quote and docs/library/quoting/rfq.md the request."""
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from enum import Enum
 from typing import Final, assert_never, cast
 
 import numpy as np
@@ -54,6 +58,7 @@ from catalyst.trades.resolution import (
 from catalyst.trades.schedule_methods import METHODS, ScheduleMethod
 from catalyst.trades.template import (
     DayOrRule,
+    choice,
     payment_rule_of,
     quantity_per_of,
     route_of,
@@ -86,6 +91,23 @@ OBSERVATIONS_MADE: Final = "observations_made"  # observations made over the com
 PAYMENT_DAYS_MADE: Final = "payment_days_made"  # one per month of a financial quote or request
 PRICE_REDUCTIONS: Final = "price_reductions"  # the reductions formed: the months' prices,
 # the largest weight's exponent, the weights and the price
+
+
+class Pricing(Enum):
+    """Which one price a quote or a request asks for, since fit-to-curve-price.md, the caller's
+    choice on every call and no term of the template: flat, one fixed price for the whole
+    period, each component weighed by its quantity and its payment's factor; or ftc, fit to
+    curve, the summary of a fixed price per component set at that component's own price, the
+    components weighed by quantity alone."""
+
+    FLAT = "flat"
+    FTC = "ftc"
+
+
+def pricing_of(text: str) -> Pricing:
+    """The pricing a caller typed, one of the two words exactly, case and all, any other text
+    refused by name in the words every choice of the library is refused in."""
+    return choice("pricing", text, Pricing, "flat or ftc")
 
 
 @dataclass(frozen=True, slots=True)
@@ -319,11 +341,13 @@ def _shown(value: object) -> str:
 def the_curve(
     terms: Terms, curve_set: DiscountCurveSet | None, as_of: np.datetime64, counter: WorkCounter
 ) -> DiscountCurve | None:
-    """The curve a bilateral quote discounts on, bound once from the collection by the template's
+    """The curve a bilateral quote is given, bound once from the collection by the template's
     key, exactly, case and all, no fallback to the first curve, a collection of one included,
     and starting on the valuation day, never rebased; the collection is required with a bilateral
-    quote and refused with a cleared one, which discounts nothing. Its coverage is checked once
-    the payment days are known, and no other curve of the collection is read."""
+    quote and refused with a cleared one, which discounts nothing. Since fit-to-curve-price.md
+    it is taken the same way under either pricing, so one formula serves both: a flat price
+    discounts on it, its coverage checked once the payment days are known, and a fit-to-curve
+    price reads no factor of it. No other curve of the collection is read."""
     match terms.route:
         case Route.CLEARED:
             if curve_set is not None:
@@ -338,7 +362,7 @@ def the_curve(
             if curve_set is None:
                 raise ValueError(
                     f"discount_curve_set is missing, expected a collection of discount curves "
-                    f"holding {key!r} with route = bilateral, whose payments it discounts"
+                    f"holding {key!r} with route = bilateral, under flat and ftc alike"
                 )
             curve = next((each for each in curve_set.curves if each.name == key), None)
             if curve is None:
@@ -570,15 +594,21 @@ def the_payments(
 
 
 def priced(
-    request: Request, market: Market, curve: DiscountCurve | None, counter: WorkCounter
+    request: Request,
+    market: Market,
+    curve: DiscountCurve | None,
+    pricing: Pricing,
+    counter: WorkCounter,
 ) -> float:
-    """The price of a resolved request on a market, under the curve its terms bound: the
-    observations' calendar rows on the market's calendar, a day before it refused by name; a
-    fixed day's price off the history and a live day's off the market's quotes, each distinct
-    live contract once; a physical request's contracts not yet expired; a financial one's
-    payment factors, the selected curve covering every payment after the valuation day; then
-    each month's price and its share. Each month's share is its weight, quantity times factor,
-    over the weights' sum, and the price the shares' sum of the months' prices: a convex
+    """The price of a resolved request on a market, under the curve its terms bound and the
+    pricing its caller chose: the observations' calendar rows on the market's calendar, a day
+    before it refused by name; a fixed day's price off the history and a live day's off the
+    market's quotes, each distinct live contract once; a physical request's contracts not yet
+    expired; a financial one's payment factors, under flat the selected curve covering every
+    payment after the valuation day, and under ftc, since fit-to-curve-price.md, one for every
+    payment, no factor read and no coverage asked of the curve; then each month's price and
+    its share. Each month's share is its weight, quantity times factor, over the weights' sum,
+    and the price the shares' sum of the months' prices: a convex
     combination at each step, the observations' weights summing to one and the shares to one.
     The weights are formed from the mantissas and exponents of the quantities and the factors
     apart, shifted by one power of two from the largest weight's exponent, so that the largest
@@ -606,7 +636,15 @@ def priced(
         _not_expired(observations, is_fixed, as_of, request.component)
         factor = np.ones(n)
     else:
-        factor = _the_factors(curve, request.terms.key, pays, as_of, request.component, counter)
+        match pricing:
+            case Pricing.FLAT:
+                factor = _the_factors(
+                    curve, request.terms.key, pays, as_of, request.component, counter
+                )
+            case Pricing.FTC:
+                factor = np.ones(n)
+            case _:
+                assert_never(pricing)
     # Each weight from the mantissas' product, a quarter to one for a month of something and
     # zero for a month of nothing, and the exponents' sum, shifted from the largest weight's: the
     # quantities hold at least one positive and the factors are all positive, so a largest

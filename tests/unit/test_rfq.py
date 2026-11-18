@@ -159,7 +159,7 @@ def price(
     curves: DiscountCurveSet | None = None,
     counter: WorkCounter | None = None,
 ) -> float:
-    return quote_rfq(market, saved, curves, counter or WorkCounter())
+    return quote_rfq(market, saved, "flat", curves, counter or WorkCounter())
 
 
 def refused(message: str, **made: Any) -> None:
@@ -583,7 +583,7 @@ def test_a_one_row_window_quotes_as_the_quote_by_dates_does() -> None:
             assert price(MARKET, saved, curves) == pytest.approx(WINDOW_PRICE, **CLOSE)
             assert price(MARKET, saved, curves) == pytest.approx(
                 quote_by_dates(
-                    MARKET, day(WINDOW[0]), day(WINDOW[1]), template, curves, WorkCounter()
+                    MARKET, day(WINDOW[0]), day(WINDOW[1]), template, "flat", curves, WorkCounter()
                 ),
                 **CLOSE,
             )
@@ -881,7 +881,7 @@ def test_the_template_the_index_and_the_market_refuse_as_a_quote_does() -> None:
         MARKET,
         saved,
         "discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' "
-        "with route = bilateral, whose payments it discounts",
+        "with route = bilateral, under flat and ftc alike",
     )
     refused_price(
         MARKET,
@@ -1000,10 +1000,14 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         ),
         otc_template,
     )
-    assert ENTRY["_QuoteRFQ"](market, saved, rates) == pytest.approx(DEFAULT_PRICE, **CLOSE)
-    assert ENTRY["_QuoteRFQ"](market, dated, rates) == pytest.approx(EXPLICIT_PRICE, **CLOSE)
+    assert ENTRY["_QuoteRFQ"](market, saved, "flat", rates) == pytest.approx(DEFAULT_PRICE, **CLOSE)
+    assert ENTRY["_QuoteRFQ"](market, dated, "flat", rates) == pytest.approx(
+        EXPLICIT_PRICE, **CLOSE
+    )
     one_cell = ENTRY["_CreateRFQ"](ix, by_code, cells_of(["G27", 5.0]), cleared_template)
-    assert ENTRY["_QuoteRFQ"](market, one_cell, bridge.MISSING) == pytest.approx(1.2, **CLOSE)
+    assert ENTRY["_QuoteRFQ"](market, one_cell, "flat", bridge.MISSING) == pytest.approx(
+        1.2, **CLOSE
+    )
     by_dates = row("start_date", "end_date", "quantity", "payment_day")
     windowed = ENTRY["_CreateRFQ"](
         ix,
@@ -1014,7 +1018,9 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         ),
         onetime_template,
     )
-    assert ENTRY["_QuoteRFQ"](market, windowed, rates) == pytest.approx(WINDOWS_PRICE, **CLOSE)
+    assert ENTRY["_QuoteRFQ"](market, windowed, "flat", rates) == pytest.approx(
+        WINDOWS_PRICE, **CLOSE
+    )
     table = spilled(ENTRY["util_ReadHandle"](dated))
     assert table[0][:7] == [
         "row",
@@ -1074,14 +1080,14 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "#ERROR _CreateRFQ: ValueError: payment_day row 1 is '+5bd', expected a date; a request's "
         "rows pay on dates, and a rule is the template's to hold"
     )
-    assert ENTRY["_QuoteRFQ"](market, saved, bridge.MISSING) == (
+    assert ENTRY["_QuoteRFQ"](market, saved, "flat", bridge.MISSING) == (
         "#ERROR _QuoteRFQ: ValueError: discount_curve_set is missing, expected a collection of "
-        "discount curves holding 'SOFR' with route = bilateral, whose payments it discounts"
+        "discount curves holding 'SOFR' with route = bilateral, under flat and ftc alike"
     )
-    assert ENTRY["_QuoteRFQ"](market, otc_template, rates) == (
+    assert ENTRY["_QuoteRFQ"](market, otc_template, "flat", rates) == (
         f"#ERROR _QuoteRFQ: rfq is quote template handle {otc_template!r}, expected rfq handle"
     )
-    assert ENTRY["_QuoteRFQ"](history, saved, rates) == (
+    assert ENTRY["_QuoteRFQ"](history, saved, "flat", rates) == (
         f"#ERROR _QuoteRFQ: market is market history handle {history!r}, expected market handle"
     )
     assert isinstance(saved, str) and PaymentSource.REQUEST.value == "request"

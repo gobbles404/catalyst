@@ -16,6 +16,7 @@ def _CreateRFQ(
 def _QuoteRFQ(
     market: Handle[Market],
     rfq: Handle[Rfq],
+    pricing: str,
     discount_curve_set: Handle[DiscountCurveSet] | None = None,
 ) -> float: ...
 ```
@@ -27,8 +28,8 @@ The ticket's example, the index in a cell named `propane_index`, its market in `
 | 1 | contract_code | quantity | payment_day | |
 | 2 | F27 | 100000 | 8-Feb-2027 | `=_CreateRFQ(propane_index, A1:B1, A2:B3, quote_template)` shows `30512:rfq:PROPANE:46` |
 | 3 | G27 | 300000 | 8-Mar-2027 | `=_CreateRFQ(propane_index, A1:C1, A2:C3, quote_template)` shows `30512:rfq:PROPANE:47` |
-| 4 | | | | `=_QuoteRFQ(propane_market, D2, rates)` shows 1.1492307692307693 |
-| 5 | | | | `=_QuoteRFQ(propane_market, D3, rates)` shows 1.1492227979274612 |
+| 4 | | | | `=_QuoteRFQ(propane_market, D2, "flat", rates)` shows 1.1492307692307693 |
+| 5 | | | | `=_QuoteRFQ(propane_market, D3, "flat", rates)` shows 1.1492227979274612 |
 
 And two windows by their dates under a template of the same terms holding `settlement_frequency = onetime` and `quantity_per = period` in `window_template`:
 
@@ -36,13 +37,13 @@ And two windows by their dates under a template of the same terms holding `settl
 |---|---|---|---|---|---|
 | 7 | start_date | end_date | quantity | payment_day | |
 | 8 | 11-Jan-2027 | 26-Feb-2027 | 100000 | 8-Mar-2027 | `=_CreateRFQ(propane_index, A7:D7, A8:D9, window_template)` shows `30512:rfq:PROPANE:48` |
-| 9 | 1-Feb-2027 | 12-Feb-2027 | 300000 | 5-Mar-2027 | `=_QuoteRFQ(propane_market, E8, rates)` shows 1.178737541528239 |
+| 9 | 1-Feb-2027 | 12-Feb-2027 | 300000 | 5-Mar-2027 | `=_QuoteRFQ(propane_market, E8, "flat", rates)` shows 1.178737541528239 |
 
 `_CreateRFQ` takes four arguments, all required. The index is the one of [_CreateIndex](../index-definitions/index.md), the cell showing its handle or a name for it, the one index every row is on; `_QuoteRFQ` holds the market to that exact object. The headers are one row of the `fixed_float`'s field names, exactly as [_ShowInstrument](../instruments/show-instrument.md) spells them, from the five a request's rows hold, `contract_code`, `start_date`, `end_date`, `quantity` and `payment_day`, in any order and any subset that gives every row a period and a quantity; any other field is a field of booking and refused by name. The rows are the rectangle under them, one row per entered row, bound by the headers as a booking's ticket is bound, [create-trades.md](../trades/create-trades.md): a cell's type follows its field, a code text, a quantity a number, a date a date, and only a cell of the three period fields may be left blank, since a row chooses its period from them. The template is a quote template and no other kind, [quote-template.md](quote-template.md); it supplies the request's terms, and its `settlement_frequency` says what each row's period is.
 
 Each row's period is chosen by booking's rule, since [dated-quotes.md](../../engineering-tickets/trade-valuation-pipeline/dated-quotes.md) the one rule a booking's rows and a request's share: a row with both dates books the days between them, a code beside them kept as entered text and never read; a row with neither books its code, read once per distinct text through the period grammar behind [util_StartDate](../utilities/start-date.md), `F27`, `g27`, `F27-G27` or `CAL27`, every month a contract of the index's schedule, a balance refused since a request has no valuation day; a row with one date and not the other, or with no code and no pair, is refused by the first such row from the top. The quantities are one number per row in one common unit, and the payment days, when the column is given, one date per row taken exactly; a template's rule stays in the template.
 
-`_QuoteRFQ` takes the market, the one of [_CreateMarket](../market/market.md) over the request's index, the request's handle, and the collection of [_CollectDiscountCurves](../globals/collect-discount-curves.md), required when the template's route is bilateral and left out when it is cleared, as `_Quote` takes it. The cell shows the number, in the index's quote units, exactly as `_Quote` shows one; nothing is published and nothing retained.
+`_QuoteRFQ` takes the market, the one of [_CreateMarket](../market/market.md) over the request's index, the request's handle, the pricing, `flat` or `ftc`, [quote.md](quote.md#the-pricing)'s two words, required and without a default, and the collection of [_CollectDiscountCurves](../globals/collect-discount-curves.md), required when the template's route is bilateral and left out when it is cleared, under either pricing, as `_Quote` takes it. The cell shows the number, in the index's quote units, exactly as `_Quote` shows one; nothing is published and nothing retained.
 
 ## Excel help
 
@@ -56,10 +57,11 @@ Each row's period is chosen by booking's rule, since [dated-quotes.md](../../eng
 
 | Item | Text |
 |---|---|
-| Function | Quotes one fixed price for a saved request on one market, each month at its quantity, fixings for the observations that have passed and the day's quotes for the rest, a bilateral payment discounted on the template's curve on each month's own day. |
+| Function | Quotes one fixed price, flat or fit to curve, for a saved request on one market, each month at its quantity, fixings for the observations that have passed and the day's quotes for the rest, a flat bilateral price discounted on each month's own day. |
 | market | The market handle over the request's index: the cell showing _CreateMarket's result, such as I12, or a name for it, with the day's quotes over the history they follow. |
 | rfq | The request handle: the cell showing _CreateRFQ's result, such as B5, or a name for it. |
-| [discount_curve_set] | The collection handle for a bilateral request: the cell showing _CollectDiscountCurves's result, such as I13, or a name for it, holding the curve the template names; left out for a cleared request. |
+| pricing | The price to quote, flat or ftc: flat is one fixed price for the request, each component weighed by its quantity and its payment's discount factor; ftc, fit to curve, is the components' own prices averaged by quantity alone. |
+| [discount_curve_set] | The collection handle for a bilateral request, under either pricing: the cell showing _CollectDiscountCurves's result, such as I13, or a name for it, holding the curve the template names; left out for a cleared request. |
 
 ## The rows under the template's frequency
 
@@ -85,6 +87,8 @@ K   = sum_i(q_i * D_i * P_i) / sum_i(q_i * D_i)
 ```
 
 Each component's weight, its quantity times its factor, is formed from the mantissas and exponents of the two apart and shifted by one power of two from the largest weight's exponent, so that the largest weight is at least a quarter and none is above one: a power of two moves the exponent alone, so every price is as the plain products give it, while no quantity or factor the inputs allow drives a positive weight below the smallest number or the weights' sum above the largest, a quantity of 1e300 or 1e-300 pricing as a convex combination like any other; a component whose weight is negligible beside the largest counts for nothing, as it should. Every component stands in both sums whether its payment has passed or not, the full-period convention of the quote.
+
+Since [fit-to-curve-price.md](../../engineering-tickets/trade-valuation-pipeline/fit-to-curve-price.md) the pricing is the caller's on each quote of the request, `flat` the price above and `ftc`, fit to curve, the same sums with every factor taken as 1, the components' own prices averaged by their quantities alone, [quote.md](quote.md#the-pricing). One saved request serves both: it is made knowing neither. The cleared rows of the two tables below are the `ftc` prices on either route, 1.15 for the months whichever days they pay on and `(100000 * 39/35 + 300000 * 1.20) / 400000` for the windows.
 
 The ticket's worked acceptance, a month-matching asian index valued 31 December 2026 with January at 1.00 and February at 1.20, last observations Friday 29 January and Friday 26 February, a weekend-only payment calendar, a template per month paying `+5bd` and, bilateral, keyed `SOFR`; the curve 1 on the valuation day and the four payment points, fixture data and no claim about any rate:
 
@@ -133,7 +137,7 @@ The rules in this order, the first failure being the cell's text after `#ERROR _
 | each quantity finite and zero or more, at least one positive, and under `calday` its product with the component's days finite | `quantity row 2 is -1.0, expected a finite number of zero or more; a request is a weighted quote, not a spread or a net position`; `quantity is zero on every row, expected at least one positive; a request of nothing has no price`; `quantity row 1 is 1e+308 per calendar day, expected a finite quantity for the period; times its 31 days it outruns the largest number` |
 | the observations and their pricing contracts by the pipeline's rules, each refusal naming the row and the window as a booking names it | `F27 of row 1 has no pricing day from 2027-01-01 to 2027-01-31, expected a Monday to Friday of the days it covers the index's market is open on; the asian method averages the pricing days a component covers`; `the window of row 1 has no pricing day from 2027-01-30 to 2027-01-31, expected ...` |
 | the request's payment days dates alone; each payment day after its component's last observation, the template's or the request's, a window named by its dates | `payment_day row 2 is '+5bd', expected a date; a request's rows pay on dates, and a rule is the template's to hold`; `F27 of row 1 pays on 2027-01-29, expected a day after its last observation, 2027-01-29, when its final price exists`; `2027-01-11 to 2027-02-26 of row 1 pays on 2027-02-26, expected a day after its last observation, 2027-02-26, when its final price exists` |
-| `_QuoteRFQ`: the market's index is the request's, the one object, before any data is gathered; the collection supplied with a bilateral request and left out with a cleared one, the key bound and the curve starting on the valuation day; then the quote's own market rules, a day before the calendar, a contract beyond the market's coverage, an expired physical contract and a payment past the curve, [quote.md](quote.md) | `market is over another index, 'TOY_GAS', expected the request's, 'STRIP'`; `discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, whose payments it discounts`; `the payment of 2027-01-11 to 2027-02-26 on 2027-03-08 on SOFR is past the discount curve 'SOFR', which runs from 2026-12-31 to 2027-03-05; expected every payment day after the valuation date covered` |
+| `_QuoteRFQ`: the pricing `flat` or `ftc`, read first; the market's index is the request's, the one object, before any data is gathered; the collection supplied with a bilateral request and left out with a cleared one, under either pricing, the key bound and the curve starting on the valuation day; then the quote's own market rules, a day before the calendar, a contract beyond the market's coverage, an expired physical contract and, under `flat`, a payment past the curve, [quote.md](quote.md) | `pricing is 'FTC', expected flat or ftc`; `market is over another index, 'TOY_GAS', expected the request's, 'STRIP'`; `discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, under flat and ftc alike`; `the payment of 2027-01-11 to 2027-02-26 on 2027-03-08 on SOFR is past the discount curve 'SOFR', which runs from 2026-12-31 to 2027-03-05; expected every payment day after the valuation date covered` |
 
 ## What it retains
 
@@ -152,7 +156,7 @@ Rfq
                         quantities themselves, and the payment days, None for physical
 ```
 
-No history, price, factor, curve or valuation day: those are the market's and the collection's, read when the request is priced, so a price tick, a corrected fixing, a valuation day rolled or a new collection reprices the same request and nothing of its periods, observations or payments is made again, and no fixed or live flag is saved that a later day would outdate. An as-of change never shortens the request; a component whose payment has passed stays in the price at its realized price and factor one, as in the quote, and a window's dates stand as entered, never turned into a balance.
+No history, price, factor, curve, pricing or valuation day: those are the market's, the collection's and the caller's, read when the request is priced, so a price tick, a corrected fixing, a valuation day rolled or a new collection reprices the same request and nothing of its periods, observations or payments is made again, and no fixed or live flag is saved that a later day would outdate. An as-of change never shortens the request; a component whose payment has passed stays in the price at its realized price and factor one, as in the quote, and a window's dates stand as entered, never turned into a balance.
 
 ## Reading it back
 
@@ -160,7 +164,7 @@ No history, price, factor, curve or valuation day: those are the market's and th
 
 ## Work
 
-The request reports what it did in the quote's counters: at creation the template's values read, the schedule's codes read, the ticket's distinct codes read, the months resolved, one per component, or under `onetime` the windows resolved, one per row, the observations made, the payment rule read and its instructions applied once over the components and the payment days made, none of the rule and no shift for the request's own dates; nothing of a history, a price, a curve or a factor. A quote of the request reports the curve selected, the fixings read, one per fixed observation, the live prices read, one per distinct live contract, the payment factors read, one per distinct payment day ahead, and four reductions, and resolves nothing: no period, observation or payment is made again on a tick. The budgets under `tests/performance` pin the counts, the functions each step runs once, the retained bytes, 32 an observation and 49 a component, and the peaks.
+The request reports what it did in the quote's counters: at creation the template's values read, the schedule's codes read, the ticket's distinct codes read, the months resolved, one per component, or under `onetime` the windows resolved, one per row, the observations made, the payment rule read and its instructions applied once over the components and the payment days made, none of the rule and no shift for the request's own dates; nothing of a history, a price, a curve or a factor. A quote of the request reports the curve selected, the fixings read, one per fixed observation, the live prices read, one per distinct live contract, under `flat` the payment factors read, one per distinct payment day ahead, and four reductions, and resolves nothing: no period, observation or payment is made again on a tick. The budgets under `tests/performance` pin the counts, the functions each step runs once, the retained bytes, 32 an observation and 49 a component, and the peaks.
 
 ## Not here
 

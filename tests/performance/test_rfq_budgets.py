@@ -96,14 +96,14 @@ def test_quoting_a_saved_request_prices_and_resolves_nothing() -> None:
     # curve selected and seven factors ahead, four reductions; no month resolved, no
     # observation made, no payment shifted. The cleared request reads no curve.
     saved = made()
-    assert counted(lambda c: quote_rfq(MARKET, saved, RATES, c)) == {
+    assert counted(lambda c: quote_rfq(MARKET, saved, "flat", RATES, c)) == {
         "curves_selected": 1,
         "fixings_read": 118,
         "live_prices_read": 7,
         "payment_factors_read": 7,
         "price_reductions": 4,
     }
-    assert counted(lambda c: quote_rfq(MARKET, made(12, CLEARED), None, c)) == {
+    assert counted(lambda c: quote_rfq(MARKET, made(12, CLEARED), "flat", None, c)) == {
         "fixings_read": 118,
         "live_prices_read": 7,
         "price_reductions": 4,
@@ -115,6 +115,8 @@ def test_quoting_a_saved_request_prices_and_resolves_nothing() -> None:
 # the shares; nothing of the period, the observations or the payments.
 QUOTE_LEDGER = {
     "quote_rfq": 1,
+    "pricing_of": 1,  # the pricing read once, flat or ftc, since fit-to-curve-price.md
+    "choice": 1,
     "the_curve": 1,
     "the_curve.<locals>.<genexpr>": 2,
     "DiscountCurve.start_date": 2,
@@ -136,8 +138,40 @@ def test_a_month_and_a_year_quote_through_the_same_functions_once(
     call_profile: CallProfile,
 ) -> None:
     month, year = made(1), made(12)
-    assert call_profile(lambda: quote_rfq(MARKET, month, RATES, WorkCounter())) == QUOTE_LEDGER
-    assert call_profile(lambda: quote_rfq(MARKET, year, RATES, WorkCounter())) == QUOTE_LEDGER
+    assert (
+        call_profile(lambda: quote_rfq(MARKET, month, "flat", RATES, WorkCounter())) == QUOTE_LEDGER
+    )
+    assert (
+        call_profile(lambda: quote_rfq(MARKET, year, "flat", RATES, WorkCounter())) == QUOTE_LEDGER
+    )
+
+
+def test_a_fit_to_curve_price_of_a_saved_request_reads_no_factor(
+    call_profile: CallProfile,
+) -> None:
+    # fit-to-curve-price.md: the same saved request under ftc, the curve selected as under flat
+    # and no factor read; the functions the flat price runs but the factors'; a cleared request
+    # the same work under either; within the flat price's bound.
+    saved = made()
+    assert counted(lambda c: quote_rfq(MARKET, saved, "ftc", RATES, c)) == {
+        "curves_selected": 1,
+        "fixings_read": 118,
+        "live_prices_read": 7,
+        "price_reductions": 4,
+    }
+    factors = ("_the_factors", "factors_on", "DiscountCurve.max_date")
+    assert call_profile(lambda: quote_rfq(MARKET, saved, "ftc", RATES, WorkCounter())) == {
+        **{name: count for name, count in QUOTE_LEDGER.items() if name not in factors},
+        "DiscountCurve.start_date": 1,  # read for the start alone, not again for a factor
+        "WorkCounter.hit": 4,  # one fewer, the factors uncounted
+    }
+    cleared = made(12, CLEARED)
+    assert counted(lambda c: quote_rfq(MARKET, cleared, "ftc", None, c)) == counted(
+        lambda c: quote_rfq(MARKET, cleared, "flat", None, c)
+    )
+    assert least_peak(lambda: quote_rfq(MARKET, saved, "ftc", RATES, WorkCounter())) <= (
+        2_000 + 55 * 261 + SLACK
+    )
 
 
 def test_creation_runs_the_resolution_once_and_nothing_of_the_pricing(
@@ -318,12 +352,12 @@ def test_the_seam_quotes_a_saved_request_resolving_three_handles_and_publishing_
 ) -> None:
     market, saved, rates, _, _ = on_the_sheet()
     live = bridge.live_handles()
-    assert PATH["_QuoteRFQ"](market, saved, rates) == pytest.approx(448_200 / 390_000)
-    assert call_profile(lambda: PATH["_QuoteRFQ"](market, saved, rates)) == {
+    assert PATH["_QuoteRFQ"](market, saved, "flat", rates) == pytest.approx(448_200 / 390_000)
+    assert call_profile(lambda: PATH["_QuoteRFQ"](market, saved, "flat", rates)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 3,
-        "_text": 3,
+        "_validate": 4,  # the three handles and the pricing, one argument more
+        "_text": 4,  # each handle cell's text, and the pricing's
         "_resolve": 3,
         "_QuoteRFQ": 1,
         **QUOTE_LEDGER,
@@ -384,7 +418,7 @@ def test_a_request_retains_its_arrays_and_allocates_within_its_observations(
     assert least_peak(lambda: made(n, BILATERAL, None, WorkCounter())) <= (
         7_500 + 55 * observations + SLACK
     )
-    assert least_peak(lambda: quote_rfq(MARKET, saved, RATES, WorkCounter())) <= (
+    assert least_peak(lambda: quote_rfq(MARKET, saved, "flat", RATES, WorkCounter())) <= (
         2_000 + 55 * observations + SLACK
     )
 
@@ -446,14 +480,16 @@ def test_a_request_of_windows_resolves_each_row_once_and_reprices_resolving_noth
         "window_rows": 1,  # the windows' contracts, the first pricing each one's first day
     }
     saved = rfq(CAL, WINDOWS, ONETIME, WorkCounter())
-    assert counted(lambda c: quote_rfq(MARKET, saved, RATES, c)) == {
+    assert counted(lambda c: quote_rfq(MARKET, saved, "flat", RATES, c)) == {
         "curves_selected": 1,
         "fixings_read": 57,
         "live_prices_read": 7,
         "payment_factors_read": 7,
         "price_reductions": 4,
     }
-    assert call_profile(lambda: quote_rfq(MARKET, saved, RATES, WorkCounter())) == QUOTE_LEDGER
+    assert (
+        call_profile(lambda: quote_rfq(MARKET, saved, "flat", RATES, WorkCounter())) == QUOTE_LEDGER
+    )
     assert retained(saved) == 8 * 6 * 12 + 12 + 32 * 128
     # Measured on 2026-11-01: creation 12,560 bytes, within the request's own bound; the quote
     # 10,952, about 70 an observation where the year's is 52, since 70 of the 128 observations are
@@ -461,6 +497,6 @@ def test_a_request_of_windows_resolves_each_row_once_and_reprices_resolving_noth
     # beside the fixed one's search, where the year in June has 143 live of 261.
     assert least_peak(lambda: rfq(CAL, WINDOWS, ONETIME, WorkCounter())) <= 7_500 + 55 * 128 + SLACK
     assert (
-        least_peak(lambda: quote_rfq(MARKET, saved, RATES, WorkCounter()))
+        least_peak(lambda: quote_rfq(MARKET, saved, "flat", RATES, WorkCounter()))
         <= 3_000 + 55 * 128 + SLACK
     )

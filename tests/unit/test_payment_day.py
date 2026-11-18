@@ -555,9 +555,11 @@ def test_a_quote_template_takes_the_date_through_the_seam(syn: dict[str, Any]) -
     template = ENTRY["_CreateQuoteTemplate"]("fixed_float", row(*fields), row(*fields.values()))
     history = a_history(syn["index"], "2026-10-29", "2026-12-15", SEAM_HOLIDAYS, {})
     market = a_market(history, "SYN", 3.00, 3.10, 3.20, 3.30)  # Z26 the prompt
-    assert ENTRY["_Quote"](market, "F27", template, bridge.MISSING) == pytest.approx(3.10)
-    assert ENTRY["_Quote"](market, "F27-G27", template, bridge.MISSING) == pytest.approx(3.15)
-    assert ENTRY["_Quote"](market, "H27", template, bridge.MISSING) == (
+    assert ENTRY["_Quote"](market, "F27", template, "flat", bridge.MISSING) == pytest.approx(3.10)
+    assert ENTRY["_Quote"](market, "F27-G27", template, "flat", bridge.MISSING) == pytest.approx(
+        3.15
+    )
+    assert ENTRY["_Quote"](market, "H27", template, "flat", bridge.MISSING) == (
         "#ERROR _Quote: ValueError: H27 pays on 2027-03-15, expected a day after its last "
         "observation, 2027-03-31, when its final price exists"
     )
