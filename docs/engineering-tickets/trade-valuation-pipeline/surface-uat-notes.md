@@ -901,7 +901,7 @@ refusal that says to supply it on the quote template, B3316.
 
 ## 33. A fit-to-curve single price from the quote functions
 
-Agreed 17 November 2026 and built in #NNN, issue #219:
+Agreed 17 November 2026 and built in #249, issue #219:
 [fit-to-curve-price.md](fit-to-curve-price.md), one pull request from main. `_Quote`,
 `_QuoteByDates` and `_QuoteRFQ` take a required `pricing` word before the collection, `flat` or
 `ftc`: `flat` is the one fixed price each returned before, and `ftc`, fit to curve, the months'

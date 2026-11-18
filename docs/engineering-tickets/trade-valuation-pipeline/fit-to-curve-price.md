@@ -1,6 +1,6 @@
 # A fit-to-curve single price from the quote functions
 
-**Status:** Built in #NNN, agreed with the owner on 17 November 2026 for
+**Status:** Built in #249, agreed with the owner on 17 November 2026 for
 [issue #219](https://github.com/gobbles404/catalyst/issues/219), this page in its first commit;
 one pull request on `feat/ftc-quote`, from main after #248.
 [quote.md](../../library/quoting/quote.md) owns the calculation;
