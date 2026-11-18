@@ -2402,6 +2402,50 @@ $formulas = [ordered]@{
     '=TEXT(_QuoteRFQ(VA7,XD5,"ftc",VN6),"0.000000")' = "56.785714"
     '=_QuoteRFQ(VA7,XD1,"both",VN6)' = "#ERROR _QuoteRFQ: ValueError: pricing is 'both', expected flat or ftc"
     '=_QuoteRFQ(VA7,XD1)' = "#ERROR _QuoteRFQ: pricing is missing, expected text"
+    # The months' fixed prices from one agreed price, ftc-monthly-prices.md, on the same saved
+    # requests: agreed at 52.63 against the quote of 52.5 each month takes 13 cents, 30.13 and
+    # 60.13, at one decimal 30.1 and 60.1, back to 21,040,000 over 400,000, 52.6, three cents
+    # under; the check's three rows, a dash in their spare cells, over the header, the types and
+    # a row a month. The rounding is the sheet's own ROUND: at 52.505 and two decimals the months
+    # are 30.005 and 60.005, which the bits alone hold a hair under, and both go up, as ROUND
+    # sends them, and away from zero below it. At the quote's own cell nothing moves and the
+    # difference is zero exactly. No curve is taken, so the request paying past the curve is
+    # priced as any; the calendar-day request shows the quantities its average weighs, and the
+    # windows their dates.
+    '=ROWS(_QuoteFTCPrices(VA7,XD1,52.63,1))&"x"&COLUMNS(_QuoteFTCPrices(VA7,XD1,52.63,1))' = "7x4"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),1,1)' = "agreed_price"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),1,2)' = "52.63"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),1,3)&INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),3,4)' = "--"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),2,1)' = "average_fixed_price"
+    '=TEXT(INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),2,2),"0.000000000000")' = "52.600000000000"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),3,1)' = "difference"
+    '=TEXT(INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),3,2),"0.000000000000")' = "-0.030000000000"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),4,1)&" "&INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),4,2)&" "&INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),4,3)&" "&INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),4,4)' = "period quantity curve_price fixed_price"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),5,1)&" "&INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),5,4)' = "str float64"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),6,1)&" "&INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),7,1)' = "F27 G27"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),6,2)' = "100000"
+    '=TEXT(INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),7,3),"0.000000000000")' = "60.000000000000"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),6,4)' = "30.1"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.63,1),7,4)' = "60.1"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.505,2),6,4)' = "30.01"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.505,2),7,4)' = "60.01"
+    '=ROUND(30+52.505-52.5,2)&" "&ROUND(60+52.505-52.5,2)' = "30.01 60.01"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.505,2),6,4)=ROUND(INDEX(_QuoteFTCPrices(VA7,XD1,52.505,2),6,3)+52.505-_QuoteRFQ(VA7,XD1,"ftc",VN6),2)' = "TRUE"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,52.635,2),7,4)=ROUND(INDEX(_QuoteFTCPrices(VA7,XD1,52.635,2),7,3)+52.635-_QuoteRFQ(VA7,XD1,"ftc",VN6),2)' = "TRUE"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,-52.505,2),6,4)' = "-75.01"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,-52.505,2),7,4)' = "-45.01"
+    '=ROUND(30-52.505-52.5,2)&" "&ROUND(60-52.505-52.5,2)' = "-75.01 -45.01"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,_QuoteRFQ(VA7,XD1,"ftc",VN6),2),3,2)' = "0"
+    '=INDEX(_QuoteFTCPrices(VA7,XD1,_QuoteRFQ(VA7,XD1,"ftc",VN6),2),6,4)&" "&INDEX(_QuoteFTCPrices(VA7,XD1,_QuoteRFQ(VA7,XD1,"ftc",VN6),2),7,4)' = "30 60"
+    '=INDEX(_QuoteFTCPrices(VA7,XD4,52.63,1),7,4)' = "60.1"
+    '=INDEX(_QuoteFTCPrices(VA7,XD3,52,0),6,2)&" "&INDEX(_QuoteFTCPrices(VA7,XD3,52,0),7,2)' = "3100000 8400000"
+    '=INDEX(_QuoteFTCPrices(VA7,XD5,56.79,2),6,1)' = "2027-01-11 to 2027-02-26"
+    '=_QuoteFTCPrices(VA7,XD1,52.63)' = "#ERROR _QuoteFTCPrices: decimals is missing, expected whole number"
+    '=_QuoteFTCPrices(VA7,XD1,52.63,2.5)' = "#ERROR _QuoteFTCPrices: decimals is number 2.5, expected whole number"
+    '=_QuoteFTCPrices(VA7,XD1,52.63,16)' = "#ERROR _QuoteFTCPrices: ValueError: decimals is 16, expected a whole number from 0 to 15, the decimals a fixed price may hold"
+    '=_QuoteFTCPrices(VA7,XD1,"flat",2)' = "#ERROR _QuoteFTCPrices: price is text 'flat', expected number"
+    '=_QuoteFTCPrices(FM11,XD1,52.63,2)' = "#ERROR _QuoteFTCPrices: ValueError: market is over another index, 'TOY_GAS', expected the request's, 'STRIP'"
+    '=LEFT(_QuoteFTCPrices(VA7,VF3,52.63,2),52)' = "#ERROR _QuoteFTCPrices: rfq is quote template handle"
     "=INDEX(util_ReadHandle(XD5),3,2)"   = "2027-01-11 to 2027-02-26"
     "=INDEX(util_ReadHandle(XD5),4,2)"   = "2027-02-01 to 2027-02-12"
     "=INDEX(util_ReadHandle(XD5),4,14)"  = "onetime"

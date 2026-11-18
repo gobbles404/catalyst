@@ -6,8 +6,9 @@ dates, the same price for the days between two dates, one average over the windo
 onetime template; and since rfq-quoting.md the request for quote, a saved quantity and payment
 schedule on one index under a template's terms, and its price on a market by the quote's
 calculation; since fit-to-curve-price.md each of the three quotes takes the pricing, flat or
-ftc, the one fixed price or the fit-to-curve one. docs/library/quoting/ holds a page per
-function.
+ftc, the one fixed price or the fit-to-curve one; and since ftc-monthly-prices.md the
+fit-to-curve prices of a request, the fixed price of each of its months from one agreed
+price. docs/library/quoting/ holds a page per function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
 what it shows about that argument as a person types the formula. How to write a line is
@@ -16,11 +17,16 @@ docs/library/conventions.md under Excel help; the pages quote the lines.
 
 from typing import Annotated
 
+import numpy as np
+
 from catalyst.excel.bridge import (
+    NUMBER_CODE,
+    TEXT_CODE,
     Date,
     FieldRow,
     FieldRows,
     Handle,
+    MixedArray,
     TextRow,
     excel_function,
 )
@@ -28,13 +34,21 @@ from catalyst.globals.discount_curve_set import DiscountCurveSet
 from catalyst.index_definitions.index import Index
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market.market import Market
+from catalyst.quoting.ftc_prices import FtcPrices, ftc_prices
 from catalyst.quoting.quote import quote, quote_by_dates
 from catalyst.quoting.rfq import Rfq, quote_rfq, rfq
 from catalyst.quoting.template import QuoteTemplate, quote_template
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
-__all__ = ["_CreateQuoteTemplate", "_CreateRFQ", "_Quote", "_QuoteByDates", "_QuoteRFQ"]
+__all__ = [
+    "_CreateQuoteTemplate",
+    "_CreateRFQ",
+    "_Quote",
+    "_QuoteByDates",
+    "_QuoteFTCPrices",
+    "_QuoteRFQ",
+]
 
 
 @excel_function
@@ -187,3 +201,76 @@ def _QuoteRFQ(
     month at its quantity, fixings for the observations that have passed and the day's quotes
     for the rest, a flat bilateral price discounted on each month's own day."""
     return quote_rfq(market, rfq, pricing, discount_curve_set, WorkCounter())
+
+
+@excel_function
+def _QuoteFTCPrices(
+    market: Annotated[
+        Handle[Market],
+        "The market handle over the request's index: the cell showing _CreateMarket's result, "
+        "such as I12, or a name for it, with the day's quotes over the history they follow.",
+    ],
+    rfq: Annotated[
+        Handle[Rfq],
+        "The request handle: the cell showing _CreateRFQ's result, such as B5, or a name for it.",
+    ],
+    price: Annotated[
+        float,
+        "The one price agreed for the request, a fit-to-curve price, such as B7 or 3.95; every "
+        "month's own price is moved by the same amount, this price less the request's "
+        "fit-to-curve quote.",
+    ],
+    decimals: Annotated[
+        int,
+        "The decimals a fixed price may hold, a whole number from 0 to 15, such as 2; each "
+        "fixed price is rounded alone, as ROUND rounds.",
+    ],
+) -> MixedArray:
+    """Quotes the fixed price of each month of a saved request from one agreed fit-to-curve
+    price, each month's own price moved by the same amount and rounded, and above them the
+    agreed price, the average the fixed prices come back to and the difference."""
+    return ftc_prices_table(ftc_prices(market, rfq, price, decimals, WorkCounter()))
+
+
+def ftc_prices_table(prices: FtcPrices) -> MixedArray:
+    """The fit-to-curve prices' rectangle, four cells wide: three rows of the check, a word and
+    its number and a dash in the two cells beside them, `agreed_price`, `average_fixed_price`
+    and `difference`, the average less the agreed, first so that they sit in the same cells
+    whatever the request holds; a header row, `period`, `quantity`, `curve_price` and
+    `fixed_price`; a type row, `str` and `float64` three times; then one row per component in
+    the request's order. A column holds a word above numbers and a check row a word before a
+    number, so the rectangle is written by kind, as the risk report's is: the kinds, the slots
+    and the texts in sheet order. The numbers are placed as they are, the pricing having held
+    them finite. Nothing is priced, summed or rounded here.
+
+    Work: the rectangle filled once, a copy per column."""
+    rows = 5 + len(prices.period)
+    kinds = np.full((rows, 4), TEXT_CODE, dtype=np.uint8)
+    kinds[:3, 1] = NUMBER_CODE
+    kinds[5:, 1:] = NUMBER_CODE
+    slots = np.full((rows, 4), np.nan)
+    slots[:3, 1] = (prices.agreed, prices.average, prices.difference)
+    slots[5:, 1] = prices.quantity
+    slots[5:, 2] = prices.curve_price
+    slots[5:, 3] = prices.fixed_price
+    texts = (
+        "agreed_price",
+        "-",
+        "-",
+        "average_fixed_price",
+        "-",
+        "-",
+        "difference",
+        "-",
+        "-",
+        "period",
+        "quantity",
+        "curve_price",
+        "fixed_price",
+        "str",
+        "float64",
+        "float64",
+        "float64",
+        *prices.period,
+    )
+    return MixedArray(kinds, slots, texts)

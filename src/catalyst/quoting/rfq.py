@@ -219,15 +219,22 @@ def quote_rfq(
     the observations or the payments made again. Work: the curve selected, the fixings and live
     prices read and, under flat, the factors read, as a quote's."""
     chosen = pricing_of(pricing)
+    on_its_index(market, request)
+    as_of = market.market_history.calendar.valuation_date.as_of
+    curve = the_curve(request.request.terms, curve_set, as_of, counter)
+    return priced(request.request, market, curve, chosen, counter)
+
+
+def on_its_index(market: Market, request: Rfq) -> None:
+    """The market is over the request's index, the one object and no other of the same name,
+    the check every reading of a saved request on a market makes before any data is gathered:
+    its quote, and since ftc-monthly-prices.md its fit-to-curve prices."""
     index = market.market_history.calendar.index
     mine = request.request.index
     if index is not mine:
         raise ValueError(
             f"market is over another index, {index.name!r}, expected the request's, {mine.name!r}"
         )
-    as_of = market.market_history.calendar.valuation_date.as_of
-    curve = the_curve(request.request.terms, curve_set, as_of, counter)
-    return priced(request.request, market, curve, chosen, counter)
 
 
 # --- the ticket --------------------------------------------------------------------------------
