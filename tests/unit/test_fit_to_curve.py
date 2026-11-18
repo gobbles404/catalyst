@@ -249,8 +249,8 @@ def test_a_physical_quote_is_the_same_under_either_pricing() -> None:
 
 
 def test_one_payment_quotes_one_price_under_either_pricing() -> None:
-    # One component's share is one whatever its factor: a month, a onetime window and a one-row
-    # request quote the same number, exactly, flat or ftc.
+    # One component's share is one whatever its factor: a month, a onetime window and a
+    # one-component request quote the same number, exactly, flat or ftc.
     month = by_code(EXAMPLE, "G27", bilateral(), "ftc", RATES)
     assert month == by_code(EXAMPLE, "G27", bilateral(), "flat", RATES)
     assert month == pytest.approx(4.30, **CLOSE)
@@ -259,8 +259,15 @@ def test_one_payment_quotes_one_price_under_either_pricing() -> None:
     assert by_dates(STRIP_MARKET, start, end, window, "ftc", REQUEST_RATES) == by_dates(
         STRIP_MARKET, start, end, window, "flat", REQUEST_RATES
     )
-    one_row = request(("H27",), (7.0,), bilateral(), ix=LONGER)
-    assert by_request(EXAMPLE, one_row, "ftc", RATES) == by_request(EXAMPLE, one_row, "flat", RATES)
+    one_month = request(("H27",), (7.0,), bilateral(), ix=LONGER)
+    assert by_request(EXAMPLE, one_month, "ftc", RATES) == by_request(
+        EXAMPLE, one_month, "flat", RATES
+    )
+    # One row is one component only where it is one month or one window: a row of F27-H27 is
+    # three months and three payments, and quotes as the strip by code does, the two differing.
+    strip = request(("F27-H27",), (7.0,), bilateral(), ix=LONGER)
+    assert by_request(EXAMPLE, strip, "flat", RATES) == pytest.approx(BY_MONTH_FLAT, **CLOSE)
+    assert by_request(EXAMPLE, strip, "ftc", RATES) == pytest.approx(BY_MONTH_FTC, **CLOSE)
     # Several months paying on one day carry one factor, which cancels: the flat price is the
     # fit-to-curve one, to rounding.
     together = request(CODES, QUANTITY, bilateral(day="2027-04-01"), ix=LONGER)

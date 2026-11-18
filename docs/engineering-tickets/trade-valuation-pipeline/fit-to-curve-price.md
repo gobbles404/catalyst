@@ -27,7 +27,7 @@ quoted the flat price alone.
 | The words | Matched exactly, case and all, as every code of the library is, so `FTC` is refused by name. A blank cell and a left-out argument fail in the seam's words. |
 | The collection | Taken the same way under either pricing, so that one formula serves both with the one word changed and a cell can hold the word: on a bilateral template the collection is required, its key bound and its start checked. Under `ftc` no factor is read of it, so a curve too short to cover a late payment is not refused. The owner's choice, "so the signature isn't volatile", over refusing the collection under `ftc` as a cleared quote refuses it. |
 | A cleared quote | Allowed under `ftc`, and the same number as under `flat`, since a cleared quote already discounts nothing. |
-| One payment | Allowed under `ftc`, and the same number as under `flat`: one month, a `onetime` window, a one-row request. A request may hold several `onetime` rows, where the two differ, so a refusal by frequency would be wrong. |
+| One payment | Allowed under `ftc`, and the same number as under `flat`: one month, a `onetime` window, a one-component request. A request's row is one component only where it is one month or one `onetime` window: a row of `F27-H27` under `monthly` is three payments, where the two differ. A request may hold several `onetime` rows, where the two differ too, so a refusal by frequency would be wrong. |
 
 ## Calculation
 
