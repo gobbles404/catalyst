@@ -1,6 +1,6 @@
 # The monthly prices of a fit-to-curve deal from its agreed price
 
-**Status:** Built in #NNN, agreed with the owner on 18 November 2026 for
+**Status:** Built in #251, agreed with the owner on 18 November 2026 for
 [issue #250](https://github.com/gobbles404/catalyst/issues/250), this page in its first commit;
 one pull request on `feat/ftc-prices`, stacked on #249.
 [quote-ftc-prices.md](../../library/quoting/quote-ftc-prices.md) owns the function. It follows

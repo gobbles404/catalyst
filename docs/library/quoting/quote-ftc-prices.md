@@ -1,6 +1,6 @@
 # _QuoteFTCPrices
 
-Built in #NNN from [ftc-monthly-prices.md](../../engineering-tickets/trade-valuation-pipeline/ftc-monthly-prices.md), with [_CreateRFQ and _QuoteRFQ](rfq.md). The bridge from the one price a desk agrees for a fit-to-curve deal back to the fixed price of each month the deal is booked at: every month's own price on the curve moved by the same amount, the agreed price less the request's fit-to-curve quote, and rounded alone to the decimals a price may hold, with the average the fixed prices come back to and its difference from the agreed price shown above them. It reads the saved request [_QuoteRFQ](rfq.md) prices, so each month's own price and its share are formed once, by the quote's own steps. The code is `src/catalyst/quoting/ftc_prices.py`, the prices, `src/catalyst/quoting/request.py`, the two steps it shares with the quote, and `src/catalyst/excel/quoting.py`, the worksheet function and its table.
+Built from [ftc-monthly-prices.md](../../engineering-tickets/trade-valuation-pipeline/ftc-monthly-prices.md), with [_CreateRFQ and _QuoteRFQ](rfq.md). The bridge from the one price a desk agrees for a fit-to-curve deal back to the fixed price of each month the deal is booked at: every month's own price on the curve moved by the same amount, the agreed price less the request's fit-to-curve quote, and rounded alone to the decimals a price may hold, with the average the fixed prices come back to and its difference from the agreed price shown above them. It reads the saved request [_QuoteRFQ](rfq.md) prices, so each month's own price and its share are formed once, by the quote's own steps. The code is `src/catalyst/quoting/ftc_prices.py`, the prices, `src/catalyst/quoting/request.py`, the two steps it shares with the quote, and `src/catalyst/excel/quoting.py`, the worksheet function and its table.
 
 ## Worksheet contract
 
@@ -84,22 +84,6 @@ The collection's checks are not among them: no collection is taken, so a request
 ## Work
 
 The function reports what it did in the quote's counters: the fixings read, one per fixed observation, and the live prices read, one per distinct live contract, as a quote of the request reads them; five reductions, the components' prices, the largest weight's exponent, the weights, the quote and the average; and `prices_rounded`, one per component. No curve is selected and no factor read, and nothing of the request's periods, observations or payments is made again. The rounding is one pass over the components. The budgets under `tests/performance` pin the counts, the functions it runs once whatever the request and the peak, within the quote's own.
-
-## Tests
-
-| Rule | Test |
-|---|---|
-| the issue's example by hand, one more decimal and none; unequal quantities, their scale and their order; a component of no quantity | `tests/unit/test_ftc_prices.py`, example |
-| at the request's own quote the curve's prices and a difference of exactly zero; a cleared request the same table; every component moved by the same amount | example |
-| the rounding as `ROUND`: 4.515, 4.505, 2.675 and 1.005 up, their negatives away from zero, halves the bits hold exactly, a price under a half by more than fifteen digits, more decimals than the number holds, a price with no digit at the decimals, zero never minus zero | example |
-| every rounded price at the decimals and within half a step, rounded once is rounded, either side of zero alike; the average within half a step of the agreed price for any price, decimals and quantities | property |
-| prices at zero and below; a request of windows under their dates; a request per calendar day weighed by its days | example |
-| no curve taken and no factor read; the decimals' range; another index's market; a physical request's expired contract; a price that cannot be moved to | example |
-| the table through the seam, cell by cell, and the seam's refusals of each argument | example, through the seam |
-| the counts, the functions run once for a month and a year, the peak within the quote's bound, the seam's own steps | `tests/performance/test_ftc_prices_budgets.py` |
-| the help lines | `tests/unit/test_help.py` |
-| from the host, in the request's fact | `host/Catalyst.Host.Tests/CallTests.cs` |
-| in Excel, against the sheet's own `ROUND` | `tools/excel_smoke.ps1` |
 
 ## Not here
 

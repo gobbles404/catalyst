@@ -923,7 +923,7 @@ template and read that it is asked for under flat and ftc alike.
 
 ## 34. The monthly prices of a fit-to-curve deal from its agreed price
 
-Agreed 18 November 2026 and built in #NNN, issue #250:
+Agreed 18 November 2026 and built in #251, issue #250:
 [ftc-monthly-prices.md](ftc-monthly-prices.md), one pull request stacked on #249.
 `_QuoteFTCPrices(market, rfq, price, decimals)` takes the market and the saved request a quote
 took, the one price agreed and the decimals a monthly price may hold, and spills the fixed
