@@ -193,7 +193,9 @@ def test_a_first_nearby_average_reads_the_prompts_column_whatever_the_width(near
         payment_day=DayOrRule(day("2026-06-18"), None),
         payment_holiday_calendar=ROLL.holiday_calendar,
     )
-    price = quote_by_dates(market, day("2026-06-15"), day("2026-06-16"), quote, None, WorkCounter())
+    price = quote_by_dates(
+        market, day("2026-06-15"), day("2026-06-16"), quote, "flat", None, WorkCounter()
+    )
     assert price == 80.5
 
 

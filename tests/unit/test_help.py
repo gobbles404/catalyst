@@ -776,9 +776,9 @@ def test_the_quote_explains_itself() -> None:
     description, arguments, hidden = SPECS["_Quote"]
     assert not hidden
     assert description == (
-        "Quotes one whole-period fixed price for a contract or strip on one market from a quote "
-        "template's terms, fixings for the observations that have passed and the day's quotes for "
-        "the rest, a bilateral payment discounted on the template's curve."
+        "Quotes one fixed price, flat or fit to curve, for a contract or strip on a market from "
+        "a quote template's terms, fixings for the observations that have passed and the day's "
+        "quotes for the rest, a flat bilateral price discounted on the template's curve."
     )
     assert arguments == [
         (
@@ -798,8 +798,14 @@ def test_the_quote_explains_itself() -> None:
             "B3, or a name for it, which supplies the quote's terms.",
         ),
         (
+            "pricing",
+            "The price to quote, flat or ftc: flat is one fixed price for the whole period, each "
+            "month weighed by its quantity and its payment's discount factor; ftc, fit to curve, "
+            "is the months' own prices averaged by quantity alone.",
+        ),
+        (
             "[discount_curve_set]",
-            "The collection handle for a bilateral quote: the cell showing "
+            "The collection handle for a bilateral quote, under either pricing: the cell showing "
             "_CollectDiscountCurves's result, such as I13, or a name for it, holding the curve "
             "the template names; left out for a cleared quote.",
         ),
@@ -810,9 +816,9 @@ def test_the_quote_by_dates_explains_itself() -> None:
     description, arguments, hidden = SPECS["_QuoteByDates"]
     assert not hidden
     assert description == (
-        "Quotes one fixed price from start_date to end_date on one market from a quote "
-        "template's terms, one average over the window under onetime and a strip by the month "
-        "under monthly, fixings for the days passed and the day's quotes for the rest."
+        "Quotes one fixed price, flat or fit to curve, from start_date to end_date on a market "
+        "under a quote template, one average over the window under onetime and a strip by the "
+        "month under monthly, fixings for days passed and the day's quotes for the rest."
     )
     assert arguments == [
         (
@@ -833,8 +839,14 @@ def test_the_quote_by_dates_explains_itself() -> None:
             "strip by the month.",
         ),
         (
+            "pricing",
+            "The price to quote, flat or ftc: flat is one fixed price for the days, each "
+            "component weighed by its quantity and its payment's discount factor; ftc, fit to "
+            "curve, is the components' own prices averaged by quantity alone.",
+        ),
+        (
             "[discount_curve_set]",
-            "The collection handle for a bilateral quote: the cell showing "
+            "The collection handle for a bilateral quote, under either pricing: the cell showing "
             "_CollectDiscountCurves's result, such as I13, or a name for it, holding the curve "
             "the template names; left out for a cleared quote.",
         ),
@@ -1070,9 +1082,9 @@ def test_the_request_quote_explains_itself() -> None:
     description, arguments, hidden = SPECS["_QuoteRFQ"]
     assert not hidden
     assert description == (
-        "Quotes one fixed price for a saved request on one market, each month at its quantity, "
-        "fixings for the observations that have passed and the day's quotes for the rest, a "
-        "bilateral payment discounted on the template's curve on each month's own day."
+        "Quotes one fixed price, flat or fit to curve, for a saved request on one market, each "
+        "month at its quantity, fixings for the observations that have passed and the day's "
+        "quotes for the rest, a flat bilateral price discounted on each month's own day."
     )
     assert arguments == [
         (
@@ -1086,10 +1098,16 @@ def test_the_request_quote_explains_itself() -> None:
             "it.",
         ),
         (
+            "pricing",
+            "The price to quote, flat or ftc: flat is one fixed price for the request, each "
+            "component weighed by its quantity and its payment's discount factor; ftc, fit to "
+            "curve, is the components' own prices averaged by quantity alone.",
+        ),
+        (
             "[discount_curve_set]",
-            "The collection handle for a bilateral request: the cell showing "
-            "_CollectDiscountCurves's result, such as I13, or a name for it, holding the curve "
-            "the template names; left out for a cleared request.",
+            "The collection handle for a bilateral request, under either pricing: the cell "
+            "showing _CollectDiscountCurves's result, such as I13, or a name for it, holding the "
+            "curve the template names; left out for a cleared request.",
         ),
     ]
 

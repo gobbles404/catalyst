@@ -295,14 +295,14 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("contract_code", "route"), Row(ExcelEmpty.Value, "cleared") }, "#ERROR _CreateQuoteTemplate: ValueError: contract_code is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_calendar, settlement_frequency, nearby" };
             yield return new object[] { "_CreateQuoteTemplate", new object[] { "cashflow", Row("currency"), "USD" }, "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'cashflow', expected one a quote prices: 'fixed_float'" };
             yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("route"), "Cleared" }, "#ERROR _CreateQuoteTemplate: ValueError: route is 'Cleared', expected cleared or bilateral" };
-            yield return new object[] { "_Quote", new object[] { ExcelMissing.Value, "F27", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _Quote: market is missing, expected market handle" };
-            yield return new object[] { "_Quote", new object[] { "x:market:gas:9", "F27", "y:quote_template:9", ExcelMissing.Value }, "#ERROR _Quote: market is text 'x:market:gas:9' naming no live object, expected market handle" };
-            yield return new object[] { "_QuoteByDates", new object[] { ExcelMissing.Value, 46168.0, 46198.0, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _QuoteByDates: market is missing, expected market handle" };
-            yield return new object[] { "_QuoteByDates", new object[] { "x:market:gas:9", "26-May-2026", 46198.0, "y:quote_template:9", ExcelMissing.Value }, "#ERROR _QuoteByDates: market is text 'x:market:gas:9' naming no live object, expected market handle" };
+            yield return new object[] { "_Quote", new object[] { ExcelMissing.Value, "F27", ExcelMissing.Value, "flat", ExcelMissing.Value }, "#ERROR _Quote: market is missing, expected market handle" };
+            yield return new object[] { "_Quote", new object[] { "x:market:gas:9", "F27", "y:quote_template:9", "flat", ExcelMissing.Value }, "#ERROR _Quote: market is text 'x:market:gas:9' naming no live object, expected market handle" };
+            yield return new object[] { "_QuoteByDates", new object[] { ExcelMissing.Value, 46168.0, 46198.0, ExcelMissing.Value, "flat", ExcelMissing.Value }, "#ERROR _QuoteByDates: market is missing, expected market handle" };
+            yield return new object[] { "_QuoteByDates", new object[] { "x:market:gas:9", "26-May-2026", 46198.0, "y:quote_template:9", "flat", ExcelMissing.Value }, "#ERROR _QuoteByDates: market is text 'x:market:gas:9' naming no live object, expected market handle" };
             yield return new object[] { "_CreateRFQ", new object[] { ExcelMissing.Value, Row("contract_code", "quantity"), Row("F27", 1.0), ExcelMissing.Value }, "#ERROR _CreateRFQ: index is missing, expected index handle" };
             yield return new object[] { "_CreateRFQ", new object[] { "x:index:gas:9", Row("contract_code", "quantity"), Row("F27", 1.0), "y:quote_template:9" }, "#ERROR _CreateRFQ: index is text 'x:index:gas:9' naming no live object, expected index handle" };
-            yield return new object[] { "_QuoteRFQ", new object[] { ExcelMissing.Value, "x:rfq:gas:9", ExcelMissing.Value }, "#ERROR _QuoteRFQ: market is missing, expected market handle" };
-            yield return new object[] { "_QuoteRFQ", new object[] { "x:market:gas:9", "x:rfq:gas:9", ExcelMissing.Value }, "#ERROR _QuoteRFQ: market is text 'x:market:gas:9' naming no live object, expected market handle" };
+            yield return new object[] { "_QuoteRFQ", new object[] { ExcelMissing.Value, "x:rfq:gas:9", "flat", ExcelMissing.Value }, "#ERROR _QuoteRFQ: market is missing, expected market handle" };
+            yield return new object[] { "_QuoteRFQ", new object[] { "x:market:gas:9", "x:rfq:gas:9", "flat", ExcelMissing.Value }, "#ERROR _QuoteRFQ: market is text 'x:market:gas:9' naming no live object, expected market handle" };
             yield return new object[] { "_CreateTrades", new object[] { ExcelMissing.Value, Row("quantity"), 1.0, ExcelMissing.Value }, "#ERROR _CreateTrades: indexes is missing, expected index handles in a cell, a row or a column" };
             yield return new object[] { "_CreateTrades", new object[] { "x:index:gas:9", Row("quantity"), 1.0, "y:trade_template:9" }, "#ERROR _CreateTrades: indexes is text 'x:index:gas:9' naming no live object, expected index handle" };
             // The valuation path: the handles left out, naming nothing or of another kind, in the seam's words; the batch itself is in the fact below.
@@ -960,17 +960,21 @@ namespace Catalyst.Host.Tests
             var fields = Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_holiday_calendar", "settlement_frequency", "nearby");
             var onetime = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", fields, Row("cleared", "financial", "asian", "period", 46202.0, holidays, "onetime", 1.0));
             var monthly = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", fields, Row("cleared", "financial", "asian", "month", 46202.0, holidays, "monthly", 1.0));
-            var window = (double)Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, onetime, ExcelMissing.Value);
+            var window = (double)Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, onetime, "flat", ExcelMissing.Value);
             Assert.Equal((19 * 70.0 + 3 * 72.0) / 22, window, 12);
-            Assert.Equal((70.0 + (15 * 70.0 + 3 * 72.0) / 18) / 2, (double)Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, monthly, ExcelMissing.Value), 12);
+            Assert.Equal((70.0 + (15 * 70.0 + 3 * 72.0) / 18) / 2, (double)Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, monthly, "flat", ExcelMissing.Value), 12);
+            // Since fit-to-curve-price.md the pricing: a cleared strip and one window are each the same under ftc.
+            Assert.Equal((70.0 + (15 * 70.0 + 3 * 72.0) / 18) / 2, (double)Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, monthly, "ftc", ExcelMissing.Value), 12);
+            Assert.Equal(window, (double)Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, onetime, "ftc", ExcelMissing.Value), 12);
+            Assert.Equal("#ERROR _QuoteByDates: ValueError: pricing is 'Flat', expected flat or ftc", Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, monthly, "Flat", ExcelMissing.Value));
             var booking = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", booking, Row("BBL", "period", "onetime", 1.0, "asian", "cleared", "financial", "CME Clearing", 46202.0, holidays));
             var trades = (string)Seam.Call("_CreateTrades", index, Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price"), Row(1.0, 46157.0, 46168.0, 46198.0, 2200.0, window), template);
             var results = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", trades, history), market, ExcelMissing.Value);
             Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
-            Assert.Equal("#ERROR _QuoteByDates: ValueError: end_date is 2026-05-26, expected a day on or after start_date, 2026-06-25", Seam.Call("_QuoteByDates", market, 46198.0, 46168.0, onetime, ExcelMissing.Value));
-            Assert.Equal("#ERROR _QuoteByDates: start_date is text '26-May-2026', expected date", Seam.Call("_QuoteByDates", market, "26-May-2026", 46198.0, onetime, ExcelMissing.Value));
-            Assert.Equal("#ERROR _Quote: ValueError: settlement_frequency is 'onetime', expected 'monthly'; a quote by contract code prices by the month, and _QuoteByDates prices a onetime period across two dates", Seam.Call("_Quote", market, "K26-M26", onetime, ExcelMissing.Value));
+            Assert.Equal("#ERROR _QuoteByDates: ValueError: end_date is 2026-05-26, expected a day on or after start_date, 2026-06-25", Seam.Call("_QuoteByDates", market, 46198.0, 46168.0, onetime, "flat", ExcelMissing.Value));
+            Assert.Equal("#ERROR _QuoteByDates: start_date is text '26-May-2026', expected date", Seam.Call("_QuoteByDates", market, "26-May-2026", 46198.0, onetime, "flat", ExcelMissing.Value));
+            Assert.Equal("#ERROR _Quote: ValueError: settlement_frequency is 'onetime', expected 'monthly'; a quote by contract code prices by the month, and _QuoteByDates prices a onetime period across two dates", Seam.Call("_Quote", market, "K26-M26", onetime, "flat", ExcelMissing.Value));
         }
 
         // The valuation path from the host's side: the market fact's chain, valued on 26 May 2026 with
@@ -1263,11 +1267,16 @@ namespace Catalyst.Host.Tests
             Assert.StartsWith(Pid + ":quote_template:", otc);
             var sofr = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46387.0, 1.0 }, { 46419.0, 0.99 }, { 46447.0, 0.98 } });
             var rates = (string)Seam.Call("_CollectDiscountCurves", sofr);
-            Assert.Equal(44.23728813559322, (double)Seam.Call("_Quote", market, "F27-G27", cleared, ExcelMissing.Value), 12);
-            Assert.Equal(44.923857868020306, (double)Seam.Call("_Quote", market, "F27-G27", otc, rates), 12);
-            Assert.Equal(30.0, (double)Seam.Call("_Quote", market, "F27", otc, rates), 12);
-            Assert.Equal(44.23728813559322, (double)Seam.Call("_Quote", market, "BALF27-G27", cleared, ExcelMissing.Value), 12);
-            Assert.Equal("#ERROR _Quote: ValueError: valuation_date is 2026-12-31, after 'BALX26' ended on 2026-11-30, expected a valuation day on or before the period's last day", Seam.Call("_Quote", market, "BALX26", cleared, ExcelMissing.Value));
+            Assert.Equal(44.23728813559322, (double)Seam.Call("_Quote", market, "F27-G27", cleared, "flat", ExcelMissing.Value), 12);
+            Assert.Equal(44.923857868020306, (double)Seam.Call("_Quote", market, "F27-G27", otc, "flat", rates), 12);
+            Assert.Equal(30.0, (double)Seam.Call("_Quote", market, "F27", otc, "flat", rates), 12);
+            // Since fit-to-curve-price.md the pricing: ftc weighs the months by quantity alone, 45 where the
+            // flat bilateral price is 44.92; one month and a cleared quote are the same under either.
+            Assert.Equal(45.0, (double)Seam.Call("_Quote", market, "F27-G27", otc, "ftc", rates), 12);
+            Assert.Equal(30.0, (double)Seam.Call("_Quote", market, "F27", otc, "ftc", rates), 12);
+            Assert.Equal(44.23728813559322, (double)Seam.Call("_Quote", market, "F27-G27", cleared, "ftc", ExcelMissing.Value), 12);
+            Assert.Equal(44.23728813559322, (double)Seam.Call("_Quote", market, "BALF27-G27", cleared, "flat", ExcelMissing.Value), 12);
+            Assert.Equal("#ERROR _Quote: ValueError: valuation_date is 2026-12-31, after 'BALX26' ended on 2026-11-30, expected a valuation day on or before the period's last day", Seam.Call("_Quote", market, "BALX26", cleared, "flat", ExcelMissing.Value));
             var shown = (object[,])Seam.Call("util_ReadHandle", otc);
             Assert.Equal(3, shown.GetLength(0));
             Assert.Equal(10, shown.GetLength(1));  // settlement_frequency since onetime-averaging.md, nearby since nearby-selection.md
@@ -1277,10 +1286,16 @@ namespace Catalyst.Host.Tests
             Assert.Equal("discount_curve_key", shown[0, 7]);
             Assert.Equal("SOFR", shown[2, 7]);
             var trade = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("route"), "cleared");
-            Assert.Equal($"#ERROR _Quote: template is trade template handle '{trade}', expected quote template handle", Seam.Call("_Quote", market, "F27", trade, ExcelMissing.Value));
-            Assert.Equal("#ERROR _Quote: discount_curve_set is blank, expected discount curve set handle", Seam.Call("_Quote", market, "F27", otc, ExcelEmpty.Value));
-            Assert.Equal("#ERROR _Quote: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, whose payments it discounts", Seam.Call("_Quote", market, "F27", otc, ExcelMissing.Value));
-            Assert.Equal("#ERROR _Quote: ValueError: discount_curve_set is a collection of 1 curve, expected none with route = cleared; a cleared quote discounts nothing", Seam.Call("_Quote", market, "F27", cleared, rates));
+            Assert.Equal($"#ERROR _Quote: template is trade template handle '{trade}', expected quote template handle", Seam.Call("_Quote", market, "F27", trade, "flat", ExcelMissing.Value));
+            Assert.Equal("#ERROR _Quote: discount_curve_set is blank, expected discount curve set handle", Seam.Call("_Quote", market, "F27", otc, "flat", ExcelEmpty.Value));
+            Assert.Equal("#ERROR _Quote: pricing is blank, expected text", Seam.Call("_Quote", market, "F27", otc, ExcelEmpty.Value, rates));
+            Assert.Equal("#ERROR _Quote: pricing is missing, expected text", Seam.Call("_Quote", market, "F27", otc, ExcelMissing.Value, rates));
+            Assert.Equal("#ERROR _Quote: ValueError: pricing is 'FTC', expected flat or ftc", Seam.Call("_Quote", market, "F27", otc, "FTC", rates));
+            // A formula written before the argument existed has its curve where the pricing now goes.
+            Assert.Equal($"#ERROR _Quote: ValueError: pricing is '{rates}', expected flat or ftc", Seam.Call("_Quote", market, "F27", otc, rates, ExcelMissing.Value));
+            Assert.Equal("#ERROR _Quote: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, under flat and ftc alike", Seam.Call("_Quote", market, "F27", otc, "ftc", ExcelMissing.Value));
+            Assert.Equal("#ERROR _Quote: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, under flat and ftc alike", Seam.Call("_Quote", market, "F27", otc, "flat", ExcelMissing.Value));
+            Assert.Equal("#ERROR _Quote: ValueError: discount_curve_set is a collection of 1 curve, expected none with route = cleared; a cleared quote discounts nothing", Seam.Call("_Quote", market, "F27", cleared, "flat", rates));
             Assert.Equal($"#ERROR _CreateTrades: template is quote template handle '{otc}', expected trade template handle", Seam.Call("_CreateTrades", index, Row("quantity"), 1.0, otc));
         }
 
@@ -1318,9 +1333,14 @@ namespace Catalyst.Host.Tests
             var dated = (string)Seam.Call("_CreateRFQ", index, withDays, new object[,] { { "F27", 100000.0, 46426.0 }, { "G27", 300000.0, 46447.0 } }, otc);
             Assert.StartsWith(Pid + ":rfq:STRIP:", dated);
             var daily = (string)Seam.Call("_CreateRFQ", index, byCode, ticket, cleared);
-            Assert.Equal(20610000.0 / 393000.0, (double)Seam.Call("_QuoteRFQ", market, saved, rates), 12);
-            Assert.Equal(20602500.0 / 392750.0, (double)Seam.Call("_QuoteRFQ", market, dated, rates), 12);
-            Assert.Equal(597.0 / 11.5, (double)Seam.Call("_QuoteRFQ", market, daily, ExcelMissing.Value), 12);
+            Assert.Equal(20610000.0 / 393000.0, (double)Seam.Call("_QuoteRFQ", market, saved, "flat", rates), 12);
+            Assert.Equal(20602500.0 / 392750.0, (double)Seam.Call("_QuoteRFQ", market, dated, "flat", rates), 12);
+            Assert.Equal(597.0 / 11.5, (double)Seam.Call("_QuoteRFQ", market, daily, "flat", ExcelMissing.Value), 12);
+            // Since fit-to-curve-price.md the same saved requests under ftc: the quantities alone, 21,000,000
+            // over 400,000, whichever days they pay on; the cleared one the same under either.
+            Assert.Equal(52.5, (double)Seam.Call("_QuoteRFQ", market, saved, "ftc", rates), 12);
+            Assert.Equal(52.5, (double)Seam.Call("_QuoteRFQ", market, dated, "ftc", rates), 12);
+            Assert.Equal(597.0 / 11.5, (double)Seam.Call("_QuoteRFQ", market, daily, "ftc", ExcelMissing.Value), 12);
             var shown = (object[,])Seam.Call("util_ReadHandle", dated);
             Assert.Equal(4, shown.GetLength(0));
             Assert.Equal(15, shown.GetLength(1));  // nearby last, since nearby-selection.md
@@ -1342,7 +1362,8 @@ namespace Catalyst.Host.Tests
             Assert.Equal(3100000.0, ((object[,])Seam.Call("util_ReadHandle", daily))[2, 4]);
             var onetime = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", fields, Row("bilateral", "financial", "asian", "period", "+1bd", weekends, "SOFR", "onetime", 1.0));
             var windows = (string)Seam.Call("_CreateRFQ", index, Row("start_date", "end_date", "quantity", "payment_day"), new object[,] { { 46398.0, 46444.0, 100000.0, 46447.0 }, { 46419.0, 46430.0, 300000.0, 46433.0 } }, onetime);
-            Assert.Equal(22350000.0 / 393500.0, (double)Seam.Call("_QuoteRFQ", market, windows, rates), 9);
+            Assert.Equal(22350000.0 / 393500.0, (double)Seam.Call("_QuoteRFQ", market, windows, "flat", rates), 9);
+            Assert.Equal((100000.0 * 1650.0 / 35.0 + 300000.0 * 60.0) / 400000.0, (double)Seam.Call("_QuoteRFQ", market, windows, "ftc", rates), 9);
             var byDates = (object[,])Seam.Call("util_ReadHandle", windows);
             Assert.Equal("2027-01-11 to 2027-02-26", byDates[2, 1]);
             Assert.Equal("2027-02-01 to 2027-02-12", byDates[3, 1]);
@@ -1354,11 +1375,13 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _CreateRFQ: ValueError: payment_day row 1 is '+2bd', expected a date; a request's rows pay on dates, and a rule is the template's to hold", Seam.Call("_CreateRFQ", index, withDays, Row("F27", 100000.0, "+2bd"), otc));
             Assert.Equal("#ERROR _CreateRFQ: ValueError: contract_code row 2 is 'H27', expected months the index's schedule has a contract for; it has none for 2027-03", Seam.Call("_CreateRFQ", index, byCode, new object[,] { { "F27", 1.0 }, { "H27", 1.0 } }, otc));
             Assert.Equal("#ERROR _CreateRFQ: ValueError: F27 of row 1 pays on 2027-01-29, expected a day after its last observation, 2027-01-29, when its final price exists", Seam.Call("_CreateRFQ", index, withDays, Row("F27", 100000.0, 46416.0), otc));
-            Assert.Equal("#ERROR _QuoteRFQ: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, whose payments it discounts", Seam.Call("_QuoteRFQ", market, saved, ExcelMissing.Value));
-            Assert.Equal($"#ERROR _QuoteRFQ: rfq is quote template handle '{otc}', expected rfq handle", Seam.Call("_QuoteRFQ", market, otc, rates));
+            Assert.Equal("#ERROR _QuoteRFQ: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, under flat and ftc alike", Seam.Call("_QuoteRFQ", market, saved, "flat", ExcelMissing.Value));
+            Assert.Equal($"#ERROR _QuoteRFQ: rfq is quote template handle '{otc}', expected rfq handle", Seam.Call("_QuoteRFQ", market, otc, "flat", rates));
+            Assert.Equal("#ERROR _QuoteRFQ: ValueError: pricing is 'both', expected flat or ftc", Seam.Call("_QuoteRFQ", market, saved, "both", rates));
+            Assert.Equal($"#ERROR _QuoteRFQ: ValueError: pricing is '{rates}', expected flat or ftc", Seam.Call("_QuoteRFQ", market, saved, rates, ExcelMissing.Value));
             var other = Index(schedule, holidays, "OTHER");
             var elsewhere = (string)Seam.Call("_CreateMarket", (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", date, other), (string)Seam.Call("_CreateFuturesFixings", Column(46386.0, 46385.0, 46384.0, 46381.0, 46380.0, 46379.0, 46378.0, 46377.0, 46374.0, 46373.0, 46372.0), Column(3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0), other)), (string)Seam.Call("_CreatePriceVector", "OTHER", Column(30.0, 60.0)));
-            Assert.StartsWith("#ERROR _QuoteRFQ: ValueError: market is over another index, 'OTHER', expected the request's, 'STRIP'", (string)Seam.Call("_QuoteRFQ", elsewhere, saved, rates));
+            Assert.StartsWith("#ERROR _QuoteRFQ: ValueError: market is over another index, 'OTHER', expected the request's, 'STRIP'", (string)Seam.Call("_QuoteRFQ", elsewhere, saved, "flat", rates));
         }
 
         // Since payment-day-date-or-rule.md the payment field holds a date or a rule: the ticket's two
@@ -2195,11 +2218,11 @@ namespace Catalyst.Host.Tests
             var quoteFields = Row("route", "settlement_method", "schedule_method", "quantity_per", "settlement_frequency", "payment_day", "payment_holiday_calendar", "nearby");
             var later = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", quoteFields, Row("cleared", "financial", "asian", "period", "onetime", 46191.0, holidays, 2.0));
             Assert.StartsWith(Pid + ":quote_template:", later);
-            Assert.Equal(82.5, (double)Seam.Call("_QuoteByDates", market, 46188.0, 46189.0, later, ExcelMissing.Value), 12);
+            Assert.Equal(82.5, (double)Seam.Call("_QuoteByDates", market, 46188.0, 46189.0, later, "flat", ExcelMissing.Value), 12);
             var expiry = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", quoteFields, Row("cleared", "financial", "lastday", "month", "monthly", "+2bd", holidays, 2.0));
-            Assert.Equal("#ERROR _Quote: ValueError: nearby of the quote is 2, expected 1 under schedule_method = lastday; the expiry-based methods take their own contract's days, and a later nearby is priced under asian", Seam.Call("_Quote", market, "N26", expiry, ExcelMissing.Value));
+            Assert.Equal("#ERROR _Quote: ValueError: nearby of the quote is 2, expected 1 under schedule_method = lastday; the expiry-based methods take their own contract's days, and a later nearby is priced under asian", Seam.Call("_Quote", market, "N26", expiry, "flat", ExcelMissing.Value));
             var prompt = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", quoteFields, Row("cleared", "financial", "asian", "period", "onetime", 46191.0, holidays, 1.0));
-            Assert.Equal(80.5, (double)Seam.Call("_QuoteByDates", market, 46188.0, 46189.0, prompt, ExcelMissing.Value), 12);
+            Assert.Equal(80.5, (double)Seam.Call("_QuoteByDates", market, 46188.0, 46189.0, prompt, "flat", ExcelMissing.Value), 12);
         }
 
         // The calendar: the valuation date and the index of a three-contract schedule with a one-day

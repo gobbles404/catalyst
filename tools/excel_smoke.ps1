@@ -396,9 +396,9 @@ $formulas = [ordered]@{
     "=_CreateTrades(XV5,XQ39:XW39,XQ45:XW45,XV22)" = "#ERROR _CreateTrades: trade_rows cell (1, 7) is text 'second', expected number"
     "=_CreateTrades(XV5,XQ39:XV39,XQ40:XV41,XV22)" = "#ERROR _CreateTrades: ValueError: nearby is missing, expected a value in the template or a column in the ticket"
     "=_CreateTrades(XV5,XQ39:XW39,XQ40:XW41,XV13)" = "#ERROR _CreateTrades: ValueError: nearby is supplied by the template and by the ticket, expected by one of them"
-    "=_QuoteByDates(XV17,XS34,XT34,XV51)" = "82.5"
-    '=_Quote(XV17,"N26",XV53)'          = "#ERROR _Quote: ValueError: nearby of the quote is 2, expected 1 under schedule_method = lastday; the expiry-based methods take their own contract's days, and a later nearby is priced under asian"
-    "=_QuoteByDates(XV17,XS34,XT34,XV52)" = "80.5"
+    '=_QuoteByDates(XV17,XS34,XT34,XV51,"flat")' = "82.5"
+    '=_Quote(XV17,"N26",XV53,"flat")'          = "#ERROR _Quote: ValueError: nearby of the quote is 2, expected 1 under schedule_method = lastday; the expiry-based methods take their own contract's days, and a later nearby is priced under asian"
+    '=_QuoteByDates(XV17,XS34,XT34,XV52,"flat")' = "80.5"
     # The IFERC fixings: a creator over a column of contract codes, the newest month first as the
     # creator requires, a column of indices and the index in EE2, whose schedule holds those four
     # months the other way up, read back through util_ReadHandle newest first; the creator again
@@ -1196,9 +1196,14 @@ $formulas = [ordered]@{
     '=TEXT(MS10,"0.000000")' = "74.684211"
     "=ROUND(1900*(MS10-70)-INDEX(_ReportValues(MS9),3,1),6)" = "0"
     '=TEXT(MS11,"0.000000")' = "74.666667"
-    "=_QuoteByDates(MY9,MV6,MU6,MJ9)" = "#ERROR _QuoteByDates: ValueError: end_date is 2026-12-18, expected a day on or after start_date, 2027-01-15"
-    '=_QuoteByDates(MY9,"18-Dec-2026",MV6,MJ9)' = "#ERROR _QuoteByDates: start_date is text '18-Dec-2026', expected date"
-    '=_Quote(MY9,"F27-G27",MJ9)' = "#ERROR _Quote: ValueError: settlement_frequency is 'onetime', expected 'monthly'; a quote by contract code prices by the month, and _QuoteByDates prices a onetime period across two dates"
+    # Since fit-to-curve-price.md the pricing: one window, and a cleared strip, are each the same
+    # price under ftc as under flat.
+    '=_QuoteByDates(MY9,MU6,MV6,MJ9,"ftc")-MS10' = "0"
+    '=_QuoteByDates(MY9,MU6,MV6,MJ11,"ftc")-MS11' = "0"
+    '=_QuoteByDates(MY9,MU6,MV6,MJ11,"Flat")' = "#ERROR _QuoteByDates: ValueError: pricing is 'Flat', expected flat or ftc"
+    '=_QuoteByDates(MY9,MV6,MU6,MJ9,"flat")' = "#ERROR _QuoteByDates: ValueError: end_date is 2026-12-18, expected a day on or after start_date, 2027-01-15"
+    '=_QuoteByDates(MY9,"18-Dec-2026",MV6,MJ9,"flat")' = "#ERROR _QuoteByDates: start_date is text '18-Dec-2026', expected date"
+    '=_Quote(MY9,"F27-G27",MJ9,"flat")' = "#ERROR _Quote: ValueError: settlement_frequency is 'onetime', expected 'monthly'; a quote by contract code prices by the month, and _QuoteByDates prices a onetime period across two dates"
     # The risk by day, month and year, unified-risk-reporting.md: _ReportRisk on the WTI block's
     # results, the nominal delta by day six rows under the Total, 0.2 a day from 46374, by month one
     # row from 46357 and by year one from 46023, each 1.2; all three on one axis with the DV01
@@ -2200,8 +2205,8 @@ $formulas = [ordered]@{
     '=TEXT(VP1,"0.000000000000")' = "44.923857868020"
     '=TEXT(VP2,"0.000000000000")' = "44.237288135593"
     "=VP3" = "30"
-    '=_Quote(VA7,"f27-g27",VF3,VN6)-VP1' = "0"
-    '=_Quote(VA7,"F27-G27",VF7)-VP2' = "0"
+    '=_Quote(VA7,"f27-g27",VF3,"flat",VN6)-VP1' = "0"
+    '=_Quote(VA7,"F27-G27",VF7,"flat")-VP2' = "0"
     '=MID(VF3,FIND(":",VF3)+1,15)' = "quote_template:"
     "=ROWS(util_ReadHandle(VF3))" = "3"
     "=COLUMNS(util_ReadHandle(VF3))" = "10"
@@ -2209,12 +2214,12 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(VF3),3,1)" = "fixed_float"
     "=INDEX(util_ReadHandle(VF3),3,7)" = "a holiday calendar"
     "=INDEX(util_ReadHandle(VF3),3,8)" = "SOFR"
-    '=LEFT(_Quote(VA7,"F27",GP3,VN6),41)' = "#ERROR _Quote: template is trade template"
-    '=_Quote(VA7,"F27",VF3,C2)' = "#ERROR _Quote: discount_curve_set is blank, expected discount curve set handle"
-    '=_Quote(VA7,"F27",VF3)' = "#ERROR _Quote: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, whose payments it discounts"
-    '=_Quote(VA7,"F27",VF7,VN6)' = "#ERROR _Quote: ValueError: discount_curve_set is a collection of 1 curve, expected none with route = cleared; a cleared quote discounts nothing"
-    '=_Quote(VA7,"F27",VF3,UQ5)' = "#ERROR _Quote: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2026-12-31, the valuation date; a curve is never rebased"
-    '=_Quote(VA7,"CAL28",VF7)' = "#ERROR _Quote: ValueError: contract_code is 'CAL28', expected months the index's schedule has a contract for; it has none for 2028-01"
+    '=LEFT(_Quote(VA7,"F27",GP3,"flat",VN6),41)' = "#ERROR _Quote: template is trade template"
+    '=_Quote(VA7,"F27",VF3,"flat",C2)' = "#ERROR _Quote: discount_curve_set is blank, expected discount curve set handle"
+    '=_Quote(VA7,"F27",VF3,"flat")' = "#ERROR _Quote: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, under flat and ftc alike"
+    '=_Quote(VA7,"F27",VF7,"flat",VN6)' = "#ERROR _Quote: ValueError: discount_curve_set is a collection of 1 curve, expected none with route = cleared; a cleared quote discounts nothing"
+    '=_Quote(VA7,"F27",VF3,"flat",UQ5)' = "#ERROR _Quote: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2026-12-31, the valuation date; a curve is never rebased"
+    '=_Quote(VA7,"CAL28",VF7,"flat")' = "#ERROR _Quote: ValueError: contract_code is 'CAL28', expected months the index's schedule has a contract for; it has none for 2028-01"
     '=_CreateQuoteTemplate("fixed_float",FG1:FK1,FG2:FK2)' = "#ERROR _CreateQuoteTemplate: ValueError: trade_id is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_calendar, settlement_frequency, nearby"
     '=_CreateQuoteTemplate("cashflow",UH1:UL1,UH2:UL2)' = "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'cashflow', expected one a quote prices: 'fixed_float'"
     '=_CreateQuoteTemplate("fixed_float",VF1:VM1,VF6:VM6)' = "#ERROR _CreateQuoteTemplate: values cell (1, 8) is blank, expected text"
@@ -2222,9 +2227,23 @@ $formulas = [ordered]@{
     # The balance of a period, balance-of-period-quotes.md: with both months ahead BALF27-G27 is the
     # strip; December's balance on its last day is that day alone, priced by F27 as the calendar says;
     # November's has ended.
-    '=_Quote(VA7,"BALF27-G27",VF7)-VP2' = "0"
-    '=_Quote(VA7,"BALZ26",VF7)' = "30"
-    '=_Quote(VA7,"BALX26",VF7)' = "#ERROR _Quote: ValueError: valuation_date is 2026-12-31, after 'BALX26' ended on 2026-11-30, expected a valuation day on or before the period's last day"
+    '=_Quote(VA7,"BALF27-G27",VF7,"flat")-VP2' = "0"
+    '=_Quote(VA7,"BALZ26",VF7,"flat")' = "30"
+    '=_Quote(VA7,"BALX26",VF7,"flat")' = "#ERROR _Quote: ValueError: valuation_date is 2026-12-31, after 'BALX26' ended on 2026-11-30, expected a valuation day on or before the period's last day"
+    # The pricing, fit-to-curve-price.md: ftc weighs the months by quantity alone, 45 where the flat
+    # bilateral price of VP1 is 44.92; one month, and the cleared quote, are the same under either;
+    # the collection is asked for alike, and a word that is neither is refused by name, a blank
+    # cell and a left-out argument by the seam. A formula written before the argument existed has
+    # its curve where the pricing now goes, or is a cell short, and is told so.
+    '=TEXT(_Quote(VA7,"F27-G27",VF3,"ftc",VN6),"0.000000000000")' = "45.000000000000"
+    '=_Quote(VA7,"F27",VF3,"ftc",VN6)-VP3' = "0"
+    '=_Quote(VA7,"F27-G27",VF7,"ftc")-VP2' = "0"
+    '=_Quote(VA7,"F27-G27",VF3,"ftc")' = "#ERROR _Quote: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, under flat and ftc alike"
+    '=_Quote(VA7,"F27-G27",VF3,"FTC",VN6)' = "#ERROR _Quote: ValueError: pricing is 'FTC', expected flat or ftc"
+    '=_Quote(VA7,"F27-G27",VF3,C2,VN6)' = "#ERROR _Quote: pricing is blank, expected text"
+    '=_Quote(VA7,"F27-G27",VF7)' = "#ERROR _Quote: pricing is missing, expected text"
+    '=LEFT(_Quote(VA7,"F27-G27",VF3,VN6),39)' = "#ERROR _Quote: ValueError: pricing is '"
+    '=RIGHT(_Quote(VA7,"F27-G27",VF3,VN6),23)' = "', expected flat or ftc"
     # A pair of indexes, two-index-fixed-float.md and two-index-one-price.md: A a futures index and
     # B an IFERC index over one NYMEX NG specification, booked as one row of G27 for one lot at the
     # outright 3.00 in WJ22 over the column WJ5:WJ6, prepared in WJ23 over the histories WJ13:WJ14
@@ -2337,9 +2356,9 @@ $formulas = [ordered]@{
     # quantities, the template's kind and the collection refused in the seam's words and the
     # library's.
     '=MID(XD1,FIND(":",XD1)+1,10)' = "rfq:STRIP:"
-    '=TEXT(_QuoteRFQ(VA7,XD1,VN6),"0.0000")' = "52.4427"
-    '=TEXT(_QuoteRFQ(VA7,XD2,VN6),"0.0000")' = "52.4570"
-    '=TEXT(_QuoteRFQ(VA7,XD3),"0.0000")'     = "51.9130"
+    '=TEXT(_QuoteRFQ(VA7,XD1,"flat",VN6),"0.0000")' = "52.4427"
+    '=TEXT(_QuoteRFQ(VA7,XD2,"flat",VN6),"0.0000")' = "52.4570"
+    '=TEXT(_QuoteRFQ(VA7,XD3,"flat"),"0.0000")'     = "51.9130"
     "=ROWS(util_ReadHandle(XD1))"        = "4"
     "=COLUMNS(util_ReadHandle(XD1))"     = "15"
     "=INDEX(util_ReadHandle(XD1),1,1)"   = "row"
@@ -2359,11 +2378,11 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(XD3),3,5)"   = "3100000"
     "=INDEX(util_ReadHandle(XD3),4,5)"   = "8400000"
     "=INDEX(util_ReadHandle(XD3),3,13)"  = "-"
-    "=_QuoteRFQ(VA7,XD4,VN6)" = "#ERROR _QuoteRFQ: ValueError: the payment of G27 on 2027-03-08 on SOFR is past the discount curve 'SOFR', which runs from 2026-12-31 to 2027-03-01; expected every payment day after the valuation date covered"
-    "=_QuoteRFQ(FM11,XD1,VN6)" = "#ERROR _QuoteRFQ: ValueError: market is over another index, 'TOY_GAS', expected the request's, 'STRIP'"
-    "=_QuoteRFQ(VA7,XD1)"     = "#ERROR _QuoteRFQ: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, whose payments it discounts"
-    "=_QuoteRFQ(VA7,XD3,VN6)" = "#ERROR _QuoteRFQ: ValueError: discount_curve_set is a collection of 1 curve, expected none with route = cleared; a cleared quote discounts nothing"
-    "=LEFT(_QuoteRFQ(VA7,VF3,VN6),46)" = "#ERROR _QuoteRFQ: rfq is quote template handle"
+    '=_QuoteRFQ(VA7,XD4,"flat",VN6)' = "#ERROR _QuoteRFQ: ValueError: the payment of G27 on 2027-03-08 on SOFR is past the discount curve 'SOFR', which runs from 2026-12-31 to 2027-03-01; expected every payment day after the valuation date covered"
+    '=_QuoteRFQ(FM11,XD1,"flat",VN6)' = "#ERROR _QuoteRFQ: ValueError: market is over another index, 'TOY_GAS', expected the request's, 'STRIP'"
+    '=_QuoteRFQ(VA7,XD1,"flat")'     = "#ERROR _QuoteRFQ: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, under flat and ftc alike"
+    '=_QuoteRFQ(VA7,XD3,"flat",VN6)' = "#ERROR _QuoteRFQ: ValueError: discount_curve_set is a collection of 1 curve, expected none with route = cleared; a cleared quote discounts nothing"
+    '=LEFT(_QuoteRFQ(VA7,VF3,"flat",VN6),46)' = "#ERROR _QuoteRFQ: rfq is quote template handle"
     # The rows by dates, dated-quotes.md: the two windows in XD5, 11 January to 26 February at
     # 1650/35 paying 1 March at 0.98 and 1 to 12 February at 60 paying 15 February at 0.985,
     # 22,350,000 over 393,500, the readback naming each by its dates; a strip row its two months;
@@ -2371,7 +2390,18 @@ $formulas = [ordered]@{
     # quantities of nothing or below zero, a date on a month's last observation, a ticket without
     # a quantity, the dates reversed and a trade template refused in the seam's words and the
     # library's.
-    '=TEXT(_QuoteRFQ(VA7,XD5,VN6),"0.000000")' = "56.797967"
+    '=TEXT(_QuoteRFQ(VA7,XD5,"flat",VN6),"0.000000")' = "56.797967"
+    # The same saved requests under ftc, fit-to-curve-price.md: the quantities alone, 21,000,000
+    # over 400,000, whichever days they pay on, so the request paying past the curve in XD4, which
+    # the flat price refuses, is priced too; the cleared one the same under either; the windows
+    # by quantity alone, 100,000 at 1650/35 and 300,000 at 60 over 400,000.
+    '=TEXT(_QuoteRFQ(VA7,XD1,"ftc",VN6),"0.000000000000")' = "52.500000000000"
+    '=TEXT(_QuoteRFQ(VA7,XD2,"ftc",VN6),"0.000000000000")' = "52.500000000000"
+    '=TEXT(_QuoteRFQ(VA7,XD4,"ftc",VN6),"0.000000000000")' = "52.500000000000"
+    '=_QuoteRFQ(VA7,XD3,"ftc")-_QuoteRFQ(VA7,XD3,"flat")' = "0"
+    '=TEXT(_QuoteRFQ(VA7,XD5,"ftc",VN6),"0.000000")' = "56.785714"
+    '=_QuoteRFQ(VA7,XD1,"both",VN6)' = "#ERROR _QuoteRFQ: ValueError: pricing is 'both', expected flat or ftc"
+    '=_QuoteRFQ(VA7,XD1)' = "#ERROR _QuoteRFQ: pricing is missing, expected text"
     "=INDEX(util_ReadHandle(XD5),3,2)"   = "2027-01-11 to 2027-02-26"
     "=INDEX(util_ReadHandle(XD5),4,2)"   = "2027-02-01 to 2027-02-12"
     "=INDEX(util_ReadHandle(XD5),4,14)"  = "onetime"
@@ -2921,8 +2951,8 @@ $cells = [ordered]@{
     "MJ9" = '=_CreateQuoteTemplate("fixed_float",HSTACK(VF5:VL5,"nearby"),HSTACK(MJ8:MP8,1))'
     "MJ10" = "cleared"; "MK10" = "financial"; "ML10" = "asian"; "MM10" = "month"; "MN10" = "+2bd"; "MO10" = "=MC3"; "MP10" = "monthly"
     "MJ11" = '=_CreateQuoteTemplate("fixed_float",HSTACK(VF5:VL5,"nearby"),HSTACK(MJ10:MP10,1))'
-    "MS10" = "=_QuoteByDates(MY9,MU6,MV6,MJ9)"
-    "MS11" = "=_QuoteByDates(MY9,MU6,MV6,MJ11)"
+    "MS10" = '=_QuoteByDates(MY9,MU6,MV6,MJ9,"flat")'
+    "MS11" = '=_QuoteByDates(MY9,MU6,MV6,MJ11,"flat")'
     "NH1" = "X26"; "NJ1" = "2-Nov-2026"
     "NH2" = "Z26"; "NJ2" = "1-Dec-2026"
     "NH3" = "F27"; "NJ3" = "4-Jan-2027"
@@ -3767,9 +3797,9 @@ $cells = [ordered]@{
     "VN4" = "1-Mar-2027"; "VO4" = "0.98"
     "VN5" = '=_CreateDiscountCurve("SOFR",VN1:VO1,VN2:VO4)'
     "VN6" = "=_CollectDiscountCurves(VN5)"
-    "VP1" = '=_Quote(VA7,"F27-G27",VF3,VN6)'
-    "VP2" = '=_Quote(VA7,"F27-G27",VF7)'
-    "VP3" = '=_Quote(VA7,"F27",VF3,VN6)'
+    "VP1" = '=_Quote(VA7,"F27-G27",VF3,"flat",VN6)'
+    "VP2" = '=_Quote(VA7,"F27-G27",VF7,"flat")'
+    "VP3" = '=_Quote(VA7,"F27",VF3,"flat",VN6)'
     # The pair, two-index-fixed-float.md: A's futures schedule in WA1:WB3 with 1 January 2027 closed,
     # B's IFERC schedule in WA5:WB9, the NYMEX NG specification in WD1:WH2 shared by the two
     # indexes, A in WJ5 and B in WJ6, a column; the valuation day 4 January 2027 in WA11, A's two

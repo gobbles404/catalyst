@@ -186,9 +186,11 @@ BILATERAL = a_template("bilateral")
 CLEARED = a_template("cleared")
 
 
-def counted(code: str, template: QuoteTemplate, curves: DiscountCurveSet | None) -> dict[str, int]:
+def counted(
+    code: str, template: QuoteTemplate, curves: DiscountCurveSet | None, pricing: str = "flat"
+) -> dict[str, int]:
     counter = WorkCounter()
-    quote(MARKET, code, template, curves, counter)
+    quote(MARKET, code, template, pricing, curves, counter)
     return counter.freeze().as_dict()
 
 
@@ -257,6 +259,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
 # payments and factors, the shares and their sum.
 LEDGER = {
     "quote": 1,
+    "pricing_of": 1,  # the pricing read once, flat or ftc, since fit-to-curve-price.md
     "quote.<locals>.<lambda>": 1,  # the span read once the terms are checked; the period's
     # words never, nothing refused
     "_priced": 1,  # the steps a label and two dates share, since dated-quotes.md
@@ -268,7 +271,7 @@ LEDGER = {
     "schedule_method_of": 1,
     "quantity_per_of": 1,
     "settlement_frequency_of": 1,  # since onetime-averaging.md
-    "choice": 5,
+    "choice": 6,  # the template's five codes and the pricing
     "payment_rule_of": 1,
     "read_offset": 1,
     "by_the_month": 1,  # a label names months, since dated-quotes.md
@@ -326,10 +329,45 @@ LEDGER = {
 
 
 def test_a_month_and_a_strip_run_the_same_functions_once(call_profile: CallProfile) -> None:
-    month = call_profile(lambda: quote(MARKET, "M27", BILATERAL, RATES, WorkCounter()))
-    strip = call_profile(lambda: quote(MARKET, "CAL27", BILATERAL, RATES, WorkCounter()))
+    month = call_profile(lambda: quote(MARKET, "M27", BILATERAL, "flat", RATES, WorkCounter()))
+    strip = call_profile(lambda: quote(MARKET, "CAL27", BILATERAL, "flat", RATES, WorkCounter()))
     assert month == LEDGER
     assert strip == LEDGER
+
+
+# --- the fit-to-curve price, fit-to-curve-price.md ------------------------------------------------
+# What a flat bilateral quote runs and a fit-to-curve one does not: the factors, read off the
+# curve for the payments ahead, with the curve's last day asked for its coverage.
+FACTORS = ("_the_factors", "factors_on", "DiscountCurve.max_date")
+
+
+def test_a_fit_to_curve_quote_reports_the_flat_quotes_work_but_the_factors() -> None:
+    # The year under ftc: every count of the flat quote but the factors, none read; the curve
+    # still selected, taken alike under both. A cleared quote reports the same work under either.
+    flat, ftc = counted("CAL27", BILATERAL, RATES), counted("CAL27", BILATERAL, RATES, "ftc")
+    assert "payment_factors_read" not in ftc
+    assert {**ftc, "payment_factors_read": 7} == flat
+    assert ftc["curves_selected"] == 1
+    assert counted("CAL27", CLEARED, None, "ftc") == counted("CAL27", CLEARED, None)
+
+
+def test_a_fit_to_curve_quote_runs_the_flat_quotes_functions_but_the_factors(
+    call_profile: CallProfile,
+) -> None:
+    expected = {
+        **{name: count for name, count in LEDGER.items() if name not in FACTORS},
+        "DiscountCurve.start_date": 1,  # read for the start alone, not again for a factor
+        "WorkCounter.hit": 11,  # one fewer, the factors uncounted
+    }
+    month = call_profile(lambda: quote(MARKET, "M27", BILATERAL, "ftc", RATES, WorkCounter()))
+    strip = call_profile(lambda: quote(MARKET, "CAL27", BILATERAL, "ftc", RATES, WorkCounter()))
+    assert month == expected
+    assert strip == expected
+
+
+def test_a_fit_to_curve_quote_allocates_within_the_flat_quotes_bound() -> None:
+    peak = least_peak(lambda: quote(MARKET, "CAL27", BILATERAL, "ftc", RATES, WorkCounter()))
+    assert peak <= 10_000 + 70 * 261 + SLACK
 
 
 # The peak of a quote, measured on 2026-10-18: 11,134 bytes for June's 22 observations and 26,579
@@ -342,7 +380,7 @@ def test_a_month_and_a_strip_run_the_same_functions_once(call_profile: CallProfi
     ids=["a month", "a year", "the balance of the year"],
 )
 def test_a_quote_allocates_within_its_observations(code: str, observations: int) -> None:
-    peak = least_peak(lambda: quote(MARKET, code, BILATERAL, RATES, WorkCounter()))
+    peak = least_peak(lambda: quote(MARKET, code, BILATERAL, "flat", RATES, WorkCounter()))
     assert peak <= 10_000 + 70 * observations + SLACK
 
 
@@ -379,7 +417,7 @@ BY_MONTH = ("schedule_months", "month_and_year", "schedule_rows", "month_bounds"
 
 def test_a_window_reports_its_work_and_the_same_dates_under_monthly_the_balances() -> None:
     counter = WorkCounter()
-    quote_by_dates(MARKET, JUNE_16, DEC_31, ONETIME_BILATERAL, RATES, counter)
+    quote_by_dates(MARKET, JUNE_16, DEC_31, ONETIME_BILATERAL, "flat", RATES, counter)
     assert counter.freeze().as_dict() == {
         "curves_selected": 1,
         "fixings_read": 0,
@@ -394,7 +432,7 @@ def test_a_window_reports_its_work_and_the_same_dates_under_monthly_the_balances
         "windows_resolved": 1,
     }
     counter = WorkCounter()
-    quote_by_dates(MARKET, JUNE_16, DEC_31, BILATERAL, RATES, counter)
+    quote_by_dates(MARKET, JUNE_16, DEC_31, BILATERAL, "flat", RATES, counter)
     assert counter.freeze().as_dict() == counted("BALCAL27", BILATERAL, RATES)
 
 
@@ -405,7 +443,9 @@ def test_two_dates_run_the_quotes_functions_once_but_the_labels(call_profile: Ca
     # were counted. The dated strip: the label's functions but its entry and grammar.
     shared = {name: count for name, count in LEDGER.items() if name not in BY_LABEL + BY_MONTH}
     window = call_profile(
-        lambda: quote_by_dates(MARKET, JUNE_16, DEC_31, ONETIME_BILATERAL, RATES, WorkCounter())
+        lambda: quote_by_dates(
+            MARKET, JUNE_16, DEC_31, ONETIME_BILATERAL, "flat", RATES, WorkCounter()
+        )
     )
     assert window == {
         **shared,
@@ -417,7 +457,7 @@ def test_two_dates_run_the_quotes_functions_once_but_the_labels(call_profile: Ca
         "WorkCounter.hit": 11,
     }
     strip = call_profile(
-        lambda: quote_by_dates(MARKET, JUNE_16, DEC_31, BILATERAL, RATES, WorkCounter())
+        lambda: quote_by_dates(MARKET, JUNE_16, DEC_31, BILATERAL, "flat", RATES, WorkCounter())
     )
     assert strip == {
         **{name: count for name, count in LEDGER.items() if name not in BY_LABEL},
@@ -429,6 +469,8 @@ def test_two_dates_run_the_quotes_functions_once_but_the_labels(call_profile: Ca
 
 def test_a_window_allocates_within_its_observations() -> None:
     peak = least_peak(
-        lambda: quote_by_dates(MARKET, JUNE_16, DEC_31, ONETIME_BILATERAL, RATES, WorkCounter())
+        lambda: quote_by_dates(
+            MARKET, JUNE_16, DEC_31, ONETIME_BILATERAL, "flat", RATES, WorkCounter()
+        )
     )
     assert peak <= 10_000 + 70 * 143 + SLACK

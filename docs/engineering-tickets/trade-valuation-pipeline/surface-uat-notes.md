@@ -898,3 +898,25 @@ Q26 into U26 inside the month, and a template by the month under `asian`; `_Quot
 L3311 and `_QuoteRFQ` over a request of the same month in L3314 show the same 84.5435, and
 L3315 their difference, nothing. Type a `nearby` column on a request's row and read the
 refusal that says to supply it on the quote template, B3316.
+
+## 33. A fit-to-curve single price from the quote functions
+
+Agreed 17 November 2026 and built in #249, issue #219:
+[fit-to-curve-price.md](fit-to-curve-price.md), one pull request from main. `_Quote`,
+`_QuoteByDates` and `_QuoteRFQ` take a required `pricing` word before the collection, `flat` or
+`ftc`: `flat` is the one fixed price each returned before, and `ftc`, fit to curve, the months'
+own prices averaged by quantity alone, no discount factor read. Every existing quote formula
+gains the word; nothing is added to a template or a booking.
+
+UAT: open a sheet saved before the change and read what its quote cells say, a bilateral one
+`pricing is '<the collection's handle>', expected flat or ftc` and a cleared one `pricing is
+missing, expected text`; add `"flat"` before the collection, or last where there is none, and
+see each number stand. Rows 3320 to 3329 of the kept workbook: the words in B3321 and B3322,
+CAL27 quoted from each in C3321 and C3322 under the bilateral template, 35.7841 flat and
+35.8333 fit to curve, D3322 the fit-to-curve price less the cleared quote of C2984, nothing;
+the saved request and the request of windows under each word in rows 3324 and 3325; the
+balance by its dates in B3326. Type `FTC` in capitals and read B3327's refusal. Change B3322
+to `flat` and see C3322 take the flat price, the formula untouched. Shorten the curve so that
+it stops before December's payment: the flat cell refuses and names the payment, and the
+fit-to-curve cell prices. Take the collection out of a fit-to-curve formula on the bilateral
+template and read that it is asked for under flat and ftc alike.
