@@ -117,12 +117,15 @@ QUOTE_LEDGER = {
     "quote_rfq": 1,
     "pricing_of": 1,  # the pricing read once, flat or ftc, since fit-to-curve-price.md
     "choice": 1,
+    "on_its_index": 1,  # the market over the request's index, the check its prices share
     "the_curve": 1,
     "the_curve.<locals>.<genexpr>": 2,
     "DiscountCurve.start_date": 2,
     "curve_starts_on": 1,
     "DiscountCurve.max_date": 1,
     "priced": 1,
+    "component_prices": 1,  # each component's own price and its share, the two steps the
+    "shares": 1,  # fit-to-curve prices share with the quote since ftc-monthly-prices.md
     "calendar_rows": 1,
     "_the_prices": 1,
     "MarketHistory.fixed_prices": 1,  # each fixed day's settle, by its day and its contract

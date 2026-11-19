@@ -14,7 +14,10 @@ in the index's quote units, every component in both sums whether its payment has
 not, the agreed full-period convention. Since fit-to-curve-price.md the caller says which of
 two prices it asks for: flat, the one fixed price above, and ftc, fit to curve, the same sums
 with every D_i taken as 1, the components' own prices averaged by quantity alone, which reads
-no factor of any curve. A quote resolves its period to a request on each call
+no factor of any curve. Since ftc-monthly-prices.md the two steps a request's fit-to-curve
+prices share with that price stand apart, each component's own price, component_prices, and
+the shares, shares, ftc_prices.py their second caller. A quote resolves its period to a request
+on each call
 and prices it at once, quote.py; a request for quote retains one and prices it on each market,
 rfq.py. docs/library/quoting/quote.md owns the calculation, docs/library/quoting/quote-by-dates.md
 the dated quote and docs/library/quoting/rfq.md the request."""
@@ -601,25 +604,44 @@ def priced(
     counter: WorkCounter,
 ) -> float:
     """The price of a resolved request on a market, under the curve its terms bound and the
-    pricing its caller chose: the observations' calendar rows on the market's calendar, a day
-    before it refused by name; a fixed day's price off the history and a live day's off the
-    market's quotes, each distinct live contract once; a physical request's contracts not yet
-    expired; a financial one's payment factors, under flat the selected curve covering every
-    payment after the valuation day, and under ftc, since fit-to-curve-price.md, one for every
-    payment, no factor read and no coverage asked of the curve; then each month's price and
-    its share. Each month's share is its weight, quantity times factor, over the weights' sum,
-    and the price the shares' sum of the months' prices: a convex
+    pricing its caller chose: each component's own price, component_prices, the fixings, the
+    live prices and a physical request's contracts not yet expired; a financial one's payment
+    factors, under flat the selected curve covering every payment after the valuation day, and
+    under ftc, since fit-to-curve-price.md, one for every payment, no factor read and no
+    coverage asked of the curve; then each month's share, shares, its quantity times its factor
+    over the weights' sum, and the price the shares' sum of the months' prices: a convex
     combination at each step, the observations' weights summing to one and the shares to one.
-    The weights are formed from the mantissas and exponents of the quantities and the factors
-    apart, shifted by one power of two from the largest weight's exponent, so that the largest
-    weight is at least a quarter and none is above one: a power of two moves the exponent
-    alone, so every share and price is as the plain products give it, while no quantity or
-    factor the inputs allow, a quantity of 1e-100 beside 1e224 or a factor near the smallest
-    number, which the curve accepts, drives a positive weight below the smallest number or the
-    weights' sum above the largest; a month whose weight is negligible beside the largest
-    counts for nothing, as it should, and one month's share is one whatever its factor."""
+    Work: the fixings and the live prices read, the factors read under flat, and four
+    reductions, the months' prices, the largest weight's exponent, the weights and the price."""
+    monthly = component_prices(request, market, counter)
+    pays = request.payment_date
+    if pays is None:
+        factor = np.ones(monthly.size)
+    else:
+        match pricing:
+            case Pricing.FLAT:
+                as_of = market.market_history.calendar.valuation_date.as_of
+                factor = _the_factors(
+                    curve, request.terms.key, pays, as_of, request.component, counter
+                )
+            case Pricing.FTC:
+                factor = np.ones(monthly.size)
+            case _:
+                assert_never(pricing)
+    counter.hit(PRICE_REDUCTIONS, 4)
+    return float((shares(request.quantity, factor) * monthly).sum())
+
+
+def component_prices(request: Request, market: Market, counter: WorkCounter) -> NDArray[np.float64]:
+    """Each component's own price on a market, the step a quote's one price and, since
+    ftc-monthly-prices.md, a request's fit-to-curve prices share, so that neither forms a
+    month's price a second way: the observations' calendar rows on the market's calendar, a day
+    before it refused by name; a fixed day's price off the history and a live day's off the
+    market's quotes, each distinct live contract once; each component's price the sum of its
+    observations' weighted prices, the weights summing to one; and a physical request's
+    contracts not yet expired, the check its prices' reading makes possible. Work: the fixings
+    and the live prices read; the reduction is the caller's to count with its own."""
     calendar = market.market_history.calendar
-    as_of = calendar.valuation_date.as_of
     observations = request.observations
     rows = calendar_rows(
         request.schedule,
@@ -629,35 +651,38 @@ def priced(
     )
     is_fixed = calendar.is_fixed[rows]
     prices = _the_prices(market, request.references, rows, is_fixed, counter)
-    n = request.period.contract.size
-    monthly = np.bincount(observations.component, weights=observations.weight * prices, minlength=n)
-    pays = request.payment_date
-    if pays is None:
-        _not_expired(observations, is_fixed, as_of, request.component)
-        factor = np.ones(n)
-    else:
-        match pricing:
-            case Pricing.FLAT:
-                factor = _the_factors(
-                    curve, request.terms.key, pays, as_of, request.component, counter
-                )
-            case Pricing.FTC:
-                factor = np.ones(n)
-            case _:
-                assert_never(pricing)
+    own = np.bincount(
+        observations.component,
+        weights=observations.weight * prices,
+        minlength=request.period.contract.size,
+    )
+    if request.payment_date is None:
+        _not_expired(observations, is_fixed, calendar.valuation_date.as_of, request.component)
+    return own
+
+
+def shares(quantity: NDArray[np.float64], factor: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Each component's share of a price: its weight, quantity times factor, over the weights'
+    sum, the factors all one for a price that discounts nothing. The weights are formed from
+    the mantissas and exponents of the quantities and the factors apart, shifted by one power
+    of two from the largest weight's exponent, so that the largest weight is at least a quarter
+    and none is above one: a power of two moves the exponent alone, so every share and price is
+    as the plain products give it, while no quantity or factor the inputs allow, a quantity of
+    1e-100 beside 1e224 or a factor near the smallest number, which the curve accepts, drives a
+    positive weight below the smallest number or the weights' sum above the largest; a
+    component whose weight is negligible beside the largest counts for nothing, as it should,
+    and one component's share is one whatever its factor."""
     # Each weight from the mantissas' product, a quarter to one for a month of something and
     # zero for a month of nothing, and the exponents' sum, shifted from the largest weight's: the
     # quantities hold at least one positive and the factors are all positive, so a largest
     # exists and the weights' sum is at least a quarter and at most the months.
-    mantissa, exponent = np.frexp(request.quantity)
+    mantissa, exponent = np.frexp(quantity)
     scale, shift = np.frexp(factor)
     mantissa = mantissa * scale
     exponent = exponent + shift
     largest = exponent[mantissa > 0].max()
     weight = np.ldexp(mantissa, exponent - largest)
-    share = weight / weight.sum()
-    counter.hit(PRICE_REDUCTIONS, 4)
-    return float((share * monthly).sum())
+    return weight / weight.sum()
 
 
 def _the_prices(

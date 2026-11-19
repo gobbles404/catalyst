@@ -1112,6 +1112,39 @@ def test_the_request_quote_explains_itself() -> None:
     ]
 
 
+def test_the_fit_to_curve_prices_explain_themselves() -> None:
+    description, arguments, hidden = SPECS["_QuoteFTCPrices"]
+    assert not hidden
+    assert description == (
+        "Quotes the fixed price of each month of a saved request from one agreed fit-to-curve "
+        "price, each month's own price moved by the same amount and rounded, and above them the "
+        "agreed price, the average the fixed prices come back to and the difference."
+    )
+    assert arguments == [
+        (
+            "market",
+            "The market handle over the request's index: the cell showing _CreateMarket's result, "
+            "such as I12, or a name for it, with the day's quotes over the history they follow.",
+        ),
+        (
+            "rfq",
+            "The request handle: the cell showing _CreateRFQ's result, such as B5, or a name for "
+            "it.",
+        ),
+        (
+            "price",
+            "The one price agreed for the request, a fit-to-curve price, such as B7 or 3.95; "
+            "every month's own price is moved by the same amount, this price less the request's "
+            "fit-to-curve quote.",
+        ),
+        (
+            "decimals",
+            "The decimals a fixed price may hold, a whole number from 0 to 15, such as 2; each "
+            "fixed price is rounded alone, as ROUND rounds.",
+        ),
+    ]
+
+
 # --- what registration refuses, on a function Excel lists ----------------------------------
 
 

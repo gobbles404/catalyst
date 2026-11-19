@@ -303,6 +303,8 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "_CreateRFQ", new object[] { "x:index:gas:9", Row("contract_code", "quantity"), Row("F27", 1.0), "y:quote_template:9" }, "#ERROR _CreateRFQ: index is text 'x:index:gas:9' naming no live object, expected index handle" };
             yield return new object[] { "_QuoteRFQ", new object[] { ExcelMissing.Value, "x:rfq:gas:9", "flat", ExcelMissing.Value }, "#ERROR _QuoteRFQ: market is missing, expected market handle" };
             yield return new object[] { "_QuoteRFQ", new object[] { "x:market:gas:9", "x:rfq:gas:9", "flat", ExcelMissing.Value }, "#ERROR _QuoteRFQ: market is text 'x:market:gas:9' naming no live object, expected market handle" };
+            yield return new object[] { "_QuoteFTCPrices", new object[] { ExcelMissing.Value, "x:rfq:gas:9", 3.95, 2.0 }, "#ERROR _QuoteFTCPrices: market is missing, expected market handle" };
+            yield return new object[] { "_QuoteFTCPrices", new object[] { "x:market:gas:9", "x:rfq:gas:9", 3.95, 2.0 }, "#ERROR _QuoteFTCPrices: market is text 'x:market:gas:9' naming no live object, expected market handle" };
             yield return new object[] { "_CreateTrades", new object[] { ExcelMissing.Value, Row("quantity"), 1.0, ExcelMissing.Value }, "#ERROR _CreateTrades: indexes is missing, expected index handles in a cell, a row or a column" };
             yield return new object[] { "_CreateTrades", new object[] { "x:index:gas:9", Row("quantity"), 1.0, "y:trade_template:9" }, "#ERROR _CreateTrades: indexes is text 'x:index:gas:9' naming no live object, expected index handle" };
             // The valuation path: the handles left out, naming nothing or of another kind, in the seam's words; the batch itself is in the fact below.
@@ -1341,6 +1343,44 @@ namespace Catalyst.Host.Tests
             Assert.Equal(52.5, (double)Seam.Call("_QuoteRFQ", market, saved, "ftc", rates), 12);
             Assert.Equal(52.5, (double)Seam.Call("_QuoteRFQ", market, dated, "ftc", rates), 12);
             Assert.Equal(597.0 / 11.5, (double)Seam.Call("_QuoteRFQ", market, daily, "ftc", ExcelMissing.Value), 12);
+            // Since ftc-monthly-prices.md the months' fixed prices from one agreed price: agreed at 52.63
+            // against the quote of 52.5 each month takes 13 cents, 30.13 and 60.13, which round at one
+            // decimal to 30.1 and 60.1 and come back to 21,040,000 over 400,000, 52.6, three cents under;
+            // the check's three rows, a dash in their spare cells, over the header, the types and a row a
+            // month. At the quote's own cell nothing moves and the difference is zero exactly.
+            var prices = (object[,])Seam.Call("_QuoteFTCPrices", market, saved, 52.63, 1.0);
+            Assert.Equal(7, prices.GetLength(0));
+            Assert.Equal(4, prices.GetLength(1));
+            Assert.Equal("agreed_price", prices[0, 0]);
+            Assert.Equal(52.63, prices[0, 1]);
+            Assert.Equal("-", prices[0, 2]);
+            Assert.Equal("-", prices[0, 3]);
+            Assert.Equal("average_fixed_price", prices[1, 0]);
+            Assert.Equal(52.6, (double)prices[1, 1], 12);
+            Assert.Equal("difference", prices[2, 0]);
+            Assert.Equal(-0.03, (double)prices[2, 1], 12);
+            Assert.Equal("period", prices[3, 0]);
+            Assert.Equal("fixed_price", prices[3, 3]);
+            Assert.Equal("str", prices[4, 0]);
+            Assert.Equal("float64", prices[4, 3]);
+            Assert.Equal("F27", prices[5, 0]);
+            Assert.Equal(100000.0, prices[5, 1]);
+            Assert.Equal(30.0, (double)prices[5, 2], 12);
+            Assert.Equal(30.1, prices[5, 3]);
+            Assert.Equal("G27", prices[6, 0]);
+            Assert.Equal(300000.0, prices[6, 1]);
+            Assert.Equal(60.1, prices[6, 3]);
+            var quoted = (double)Seam.Call("_QuoteRFQ", market, daily, "ftc", ExcelMissing.Value);
+            var atQuote = (object[,])Seam.Call("_QuoteFTCPrices", market, daily, quoted, 0.0);
+            Assert.Equal(0.0, atQuote[2, 1]);
+            Assert.Equal(3100000.0, atQuote[5, 1]);
+            Assert.Equal(30.0, atQuote[5, 3]);
+            Assert.Equal(60.0, atQuote[6, 3]);
+            Assert.Equal("#ERROR _QuoteFTCPrices: decimals is number 2.5, expected whole number", Seam.Call("_QuoteFTCPrices", market, saved, 52.63, 2.5));
+            Assert.Equal("#ERROR _QuoteFTCPrices: ValueError: decimals is 16, expected a whole number from 0 to 15, the decimals a fixed price may hold", Seam.Call("_QuoteFTCPrices", market, saved, 52.63, 16.0));
+            Assert.Equal("#ERROR _QuoteFTCPrices: price is text 'flat', expected number", Seam.Call("_QuoteFTCPrices", market, saved, "flat", 2.0));
+            Assert.Equal("#ERROR _QuoteFTCPrices: decimals is missing, expected whole number", Seam.Call("_QuoteFTCPrices", market, saved, 52.63, ExcelMissing.Value));
+            Assert.Equal($"#ERROR _QuoteFTCPrices: rfq is market handle '{market}', expected rfq handle", Seam.Call("_QuoteFTCPrices", market, market, 52.63, 2.0));
             var shown = (object[,])Seam.Call("util_ReadHandle", dated);
             Assert.Equal(4, shown.GetLength(0));
             Assert.Equal(15, shown.GetLength(1));  // nearby last, since nearby-selection.md

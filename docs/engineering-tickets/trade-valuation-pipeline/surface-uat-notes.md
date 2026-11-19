@@ -920,3 +920,25 @@ to `flat` and see C3322 take the flat price, the formula untouched. Shorten the 
 it stops before December's payment: the flat cell refuses and names the payment, and the
 fit-to-curve cell prices. Take the collection out of a fit-to-curve formula on the bilateral
 template and read that it is asked for under flat and ftc alike.
+
+## 34. The monthly prices of a fit-to-curve deal from its agreed price
+
+Agreed 18 November 2026 and built in #251, issue #250:
+[ftc-monthly-prices.md](ftc-monthly-prices.md), one pull request stacked on #249.
+`_QuoteFTCPrices(market, rfq, price, decimals)` takes the market and the saved request a quote
+took, the one price agreed and the decimals a monthly price may hold, and spills the fixed
+price of each month: its own price on the curve moved by the same amount, the agreed price
+less the request's fit-to-curve quote, and rounded alone as `ROUND` rounds. Above the months
+sit the agreed price, the average the fixed prices come back to and the difference. Nothing is
+fitted to the agreed price; the adjustment is the desk's.
+
+UAT: rows 3332 to 3349 of the kept workbook. Read the fit-to-curve quote of the request in
+B3334, 1.15, and the agreed price typed under it, 1.167; the table spills from A3338, the
+check in its first three rows and a row a month under the header and the types, 1.02 and 1.22
+coming back to 1.17, three tenths of a cent over. Change the agreed price and see every month
+move by the same amount and the difference follow; change the decimals in B3336 from 2 to 3
+and to 0. Column E holds the sheet's own `ROUND` of each month moved and column F whether the
+table agrees with it: try an agreed price of 1.155, where both months sit on a half. Point
+B3335 at the quote's own cell and read a difference of exactly 0, as B3346 shows. Move one
+month by a cent in a copy of the column and see your own SUMPRODUCT tie to the agreed price.
+B3348 and B3349 are the refusals of 2.5 decimals and of 16.

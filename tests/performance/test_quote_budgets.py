@@ -321,6 +321,8 @@ LEDGER = {
     "payments_after_observations": 1,  # the kernel's rule, one owner since
     # payment-day-date-or-rule.md
     "priced": 1,  # the request priced, since rfq-quoting.md, request.py
+    "component_prices": 1,  # each component's own price and its share, the two steps a request's
+    "shares": 1,  # fit-to-curve prices share with the quote since ftc-monthly-prices.md
     "_the_factors": 1,
     "factors_on": 1,
     "WorkCounter.__init__": 1,
