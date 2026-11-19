@@ -492,15 +492,16 @@ def test_a_grids_rows_are_counted_against_the_dates_whatever_its_width() -> None
     assert str(failure.value) == "settle has 3 rows, expected 4, one per date"
 
 
-# Any run of business days with any number of nearbys beside it, given newest first: kept oldest
-# first, every row of settles beside its own day and every column in its place.
+# Any run of the index's business days with any number of nearbys beside it, given newest first:
+# kept oldest first, every row of settles beside its own day and every column in its place. The
+# run skips the one day the index is closed, as the calendar it is checked against does.
 @settings(deadline=None)
 @given(count=st.integers(1, 120), nearbys=st.integers(1, 5), data=st.data())
 def test_any_grid_of_settles_is_kept_row_for_row_and_column_for_column(
     count: int, nearbys: int, data: st.DataObject
 ) -> None:
     start = np.datetime64("2000-01-01") + np.timedelta64(data.draw(st.integers(0, 36_000)), "D")
-    run = np.busday_offset(start, np.arange(count), roll="forward")
+    run = np.busday_offset(start, np.arange(count), roll="forward", holidays=ELSEWHERE)
     grid = np.array(
         data.draw(
             st.lists(
