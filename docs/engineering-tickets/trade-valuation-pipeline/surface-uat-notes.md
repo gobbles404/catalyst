@@ -969,19 +969,27 @@ amount; type `cleared` as the route and a broker's name, and read each refusal.
 
 ## 36. A float_float's spread price in its own unit, and the cracks
 
-Agreed 19 November 2026, issue #239: [float-float-units.md](float-float-units.md), one pull
-request stacked on #252, the second slice of two. A `float_float` books two indexes that
+Agreed 19 November 2026 and built in #253, issue #239:
+[float-float-units.md](float-float-units.md), stacked on #252, the second slice of two. A `float_float` books two indexes that
 price in different units, gasoline in dollars a gallon less crude in dollars a barrel, and
 every `float_float` template now types the unit its spread price is in, two fields,
 `spread_price_currency_unit` and `spread_price_quantity_unit`: USD and BBL on a crack, USD
 and MMBTU on a gas spread. No price is converted: each leg's quantity is counted in its own
 index's price unit and the spread price's in its own. Each index keeps its own lots.
 
-UAT: book 1,000 barrels of RB less WTI at a spread price of 15.00 with USD and BBL, RB at
-2.10 and WTI at 70.00, and read a payment of 3,200, one lot of RB and minus one of WTI; type
-the spread price as 1,500 with CENT, and the quantity as 1 of a lot both indexes define, and
-see the same numbers; clear one of the two unit cells on a gas spread's template and read
-the field named as missing; book a volume index against an energy index and read the
-refusal; book a C5 leg in cents a gallon against WTI at a spread price of -9.10 and read
-zero at 145 and 70.00. Then book one of the desk's cracks from the record and compare the
-mark with the record's NPV.
+UAT: rows 3382 to 3433 of the kept workbook, on two test indexes made there until the
+desk's inputs book a real crack. H3403 is the crack, RB in dollars a gallon less WTI in
+dollars a barrel, 1,000 barrels of G27 at a spread price of 15.00, the spread price's
+unit typed in B3408 and C3408, USD and BBL; its handle reads `RB-WTI`. B3415 reads its
+mark, 3,040, and the risk by year spills from B3418, one lot of RB and minus one of WTI,
+each in its own lot. Row 3426 reads back the spread price with its unit, the spread leg,
+each leg's floating contribution, the unit each leg's price is in and the payment, 3,200.
+Type 21 over the spread price in F3411, then GAL over BBL in C3408 and 0.5 over the 21,
+and read the same payment in I3426 both times, -2,800. Type LOT over BBL in D3408 and 1
+over the quantity in E3411 and see the first numbers again. Row 3429 is the same crack at
+1,500 cents a barrel. B3431 to B3433 are the refusals of no currency unit, a unit of
+another measure and a gas index beside RB. In the spread block above, H3354 now types USD
+and MMBTU and nothing it shows moved. Then clear a unit cell of a template and read the
+field named as missing; book a C5 leg in cents a gallon against WTI at a spread price of
+-9.10 and read zero at 145 and 70.00; and book one of the desk's cracks from the record
+and compare the mark with the record's NPV.

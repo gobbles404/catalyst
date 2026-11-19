@@ -1,8 +1,8 @@
 # A float_float's spread price in its own unit, and the cracks
 
-**Status:** Agreed with the owner, 19 November 2026, for
-[issue #239](https://github.com/gobbles404/catalyst/issues/239). One pull request stacked on
-#252, this page in its first commit. It is the second slice of two, above
+**Status:** Built in #253, stacked on #252, agreed with the owner on 19 November 2026
+for [issue #239](https://github.com/gobbles404/catalyst/issues/239), this page in its
+first commit. It is the second slice of two, above
 [float-float-spread.md](float-float-spread.md): a `float_float` on two indexes that price in
 different units, a crack, with the spread price's unit typed. It changes nothing a
 `fixed_float` books, values or reads back, one index or two.
