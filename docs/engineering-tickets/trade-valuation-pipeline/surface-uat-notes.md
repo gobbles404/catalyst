@@ -945,19 +945,24 @@ B3348 and B3349 are the refusals of 2.5 decimals and of 16.
 
 ## 35. A float_float swap on two indexes at one spread price
 
-Agreed 18 November 2026, issue #239: [float-float-spread.md](float-float-spread.md), one pull
-request from main, the first slice of two. A new instrument, `float_float`, books two indexes
+Agreed 18 November 2026 and built in #252, issue #239:
+[float-float-spread.md](float-float-spread.md), the first slice of two. A new instrument, `float_float`, books two indexes
 quoted in one unit against one `spread_price`: a positive quantity receives the first index
 and pays the second and the spread price, one net payment a month. The handle reads as a
 difference, `NTO-PAN`. Each index keeps its own deltas and cross gamma, the second's of the
 opposite sign; the DV01 is the net payment's, counted once. The two-index `fixed_float`, the
 sum at one outright price, stands as it is.
 
-UAT: book the NTO against PAN swap from the record, the index it receives first, and compare
-the mark with the record's NPV; read the risk report and see the two indexes' deltas of
-opposite sign, one DV01 column and a cross gamma per index; move the spread price and see the
-value and the DV01 move with the deltas still; sell the same spread and see every number
-reverse; collect it with a position on one of its indexes and read that index netted and the
-spread's DV01 on its `NTO-PAN` row; follow one leg fixing before the other, both fixed, then
-paid, one cash amount; type `fixed_price` on the ticket, `cleared` as the route and a broker's
-name, and read each refusal.
+UAT: rows 3352 to 3380 of the kept workbook, on the pair block's two test indexes until the
+desk's inputs book NTO and PAN. H3355 is the spread, A less B, one lot of G27 at a spread
+price of 3.80, its handle reading `A-B`; B3361 reads its mark, 950, and the risk by year
+spills from B3364, A one lot and B minus one, one DV01 and a cross gamma per index. Type 3.9
+over the spread price in F3355 and see the value and the DV01 move with the lots still; type
+-1 over the quantity in E3355 and see every number reverse. Row 3372 reads back the spread
+price, the spread leg and each leg's floating contribution with its sign. H3374 collects the
+spread with the pair of H3124: A two lots, B none, the DV01 twice. B3378 to B3380 are the
+refusals of one index and of each instrument's price under the other. The list of
+instruments is in B1258, a row higher than it was, with the float_float's row. Then book the
+NTO against PAN swap from the record, the index it receives first, and compare the mark with
+the record's NPV; follow one leg fixing before the other, both fixed, then paid, one cash
+amount; type `cleared` as the route and a broker's name, and read each refusal.

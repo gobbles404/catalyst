@@ -1,8 +1,8 @@
 # A float_float swap on two indexes at one spread price
 
-**Status:** Agreed with the owner, 18 November 2026, for
-[issue #239](https://github.com/gobbles404/catalyst/issues/239). One pull request from
-main, this page in its first commit. It is the first slice of two: a pair of indexes quoted
+**Status:** Built in #252, from main after #251, agreed with the owner on 18 November
+2026 for [issue #239](https://github.com/gobbles404/catalyst/issues/239), this page in
+its first commit. It is the first slice of two: a pair of indexes quoted
 in one unit. It adds an instrument beside the two-index `fixed_float` of
 [two-index-one-price.md](two-index-one-price.md), built in #242, and changes nothing a
 `fixed_float` books, values or reads back.
