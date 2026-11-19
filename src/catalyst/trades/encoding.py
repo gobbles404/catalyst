@@ -44,6 +44,7 @@ from catalyst.trades.terms import (
     named_trade,
     onetime_components,
     payments_after_observations,
+    price_words,
 )
 
 ENCODED_COMPONENTS = "encoded_components"  # components turned into quantities and offsets
@@ -299,7 +300,11 @@ def encoded(
     once whatever the legs: minus the first leg's coefficient times the trade's one fixed
     price, per component, the first leg's coefficient the trade's since the pair rule below
     holds the two legs' equal to within the roundoff of their conversions, as the first leg
-    supplies the fees and the handle's first word.
+    supplies the fees and the handle's first word. A float_float, since float-float-spread.md,
+    takes its second leg's sign here and nowhere else: a subtracted leg's quote quantities and
+    coefficients are made negated, so its exposures, and every amount, delta and lot a later
+    stage makes from them, are the price a positive quantity pays; its own side, the spread
+    leg, is the first leg's coefficient times the spread price as a fixed leg is.
     For a pair, since two-index-fixed-float.md, each occurrence's quantity unit is one quantity
     per entered unit on both indexes: the specification it names on each index restates one
     entered unit in the shared quote quantity unit, and the two sizes agree to within
@@ -392,7 +397,7 @@ def encoded(
     amounts = [_the_amounts(terms, leg, units) for leg in terms.legs]
     for leg, (_, _, sizes) in zip(terms.legs[1:], amounts[1:], strict=True):
         _the_same_quantity(terms, terms.legs[0], amounts[0][2], leg, sizes)
-    offset = _the_fixed_leg(terms, amounts[0][1])
+    offset = _the_price_leg(terms, amounts[0][1])
     offset_of_group = _the_group_offsets(
         terms, terms.legs[0], heads, group_of_component, offset, payment_date, keys, key_of_group
     )
@@ -582,7 +587,11 @@ def _the_amounts(
         to_currency = units.factor(
             CURRENCY, conventions.quote_currency_unit, conventions.currency_unit
         )
-        quote_quantity = terms.component_quantity * to_quote_unit[selection]
+        # A subtracted leg's sign, taken here once, float-float-spread.md: its sizes negated
+        # before the gather, a handful of numbers, so that its quote quantities, its
+        # coefficients and everything later made from them carry it with no step of their own.
+        per_unit = -to_quote_unit if leg.subtracted else to_quote_unit
+        quote_quantity = terms.component_quantity * per_unit[selection]
         coefficient = quote_quantity * to_currency
     for values, what, unit, why in (
         (
@@ -608,21 +617,23 @@ def _the_amounts(
     return quote_quantity, coefficient, to_quote_unit
 
 
-def _the_fixed_leg(terms: ResolvedTrades, coefficient: NDArray[np.float64]) -> NDArray[np.float64]:
-    """The trade's fixed leg per component, since two-index-one-price.md: minus the first leg's
-    coefficient times the trade's one fixed price, the entry-price side of each component's
-    payment in the settlement currency, booked once whatever the legs; each finite or the first
-    that is not refused by its trade and its operation, the arithmetic running with numpy's
-    flags down."""
+def _the_price_leg(terms: ResolvedTrades, coefficient: NDArray[np.float64]) -> NDArray[np.float64]:
+    """The trade's own side of each component's payment, since two-index-one-price.md: minus
+    the first leg's coefficient times the trade's one price, in the settlement currency, booked
+    once whatever the legs, a fixed_float's fixed leg and since float-float-spread.md a
+    float_float's spread leg, named so in a refusal; each finite or the first that is not
+    refused by its trade and its operation, the arithmetic running with numpy's flags down."""
     currency = terms.legs[0].index.conventions.currency_unit
     with np.errstate(over="ignore", invalid="ignore"):
-        offset = -coefficient * terms.fixed_price
+        offset = -coefficient * terms.price
     outrun = ~np.isfinite(offset)
     if outrun.any():
         k = int(outrun.argmax())
+        field, side = price_words(terms.instrument)
         raise ValueError(
-            f"{terms.named(k)} has {float(offset[k])!r} of fixed leg, expected a finite amount "
-            f"of {currency}; its coefficient times its fixed price outruns the largest number"
+            f"{terms.named(k)} has {float(offset[k])!r} of {side}, expected a finite amount "
+            f"of {currency}; its coefficient times its {field.replace('_', ' ')} outruns the "
+            "largest number"
         )
     return offset
 
@@ -667,18 +678,20 @@ def _the_group_offsets(
     keys: tuple[str, ...],
     key_of_group: NDArray[np.intp] | None,
 ) -> NDArray[np.float64]:
-    """The trade's fixed legs summed by group, one bincount, each finite or the first that is not
-    refused by its group, a sum blamed on the group and never on one of its trades; the leg
-    given names the group's contract in the refusal, the first leg's."""
+    """The trade's own sides summed by group, a fixed_float's fixed legs or a float_float's
+    spread legs, one bincount, each finite or the first that is not refused by its group, a sum
+    blamed on the group and never on one of its trades; the leg given names the group's
+    contract in the refusal, the first leg's."""
     with np.errstate(over="ignore", invalid="ignore"):
         offset_of_group = np.bincount(group_of_component, weights=offset, minlength=heads.size)
     outrun = ~np.isfinite(offset_of_group)
     if outrun.any():
         g = int(outrun.argmax())
         group = group_words(terms, leg, heads, payment_date, g, keys, key_of_group)
+        side = price_words(terms.instrument)[1]
         raise ValueError(
-            f"the fixed leg of {group} is {float(offset_of_group[g])!r}, expected a finite amount "
-            f"of {leg.index.conventions.currency_unit}; its components' fixed legs, each finite, "
+            f"the {side} of {group} is {float(offset_of_group[g])!r}, expected a finite amount "
+            f"of {leg.index.conventions.currency_unit}; its components' {side}s, each finite, "
             "sum past the largest number"
         )
     return offset_of_group

@@ -683,8 +683,12 @@ $formulas = [ordered]@{
     # and a blank in the seam's.
     "=INDEX(_ListInstruments(),1,1)"  = "instrument"
     "=INDEX(_ListInstruments(),2,1)"  = "fixed_float"
-    "=ROWS(_ListInstruments())"       = "3"
-    "=INDEX(_ListInstruments(),3,1)"  = "cashflow"
+    "=ROWS(_ListInstruments())"       = "4"
+    "=INDEX(_ListInstruments(),3,1)"  = "float_float"
+    "=INDEX(_ListInstruments(),4,1)"  = "cashflow"
+    '=COLUMNS(_ShowInstrument("float_float"))'    = "24"
+    '=INDEX(_ShowInstrument("float_float"),1,17)' = "spread_price"
+    '=INDEX(_ShowInstrument("float_float"),3,18)' = "TRUE"
     "=COLUMNS(_ListInstruments())"    = "2"
     '=INDEX(_ShowInstrument("fixed_float"),1,1)'  = "field"
     '=INDEX(_ShowInstrument("fixed_float"),1,2)'  = "trade_id"
@@ -694,7 +698,7 @@ $formulas = [ordered]@{
     # Since #189, reject-nul-input-text.md: the two characters backslash and zero are ordinary text, refused
     # here by the seam as the name of no instrument. A genuine U+0000 the harness cannot deliver: CHAR(0) is
     # #VALUE! and a text typed through COM is cut at the NUL, so the host's refusal of one is the host tests' alone.
-    '=_ShowInstrument("fixed\0float")'  = '#ERROR _ShowInstrument: ValueError: instrument is ''fixed\\0float'', expected one of: ''fixed_float'', ''cashflow'''
+    '=_ShowInstrument("fixed\0float")'  = '#ERROR _ShowInstrument: ValueError: instrument is ''fixed\\0float'', expected one of: ''fixed_float'', ''float_float'', ''cashflow'''
     '=INDEX(_ShowInstrument("fixed_float"),3,4)'  = "FALSE"
     '=INDEX(_ShowInstrument("fixed_float"),4,4)'  = "no start_date and end_date on the row"
     '=INDEX(_ShowInstrument("fixed_float"),4,5)'  = "no contract_code on the row, or with end_date"
@@ -733,8 +737,8 @@ $formulas = [ordered]@{
     '=INDEX(_ShowInstrument("fixed_float"),9,20)' = "FALSE"
     '=INDEX(_ShowInstrument("fixed_float"),10,20)' = "settlement_method = financial"
     '=INDEX(_ShowInstrument("fixed_float"),10,12)' = "route = bilateral"
-    '=_ShowInstrument("Future")' = "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'"
-    '=LEFT(_ShowInstrument("future"),100)' = "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float', 'cashflo"
+    '=_ShowInstrument("Future")' = "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'"
+    '=LEFT(_ShowInstrument("future"),100)' = "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float', 'float_f"
     "=_ShowInstrument(C2)"       = "#ERROR _ShowInstrument: instrument is blank, expected text"
     # A row of an instrument's fields bound against the instrument named, the handle cell resolved
     # to its calendar and echoed as the words of its kind; rows of two fields counted; the name in
@@ -746,7 +750,7 @@ $formulas = [ordered]@{
     '=INDEX(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2),2,6)' = "10"
     '=COLUMNS(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2))'  = "6"
     '=CountFieldRows("fixed_float",EP4:EQ4,EP5:EQ7)'        = "3"
-    '=EchoFieldRow("Future",EP1:EU1,EP2:EU2)' = "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'"
+    '=EchoFieldRow("Future",EP1:EU1,EP2:EU2)' = "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'"
     '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EQ7)' = "#ERROR EchoFieldRow: values is 3x2 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EP7)' = "#ERROR EchoFieldRow: values is 3x1 array, expected one row of field values"
@@ -795,7 +799,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW13),4,13)" = "46258"
     "=ROWS(util_ReadHandle(EW13))"       = "4"
     "=COLUMNS(util_ReadHandle(EW13))"    = "23"
-    '=_CreateTradeTemplate("Future",EW1:FC1,EW2:FC2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'"
+    '=_CreateTradeTemplate("Future",EW1:FC1,EW2:FC2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'"
     '=_CreateTradeTemplate("fixed_float",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate, last3day or asian"
     '=_CreateTradeTemplate("fixed_float",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
     '=_CreateTradeTemplate("fixed_float",{"payment_day"},{"+99999999999999999999bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_day has a count of 20 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
@@ -2347,6 +2351,58 @@ $formulas = [ordered]@{
     "=_PrepareTrades(WJ22,WJ13)"      = "#ERROR _PrepareTrades: ValueError: histories are 1, expected 2, one per leg of the trades"
     "=_PrepareTrades(WJ22,WK15:WK16)" = "#ERROR _PrepareTrades: ValueError: history 2 is over index 'A' as history 1 is, expected one history per index of the trades"
     "=_EvaluateTrades(WJ23,WJ17,WJ20)" = "#ERROR _EvaluateTrades: ValueError: markets are 1, expected 2, one per leg of the trades"
+    # A float_float, float-float-spread.md, on the pair's two indexes: one NYMEX NG lot of G27,
+    # A at 3.50 less B at -0.40, 3.90 against a spread price of 3.80 in WJ34, prepared in WJ35
+    # and valued in WJ36 on SOFR at 0.95: one net payment of 1,000, mark 950, DV01 -0.095; A's
+    # delta one lot and B's minus one, the second leg read back with its sign; the handles a
+    # difference, A-B, and B-A with the indexes B first; the collection's row named A-B; and
+    # what a spread does not book refused by name: one index, the other instrument's price, a
+    # broker, a cleared route and a quote template.
+    '=MID(WJ34,FIND(":",WJ34)+1,11)' = "trades:A-B:"
+    '=MID(WJ35,FIND(":",WJ35)+1,20)' = "prepared_trades:A-B:"
+    '=MID(WJ36,FIND(":",WJ36)+1,18)' = "trade_results:A-B:"
+    '=MID(WJ37,FIND(":",WJ37)+1,11)' = "trades:B-A:"
+    "=INDEX(_ReportValues(WJ36),1,1)" = "bilateral_mark"
+    "=INDEX(_ReportValues(WJ36),3,1)" = "950"
+    "=INDEX(_ReportValues(WJ36),3,2)" = "0"
+    '=COLUMNS(_ReportRisk(WJ36,"all","day"))'   = "8"
+    '=INDEX(_ReportRisk(WJ36,"all","day"),2,4)' = "B nominal_delta [NYMEX NG]"
+    '=INDEX(_ReportRisk(WJ36,"all","day"),4,2)' = "1"
+    '=INDEX(_ReportRisk(WJ36,"all","day"),4,3)' = "0.95"
+    '=INDEX(_ReportRisk(WJ36,"all","day"),4,4)' = "-1"
+    '=INDEX(_ReportRisk(WJ36,"all","day"),4,5)' = "-0.95"
+    '=INDEX(_ReportRisk(WJ36,"all","day"),4,6)' = "-0.095"
+    '=TEXT(INDEX(_ReportRisk(WJ36,"all","day"),4,7),"0.000000")' = "-0.000095"
+    '=TEXT(INDEX(_ReportRisk(WJ36,"all","day"),4,8),"0.000000")' = "0.000095"
+    "=COLUMNS(util_ReadHandle(WJ34))"    = "26"
+    "=INDEX(util_ReadHandle(WJ34),1,14)" = "spread_price"
+    "=INDEX(util_ReadHandle(WJ34),3,14)" = "3.8"
+    "=INDEX(util_ReadHandle(WJ34),1,24)" = "offset"
+    "=INDEX(util_ReadHandle(WJ34),3,24)" = "-38000"
+    "=INDEX(util_ReadHandle(WJ35),4,2)"  = "B"
+    "=INDEX(util_ReadHandle(WJ35),3,10)" = "1"
+    "=INDEX(util_ReadHandle(WJ35),4,10)" = "-1"
+    "=COLUMNS(util_ReadHandle(WJ36))"    = "33"
+    "=INDEX(util_ReadHandle(WJ36),3,18)" = "1000"
+    "=INDEX(util_ReadHandle(WJ36),3,19)" = "950"
+    "=INDEX(util_ReadHandle(WJ36),3,30)" = "10000"
+    "=INDEX(util_ReadHandle(WJ36),4,30)" = "-10000"
+    "=ROUND(INDEX(util_ReadHandle(WJ36),3,33),6)" = "35000"
+    "=ROUND(INDEX(util_ReadHandle(WJ36),4,33),6)" = "4000"
+    "=INDEX(_ReportReserves(WJ36),3,1)"  = "0"
+    "=INDEX(_ReportReserves(WJ36),3,2)"  = "0"
+    "=ROWS(util_ReadHandle(WJ38))"       = "5"
+    "=INDEX(util_ReadHandle(WJ38),3,2)"  = "A-B"
+    "=INDEX(util_ReadHandle(WJ38),3,9)"  = "-0.095"
+    "=INDEX(util_ReadHandle(WJ38),4,7)"  = "1"
+    "=INDEX(util_ReadHandle(WJ38),5,2)"  = "B"
+    "=INDEX(util_ReadHandle(WJ38),5,7)"  = "-1"
+    "=_CreateTrades(WJ5,WL10:WP10,WL11:WP11,WJ33)" = "#ERROR _CreateTrades: ValueError: indexes are 1, expected two with a float_float; a spread is the first index's price less the second's"
+    "=_CreateTrades(WJ5:WJ6,WL4:WP4,WL5:WP5,WJ33)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'fixed_price', expected a field of float_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, spread_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ21)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "=_CreateTrades(WJ5:WJ6,WL10:WQ10,WL11:WQ11,WJ33)" = "#ERROR _CreateTrades: ValueError: broker of trade 1 at row 1 is 'ICAP', expected none on a float_float; a brokered spread is not built"
+    "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ39)" = "#ERROR _CreateTrades: ValueError: route is 'cleared', expected 'bilateral' on a float_float; a cleared spread is not built"
+    '=_CreateQuoteTemplate("float_float",WP1,WP2)' = "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'float_float', expected one a quote prices: 'fixed_float'"
     # A request for quote, rfq-quoting.md, on the quoting block's strip in UX5 and its market VA7,
     # January at 30 and February at 60: F27 at 100,000 and G27 at 300,000 in XA1:XB2, the
     # bilateral +1bd template VF3 paying 1 February at 0.99 and 1 March at 0.98 in XD1, the
@@ -3918,6 +3974,20 @@ $cells = [ordered]@{
     "WJ30" = "=_CreateTrades(WJ5:WJ6,WL7:WQ7,WL8:WQ8,WJ21)"
     "WJ31" = "=_PrepareTrades(WJ30,WJ13:WJ14)"
     "WJ32" = "=_EvaluateTrades(WJ31,WJ17:WK17,WJ20)"
+    # float-float-spread.md: the pair's two indexes under a float_float, A less B. The template
+    # in WJ33 over the pair's own field cells, the row of one lot of G27 at a spread price of 3.80
+    # in WL10:WP11 with a broker's name beside it in WQ10:WQ11, booked in WJ34, prepared in WJ35
+    # and valued in WJ36; the indexes B first in WJ37, B less A; the collection of the spread
+    # alone in WJ38; and a cleared template in WJ39, which no spread is booked under.
+    "WJ33" = '=_CreateTradeTemplate("float_float",HSTACK(WL1:WV1,"nearby"),HSTACK(WL2:WV2,1))'
+    "WL10" = "trade_id"; "WM10" = "trade_date"; "WN10" = "contract_code"; "WO10" = "quantity"; "WP10" = "spread_price"; "WQ10" = "broker"
+    "WL11" = "1"; "WM11" = "15-Dec-2026"; "WN11" = "G27"; "WO11" = "1"; "WP11" = "3.8"; "WQ11" = "ICAP"
+    "WJ34" = "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ33)"
+    "WJ35" = "=_PrepareTrades(WJ34,WJ13:WJ14)"
+    "WJ36" = "=_EvaluateTrades(WJ35,WJ17:WK17,WJ20)"
+    "WJ37" = "=_CreateTrades(WK5:WK6,WL10:WP10,WL11:WP11,WJ33)"
+    "WJ38" = "=_AggregateResults(WJ36)"
+    "WJ39" = '=_CreateTradeTemplate("float_float",HSTACK(WL1:WO1,"route","settlement_method","clearing_house","payment_day","payment_holiday_calendar","settlement_frequency","nearby"),HSTACK(WL2:WO2,"cleared","financial","ICE Clear Europe",WT2,WJ2,"monthly",1))'
     # The request for quote, rfq-quoting.md and dated-quotes.md, on the quoting block's strip as a
     # ticket's rows: the two months, their quantities and the request's payment days in XA1:XC2, 8
     # February and 1 March, and in XA4:XC5 paying 1 March and 8 March, under the headers XE1:XG1;

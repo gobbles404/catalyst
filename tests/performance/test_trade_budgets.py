@@ -402,8 +402,8 @@ ENCODING_LEDGER = {
     "encoded": 1,
     "_the_groups": 1,
     "_the_amounts": 1,  # two-index-fixed-float.md: the leg's two amounts per component
-    "_the_fixed_leg": 1,  # two-index-one-price.md: the trade's fixed leg, once
-    "_the_group_offsets": 1,  # the trade's fixed legs by group
+    "_the_price_leg": 1,  # the trade's own side, once: a fixed leg, or a float_float's spread leg
+    "_the_group_offsets": 1,  # the trade's own sides by group
     "_the_exposures": 1,  # the leg's slots' exposures
     "_distinct": 2,
     "_the_references": 1,

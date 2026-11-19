@@ -27,7 +27,7 @@ from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index, ReportingLot
 from catalyst.index_definitions.kind import Kind, described
-from catalyst.instruments.definitions import Instrument
+from catalyst.instruments.definitions import FLOAT_FLOAT, Instrument
 from catalyst.instruments.fields import DatesOrTexts
 from catalyst.trades.schedule_methods import (
     METHODS,
@@ -150,7 +150,9 @@ class LegTerms:
     legs. Then schedule_month[i], since #186, the
     calendar month of every row of the schedule as numpy counts months from 1970, read once by
     the resolution against the ticket's codes and kept for the encoding's contract-month axes.
-    Every array read-only."""
+    Every array read-only. And subtracted, since float-float-spread.md: whether the leg's
+    floating price is paid, not received, by a positive quantity, the second leg of a float_float
+    and no other, read once by the encoding, which signs the leg's amounts with it."""
 
     index: Index
     schedule: FuturesSchedule | IfercSchedule
@@ -159,6 +161,7 @@ class LegTerms:
     schedule_method: NDArray[np.intp]
     contract: NDArray[np.intp]
     schedule_month: NDArray[np.int64]
+    subtracted: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,10 +205,12 @@ class ResolvedTrades:
     included, derived here, and component_quantity[k] the count the component holds, the entered
     quantity under month and the entered quantity times the covered days under calday, formed
     once here, the one quantity the encoding converts and nothing later scales again, and
-    fixed_price[k], since two-index-one-price.md the trade's own: the one price agreed for the
+    price[k], since two-index-one-price.md the trade's own: the one price agreed for the
     deal in the quote unit its indexes share, each occurrence's entered price on every component
-    of its row, finite, the outright price of the sum of two indexes where the batch is on a
-    pair and the index's price where it is on one. Then
+    of its row, finite, a fixed_float's fixed_price, the outright price of the sum of two
+    indexes where the batch is on a pair and the index's price where it is on one, and since
+    float-float-spread.md a float_float's spread_price, paid against the first index's price
+    less the second's. Then
     payment, the terms a financial settlement pays by and the days they give, one day per
     component shared by every leg, and None for a physical one, which pays on no day.
 
@@ -237,7 +242,7 @@ class ResolvedTrades:
     period_end: NDArray[np.datetime64]
     covered_days: NDArray[np.int64]
     component_quantity: NDArray[np.float64]
-    fixed_price: NDArray[np.float64]
+    price: NDArray[np.float64]
     marketing_reserve: NDArray[np.float64] | None
     cva_reserve: NDArray[np.float64] | None
     payment: PaymentTerms | None
@@ -251,9 +256,11 @@ class ResolvedTrades:
     @property
     def descriptor(self) -> str:
         """The words a handle of the batch carries where a single index's name stands: the legs'
-        index names joined by `+` in leg order, one index's name alone today, a readable
-        descriptor and nothing more, read by nothing that decides."""
-        return "+".join([leg.index.name for leg in self.legs])
+        index names in leg order, one index's name alone, a fixed_float pair's joined by `+`,
+        the sum it pays, and since float-float-spread.md a float_float's by `-`, the difference;
+        a readable descriptor and nothing more, read by nothing that decides."""
+        joiner = "-" if self.instrument is FLOAT_FLOAT else "+"
+        return joiner.join([leg.index.name for leg in self.legs])
 
 
 def named_trade(trade_ids: NDArray[np.int64] | None, row: int) -> str:
@@ -285,7 +292,7 @@ def resolved_trades(
     quantity: NDArray[np.float64],
     start_date: NDArray[np.datetime64],
     end_date: NDArray[np.datetime64],
-    fixed_price: NDArray[np.float64],
+    price: NDArray[np.float64],
     payment: PaymentTerms | None,
     *,
     schedule_month: NDArray[np.int64] | None = None,
@@ -360,7 +367,16 @@ def resolved_trades(
     since two-index-one-price.md: the outright price of the deal, the price of the sum of the
     two indexes where the batch is on a pair, entered once and never per leg, so that no
     second price exists to add and nothing is derived from two.
+
+    A float_float, since float-float-spread.md, is held to its own rules before any other,
+    spread_legs and spread_rules: two legs, the bilateral route and no named broker. Its one
+    price is its spread_price, named so in a refusal, and its second leg is the subtracted
+    one, the leg whose amounts the encoding signs; a fixed_float subtracts no leg.
     """
+    spread = instrument is FLOAT_FLOAT
+    if spread:
+        spread_legs(1 if second_leg is None else 2)
+        spread_rules(route, broker, partial(named_trade, trade_ids))
     schedule = trade_schedule_of(index)
     lot = reporting_lot_of(index)
     occurrences = _the_occurrences(
@@ -400,14 +416,18 @@ def resolved_trades(
     onetime = settlement_frequency[occurrence] == FREQUENCIES.index(SettlementFrequency.ONETIME)
     _the_monthly_components(start_date, end_date, onetime, trade_ids, occurrence)
     _the_contract_column(contract, occurrence, len(schedule.codes), "contract")
-    _the_fixed_prices(fixed_price, occurrence, trade_ids)
+    _the_prices(price, occurrence, trade_ids, price_words(instrument)[0])
     legs = (
-        _the_leg(index, schedule, lot, specification, schedule_method, contract, schedule_month),
+        _the_leg(
+            index, schedule, lot, specification, schedule_method, contract, schedule_month, False
+        ),
     )
     if second_leg is not None:
         legs = (
             *legs,
-            _the_second_leg(index, second_leg, settlement, trade_ids, occurrence, occurrences),
+            _the_second_leg(
+                index, second_leg, settlement, trade_ids, occurrence, occurrences, spread
+            ),
         )
     pays = _the_payment(settlement, payment, occurrences, occurrence.size)
     quantities = _frozen_numbers(quantity)
@@ -438,7 +458,7 @@ def resolved_trades(
         period_end,
         days,
         _the_component_quantity(quantity_per, quantities, days, trade_ids, occurrence),
-        _frozen_numbers(fixed_price),
+        _frozen_numbers(price),
         None if marketing_reserve is None else _frozen_numbers(marketing_reserve),
         None if cva_reserve is None else _frozen_numbers(cva_reserve),
         pays,
@@ -446,19 +466,63 @@ def resolved_trades(
     )
 
 
-def _the_fixed_prices(
-    fixed_price: NDArray[np.float64],
+def price_words(instrument: Instrument) -> tuple[str, str]:
+    """What a batch's one price and the trade's own side of a payment are called in a message
+    and on a readback, the words of its instrument: `spread_price` and `spread leg` on a
+    float_float since float-float-spread.md, `fixed_price` and `fixed leg` otherwise: the one
+    owner of the four words, read once where a batch is resolved, for the field to read and to
+    name, and where a refusal is worded or a header written."""
+    if instrument is FLOAT_FLOAT:
+        return "spread_price", "spread leg"
+    return "fixed_price", "fixed leg"
+
+
+def spread_legs(legs: int) -> None:
+    """A float_float's first rule, float-float-spread.md: two legs, since a spread is the first
+    index's price less the second's and one index has nothing to be less than; the kernel's
+    rule, applied by the resolution as well before a leg's field is read, so that one index is
+    refused in these words."""
+    if legs != 2:
+        raise ValueError(
+            f"indexes are {legs}, expected two with a float_float; a spread is the first index's "
+            "price less the second's"
+        )
+
+
+def spread_rules(route: Route, broker: tuple[str, ...] | None, named: Callable[[int], str]) -> None:
+    """A float_float's rules over its route and its brokers, float-float-spread.md: the
+    bilateral route, a cleared spread not being built, and no named broker, the field left out
+    or none in any case on every row, a brokered spread not being built, the first row naming
+    one refused by its trade. The kernel's rule, applied by the resolution as well before a
+    conditional field is read, so that a cleared spread is refused in these words and never as
+    a missing clearing house."""
+    if route is not Route.BILATERAL:
+        raise ValueError(
+            f"route is {route.value!r}, expected 'bilateral' on a float_float; a cleared spread "
+            "is not built"
+        )
+    if broker is not None:
+        for i, text in enumerate(broker):
+            if text.lower() != UNBROKERED:
+                raise ValueError(
+                    f"broker of {named(i)} is {text!r}, expected none on a float_float; a "
+                    "brokered spread is not built"
+                )
+
+
+def _the_prices(
+    price: NDArray[np.float64],
     occurrence: NDArray[np.intp],
     trade_ids: NDArray[np.int64] | None,
+    field: str,
 ) -> None:
     """The trade's one price column, since two-index-one-price.md: a price per component,
     aligned with the trade's components, each finite, a price refused naming the trade it
-    belongs to and the field it came from, fixed_price, the outright price of the deal whatever
-    the legs."""
-    _the_component_column("fixed_price", fixed_price, occurrence.size)
-    finite_prices(
-        fixed_price, lambda k: f"fixed_price of {named_trade(trade_ids, int(occurrence[k]))}"
-    )
+    belongs to and the field it came from, its instrument's, handed in: fixed_price, the
+    outright price of a fixed_float whatever its legs, or since float-float-spread.md a
+    float_float's spread_price."""
+    _the_component_column(field, price, occurrence.size)
+    finite_prices(price, lambda k: f"{field} of {named_trade(trade_ids, int(occurrence[k]))}")
 
 
 def _the_leg(
@@ -469,9 +533,11 @@ def _the_leg(
     schedule_method: NDArray[np.intp],
     contract: NDArray[np.intp],
     schedule_month: NDArray[np.int64] | None,
+    subtracted: bool,
 ) -> LegTerms:
     """A leg over its checked columns, each copied into its type and frozen; the schedule's
-    months the resolution's reading handed over or read here once, owned by the leg."""
+    months the resolution's reading handed over or read here once, owned by the leg; and
+    whether a positive quantity pays its price, a float_float's second leg alone."""
     months = (
         schedule_months(schedule)
         if schedule_month is None
@@ -486,6 +552,7 @@ def _the_leg(
         _frozen_rows(schedule_method),
         _frozen_rows(contract),
         months,
+        subtracted,
     )
 
 
@@ -496,12 +563,15 @@ def _the_second_leg(
     trade_ids: NDArray[np.int64] | None,
     occurrence: NDArray[np.intp],
     occurrences: int,
+    subtracted: bool,
 ) -> LegTerms:
     """The second leg over the pair's rules and its own, since two-index-fixed-float.md, in
     this order: another index than the first, by identity and by name; the first's quote
     currency, quote quantity and settlement currency units; a financial settlement; then the
     first leg's rules over this index and these columns, each refusal naming the second leg's
-    field. No price of its own since two-index-one-price.md."""
+    field. No price of its own since two-index-one-price.md. Subtracted, since
+    float-float-spread.md, when the batch is a float_float, whose two prices net where a
+    fixed_float's add, the unit refusal saying which."""
     index = second.index
     if index is first:
         raise ValueError(
@@ -523,7 +593,8 @@ def _the_second_leg(
             f"index 2 {index.name!r} quotes in {mine.quote_currency_unit} per "
             f"{mine.quote_quantity_unit} and settles in {mine.currency_unit}, expected "
             f"{theirs.quote_currency_unit} per {theirs.quote_quantity_unit} settled in "
-            f"{theirs.currency_unit} as index 1 {first.name!r}; two legs' prices add in one unit"
+            f"{theirs.currency_unit} as index 1 {first.name!r}; two legs' prices "
+            f"{'net' if subtracted else 'add'} in one unit"
         )
     if settlement is Settlement.PHYSICAL:
         raise ValueError(
@@ -543,6 +614,7 @@ def _the_second_leg(
         second.schedule_method,
         second.contract,
         second.schedule_month,
+        subtracted,
     )
 
 
@@ -937,7 +1009,7 @@ def _the_components(
     the days or a quantity refused naming the trade it belongs to, since a strip's component is
     no row of the sheet; a monthly component's one calendar month is _the_monthly_components'
     rule, once the frequencies are known. A leg's contract column is _the_contract_column's and
-    the trade's prices _the_fixed_prices'."""
+    the trade's prices _the_prices'."""
     components = occurrence.size
     if components == 0:
         raise ValueError("occurrence has 0 rows, expected at least 1, one per component")

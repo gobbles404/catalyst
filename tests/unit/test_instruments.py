@@ -22,6 +22,7 @@ from catalyst.instruments.definitions import (
     CASHFLOW,
     CATALOG,
     FIXED_FLOAT,
+    FLOAT_FLOAT,
     NONE,
     ROWS,
     Field,
@@ -41,13 +42,15 @@ def spilled(result: object) -> tuple[NDArray[np.uint8], NDArray[np.float64], str
 
 
 FIELDS = tuple([field.name for field in FIXED_FLOAT.fields])
+# The catalog's names as a refusal of an unknown one lists them, in the catalog's order.
+NAMES = "'fixed_float', 'float_float', 'cashflow'"
 
 
 # --- the definitions ------------------------------------------------------------------------
 
 
 def test_the_catalog_holds_the_fixed_float_with_its_twenty_three_fields_in_order() -> None:
-    assert [each.name for each in CATALOG] == ["fixed_float", "cashflow"]
+    assert [each.name for each in CATALOG] == ["fixed_float", "float_float", "cashflow"]
     assert FIELDS == (
         "trade_id",
         "trade_date",
@@ -120,6 +123,54 @@ def test_the_catalog_holds_the_fixed_float_with_its_twenty_three_fields_in_order
     assert by_name["quantity_unit"].type is FieldType.TEXT
     assert by_name["quantity_unit"].options == "the index's specification names"
     assert all(field.required_when == NONE for field in FIXED_FLOAT.fields if field.required)
+
+
+def test_the_float_float_is_the_fixed_float_with_a_spread_price_and_both_methods_required() -> None:
+    # float-float-spread.md: a fixed_float's fields in its order, spread_price where fixed_price
+    # stood, the second index's method always required, and no part in a quote.
+    names = tuple([field.name for field in FLOAT_FLOAT.fields])
+    assert names == tuple(["spread_price" if name == "fixed_price" else name for name in FIELDS])
+    by_name = {field.name: field for field in FLOAT_FLOAT.fields}
+    assert [field.name for field in FLOAT_FLOAT.fields if field.required] == [
+        "trade_date",
+        "schedule_method",
+        "route",
+        "settlement_method",
+        "quantity",
+        "quantity_unit",
+        "quantity_per",
+        "spread_price",
+        "second_schedule_method",
+        "settlement_frequency",
+        "nearby",
+    ]
+    assert by_name["second_schedule_method"].required_when == NONE
+    assert by_name["spread_price"].type is FieldType.NUMBER
+    assert not any(field.quote_allowed or field.quote_required for field in FLOAT_FLOAT.fields)
+    assert all(field.quote_required_when == NONE for field in FLOAT_FLOAT.fields)
+    # What this slice narrows says so where the sheet reads it: one route, one settlement, one
+    # frequency and the prompt contract alone.
+    assert [by_name[name].options for name in ("route", "settlement_method")] == [
+        "bilateral",
+        "financial",
+    ]
+    assert by_name["settlement_frequency"].options == "monthly"
+    assert by_name["nearby"].options == "1"
+    # The fields booked as a fixed_float books them are that definition's own, but for the quote.
+    booked = {field.name: field for field in FIXED_FLOAT.fields}
+    for name in ("contract_code", "counterparty", "payment_day", "cva_reserve", "quantity_per"):
+        mine, theirs = by_name[name], booked[name]
+        assert (mine.description, mine.required, mine.required_when, mine.type) == (
+            theirs.description,
+            theirs.required,
+            theirs.required_when,
+            theirs.type,
+        )
+        assert (mine.options, mine.rule, mine.may_be_unsupplied) == (
+            theirs.options,
+            theirs.rule,
+            theirs.may_be_unsupplied,
+        )
 
 
 def test_the_quote_metadata_says_what_a_quote_template_may_hold_and_a_quote_requires() -> None:
@@ -221,15 +272,16 @@ def test_a_definition_that_cannot_be_authored_says_why(
 
 def test_an_instrument_is_found_by_its_exact_name_or_refused_with_the_names_there_are() -> None:
     assert instrument("fixed_float") is FIXED_FLOAT
+    assert instrument("float_float") is FLOAT_FLOAT
     assert instrument("cashflow") is CASHFLOW
     with pytest.raises(
         ValueError,
-        match=r"^instrument is 'Future', expected one of: 'fixed_float', 'cashflow'$",
+        match=rf"^instrument is 'Future', expected one of: {NAMES}$",
     ):
         instrument("Future")
     with pytest.raises(
         ValueError,
-        match=r"^instrument is ' fixed_float', expected one of: 'fixed_float', 'cashflow'$",
+        match=rf"^instrument is ' fixed_float', expected one of: {NAMES}$",
     ):
         instrument(" fixed_float")
     with pytest.raises(
@@ -239,7 +291,7 @@ def test_an_instrument_is_found_by_its_exact_name_or_refused_with_the_names_ther
         instrument("fixed_float", ())
     with pytest.raises(
         ValueError,
-        match=r"^instrument is 'future', expected one of: 'fixed_float', 'cashflow'$",
+        match=rf"^instrument is 'future', expected one of: {NAMES}$",
     ):
         instrument("future")  # the name until #174, refused as any other word
     two = (FIXED_FLOAT, Instrument("swap", "d", (a_field(),)))
@@ -254,13 +306,17 @@ def test_an_instrument_is_found_by_its_exact_name_or_refused_with_the_names_ther
 
 def test_the_list_spills_a_header_and_one_row_per_instrument() -> None:
     listed = _ListInstruments()
-    assert listed.shape == (3, 2)
+    assert listed.shape == (4, 2)
     assert listed.texts == (
         "instrument",
         "description",
         "fixed_float",
         "A fixed-for-floating position on a specified reference contract, with explicit "
         "observation and settlement terms.",
+        "float_float",
+        "A floating-for-floating position on two reference contracts, the first index's "
+        "price less the second's against one agreed spread price, with explicit observation "
+        "and settlement terms.",
         "cashflow",
         "A known signed amount in one currency, payable on one explicit date.",
     )
@@ -329,14 +385,17 @@ def test_the_show_spills_ten_rows_and_a_column_per_field() -> None:
     assert "" not in shown.texts
 
 
-@pytest.mark.parametrize(("definition", "columns"), [(FIXED_FLOAT, 24), (CASHFLOW, 8)])
+@pytest.mark.parametrize(
+    ("definition", "columns"), [(FIXED_FLOAT, 24), (FLOAT_FLOAT, 24), (CASHFLOW, 8)]
+)
 def test_the_show_page_shows_the_same_cells_as_the_spill(
     definition: Instrument, columns: int
 ) -> None:
     page = Path(__file__).resolve().parents[2] / "docs/library/instruments/show-instrument.md"
     lines = page.read_text(encoding="utf-8").split("\n")
-    first = "| field | " + " | ".join(field.name for field in definition.fields[:3]) + " |"
-    start = next(i for i, line in enumerate(lines) if line.startswith(first))
+    # The whole header row, since two definitions begin with the same fields.
+    header = "| field | " + " | ".join(field.name for field in definition.fields) + " |"
+    start = lines.index(header)
     table = [[cell.strip() for cell in line.split("|")[1:-1]] for line in lines[start : start + 11]]
     del table[1]  # the markdown separator row
     shown = schema_cells(definition)
@@ -353,17 +412,18 @@ def test_the_show_page_shows_the_same_cells_as_the_spill(
 
 def test_the_two_functions_through_the_seam_and_their_errors() -> None:
     kinds, slots, text = spilled(ENTRY["_ListInstruments"]())
-    assert kinds.shape == (3, 2) and text.split("\0")[2::2] == ["fixed_float", "cashflow"]
+    assert kinds.shape == (4, 2)
+    assert text.split("\0")[2::2] == ["fixed_float", "float_float", "cashflow"]
     kinds, slots, text = spilled(ENTRY["_ShowInstrument"]("fixed_float"))
     assert kinds.shape == (10, 24) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
     assert slots[7, 6] == 1.0 and slots[8, 6] == 1.0 and slots[7, 1] == 0.0
     assert ENTRY["_ShowInstrument"]("Future") == (
         "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: "
-        "'fixed_float', 'cashflow'"
+        "'fixed_float', 'float_float', 'cashflow'"
     )
     assert ENTRY["_ShowInstrument"]("future") == (  # the name until #174
         "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: "
-        "'fixed_float', 'cashflow'"
+        "'fixed_float', 'float_float', 'cashflow'"
     )
     assert (
         ENTRY["_ShowInstrument"](None)

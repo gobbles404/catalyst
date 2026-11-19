@@ -241,7 +241,7 @@ def test_the_hand_table_both_legs_live_on_4_january_2027() -> None:
     batch = booked()
     assert batch.resolved.descriptor == "A+B"
     assert [leg.index for leg in batch.resolved.legs] == [A, B]
-    close(batch.resolved.fixed_price, [3.0])
+    close(batch.resolved.price, [3.0])
     close(batch.encoded.offset, [-30_000.0])  # -10,000 MMBTU at 3.00, the trade's once
     close(batch.encoded.offset_of_group, [-30_000.0])
     results = valued(batch)
@@ -675,7 +675,7 @@ def test_a_single_index_batch_is_as_it_was() -> None:
     one = {k: v for k, v in BILATERAL.items() if k != "second_schedule_method"}
     batch = booked(one, {**TICKET, "fixed_price": [3.30]}, (A,))
     assert batch.resolved.descriptor == "A" and len(batch.encoded.legs) == 1
-    close(batch.resolved.fixed_price, [3.3])
+    close(batch.resolved.price, [3.3])
     close(batch.encoded.offset, [-33_000.0])
     hist_a = history_on(A, AS_OF, {"F27": 3.55})
     prep = prepared_trades(batch.encoded, (hist_a,), WorkCounter())
@@ -1203,8 +1203,7 @@ def under(table: list[list[object]], heading: str) -> list[object]:
     return [line[at] for line in table[2:]]
 
 
-@pytest.fixture(scope="module")
-def sheet() -> dict[str, Any]:
+def the_sheet() -> dict[str, Any]:
     """The ticket's pair on a sheet, the host test's cells: A a futures index over F27, G27 and
     H27, 1 January 2027 closed, and B an IFERC index over Z26 to J27, both defining the NYMEX NG
     lot of 10,000 MMBTU; valued on 4 January 2027, A's two December settles and B's Z26 index
@@ -1306,7 +1305,15 @@ def sheet() -> dict[str, Any]:
         "template": template,
         "headers": across("trade_id", "trade_date", "contract_code", "quantity", "fixed_price"),
         "row": across(1.0, serial("2026-12-15"), "G27", 1.0, 3.00),
+        "holidays": holidays,
     }
+
+
+@pytest.fixture(scope="module")
+def sheet() -> dict[str, Any]:
+    """The pair's sheet, made once for the module; the_sheet is the plain maker another test
+    file books its own instrument over."""
+    return the_sheet()
 
 
 def test_the_sheet_books_a_pair_from_a_column_of_two_index_handles(sheet: dict[str, Any]) -> None:

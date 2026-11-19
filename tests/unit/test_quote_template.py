@@ -267,7 +267,7 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
     )
     assert create("Future", row("route"), row("cleared")) == (
         "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'Future', expected one of: "
-        "'fixed_float', 'cashflow'"
+        "'fixed_float', 'float_float', 'cashflow'"
     )
     assert str(create("fixed_float", row("Route"), row("cleared"))).startswith(
         "#ERROR _CreateQuoteTemplate: fields cell (1, 1) is text 'Route', "

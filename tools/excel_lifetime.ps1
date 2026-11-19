@@ -1556,7 +1556,11 @@ $quotes = {
 # remakes A's fixings, history and market, the preparation and the results,
 # the mark unmoved; the histories retyped B first remake the preparation and the results, matched by
 # index; B's index cleared fails the batch at its cell and everything of B and of the pair as
-# consumers, eight released, and typed back rebuilds the eight.
+# consumers, eight released, and typed back rebuilds the eight. Then a float_float on the same two
+# indexes, float-float-spread.md, A less B at a spread price of 3.80, booked beside the pair in
+# J31, prepared in J32 and valued in J33: four creators more, its handles a difference, A-B; a
+# tick on B moves the two marks opposite ways and remakes both results; a new spread price
+# remakes the spread alone.
 $pairs = {
     param($state)
     $book = New-Book $state
@@ -1680,6 +1684,55 @@ $pairs = {
     Check "and the mark reads 475 again" ((Text $state $sheet "J25") -eq "475") (Text $state $sheet "J25")
     $c = Settle $state $sheet { param($c) $c.Live -eq 24 }
     Check "twenty-four live again, eight more published, no misses, no disposal errors" ($c.Live -eq 24 -and $c.Published -eq 42 -and $c.Released -eq 18 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+
+    # A float_float on the same two indexes, float-float-spread.md, A less B: its template in J30
+    # over the pair's field cells, the row of one lot at a spread price of 3.80 in L7:P8, booked
+    # in J31, prepared in J32 and valued in J33, four creators more beside the pair's. A at 3.50
+    # less B at -0.45 is 3.95, fifteen cents over: 1,500 at 0.95, B's side paid and read back
+    # with its sign, 4,500.
+    Put $state $sheet "L7" "trade_id"; Put $state $sheet "M7" "trade_date"; Put $state $sheet "N7" "contract_code"; Put $state $sheet "O7" "quantity"; Put $state $sheet "P7" "spread_price"
+    Put $state $sheet "L8" "1"; Put $state $sheet "M8" "15-Dec-2026"; Put $state $sheet "N8" "G27"; Put $state $sheet "O8" "1"; Put $state $sheet "P8" "3.8"
+    Put $state $sheet "J30" '=_CreateTradeTemplate("float_float",HSTACK(L1:V1,"nearby"),HSTACK(L2:V2,1))'
+    Put $state $sheet "J31" "=_CreateTrades(J5:J6,L7:P7,L8:P8,J30)"
+    Put $state $sheet "J32" "=_PrepareTrades(J31,J13:J14)"
+    Put $state $sheet "J33" "=_EvaluateTrades(J32,J17:K17,J20)"
+    Put $state $sheet "J34" "=INDEX(_ReportValues(J33),3,1)"
+    Put $state $sheet "J35" "=INDEX(util_ReadHandle(J33),4,33)"
+    $spread = Text $state $sheet "J31"
+    Check "the spread's cell shows its handle, a difference in leg order" ($spread.StartsWith("${id}:trades:A-B:")) $spread
+    $spreadPrepared = Text $state $sheet "J32"
+    Check "its preparation is named for the spread" ($spreadPrepared.StartsWith("${id}:prepared_trades:A-B:")) $spreadPrepared
+    $spreadResults = Text $state $sheet "J33"
+    Check "and its results" ($spreadResults.StartsWith("${id}:trade_results:A-B:")) $spreadResults
+    Check "the spread's mark reads 1,425" ((Text $state $sheet "J34") -eq "1425") (Text $state $sheet "J34")
+    Check "and B's floating contribution, paid, reads 4,500" ((Text $state $sheet "J35") -eq "4500") (Text $state $sheet "J35")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 28 }
+    Check "four creators more, twenty-eight live" ($c.Live -eq 28 -and $c.Published -eq 46 -and $c.Released -eq 18) $c.Text
+
+    # A tick on B's G27 quote, back to -0.40: B's vector and market and both results publish
+    # anew, the pair's and the spread's, the old four released; the two marks move opposite ways,
+    # the pair's up to 950 and the spread's down to 950, B being received by one and paid by the
+    # other; both preparations are reused.
+    $pairResults = Text $state $sheet "J24"
+    Put $state $sheet "B16" "-0.4"
+    Check "a tick on B gives the spread's results a new handle" ((Text $state $sheet "J33") -ne $spreadResults -and (Text $state $sheet "J33").StartsWith("${id}:trade_results:A-B:")) (Text $state $sheet "J33")
+    Check "and the pair's" ((Text $state $sheet "J24") -ne $pairResults) (Text $state $sheet "J24")
+    Check "the spread's mark falls to 950 as B rises" ((Text $state $sheet "J34") -eq "950") (Text $state $sheet "J34")
+    Check "while the pair's rises to 950" ((Text $state $sheet "J25") -eq "950") (Text $state $sheet "J25")
+    Check "B's contribution to the spread reads 4,000" ((Text $state $sheet "J35") -eq "4000") (Text $state $sheet "J35")
+    Check "the spread's preparation is reused as it is" ((Text $state $sheet "J32") -eq $spreadPrepared) (Text $state $sheet "J32")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 28 -and $c.Released -ge 22 }
+    Check "B's old vector and market and the two old results are released; four more published" ($c.Live -eq 28 -and $c.Released -eq 22 -and $c.Published -eq 50) $c.Text
+
+    # The spread price retyped, 3.90: the spread's batch, preparation and results publish anew,
+    # the old three released, and its mark is nothing, 3.90 against 3.90; the pair stands.
+    $pairResults = Text $state $sheet "J24"
+    Put $state $sheet "P8" "3.9"
+    Check "a new spread price gives the spread a new handle, named A-B still" ((Text $state $sheet "J31") -ne $spread -and (Text $state $sheet "J31").StartsWith("${id}:trades:A-B:")) (Text $state $sheet "J31")
+    Check "and its mark reads 0" ((Text $state $sheet "J34") -eq "0") (Text $state $sheet "J34")
+    Check "the pair's results stand" ((Text $state $sheet "J24") -eq $pairResults) (Text $state $sheet "J24")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 28 -and $c.Released -ge 25 }
+    Check "the spread's old batch, preparation and results are released; no misses, no disposal errors" ($c.Live -eq 28 -and $c.Released -eq 25 -and $c.Published -eq 53 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Close-Book $state $book
 }
 

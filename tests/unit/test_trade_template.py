@@ -255,7 +255,7 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
     )
     assert create("Future", row("quantity_unit"), row("lot")) == (
         "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: "
-        "'fixed_float', 'cashflow'"
+        "'fixed_float', 'float_float', 'cashflow'"
     )
     assert str(create("fixed_float", row("Quantity_unit"), row("lot"))).startswith(
         "#ERROR _CreateTradeTemplate: fields cell (1, 1) is text 'Quantity_unit', "

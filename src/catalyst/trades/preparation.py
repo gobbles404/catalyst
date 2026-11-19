@@ -23,7 +23,7 @@ from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market.market_history import MarketHistory
 from catalyst.trades.display_axes import EarlyRisk, PeriodAxis, early_risk, period_axis
 from catalyst.trades.encoding import Encoded, EncodedLeg, PaymentAxes, group_words
-from catalyst.trades.terms import Route
+from catalyst.trades.terms import Route, price_words
 
 PREPARED_SLOTS = "prepared_slots"  # slots placed on the calendar and told live from fixed
 FIXINGS_READ = "fixings_read"  # settles read off the history, one per fixed slot
@@ -333,9 +333,10 @@ def _the_totals(
             "settled groups' offsets and set amounts sum past the largest number"
         )
     if not np.isfinite(offset_unsettled):
+        side = price_words(encoded.terms.instrument)[1]  # a float_float's is its spread leg
         raise ValueError(
-            f"the batch has {offset_unsettled!r} of unsettled fixed leg in all, expected a finite "
-            f"amount of {currency}; the unsettled groups' fixed legs, each finite, sum past the "
+            f"the batch has {offset_unsettled!r} of unsettled {side} in all, expected a finite "
+            f"amount of {currency}; the unsettled groups' {side}s, each finite, sum past the "
             "largest number"
         )
     for leg, total in zip(legs, set_unsettled, strict=True):

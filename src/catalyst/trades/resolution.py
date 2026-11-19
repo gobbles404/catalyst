@@ -36,7 +36,7 @@ from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.kind import named
 from catalyst.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from catalyst.instrumentation.work_counts import WorkCounter
-from catalyst.instruments.definitions import FIXED_FLOAT, FieldType
+from catalyst.instruments.definitions import FIXED_FLOAT, FLOAT_FLOAT, FieldType
 from catalyst.instruments.fields import DatesOrTexts, FieldValues
 from catalyst.trades.encoding import Encoded, encoded
 from catalyst.trades.observations import Observations, observed
@@ -66,8 +66,11 @@ from catalyst.trades.terms import (
     month_bounds,
     named_trade,
     payments_after_observations,
+    price_words,
     reporting_lot_of,
     resolved_trades,
+    spread_legs,
+    spread_rules,
     trade_schedule_of,
     whole_nearbys,
     whole_trade_ids,
@@ -144,8 +147,9 @@ def resolved(
     here and handed on to the encoding, since the payment days count from them, and what the
     rows entered for their codes, the rows that entered one and their texts.
 
-    The ticket is bound against the template's instrument, the fixed_float, the one whose trades are
-    built. No field is supplied by both, even to the same value. Every required field is present
+    The ticket is bound against the template's instrument, the fixed_float or since
+    float-float-spread.md the float_float, the two whose trades are built. No field is supplied
+    by both, even to the same value. Every required field is present
     in one of them. The route and the settlement are one each, the template's value or a column
     every row agrees on; the quantity unit, the method and the basis are each row's own, the
     template's value for every row or the ticket's column, so that one batch mixes them row by
@@ -222,6 +226,12 @@ def resolved(
     distinct indexes of distinct names, one quote currency, quote quantity and settlement
     currency unit, and a financial settlement, are the kernel's.
 
+    A float_float template, since float-float-spread.md, books the first index's price less the
+    second's against its one spread_price, the field read where a fixed_float's fixed_price is.
+    The kernel's rules for it are applied here as well, each before the step that would
+    otherwise refuse it in other words: two indexes, before a leg's field is read, and the
+    bilateral route with no named broker, before a conditional field is.
+
     Then the kernel's rules, through resolved_trades: whole quantities, zero included, and finite
     prices, each named by its trade, a financial settlement with penultimate, last3day and asian,
     the first row of them named under a physical one, and each component's quantity formed once
@@ -239,6 +249,9 @@ def resolved(
     index = indexes[0]
     paired = len(indexes) == 2
     fields = _fields(template, ticket)
+    spread = template.instrument is FLOAT_FLOAT
+    if spread:
+        spread_legs(len(indexes))
     _the_required(fields)
     specifications, by_unit = _each_distinct(
         fields, "quantity_unit", partial(_the_specification, index, owner=_owner(index, paired))
@@ -252,6 +265,11 @@ def resolved(
     frequencies, by_frequency = _each_distinct(
         fields, "settlement_frequency", settlement_frequency_of
     )
+    if spread:
+        # The trade IDs are read for a refusal's words alone, so only where a row is refused.
+        spread_rules(
+            route, fields.labels("broker"), lambda i: named_trade(fields.ids("trade_id"), i)
+        )
     _the_conditions(fields, route, settlement)
     _the_leg_fields(fields, paired)
     specification = np.array(specifications, dtype=np.intp)[by_unit]
@@ -336,7 +354,7 @@ def resolved(
         fields.numbers("quantity")[occurrence],
         start,
         end,
-        fields.numbers("fixed_price")[occurrence],
+        fields.numbers(price_words(template.instrument)[0])[occurrence],
         payment,
         counterparty=fields.labels("counterparty"),
         marketing_reserve=fields.amounts("marketing_reserve", marketing_reserves),
@@ -525,12 +543,12 @@ class _Fields:
 
 
 def _fields(template: TradeTemplate, ticket: FieldValues) -> _Fields:
-    """The template's instrument the fixed_float, the ticket bound against it, and the two
-    disjoint."""
-    if template.instrument is not FIXED_FLOAT:
+    """The template's instrument one whose trades are built, the fixed_float or since
+    float-float-spread.md the float_float, the ticket bound against it, and the two disjoint."""
+    if template.instrument is not FIXED_FLOAT and template.instrument is not FLOAT_FLOAT:
         raise ValueError(
-            f"template is of instrument {template.instrument.name!r}, expected {FIXED_FLOAT.name}, "
-            "the one instrument whose trades are built"
+            f"template is of instrument {template.instrument.name!r}, expected "
+            f"{FIXED_FLOAT.name} or {FLOAT_FLOAT.name}, the instruments whose trades are built"
         )
     if ticket.instrument is not template.instrument:
         raise ValueError(
