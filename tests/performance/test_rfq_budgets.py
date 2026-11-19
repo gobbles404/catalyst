@@ -40,19 +40,26 @@ def a_ticket(rows: int, columns: dict[str, object]) -> FieldValues:
     return FieldValues(FIXED_FLOAT, rows, tuple(columns), columns)
 
 
-_TICKETS: dict[tuple[int, bool], FieldValues] = {}
+def _the_ticket(n: int, dated: bool) -> FieldValues:
+    columns: dict[str, object] = {"contract_code": CODES[:n], "quantity": QUANTITIES[:n]}
+    if dated:
+        columns["payment_day"] = DatesOrTexts.of_dates(DATES[:n])
+    return a_ticket(n, columns)
+
+
+# The request's tickets, a month's and a year's, each with and without the request's own payment
+# days: made here, as the module loads, so that no measured call builds its own input whichever
+# test runs first. Made on first use they were built inside the first call that asked, and a
+# ledger read alone, with no earlier test to have asked, counted the building as the request's.
+_TICKETS = MappingProxyType(
+    {(n, dated): _the_ticket(n, dated) for n in (1, 12) for dated in (False, True)}
+)
 
 
 def ticket_of(n: int, dated: bool) -> FieldValues:
     """The request's ticket of n months at quantities one to n, with the request's own payment
-    days when dated, made once per shape so that no measured call builds its own input."""
-    key = (n, dated)
-    if key not in _TICKETS:
-        columns: dict[str, object] = {"contract_code": CODES[:n], "quantity": QUANTITIES[:n]}
-        if dated:
-            columns["payment_day"] = DatesOrTexts.of_dates(DATES[:n])
-        _TICKETS[key] = a_ticket(n, columns)
-    return _TICKETS[key]
+    days when dated."""
+    return _TICKETS[(n, dated)]
 
 
 def made(
