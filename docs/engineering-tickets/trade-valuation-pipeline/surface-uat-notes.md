@@ -942,3 +942,22 @@ table agrees with it: try an agreed price of 1.155, where both months sit on a h
 B3335 at the quote's own cell and read a difference of exactly 0, as B3346 shows. Move one
 month by a cent in a copy of the column and see your own SUMPRODUCT tie to the agreed price.
 B3348 and B3349 are the refusals of 2.5 decimals and of 16.
+
+## 35. A float_float swap on two indexes at one spread price
+
+Agreed 18 November 2026, issue #239: [float-float-spread.md](float-float-spread.md), one pull
+request from main, the first slice of two. A new instrument, `float_float`, books two indexes
+quoted in one unit against one `spread_price`: a positive quantity receives the first index
+and pays the second and the spread price, one net payment a month. The handle reads as a
+difference, `NTO-PAN`. Each index keeps its own deltas and cross gamma, the second's of the
+opposite sign; the DV01 is the net payment's, counted once. The two-index `fixed_float`, the
+sum at one outright price, stands as it is.
+
+UAT: book the NTO against PAN swap from the record, the index it receives first, and compare
+the mark with the record's NPV; read the risk report and see the two indexes' deltas of
+opposite sign, one DV01 column and a cross gamma per index; move the spread price and see the
+value and the DV01 move with the deltas still; sell the same spread and see every number
+reverse; collect it with a position on one of its indexes and read that index netted and the
+spread's DV01 on its `NTO-PAN` row; follow one leg fixing before the other, both fixed, then
+paid, one cash amount; type `fixed_price` on the ticket, `cleared` as the route and a broker's
+name, and read each refusal.
