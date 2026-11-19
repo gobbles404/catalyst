@@ -966,3 +966,22 @@ instruments is in B1258, a row higher than it was, with the float_float's row. T
 NTO against PAN swap from the record, the index it receives first, and compare the mark with
 the record's NPV; follow one leg fixing before the other, both fixed, then paid, one cash
 amount; type `cleared` as the route and a broker's name, and read each refusal.
+
+## 36. A float_float's spread price in its own unit, and the cracks
+
+Agreed 19 November 2026, issue #239: [float-float-units.md](float-float-units.md), one pull
+request stacked on #252, the second slice of two. A `float_float` books two indexes that
+price in different units, gasoline in dollars a gallon less crude in dollars a barrel, and
+every `float_float` template now types the unit its spread price is in, two fields,
+`spread_price_currency_unit` and `spread_price_quantity_unit`: USD and BBL on a crack, USD
+and MMBTU on a gas spread. No price is converted: each leg's quantity is counted in its own
+index's price unit and the spread price's in its own. Each index keeps its own lots.
+
+UAT: book 1,000 barrels of RB less WTI at a spread price of 15.00 with USD and BBL, RB at
+2.10 and WTI at 70.00, and read a payment of 3,200, one lot of RB and minus one of WTI; type
+the spread price as 1,500 with CENT, and the quantity as 1 of a lot both indexes define, and
+see the same numbers; clear one of the two unit cells on a gas spread's template and read
+the field named as missing; book a volume index against an energy index and read the
+refusal; book a C5 leg in cents a gallon against WTI at a spread price of -9.10 and read
+zero at 145 and 70.00. Then book one of the desk's cracks from the record and compare the
+mark with the record's NPV.

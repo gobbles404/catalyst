@@ -291,9 +291,9 @@ count. The pull request states the counts it measured.
 
 ## Outside this slice
 
-The second slice, on the issue: a `spread_price_unit`, each leg's price converted to it
-once at creation, a quantity entry for indexes whose lot sizes differ, and the cracks the
-issue hand-prices, RB, heating oil and C5 natural gasoline against WTI.
+The second slice, [float-float-units.md](float-float-units.md): the spread price's unit,
+typed, two indexes that price in different units, and the cracks the issue hand-prices, RB,
+heating oil and C5 natural gasoline against WTI.
 
 Outside both: cleared or brokered spreads, a batch whose rows each name their own two
 indexes, two separately executed swaps settled apart, physical delivery, more than one
