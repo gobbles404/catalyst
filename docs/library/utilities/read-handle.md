@@ -102,7 +102,7 @@ What each kind shows:
 
 A new kind adds its row to this table on the pull request that builds its creator, and the same row in code: each kind registers how it shows in `src/catalyst/excel/utilities.py`, and a kind nobody registered fails in the cell, `#ERROR util_ReadHandle: TypeError: no table for a Widget`, rather than guessing its columns.
 
-A `float_float` batch, [float-float-spread.md](../../engineering-tickets/trade-valuation-pipeline/float-float-spread.md), reads back in a pair's tables: `trades` with `spread_price` where a `fixed_float` shows `fixed_price`, and `prepared_trades` and `trade_results` with the second leg's exposures, coefficients and floating contributions under their sign.
+A `float_float` batch, [float-float-spread.md](../../engineering-tickets/trade-valuation-pipeline/float-float-spread.md), reads back in a pair's tables: `trades` with `spread_price` where a `fixed_float` shows `fixed_price` and its two units after it since [float-float-units.md](../../engineering-tickets/trade-valuation-pipeline/float-float-units.md), and `prepared_trades` and `trade_results` with the second leg's exposures, coefficients and floating contributions under their sign.
 
 ## Tests
 

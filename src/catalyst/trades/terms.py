@@ -114,6 +114,24 @@ class PaymentTerms:
     date: NDArray[np.datetime64]
 
 
+# The units of electricity among the unit tables' ENERGY units, since float-float-units.md; the
+# rest are heat. A megawatt hour is 3.412 MMBTU as energy, and a spread of power against fuel is
+# struck at a heat rate, a ratio between the legs the tables do not carry, so a float_float's
+# price units are all of one side.
+ELECTRICITY: Final = frozenset({"MWH", "KWH"})
+
+
+@dataclass(frozen=True, slots=True)
+class PriceUnit:
+    """The unit a float_float's spread price is in, since float-float-units.md, typed on the
+    batch and never taken from an index: the currency unit and the quantity unit it is per, two
+    codes of the unit tables as entered, USD and BBL for dollars a barrel. Held as given by the
+    terms; the encoding, which has the tables, reads the two for their meaning once."""
+
+    currency_unit: str
+    quantity_unit: str
+
+
 @dataclass(frozen=True, slots=True)
 class LegInputs:
     """What a second leg is made from, since two-index-fixed-float.md: the second index's side of
@@ -210,7 +228,9 @@ class ResolvedTrades:
     of its row, finite, a fixed_float's fixed_price, the outright price of the sum of two
     indexes where the batch is on a pair and the index's price where it is on one, and since
     float-float-spread.md a float_float's spread_price, paid against the first index's price
-    less the second's. Then
+    less the second's, in price_unit, since float-float-units.md the unit the batch typed for
+    it, one for the batch, which neither index need quote in, and None for a fixed_float, whose
+    price is in its indexes' one unit. Then
     payment, the terms a financial settlement pays by and the days they give, one day per
     component shared by every leg, and None for a physical one, which pays on no day.
 
@@ -243,6 +263,7 @@ class ResolvedTrades:
     covered_days: NDArray[np.int64]
     component_quantity: NDArray[np.float64]
     price: NDArray[np.float64]
+    price_unit: PriceUnit | None
     marketing_reserve: NDArray[np.float64] | None
     cva_reserve: NDArray[np.float64] | None
     payment: PaymentTerms | None
@@ -301,6 +322,7 @@ def resolved_trades(
     cva_reserve: NDArray[np.float64] | None = None,
     discount_curve_key: tuple[str, ...] | None = None,
     second_leg: LegInputs | None = None,
+    price_unit: PriceUnit | None = None,
 ) -> ResolvedTrades:
     """The one way to make ResolvedTrades: the rules of the first fixed_float profile, checked once,
     in this order, the first failure being the message; then the columns copied and frozen, the
@@ -371,12 +393,18 @@ def resolved_trades(
     A float_float, since float-float-spread.md, is held to its own rules before any other,
     spread_legs and spread_rules: two legs, the bilateral route and no named broker. Its one
     price is its spread_price, named so in a refusal, and its second leg is the subtracted
-    one, the leg whose amounts the encoding signs; a fixed_float subtracts no leg.
+    one, the leg whose amounts the encoding signs; a fixed_float subtracts no leg. Since
+    float-float-units.md the spread price has its unit, price_unit, present exactly on a
+    float_float, spread_unit, and its two legs are held to the spread's pair rules where a
+    fixed_float's are held to one unit, spread_pair: one measure, one settlement currency unit
+    and quote quantity units both of heat or both of electricity, each leg quoting in its own
+    currency and quantity units otherwise.
     """
     spread = instrument is FLOAT_FLOAT
     if spread:
         spread_legs(1 if second_leg is None else 2)
         spread_rules(route, broker, partial(named_trade, trade_ids))
+    spread_unit(spread, price_unit)
     schedule = trade_schedule_of(index)
     lot = reporting_lot_of(index)
     occurrences = _the_occurrences(
@@ -459,6 +487,7 @@ def resolved_trades(
         days,
         _the_component_quantity(quantity_per, quantities, days, trade_ids, occurrence),
         _frozen_numbers(price),
+        price_unit,
         None if marketing_reserve is None else _frozen_numbers(marketing_reserve),
         None if cva_reserve is None else _frozen_numbers(cva_reserve),
         pays,
@@ -508,6 +537,54 @@ def spread_rules(route: Route, broker: tuple[str, ...] | None, named: Callable[[
                     f"broker of {named(i)} is {text!r}, expected none on a float_float; a "
                     "brokered spread is not built"
                 )
+
+
+def spread_unit(spread: bool, price_unit: PriceUnit | None) -> None:
+    """The unit of the batch's one price, since float-float-units.md, present exactly on a
+    float_float: a spread price is in the unit the batch typed for it and no index's, so a
+    float_float without one is refused, and a fixed_float's price is in its indexes' one unit,
+    so one with a unit of its own is refused, each by name."""
+    if spread and price_unit is None:
+        raise ValueError(
+            "price_unit is None, expected the spread price's currency unit and quantity unit "
+            "with a float_float; a spread price's unit is typed, never taken from an index"
+        )
+    if not spread and price_unit is not None:
+        raise ValueError(
+            f"price_unit is {price_unit.currency_unit} per {price_unit.quantity_unit}, expected "
+            "none with a fixed_float; its price is in the unit its indexes quote in"
+        )
+
+
+def spread_pair(first: Index, second: Index) -> None:
+    """A float_float's rules over its two indexes' conventions, since float-float-units.md,
+    where a fixed_float pair is held to one unit: one quantity type, since a spread across two
+    measures needs a density or a heat content the unit tables do not carry; one settlement
+    currency unit, the one payment's; and quote quantity units both of heat or both of
+    electricity, ELECTRICITY, since a spread of power against fuel is struck at a heat rate.
+    Each leg quotes in its own currency unit and per its own quantity unit otherwise, RB in
+    dollars a gallon and WTI in dollars a barrel, the encoding restating each leg's quantity in
+    its own. The first rule broken is the message, the second index named against the first."""
+    mine, theirs = second.conventions, first.conventions
+    if mine.quantity_type != theirs.quantity_type:
+        raise ValueError(
+            f"index 2 {second.name!r} measures {mine.quantity_type}, expected "
+            f"{theirs.quantity_type} as index 1 {first.name!r}; a spread across two measures "
+            "needs a density or a heat content, which the unit tables do not carry"
+        )
+    if mine.currency_unit != theirs.currency_unit:
+        raise ValueError(
+            f"index 2 {second.name!r} settles in {mine.currency_unit}, expected "
+            f"{theirs.currency_unit} as index 1 {first.name!r}; a spread is one payment in one "
+            "currency unit"
+        )
+    if (mine.quote_quantity_unit in ELECTRICITY) != (theirs.quote_quantity_unit in ELECTRICITY):
+        raise ValueError(
+            f"index 2 {second.name!r} quotes per {mine.quote_quantity_unit} and index 1 "
+            f"{first.name!r} per {theirs.quote_quantity_unit}, expected two units of heat or "
+            "two of electricity; a spread of power against fuel is struck at a heat rate, a "
+            "ratio between the legs, which is not built"
+        )
 
 
 def _the_prices(
@@ -566,12 +643,13 @@ def _the_second_leg(
     subtracted: bool,
 ) -> LegTerms:
     """The second leg over the pair's rules and its own, since two-index-fixed-float.md, in
-    this order: another index than the first, by identity and by name; the first's quote
-    currency, quote quantity and settlement currency units; a financial settlement; then the
-    first leg's rules over this index and these columns, each refusal naming the second leg's
-    field. No price of its own since two-index-one-price.md. Subtracted, since
-    float-float-spread.md, when the batch is a float_float, whose two prices net where a
-    fixed_float's add, the unit refusal saying which."""
+    this order: another index than the first, by identity and by name; on a fixed_float the
+    first's quote currency, quote quantity and settlement currency units, its two prices adding
+    in one unit, and on a float_float, since float-float-units.md, the spread's pair rules,
+    spread_pair, each leg quoting in its own; a financial settlement; then the first leg's
+    rules over this index and these columns, each refusal naming the second leg's field. No
+    price of its own since two-index-one-price.md. Subtracted, since float-float-spread.md,
+    when the batch is a float_float."""
     index = second.index
     if index is first:
         raise ValueError(
@@ -584,7 +662,9 @@ def _the_second_leg(
             "index for one name"
         )
     mine, theirs = index.conventions, first.conventions
-    if (mine.quote_currency_unit, mine.quote_quantity_unit, mine.currency_unit) != (
+    if subtracted:
+        spread_pair(first, index)
+    elif (mine.quote_currency_unit, mine.quote_quantity_unit, mine.currency_unit) != (
         theirs.quote_currency_unit,
         theirs.quote_quantity_unit,
         theirs.currency_unit,
@@ -593,8 +673,7 @@ def _the_second_leg(
             f"index 2 {index.name!r} quotes in {mine.quote_currency_unit} per "
             f"{mine.quote_quantity_unit} and settles in {mine.currency_unit}, expected "
             f"{theirs.quote_currency_unit} per {theirs.quote_quantity_unit} settled in "
-            f"{theirs.currency_unit} as index 1 {first.name!r}; two legs' prices "
-            f"{'net' if subtracted else 'add'} in one unit"
+            f"{theirs.currency_unit} as index 1 {first.name!r}; two legs' prices add in one unit"
         )
     if settlement is Settlement.PHYSICAL:
         raise ValueError(

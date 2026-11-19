@@ -569,7 +569,8 @@ def trades_table(obj: Trades) -> MixedArray:
     # two-index-one-price.md fixed_price and offset are the trade's, one price and one fixed
     # leg whatever the legs, and no column is a leg's price; a float_float, since
     # float-float-spread.md, shows its one price under its own name, spread_price, in the same
-    # place, and offset is its spread leg.
+    # place, and offset is its spread leg; since float-float-units.md the spread price's two
+    # units follow it, as the batch typed them, on every row.
     terms, encoding = obj.resolved, obj.encoded
     leg, leg_encoding = terms.legs[0], encoding.legs[0]  # the first leg's, the batch's own
     paired = len(terms.legs) > 1
@@ -617,6 +618,9 @@ def trades_table(obj: Trades) -> MixedArray:
     )
     text("quantity_per", tuple(BASIS_NAMES[terms.quantity_per[rows]]))
     numbers(price_words(terms.instrument)[0], "float64", terms.price)
+    if terms.price_unit is not None:  # a float_float's spread price's unit, as typed
+        text("spread_price_currency_unit", (terms.price_unit.currency_unit,) * n)
+        text("spread_price_quantity_unit", (terms.price_unit.quantity_unit,) * n)
     if terms.payment is not None:
         headers.append("payment_day")  # as the ticket or the template wrote, each kind its own
         types.append("date or text")

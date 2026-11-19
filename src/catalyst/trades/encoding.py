@@ -30,14 +30,16 @@ from catalyst.globals.unit_conversions import UnitConversions
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
-from catalyst.index_definitions.index_conventions import CURRENCY
+from catalyst.index_definitions.index_conventions import CURRENCY, a_unit_of, listed
 from catalyst.index_definitions.kind import with_holiday_calendar
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.trades.observations import Observations
 from catalyst.trades.reserves import Reserves, reserves
 from catalyst.trades.schedule_methods import METHODS, requires_booked_reference
 from catalyst.trades.terms import (
+    ELECTRICITY,
     LegTerms,
+    PriceUnit,
     ResolvedTrades,
     Route,
     booked_words,
@@ -304,10 +306,17 @@ def encoded(
     takes its second leg's sign here and nowhere else: a subtracted leg's quote quantities and
     coefficients are made negated, so its exposures, and every amount, delta and lot a later
     stage makes from them, are the price a positive quantity pays; its own side, the spread
-    leg, is the first leg's coefficient times the spread price as a fixed leg is.
+    leg, is minus the spread price times the coefficient of the spread price's own unit, since
+    float-float-units.md: the component's quantity restated in the spread price's quantity
+    unit through the first index's specification, times the factor from its currency unit to
+    the settlement currency, _the_spread_coefficient, which reads the unit's two codes for
+    their meaning against the tables, so that RB in dollars a gallon less WTI in dollars a
+    barrel at a spread price in dollars a barrel is three quantities, each in its own price's
+    unit, and no price is converted.
     For a pair, since two-index-fixed-float.md, each occurrence's quantity unit is one quantity
     per entered unit on both indexes: the specification it names on each index restates one
-    entered unit in the shared quote quantity unit, and the two sizes agree to within
+    entered unit in one unit, a fixed_float pair's shared quote quantity unit and a
+    float_float's spread price's quantity unit, and the two sizes agree to within
     UNIT_ROUNDOFF, whatever the row's quantity, zero included, a `LOT` of 10,000 MMBTU on one
     index and 2,500 on the other refused as an ambiguous common quantity and not a conversion
     to invent, a THERM on one and 100,000 BTU on the other one quantity; the first occurrence
@@ -395,14 +404,24 @@ def encoded(
     # the trade's fixed leg, since two-index-one-price.md once, from the first leg's
     # coefficient, each finite or refused before any slot, the order the one-leg path had.
     amounts = [_the_amounts(terms, leg, units) for leg in terms.legs]
-    for leg, (_, _, sizes) in zip(terms.legs[1:], amounts[1:], strict=True):
-        _the_same_quantity(terms, terms.legs[0], amounts[0][2], leg, sizes)
-    offset = _the_price_leg(terms, amounts[0][1])
+    if terms.price_unit is None:
+        shared = terms.legs[0].index.conventions.quote_quantity_unit  # the kernel's pair rule
+        for leg, (_, _, sizes, _) in zip(terms.legs[1:], amounts[1:], strict=True):
+            _the_same_quantity(terms, terms.legs[0], amounts[0][2], leg, sizes, shared)
+        priced = amounts[0][1]
+    else:
+        # A float_float's spread price has a unit of its own, float-float-units.md: its
+        # coefficient is made in that unit, and the quantity rule compares there, each leg's
+        # sizes restated through the distinct selections its amounts already found.
+        priced = _the_spread_coefficient(
+            terms, terms.price_unit, units, [selected for _, _, _, selected in amounts]
+        )
+    offset = _the_price_leg(terms, priced)
     offset_of_group = _the_group_offsets(
         terms, terms.legs[0], heads, group_of_component, offset, payment_date, keys, key_of_group
     )
     parts: list[_LegParts] = []
-    for leg, observed, (quote_quantity, coefficient, _) in zip(
+    for leg, observed, (quote_quantity, coefficient, _, _) in zip(
         terms.legs, observations, amounts, strict=True
     ):
         group_contract = leg.contract[heads]
@@ -554,36 +573,20 @@ class _LegParts:
 
 def _the_amounts(
     terms: ResolvedTrades, leg: LegTerms, units: UnitConversions
-) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.intp]]:
     """A leg's two amounts per component, the quote quantity and the coefficient, each finite or
-    refused by its trade and its operation, and the quote-unit size of each of the leg's
-    specifications, the conversion formed once per distinct specification the batch selects;
-    the arithmetic runs with numpy's flags down and the rules judge."""
-    index = leg.index
-    conventions = index.conventions
-    specifications = index.specifications
+    refused by its trade and its operation, the quote-unit size of each of the leg's
+    specifications, the conversion formed once per distinct specification the batch selects,
+    and those distinct specifications, found here once, one unique; the arithmetic runs with
+    numpy's flags down and the rules judge."""
+    conventions = leg.index.conventions
     selection = leg.specification[terms.occurrence]  # each component's specification row
+    selected = np.unique(selection)  # the distinct selections of the batch
     currency = conventions.currency_unit
     quote_unit = conventions.quote_quantity_unit
     per_price = f"{currency} per {conventions.quote_currency_unit}/{quote_unit}"
-    to_quote_unit = np.zeros(len(specifications.names))
+    to_quote_unit = _the_sizes(leg, selected, quote_unit, units)
     with np.errstate(over="ignore", invalid="ignore"):
-        for row in np.unique(
-            selection
-        ):  # the distinct selections of the batch, converted once each
-            chosen = int(row)
-            to_quote_unit[chosen] = float(specifications.lot_sizes[chosen]) * units.factor(
-                conventions.quantity_type,
-                specifications.lot_units[chosen],
-                conventions.quote_quantity_unit,
-            )
-            if not np.isfinite(to_quote_unit[chosen]):
-                raise ValueError(
-                    f"specification {specifications.names[chosen]!r} is {to_quote_unit[chosen]!r} "
-                    f"{quote_unit} a lot, expected a finite number; its lot size times the factor "
-                    f"from {specifications.lot_units[chosen]} to {quote_unit} outruns the largest "
-                    "number"
-                )
         to_currency = units.factor(
             CURRENCY, conventions.quote_currency_unit, conventions.currency_unit
         )
@@ -614,15 +617,109 @@ def _the_amounts(
                 f"{terms.named(k)} has {float(values[k])!r} of {what}, expected a finite {unit}; "
                 f"{why}"
             )
-    return quote_quantity, coefficient, to_quote_unit
+    return quote_quantity, coefficient, to_quote_unit, selected
+
+
+def _the_sizes(
+    leg: LegTerms, selected: NDArray[np.intp], unit: str, units: UnitConversions
+) -> NDArray[np.float64]:
+    """The size of each of a leg's specifications in one unit of its quantity type, by
+    specification row: the lot size times the unit tables' factor from the lot unit, formed
+    once per distinct specification the batch selects, the rows handed in, zero on a row it
+    does not, each finite or the first that is not refused by its specification; the
+    arithmetic runs with numpy's flags down and the rule judges. The leg's quote quantity unit
+    for its own amounts and, since float-float-units.md, the spread price's quantity unit for a
+    float_float's spread leg and its quantity rule."""
+    conventions = leg.index.conventions
+    specifications = leg.index.specifications
+    sizes = np.zeros(len(specifications.names))
+    with np.errstate(over="ignore", invalid="ignore"):
+        for row in selected:  # the distinct selections of the batch, converted once each
+            chosen = int(row)
+            sizes[chosen] = float(specifications.lot_sizes[chosen]) * units.factor(
+                conventions.quantity_type, specifications.lot_units[chosen], unit
+            )
+            if not np.isfinite(sizes[chosen]):
+                raise ValueError(
+                    f"specification {specifications.names[chosen]!r} is {sizes[chosen]!r} "
+                    f"{unit} a lot, expected a finite number; its lot size times the factor "
+                    f"from {specifications.lot_units[chosen]} to {unit} outruns the largest "
+                    "number"
+                )
+    return sizes
+
+
+def _the_spread_coefficient(
+    terms: ResolvedTrades,
+    price_unit: PriceUnit,
+    units: UnitConversions,
+    selected: Sequence[NDArray[np.intp]],
+) -> NDArray[np.float64]:
+    """What a float_float's spread price multiplies, per component, since float-float-units.md:
+    the component's quantity restated in the spread price's quantity unit through the first
+    index's specification, times the factor from the spread price's currency unit to the
+    settlement currency unit, so that the spread price times it is an amount of the payment's
+    currency whatever unit either leg quotes in; the first leg's coefficient to the last bit
+    where the spread price's unit is the first index's.
+
+    The unit's two codes are read for their meaning here, once, against the unit tables, the
+    first failure being the message: the currency unit a unit of the tables' currency
+    category; the quantity unit a unit of the indexes' quantity type, the one both share by
+    the kernel's rule; and of heat or of electricity as the two indexes quote in, the kernel's
+    rule over the legs carried to the third unit. Then the pair's quantity rule, each
+    occurrence's quantity unit one amount on both indexes, the two sizes compared in the
+    spread price's quantity unit, _the_same_quantity, each leg's sizes made over selected,
+    the distinct specifications its amounts found, in leg order. Each coefficient finite, or
+    the first that is not refused by its trade and its operation."""
+    first = terms.legs[0]
+    conventions = first.index.conventions
+    money = units.categories[CURRENCY].sizes
+    if price_unit.currency_unit not in money:
+        raise ValueError(
+            f"spread_price_currency_unit is {price_unit.currency_unit!r}, expected {listed(money)}"
+        )
+    measure = units.categories[conventions.quantity_type].sizes
+    unit = price_unit.quantity_unit
+    if unit not in measure:
+        raise ValueError(
+            f"spread_price_quantity_unit is {unit!r}, expected "
+            f"{a_unit_of(conventions.quantity_type, measure)}"
+        )
+    electric = conventions.quote_quantity_unit in ELECTRICITY
+    if (unit in ELECTRICITY) != electric:
+        side = [each for each in measure if (each in ELECTRICITY) == electric]
+        raise ValueError(
+            f"spread_price_quantity_unit is {unit!r}, expected a unit of "
+            f"{'electricity' if electric else 'heat'} as the two indexes quote in, {listed(side)}"
+        )
+    sizes = _the_sizes(first, selected[0], unit, units)
+    for leg, rows in zip(terms.legs[1:], selected[1:], strict=True):
+        _the_same_quantity(terms, first, sizes, leg, _the_sizes(leg, rows, unit, units), unit)
+    selection = first.specification[terms.occurrence]  # each component's specification row
+    per_price = f"{conventions.currency_unit} per {price_unit.currency_unit}/{unit}"
+    with np.errstate(over="ignore", invalid="ignore"):
+        coefficient = (terms.component_quantity * sizes[selection]) * units.factor(
+            CURRENCY, price_unit.currency_unit, conventions.currency_unit
+        )
+    outrun = ~np.isfinite(coefficient)
+    if outrun.any():
+        k = int(outrun.argmax())
+        raise ValueError(
+            f"{terms.named(k)} has {float(coefficient[k])!r} of spread coefficient, expected a "
+            f"finite amount of {per_price}; its count times its specification's size in the "
+            "spread price's unit and the currency factor outruns the largest number"
+        )
+    return coefficient
 
 
 def _the_price_leg(terms: ResolvedTrades, coefficient: NDArray[np.float64]) -> NDArray[np.float64]:
     """The trade's own side of each component's payment, since two-index-one-price.md: minus
-    the first leg's coefficient times the trade's one price, in the settlement currency, booked
-    once whatever the legs, a fixed_float's fixed leg and since float-float-spread.md a
-    float_float's spread leg, named so in a refusal; each finite or the first that is not
-    refused by its trade and its operation, the arithmetic running with numpy's flags down."""
+    the coefficient its price multiplies times the trade's one price, in the settlement
+    currency, booked once whatever the legs, a fixed_float's fixed leg, from the first leg's
+    coefficient, and since float-float-spread.md a float_float's spread leg, since
+    float-float-units.md from the spread price's own coefficient, named so in a refusal; each
+    finite or the first that is not refused by its trade and its operation, the arithmetic
+    running with numpy's flags down."""
     currency = terms.legs[0].index.conventions.currency_unit
     with np.errstate(over="ignore", invalid="ignore"):
         offset = -coefficient * terms.price
@@ -644,22 +741,24 @@ def _the_same_quantity(
     first_sizes: NDArray[np.float64],
     leg: LegTerms,
     sizes: NDArray[np.float64],
+    unit: str,
 ) -> None:
     """The pair's rule, since two-index-fixed-float.md: each occurrence's quantity unit is one
     quantity per entered unit on both indexes, the size of the specification it names on each,
-    one entered unit restated in the shared quote quantity unit, agreeing to within
+    one entered unit restated in one unit, a fixed_float pair's shared quote quantity unit and
+    since float-float-units.md a float_float's spread price's quantity unit, agreeing to within
     UNIT_ROUNDOFF, relative, whatever the row's quantity, zero included; else the first
     occurrence that differs is refused by its unit, its trade and the two sizes, a `LOT` of
     10,000 MMBTU on one index and 2,500 on the other being an ambiguous common quantity and not a
-    conversion to invent, while a THERM on one and 100,000 BTU on the other are one quantity to
-    the roundoff of their conversions."""
+    conversion to invent, while a THERM on one and 100,000 BTU on the other, or a `LOT` of
+    42,000 GAL on one and of 1,000 BBL on the other, are one quantity to the roundoff of their
+    conversions."""
     theirs = first_sizes[first.specification]
     mine = sizes[leg.specification]
     differs = ~np.isclose(mine, theirs, rtol=UNIT_ROUNDOFF, atol=0.0)
     if not differs.any():
         return
     i = int(differs.argmax())
-    unit = leg.index.conventions.quote_quantity_unit
     name = first.index.specifications.names[int(first.specification[i])]
     raise ValueError(
         f"quantity_unit {name!r} of {named_trade(terms.trade_ids, i)} is {float(theirs[i])!r} "

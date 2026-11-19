@@ -17,10 +17,7 @@ from test_create_trades import a_template, a_ticket
 from test_trades import dates, day, quoted, waha_history
 from test_two_index import (
     AS_OF,
-    BILATERAL,
-    CLEARED,
     CLOSE,
-    LIFECYCLE,
     PAY,
     PID,
     SEAM,
@@ -41,6 +38,9 @@ from test_two_index import (
     the_sheet,
     under,
 )
+from test_two_index import BILATERAL as PAIR_BILATERAL
+from test_two_index import CLEARED as PAIR_CLEARED
+from test_two_index import LIFECYCLE as PAIR_LIFECYCLE
 from test_two_index import booked as booked_pair
 from test_two_index import valued as valued_on_a_and_b
 
@@ -64,6 +64,16 @@ from catalyst.trades.risk_report import Bucket, Risk
 # LOT of 2,500 MMBTU reported and one MMBTU per entered unit. Valued 4 January 2027, G27 quoted
 # -0.25 on NTO and -0.40 on PAN, one payment a year on at a SOFR factor of 0.95.
 
+# Every float_float types its spread price's unit, float-float-units.md: dollars per MMBTU here,
+# the unit both indexes quote in, on the pair test's three templates.
+UNIT: dict[str, object] = {
+    "spread_price_currency_unit": "USD",
+    "spread_price_quantity_unit": "MMBTU",
+}
+BILATERAL: dict[str, object] = {**PAIR_BILATERAL, **UNIT}
+CLEARED: dict[str, object] = {**PAIR_CLEARED, **UNIT}
+LIFECYCLE: dict[str, object] = {**PAIR_LIFECYCLE, **UNIT}
+
 NTO = iferc("NTO", 2_500.0)
 PAN = iferc("PAN", 2_500.0)
 TICKET: dict[str, list[object]] = {
@@ -73,7 +83,7 @@ TICKET: dict[str, list[object]] = {
     "quantity": [10_000],
     "spread_price": [0.10],  # the one price of the deal, against NTO less PAN
 }
-ONE_INDEX = {k: v for k, v in BILATERAL.items() if k != "second_schedule_method"}
+ONE_INDEX = {k: v for k, v in PAIR_BILATERAL.items() if k != "second_schedule_method"}
 QUOTES_NTO, QUOTES_PAN = (-0.23, -0.25, -0.27), (-0.38, -0.40, -0.42)  # from F27 on
 
 
@@ -601,9 +611,16 @@ def test_the_created_spread_reads_back_its_price_under_its_own_name() -> None:
     headings = table[0]
     assert "fixed_price" not in headings
     pair = grid(booked_pair())[0]  # a fixed_float pair's headings: the same places
-    assert headings.index("spread_price") == pair.index("fixed_price")
-    assert [h for h in headings if h != "spread_price"] == [h for h in pair if h != "fixed_price"]
+    at = headings.index("spread_price")
+    assert at == pair.index("fixed_price")
+    # Its unit follows it, as typed, float-float-units.md, and no other column moves.
+    units = ["spread_price_currency_unit", "spread_price_quantity_unit"]
+    assert headings[at + 1 : at + 3] == units
+    assert [h for h in headings if h not in ("spread_price", *units)] == [
+        h for h in pair if h != "fixed_price"
+    ]
     assert cell(table, 0, "spread_price") == 0.10
+    assert [cell(table, 0, unit) for unit in units] == ["USD", "MMBTU"]
     assert cell(table, 0, "offset") == pytest.approx(-1_000.0, **CLOSE)  # the spread leg
     assert cell(table, 0, "second_schedule_method") == "lastday"
     assert cell(table, 0, "quote_quantity") == 10_000.0  # the first leg's, the batch's own
@@ -689,14 +706,10 @@ def test_the_spread_price_and_the_second_method_are_always_required_and_the_pric
     assert "spread_price" not in {field.name for field in FIXED_FLOAT.fields}
 
 
-def test_the_pairs_rules_stand_in_their_words_and_the_units_net() -> None:
+def test_the_pairs_rules_stand_in_their_words() -> None:
     assert refused(indexes=(NTO, NTO)) == (
         "index 2 is index 1, 'NTO', again, expected two distinct indexes; a pair of one index is "
         "outside this version"
-    )
-    assert refused(indexes=(NTO, iferc("PAN", 2_500.0, "CENT"))) == (
-        "index 2 'PAN' quotes in CENT per MMBTU and settles in USD, expected USD per MMBTU settled "
-        "in USD as index 1 'NTO'; two legs' prices net in one unit"
     )
     assert refused(indexes=(NTO, futures("NTO", 2_500.0, 0.0, 0.0))) == (
         "index 2 is another index named 'NTO', the name of index 1, expected one index for one name"
@@ -735,7 +748,7 @@ def test_a_fixed_float_pair_on_the_same_indexes_is_as_it_was() -> None:
     # second leg received, its handle joined by a plus.
     rows: dict[str, list[object]] = {k: v for k, v in TICKET.items() if k != "spread_price"}
     rows["fixed_price"] = [-0.75]
-    pair = trades((NTO, PAN), a_ticket(rows), a_template(BILATERAL), UNITS, WorkCounter())
+    pair = trades((NTO, PAN), a_ticket(rows), a_template(PAIR_BILATERAL), UNITS, WorkCounter())
     assert pair.resolved.descriptor == "NTO+PAN"
     assert [leg.subtracted for leg in pair.resolved.legs] == [False, False]
     results = valued(pair)
@@ -751,7 +764,12 @@ FIELDS = (
     "quantity_unit, quantity_per, {price}, second_schedule_method, payment_day, "
     "payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
 )
+SPREAD_FIELDS = FIELDS.format(
+    price="spread_price, spread_price_currency_unit, spread_price_quantity_unit"
+)
 TEMPLATE_FIELDS = (
+    "spread_price_currency_unit",
+    "spread_price_quantity_unit",
     "quantity_unit",
     "quantity_per",
     "settlement_frequency",
@@ -777,6 +795,8 @@ def sheet() -> dict[str, Any]:
         "float_float",
         across(*TEMPLATE_FIELDS),
         across(
+            "USD",
+            "MMBTU",
             "NYMEX NG",
             "month",
             "monthly",
@@ -849,7 +869,7 @@ def test_the_sheet_refuses_what_a_spread_does_not_book(sheet: dict[str, Any]) ->
     fixed = across("trade_id", "trade_date", "contract_code", "quantity", "fixed_price")
     assert create(both, fixed, sheet["row"], sheet["template"]) == (
         "#ERROR _CreateTrades: fields cell (1, 5) is text 'fixed_price', expected a field of "
-        f"float_float: {FIELDS.format(price='spread_price')}"
+        f"float_float: {SPREAD_FIELDS}"
     )
     assert create(both, sheet["headers"], sheet["row"], the_sheet()["template"]) == (
         "#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of "
@@ -859,7 +879,7 @@ def test_the_sheet_refuses_what_a_spread_does_not_book(sheet: dict[str, Any]) ->
         "float_float", across("route", "fixed_price"), across("bilateral", 3.0)
     ) == (
         "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'fixed_price', expected a field "
-        f"of float_float: {FIELDS.format(price='spread_price')}"
+        f"of float_float: {SPREAD_FIELDS}"
     )
     assert create(sheet["a"], sheet["headers"], sheet["row"], sheet["template"]) == (
         "#ERROR _CreateTrades: ValueError: indexes are 1, expected two with a float_float; a "

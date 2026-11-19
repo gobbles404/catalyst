@@ -408,7 +408,7 @@ def _discounted(
     legs = prepared.legs
     first = legs[0]
     first_terms = first.encoded.leg
-    conventions = first_terms.index.conventions  # the pair shares its units, the kernel's rule
+    conventions = first_terms.index.conventions  # a pair settles in one unit, the kernel's rule
     currency = conventions.currency_unit
     as_of = first.history.calendar.valuation_date.as_of
     groups = encoded.offset_of_group.size

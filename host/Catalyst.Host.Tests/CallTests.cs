@@ -774,7 +774,9 @@ namespace Catalyst.Host.Tests
             var curves = (string)Seam.Call("_CollectDiscountCurves", (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 } }));
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar");
-            var template = (string)Seam.Call("_CreateTradeTemplate", "float_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays));
+            // Since float-float-units.md every float_float types its spread price's unit: dollars per MMBTU here.
+            var spreadFields = Row("spread_price_currency_unit", "spread_price_quantity_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "float_float", spreadFields, Row("USD", "MMBTU", "NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "spread_price");
             var row = Row(1.0, 46371.0, "G27", 1.0, 3.80);
             var trades = (string)Seam.Call("_CreateTrades", Column(a, b), headers, row, template);
@@ -814,6 +816,8 @@ namespace Catalyst.Host.Tests
             Assert.Equal(3, booked.GetLength(0));
             Assert.Equal(3.8, (double)booked[2, Heading(booked, "spread_price")], 12);
             Assert.Equal(-1, Heading(booked, "fixed_price"));  // a spread has no fixed price
+            Assert.Equal("USD", booked[2, Heading(booked, "spread_price_currency_unit")]);  // its unit, as typed
+            Assert.Equal("MMBTU", booked[2, Heading(booked, "spread_price_quantity_unit")]);
             Assert.Equal(-38000.0, (double)booked[2, Heading(booked, "offset")], 9);  // the spread leg, once
             var reserves = (object[,])Seam.Call("_ReportReserves", results);
             Assert.Equal(0.0, (double)reserves[2, 0], 9);
@@ -824,11 +828,98 @@ namespace Catalyst.Host.Tests
             Assert.StartsWith("#ERROR _CreateTrades: fields cell (1, 5) is text 'fixed_price', expected a field of float_float: trade_id,", (string)Seam.Call("_CreateTrades", Column(a, b), Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price"), row, template));
             var pair = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays));
             Assert.StartsWith("#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of fixed_float: trade_id,", (string)Seam.Call("_CreateTrades", Column(a, b), headers, row, pair));
-            var clearedFields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
-            var cleared = (string)Seam.Call("_CreateTradeTemplate", "float_float", clearedFields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "cleared", "financial", "ICE Clear Europe", 46756.0, holidays));
+            var clearedFields = Row("spread_price_currency_unit", "spread_price_quantity_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
+            var cleared = (string)Seam.Call("_CreateTradeTemplate", "float_float", clearedFields, Row("USD", "MMBTU", "NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "cleared", "financial", "ICE Clear Europe", 46756.0, holidays));
             Assert.Equal("#ERROR _CreateTrades: ValueError: route is 'cleared', expected 'bilateral' on a float_float; a cleared spread is not built", Seam.Call("_CreateTrades", Column(a, b), headers, row, cleared));
             Assert.Equal("#ERROR _CreateTrades: ValueError: broker of trade 7 at row 1 is 'ICAP', expected none on a float_float; a brokered spread is not built", Seam.Call("_CreateTrades", Column(a, b), Row("trade_id", "trade_date", "contract_code", "quantity", "spread_price", "broker"), Row(7.0, 46371.0, "G27", 1.0, 3.80, "ICAP"), template));
             Assert.Equal("#ERROR _CreateQuoteTemplate: ValueError: instrument is 'float_float', expected one a quote prices: 'fixed_float'", Seam.Call("_CreateQuoteTemplate", "float_float", Row("route"), Row("bilateral")));
+        }
+
+        // A futures index of VOLUME over F27, G27 and H27, quoted in USD per that unit with a LOT of that
+        // many of it and one BBL beside it, float-float-units.md: a leg of a crack.
+        private static string VolumeIndex(string name, string unit, double lot, object holidays)
+        {
+            var schedule = Seam.Call("_CreateFuturesSchedule", Column("F27", "G27", "H27"), Column(46385.0, 46414.0, 46442.0), ExcelMissing.Value);
+            var conventions = Seam.Call("_CreateIndexConventions", "USD", unit, "USD", "VOLUME", unit);
+            var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "LOT", lot, unit, 0.0, 0.0 }, { "BBL", 1.0, "BBL", 0.0, 0.0 } });
+            var handle = (string)Seam.Call("_CreateIndex", name, name + " index", schedule, conventions, specifications, holidays, "LOT");
+            Assert.StartsWith(Pid + ":index:" + name + ":", handle);
+            return handle;
+        }
+
+        // float-float-units.md: a crack, two indexes that price in different units under a float_float whose
+        // spread price's unit is typed. RB in USD per GAL with a LOT of 42,000 GAL less WTI in USD per BBL with
+        // a LOT of 1,000 BBL, 1,000 BBL of G27 at 15.00 USD per BBL, RB quoted 2.10 and WTI 70.00: 88,200 less
+        // 70,000 less 15,000, one net payment of 3,200 a year on at 0.95, 3,040; one lot of RB and minus one of
+        // WTI, each leg's price read back in its own unit and no price converted; the same crack at 1,500 cents
+        // a barrel; then a template with no unit, a unit the tables lack and one of another measure, by name.
+        [Fact]
+        public void a_crack_prices_two_indexes_of_different_units_at_a_spread_price_in_its_own()
+        {
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
+            var rb = VolumeIndex("RB", "GAL", 42000.0, holidays);
+            var wti = VolumeIndex("WTI", "BBL", 1000.0, holidays);
+            var date = (string)Seam.Call("_CreateValuationDate", 46391.0, 0.5);
+            var historyRb = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", date, rb), (string)Seam.Call("_CreateFuturesFixings", Column(46387.0, 46386.0), Column(2.05, 2.04), rb));
+            var historyWti = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", date, wti), (string)Seam.Call("_CreateFuturesFixings", Column(46387.0, 46386.0), Column(70.50, 70.40), wti));
+            var marketRb = (string)Seam.Call("_CreateMarket", historyRb, (string)Seam.Call("_CreatePriceVector", "RB", Column(2.10, 2.20)));
+            var marketWti = (string)Seam.Call("_CreateMarket", historyWti, (string)Seam.Call("_CreatePriceVector", "WTI", Column(70.00, 71.00)));
+            var curves = (string)Seam.Call("_CollectDiscountCurves", (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 } }));
+            var rest = new object[] { "BBL", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays };
+            var fields = Row("spread_price_currency_unit", "spread_price_quantity_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar");
+            object[,] Values(params object[] units)
+            {
+                var cells = new object[units.Length + rest.Length];
+                units.CopyTo(cells, 0);
+                rest.CopyTo(cells, units.Length);
+                return Row(cells);
+            }
+            var template = (string)Seam.Call("_CreateTradeTemplate", "float_float", fields, Values("USD", "BBL"));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "spread_price");
+            var row = Row(1.0, 46371.0, "G27", 1000.0, 15.0);
+            var trades = (string)Seam.Call("_CreateTrades", Column(rb, wti), headers, row, template);
+            Assert.StartsWith(Pid + ":trades:RB-WTI:", trades);
+            var booked = (object[,])Seam.Call("util_ReadHandle", trades);
+            Assert.Equal(3, booked.GetLength(0));
+            Assert.Equal(15.0, (double)booked[2, Heading(booked, "spread_price")], 12);
+            Assert.Equal("USD", booked[2, Heading(booked, "spread_price_currency_unit")]);
+            Assert.Equal("BBL", booked[2, Heading(booked, "spread_price_quantity_unit")]);
+            Assert.Equal(42000.0, (double)booked[2, Heading(booked, "quote_quantity")], 9);  // the first leg's, in its gallons
+            Assert.Equal(-15000.0, (double)booked[2, Heading(booked, "offset")], 9);  // the spread leg: 1,000 BBL at 15.00
+            var prepared = (string)Seam.Call("_PrepareTrades", trades, Column(historyRb, historyWti));
+            var results = (string)Seam.Call("_EvaluateTrades", prepared, Row(marketRb, marketWti), curves);
+            Assert.StartsWith(Pid + ":trade_results:RB-WTI:", results);
+            var values = (object[,])Seam.Call("_ReportValues", results);
+            Assert.Equal(3040.0, (double)values[2, 0], 9);
+            var risk = (object[,])Seam.Call("_ReportRisk", results, "all", "day");
+            Assert.Equal(8, risk.GetLength(1));
+            Assert.Equal("RB nominal_delta [LOT]", risk[1, 1]);
+            Assert.Equal("WTI delta [LOT]", risk[1, 4]);
+            Assert.Equal("Total", risk[3, 0]);
+            Assert.Equal(1.0, (double)risk[3, 1], 12);  // one lot of 42,000 GAL
+            Assert.Equal(0.95, (double)risk[3, 2], 12);
+            Assert.Equal(-1.0, (double)risk[3, 3], 12);  // minus one lot of 1,000 BBL, never summed with RB's
+            Assert.Equal(-0.95, (double)risk[3, 4], 12);
+            Assert.Equal(-0.304, (double)risk[3, 5], 12);
+            Assert.Equal(-0.000095, (double)risk[3, 6], 12);
+            Assert.Equal(0.000095, (double)risk[3, 7], 12);
+            var read = (object[,])Seam.Call("util_ReadHandle", results);
+            Assert.Equal("USD/GAL", read[2, Heading(read, "price_unit")]);
+            Assert.Equal("USD/BBL", read[3, Heading(read, "price_unit")]);
+            Assert.Equal(2.10, (double)read[2, Heading(read, "observation_price")], 12);  // no price converted
+            Assert.Equal(88200.0, (double)read[2, Heading(read, "floating_contribution")], 9);
+            Assert.Equal(-70000.0, (double)read[3, Heading(read, "floating_contribution")], 9);
+            // 1,500 cents a barrel is the same spread price: the same spread leg.
+            var cents = (string)Seam.Call("_CreateTradeTemplate", "float_float", fields, Values("CENT", "BBL"));
+            var inCents = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", Column(rb, wti), headers, Row(1.0, 46371.0, "G27", 1000.0, 1500.0), cents));
+            Assert.Equal(-15000.0, (double)inCents[2, Heading(inCents, "offset")], 6);
+            // The unit is typed on every float_float, a code of the tables and a unit of the indexes' measure.
+            var unitless = (string)Seam.Call("_CreateTradeTemplate", "float_float", Row("spread_price_currency_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar"), Values("USD"));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is missing, expected a value in the template or a column in the ticket", Seam.Call("_CreateTrades", Column(rb, wti), headers, row, unitless));
+            var euros = (string)Seam.Call("_CreateTradeTemplate", "float_float", fields, Values("EUR", "BBL"));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'EUR', expected USD or CENT", Seam.Call("_CreateTrades", Column(rb, wti), headers, row, euros));
+            var energy = (string)Seam.Call("_CreateTradeTemplate", "float_float", fields, Values("USD", "MMBTU"));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3", Seam.Call("_CreateTrades", Column(rb, wti), headers, row, energy));
         }
 
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;
@@ -847,16 +938,22 @@ namespace Catalyst.Host.Tests
             Assert.Equal("float_float", listed[2, 0]);  // float-float-spread.md, beside the instrument it shares its fields with
             Assert.Equal("cashflow", listed[3, 0]);
             Assert.Equal(8, ((object[,])Seam.Call("_ShowInstrument", "cashflow")).GetLength(1));
-            // The float_float: a fixed_float's columns, spread_price where fixed_price stands, the second index's
-            // method always required, and no field a quote may hold.
+            // The float_float: a fixed_float's columns, spread_price where fixed_price stands and since
+            // float-float-units.md its two units after it, the second index's method always required, and no
+            // field a quote may hold.
             var spread = (object[,])Seam.Call("_ShowInstrument", "float_float");
             Assert.Equal(10, spread.GetLength(0));
-            Assert.Equal(24, spread.GetLength(1));
+            Assert.Equal(26, spread.GetLength(1));
             Assert.Equal("spread_price", spread[0, 16]);
             Assert.Equal(true, spread[2, 16]);
-            Assert.Equal("second_schedule_method", spread[0, 17]);
+            Assert.Equal("spread_price_currency_unit", spread[0, 17]);
             Assert.Equal(true, spread[2, 17]);
-            Assert.Equal("none", spread[3, 17]);
+            Assert.Equal("USD, CENT", spread[5, 17]);
+            Assert.Equal("spread_price_quantity_unit", spread[0, 18]);
+            Assert.Equal(true, spread[2, 18]);
+            Assert.Equal("second_schedule_method", spread[0, 19]);
+            Assert.Equal(true, spread[2, 19]);
+            Assert.Equal("none", spread[3, 19]);
             Assert.Equal("bilateral", spread[5, 7]);
             Assert.Equal(false, spread[7, 6]);
             Assert.Equal(false, spread[8, 6]);

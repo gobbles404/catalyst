@@ -2,7 +2,9 @@
 same two indexes and rows at one row and at many: the spread is counted as the pair is at every
 step, creation, preparation, a tick and the collection, since its second leg's sign is taken
 once in the conversions the creation already makes and nothing later has a step for it. It runs
-the pair's functions and its own two rules, the pair's numpy calls and none more, and holds a
+the pair's functions, its own rules and, since float-float-units.md, the handful that reads
+its spread price's unit and makes that unit's coefficient at creation, the same at one row and
+at many; after creation the pair's functions and numpy calls and none more; and it holds a
 pair's memory at each step to the slack the seam allows. The indexes and the rows are the pair
 budgets' own: A a futures index, B an IFERC one."""
 
@@ -57,9 +59,18 @@ def a_ticket(columns: Mapping[str, list[object]]) -> FieldValues:
     )
 
 
+# The pair's template with the spread price's unit, float-float-units.md, the unit both indexes
+# quote in: dollars per MMBTU.
+SPREAD_TEMPLATE: dict[str, object] = {
+    **TEMPLATE,
+    "spread_price_currency_unit": "USD",
+    "spread_price_quantity_unit": "MMBTU",
+}
+
+
 def spread(n: int, counter: WorkCounter) -> Trades:
     """n rows of A less B, each its own occurrence of G27."""
-    template = trade_template(a_ticket({k: [v] for k, v in TEMPLATE.items()}))
+    template = trade_template(a_ticket({k: [v] for k, v in SPREAD_TEMPLATE.items()}))
     ticket = a_ticket({name: list(values) * n for name, values in SPREAD_TICKET.items()})
     return trades((A, B), ticket, template, UNITS, counter)
 
@@ -116,15 +127,40 @@ def test_a_spread_runs_a_pairs_functions_and_its_own_two_rules(
         "spread_legs": 2,
         "spread_rules": 2,
         "_Fields.labels": 1,  # the brokers, asked for by the rule: none here, the field absent
-        # Once for the brokers, and once more among the required fields, the second index's
-        # method being always required of a spread.
-        "_Fields.has": 2,
+        # Once for the brokers, and once each among the required fields for the second index's
+        # method, always required of a spread, and the spread price's two units.
+        "_Fields.has": 4,
         "FieldValues.has": 1,
+        # float-float-units.md, the spread price's unit, whatever the rows: its two fields read
+        # into the template and out of it as the batch's one each,
+        "field_value": 2,
+        "_holds": 2,
+        "FieldValues.field": 2,
+        "FieldValues.field.<locals>.<genexpr>": 4,
+        "FieldValues.texts": 2,
+        "_Fields.one_text": 2,
+        # the pair's rules of a spread where the one-unit rule ran inline, once in the
+        # resolution, before a quantity unit is read on the second index, and once in the kernel,
+        "spread_pair": 2,
+        # and the spread price's coefficient: each leg's selected specification restated in the
+        # spread price's quantity unit, one factor each, and the currency factor.
+        "_the_spread_coefficient": 1,
+        "_the_sizes": 2,
+        "UnitConversions.factor": 3,
+        "UnitConversions.category": 3,
     }
     assert set(theirs) <= set(mine)
-    assert numpy_calls(lambda: spread(n, WorkCounter())) == numpy_calls(
-        lambda: pair(n, WorkCounter())
-    )
+    # The pair's numpy calls and the coefficient's own: a row of sizes per leg, the flags down
+    # round each conversion and the product, and one look that every coefficient is finite.
+    # No sort, no unique and no pass over the rows but that product and that look.
+    mine_numpy = numpy_calls(lambda: spread(n, WorkCounter()))
+    theirs_numpy = numpy_calls(lambda: pair(n, WorkCounter()))
+    assert {
+        name: mine_numpy[name] - theirs_numpy.get(name, 0)
+        for name in mine_numpy
+        if mine_numpy[name] != theirs_numpy.get(name)
+    } == {"numpy.zeros": 2, "numpy._make_extobj": 3, "ndarray.any": 1, "ufunc.reduce": 1}
+    assert set(theirs_numpy) <= set(mine_numpy)
     # Preparation and a tick: the same functions and the same numpy calls, name for name.
     hist_a, hist_b = history_a(), history_b()
     markets = (quoted(hist_a, 3.50, 3.60), quoted(hist_b, -0.38, -0.40, -0.42))

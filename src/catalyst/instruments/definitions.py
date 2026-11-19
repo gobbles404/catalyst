@@ -477,8 +477,8 @@ FLOAT_FLOAT = Instrument(
             FieldType.TEXT,
             "a specification name both indexes define",
             "Selects the lot size and unit on each index given to _CreateTrades, exactly as named "
-            "there, the two one quantity per entered unit; the template may supply it, and the "
-            "indexes own what it means",
+            "there, the two one amount, compared in the spread price's quantity unit; the "
+            "template may supply it, and the indexes own what it means",
         ),
         _as_booked("quantity_per"),
         Field(
@@ -488,9 +488,31 @@ FLOAT_FLOAT = Instrument(
             NONE,
             FieldType.NUMBER,
             "no fixed list",
-            "A finite number of either sign or zero in the quote unit the two indexes share, the "
-            "same for every month of a strip: the first index's price less the second's is paid "
-            "against it; a constant of the contract, never a market price",
+            "A finite number of either sign or zero in the unit the two fields after it name, "
+            "the same for every month of a strip: the first index's price less the second's is "
+            "paid against it; a constant of the contract, never a market price",
+        ),
+        Field(
+            "spread_price_currency_unit",
+            "The currency unit the spread price is in",
+            True,
+            NONE,
+            FieldType.CODE,
+            "USD, CENT",
+            "A currency unit of the unit tables, exactly as coded, typed and never taken from an "
+            "index: 15 with USD and BBL is fifteen dollars a barrel; one for the batch, the "
+            "template's or a column every row agrees on",
+        ),
+        Field(
+            "spread_price_quantity_unit",
+            "The quantity unit the spread price is per",
+            True,
+            NONE,
+            FieldType.CODE,
+            "a unit of the measure the two indexes share",
+            "A unit of the two indexes' quantity type in the unit tables, exactly as coded, BBL "
+            "or GAL for VOLUME, MMBTU for ENERGY, typed and never taken from an index, which may "
+            "each quote per another; one for the batch",
         ),
         Field(
             "second_schedule_method",
