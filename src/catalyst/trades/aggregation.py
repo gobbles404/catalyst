@@ -33,9 +33,10 @@ contributions, contributions.py, and the collector reads contributions and never
 rate group is the exact curve object and the currency over every contribution on them, a cross
 group the exact index object and curve object, so a result on several curves joins several
 groups with nothing here to change. A batch of cashflows is a source beside a batch of trades,
-its one rate contribution joining its curve's rate group and nothing else, no index group and
-no cross group being its; a collection holds trades, cashflows or both, and a position names
-either kind. The headings carry each curve's name, qualified where two objects share one.
+each of its rate contributions, one per curve it is valued on since cashflow-curve-keys.md,
+joining its curve's rate group and nothing else, no index group and no cross group being its;
+a collection holds trades, cashflows or both, and a position names either kind. The headings
+carry each curve's name, qualified where two objects share one.
 """
 
 import itertools

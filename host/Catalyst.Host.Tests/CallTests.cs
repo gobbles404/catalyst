@@ -569,15 +569,19 @@ namespace Catalyst.Host.Tests
         [Fact]
         public void cashflows_collect_alone_and_beside_each_other_under_their_curves_names()
         {
-            var template = (string)Seam.Call("_CreateTradeTemplate", "cashflow", Row("currency"), Row("USD"));
+            // Since cashflow-curve-keys.md a batch names its curve and is valued on a collection: the
+            // same three rows keyed on SOFR and keyed on FFOIS, each on a collection of its one curve.
+            var template = (string)Seam.Call("_CreateTradeTemplate", "cashflow", Row("currency", "discount_curve_key"), Row("USD", "SOFR"));
+            var keyedOnFfois = (string)Seam.Call("_CreateTradeTemplate", "cashflow", Row("currency", "discount_curve_key"), Row("USD", "FFOIS"));
             var fields = Row("trade_id", "trade_date", "amount", "payment_date");
             var rows = new object[,] { { 1.0, 46391.0, 10000.0, 46756.0 }, { 2.0, 46391.0, -10000.0, 47121.0 }, { 3.0, 46391.0, 250.0, 46390.0 } };
             var batch = (string)Seam.Call("_CreateCashflows", fields, rows, template);
+            var batchOnFfois = (string)Seam.Call("_CreateCashflows", fields, rows, keyedOnFfois);
             var date = Seam.Call("_CreateValuationDate", 46391.0, 0.5);
             var sofr = Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 }, { 47121.0, 0.9 } });
             var ffois = Seam.Call("_CreateDiscountCurve", "FFOIS", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.96 }, { 47121.0, 0.92 } });
-            var onSofr = (string)Seam.Call("_EvaluateCashflows", batch, date, sofr);
-            var onFfois = (string)Seam.Call("_EvaluateCashflows", batch, date, ffois);
+            var onSofr = (string)Seam.Call("_EvaluateCashflows", batch, date, (string)Seam.Call("_CollectDiscountCurves", sofr));
+            var onFfois = (string)Seam.Call("_EvaluateCashflows", batchOnFfois, date, (string)Seam.Call("_CollectDiscountCurves", ffois));
             var alone = (string)Seam.Call("_AggregateResults", onSofr);
             Assert.StartsWith(Pid + ":aggregate_results:", alone);
             var own = (object[,])Seam.Call("_ReportRisk", onSofr, "dv01", "year");
@@ -612,6 +616,64 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _AggregateResults: result_handles cell (2, 1) is cashflows handle '" + batch + "', expected trade results or cashflow results handle", Seam.Call("_AggregateResults", Column(onSofr, batch)));
         }
 
+        // A named curve for each cashflow, cashflow-curve-keys.md: 10,000 received on SOFR and 10,000 paid
+        // on FFOIS, both on 4 January 2028, keyed in a ticket column and valued on 4 January 2027 over
+        // the two curves collected, 0.95 and 0.90: two groups worth 500, never one of nothing, a DV01
+        // column a curve, -0.95 and 0.90, a readback row a key with the key last and the totals once;
+        // SOFR at 0.96 marks 600 over the same booked cashflows; a key the collection lacks is refused
+        // with its row, and a ticket with no key by the field.
+        [Fact]
+        public void cashflows_on_two_curves_on_one_day_are_two_groups_valued_each_on_its_own()
+        {
+            var template = (string)Seam.Call("_CreateTradeTemplate", "cashflow", Row("currency"), Row("USD"));
+            var fields = Row("trade_date", "amount", "payment_date", "discount_curve_key");
+            var rows = new object[,] { { 46391.0, 10000.0, 46756.0, "SOFR" }, { 46391.0, -10000.0, 46756.0, "FFOIS" } };
+            var batch = (string)Seam.Call("_CreateCashflows", fields, rows, template);
+            Assert.StartsWith(Pid + ":cashflows:USD:", batch);
+            var date = Seam.Call("_CreateValuationDate", 46391.0, 0.5);
+            var headers = Row("date", "discount_factor");
+            var sofr = (string)Seam.Call("_CreateDiscountCurve", "SOFR", headers, new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 } });
+            var ffois = (string)Seam.Call("_CreateDiscountCurve", "FFOIS", headers, new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.90 } });
+            var curves = (string)Seam.Call("_CollectDiscountCurves", Column(sofr, ffois));
+            var results = (string)Seam.Call("_EvaluateCashflows", batch, date, curves);
+            Assert.StartsWith(Pid + ":cashflow_results:USD:", results);
+            var values = (object[,])Seam.Call("_ReportValues", results);
+            Assert.Equal(500.0, (double)values[2, 0], 9);
+            Assert.Equal(0.0, (double)values[2, 1], 12);
+            var risk = (object[,])Seam.Call("_ReportRisk", results, "dv01", "day");
+            Assert.Equal(5, risk.GetLength(0));  // one payment day, shared by the two curves
+            Assert.Equal(3, risk.GetLength(1));
+            Assert.Equal("SOFR USD dv01 [USD per basis point]", risk[1, 1]);
+            Assert.Equal("FFOIS USD dv01 [USD per basis point]", risk[1, 2]);
+            Assert.Equal("Total", risk[3, 0]);
+            Assert.Equal(-0.95, (double)risk[3, 1], 12);
+            Assert.Equal(0.90, (double)risk[3, 2], 12);
+            Assert.Equal(46756.0, risk[4, 0]);
+            var read = (object[,])Seam.Call("util_ReadHandle", results);
+            Assert.Equal(4, read.GetLength(0));  // one payment day on two keys: two rows
+            Assert.Equal(13, read.GetLength(1));
+            Assert.Equal("SOFR", read[2, Heading(read, "discount_curve_key")]);
+            Assert.Equal("FFOIS", read[3, Heading(read, "discount_curve_key")]);
+            Assert.Equal(9500.0, (double)read[2, Heading(read, "npv")], 9);
+            Assert.Equal(-9000.0, (double)read[3, Heading(read, "npv")], 9);
+            Assert.Equal(0.90, (double)read[3, Heading(read, "payment_factor")], 12);
+            Assert.Equal(500.0, (double)read[2, Heading(read, "cashflow_mark")], 9);
+            Assert.Equal("-", read[3, Heading(read, "cashflow_mark")]);
+            Assert.Equal(-0.05, (double)read[2, Heading(read, "cashflow_dv01")], 12);
+            var booked = (object[,])Seam.Call("util_ReadHandle", batch);
+            Assert.Equal("FFOIS", booked[3, Heading(booked, "discount_curve_key")]);
+            // SOFR at 0.96: 600 and -0.96, FFOIS's column as it was, over the same booked cashflows.
+            var lifted = (string)Seam.Call("_CreateDiscountCurve", "SOFR", headers, new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.96 } });
+            var moved = (string)Seam.Call("_EvaluateCashflows", batch, date, (string)Seam.Call("_CollectDiscountCurves", Column(lifted, ffois)));
+            Assert.Equal(600.0, (double)((object[,])Seam.Call("_ReportValues", moved))[2, 0], 9);
+            var movedRisk = (object[,])Seam.Call("_ReportRisk", moved, "dv01", "day");
+            Assert.Equal(-0.96, (double)movedRisk[3, 1], 12);
+            Assert.Equal(0.90, (double)movedRisk[3, 2], 12);
+            // A key the collection lacks, by its row; a ticket with no key, by the field.
+            Assert.Equal("#ERROR _EvaluateCashflows: ValueError: discount_curve_key 'FFOIS' of trade at row 2 names no curve of the collection, which holds 'SOFR'; expected a curve of that name", Seam.Call("_EvaluateCashflows", batch, date, (string)Seam.Call("_CollectDiscountCurves", sofr)));
+            Assert.Equal("#ERROR _CreateCashflows: ValueError: discount_curve_key is missing, expected a value in the template or a column in the ticket", Seam.Call("_CreateCashflows", Row("trade_date", "amount", "payment_date"), Row(46391.0, 1.0, 46756.0), template));
+        }
+
         // The cashflow instrument, cashflow-instrument.md: a template of USD and Firm A, the
         // ticket's three payments, valued on 4 January 2027 over the curve 1, 0.95 and 0.90: 500 of
         // mark, 250 of cash and 0.85 of DV01, the handles named for the currency; the values and
@@ -621,7 +683,7 @@ namespace Catalyst.Host.Tests
         [Fact]
         public void cashflows_are_booked_from_a_template_and_a_ticket_and_valued_on_a_curve()
         {
-            var template = (string)Seam.Call("_CreateTradeTemplate", "cashflow", Row("currency", "counterparty"), Row("USD", "Firm A"));
+            var template = (string)Seam.Call("_CreateTradeTemplate", "cashflow", Row("currency", "counterparty", "discount_curve_key"), Row("USD", "Firm A", "SOFR"));
             Assert.StartsWith(Pid + ":trade_template:", template);
             var fields = Row("trade_id", "trade_date", "amount", "payment_date", "description");
             var rows = new object[,] { { 1.0, 46391.0, 10000.0, 46756.0, "Receivable" }, { 2.0, 46391.0, -10000.0, 47121.0, "Payable" }, { 3.0, 46391.0, 250.0, 46390.0, "Earlier rebate" } };
@@ -629,8 +691,12 @@ namespace Catalyst.Host.Tests
             Assert.StartsWith(Pid + ":cashflows:USD:", batch);
             var date = Seam.Call("_CreateValuationDate", 46391.0, 0.5);
             var curve = Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 }, { 47121.0, 0.9 } });
-            var results = (string)Seam.Call("_EvaluateCashflows", batch, date, curve);
+            // Since cashflow-curve-keys.md the third argument is the collection, of one curve here; the
+            // curve itself is refused there by its kind.
+            var curves = (string)Seam.Call("_CollectDiscountCurves", curve);
+            var results = (string)Seam.Call("_EvaluateCashflows", batch, date, curves);
             Assert.StartsWith(Pid + ":cashflow_results:USD:", results);
+            Assert.Equal("#ERROR _EvaluateCashflows: discount_curve_set is discount curve handle '" + curve + "', expected discount curve set handle", Seam.Call("_EvaluateCashflows", batch, date, curve));
             var values = (object[,])Seam.Call("_ReportValues", results);
             Assert.Equal("cashflow_mark", values[0, 0]);
             Assert.Equal("cashflow_cash", values[0, 1]);
@@ -649,14 +715,18 @@ namespace Catalyst.Host.Tests
             Assert.Equal(1.8, (double)risk[6, 1], 12);
             var read = (object[,])Seam.Call("util_ReadHandle", results);
             Assert.Equal(5, read.GetLength(0));
-            Assert.Equal(12, read.GetLength(1));
+            Assert.Equal(13, read.GetLength(1));  // the key last, so that no earlier column moved
+            Assert.Equal("discount_curve_key", read[0, 12]);
+            Assert.Equal("SOFR", read[4, 12]);
             Assert.Equal("cashflow_mark", read[0, 9]);
             Assert.Equal(500.0, (double)read[2, 9], 9);
             Assert.Equal("-", read[3, 9]);
             var booked = (object[,])Seam.Call("util_ReadHandle", batch);
             Assert.Equal(5, booked.GetLength(0));
-            Assert.Equal(7, booked.GetLength(1));
+            Assert.Equal(8, booked.GetLength(1));
             Assert.Equal("Firm A", booked[2, 5]);
+            Assert.Equal("discount_curve_key", booked[0, 7]);
+            Assert.Equal("SOFR", booked[2, 7]);
             Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk", Seam.Call("_ReportRisk", results, "delta", "day"));
             var fixedFloat = Seam.Call("_CreateTradeTemplate", "fixed_float", Row("route"), Row("cleared"));
             Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
@@ -1014,7 +1084,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("fixed_float", listed[1, 0]);
             Assert.Equal("float_float", listed[2, 0]);  // float-float-spread.md, beside the instrument it shares its fields with
             Assert.Equal("cashflow", listed[3, 0]);
-            Assert.Equal(8, ((object[,])Seam.Call("_ShowInstrument", "cashflow")).GetLength(1));
+            Assert.Equal(9, ((object[,])Seam.Call("_ShowInstrument", "cashflow")).GetLength(1));  // the key the eighth field
             // The float_float: a fixed_float's columns, spread_price where fixed_price stands and since
             // float-float-units.md its two units after it, the second index's method always required, and no
             // field a quote may hold.

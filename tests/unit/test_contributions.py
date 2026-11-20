@@ -1,7 +1,7 @@
 """The contributions a result keeps per curve, named-curves-slice-2.md: one rate and one cross
 contribution from a bilateral evaluation, by reference to the arrays the evaluation made, none
-from a cleared batch, one rate contribution from a batch of cashflows; and the words a report
-names a curve by, the name bare or, where two objects share one, both qualified."""
+from a cleared batch, one rate contribution per curve from a batch of cashflows; and the words a
+report names a curve by, the name bare or, where two objects share one, both qualified."""
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -9,7 +9,7 @@ from test_aggregate_risk import HNG_HISTORY, HNG_MARKET, hng, valued_on
 from test_bilateral_kernel import A_YEAR, AS_OF, TWO_YEARS, cross, curve_of, prepared_on, rate
 from test_bilateral_kernel import terms_of as bilateral_terms
 from test_bilateral_kernel import valued as trades_valued
-from test_cashflows import booked
+from test_cashflows import booked_on
 from test_cashflows import valued as cashflows_valued
 
 from catalyst.instrumentation.work_counts import WorkCounter
@@ -157,7 +157,7 @@ def test_a_cleared_result_keeps_no_contribution_and_the_known_zeros() -> None:
 
 
 def test_a_batch_of_cashflows_keeps_one_rate_contribution_on_its_curve() -> None:
-    result = cashflows_valued(booked(), curve=FFOIS)
+    result = cashflows_valued(booked_on(FFOIS), curve=FFOIS)
     (contribution,) = result.rate_contributions
     assert contribution.curve is FFOIS and contribution.currency == "USD"
     assert contribution.dv01 == result.dv01
@@ -172,7 +172,7 @@ def test_a_batch_of_cashflows_reports_under_the_word_its_collection_shows() -> N
     # collection of the batch alone shows, a curve named cleared qualified in both.
     for name, word in (("SOFR", "SOFR"), (CLEARED, "cleared (curve_1)")):
         curve = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90), name=name)
-        result = cashflows_valued(booked(), curve=curve)
+        result = cashflows_valued(booked_on(curve), curve=curve)
         alone = aggregate_results([result], WorkCounter())
         for bucket in Bucket:
             direct = result.report(Risk.DV01, bucket)

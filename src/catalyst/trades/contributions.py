@@ -2,9 +2,10 @@
 of a result's DV01 or cross-gamma, the curve object that made it, the saved vectors on the saved
 axes by reference, and the facts refusing a month or a year view standing before the valuation
 day's period. Today's single-curve evaluation makes one of each, a cleared batch none and a batch
-of cashflows one rate contribution; a result on several curves keeps several, and the collection
-sums contributions, never results, onto its groups, so a rate group is the exact curve object and
-the currency over every contribution on them wherever it came from.
+of cashflows one rate contribution per curve its keys name, since cashflow-curve-keys.md; a
+result on several curves keeps several, and the collection sums contributions, never results,
+onto its groups, so a rate group is the exact curve object and the currency over every
+contribution on them wherever it came from.
 docs/library/trades/report-risk.md owns the labels and docs/library/trades/aggregate-results.md
 the collection."""
 

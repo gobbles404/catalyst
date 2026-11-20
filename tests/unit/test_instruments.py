@@ -399,7 +399,7 @@ def test_the_show_spills_ten_rows_and_a_column_per_field() -> None:
 
 
 @pytest.mark.parametrize(
-    ("definition", "columns"), [(FIXED_FLOAT, 24), (FLOAT_FLOAT, 26), (CASHFLOW, 8)]
+    ("definition", "columns"), [(FIXED_FLOAT, 24), (FLOAT_FLOAT, 26), (CASHFLOW, 9)]
 )
 def test_the_show_page_shows_the_same_cells_as_the_spill(
     definition: Instrument, columns: int

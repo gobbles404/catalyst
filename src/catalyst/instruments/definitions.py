@@ -607,6 +607,20 @@ CASHFLOW = Instrument(
             "no fixed list",
             "A label kept as typed; nothing is read from the words",
         ),
+        # Last, since cashflow-curve-keys.md, so that no column a sheet already reads off a
+        # batch of cashflows moves.
+        Field(
+            "discount_curve_key",
+            "The name of the curve the payment discounts on",
+            True,
+            NONE,
+            FieldType.TEXT,
+            "the name of a curve in the collection given to _EvaluateCashflows",
+            "Exact and case-sensitive, no whitespace around it: the template's one key for the "
+            "batch or a ticket column, a key a row; the curve is selected when the batch is "
+            "evaluated, from the collection supplied then, and a key naming none of its curves "
+            "fails the evaluation, never silently the first curve",
+        ),
     ),
 )
 
