@@ -686,9 +686,14 @@ $formulas = [ordered]@{
     "=ROWS(_ListInstruments())"       = "4"
     "=INDEX(_ListInstruments(),3,1)"  = "float_float"
     "=INDEX(_ListInstruments(),4,1)"  = "cashflow"
-    '=COLUMNS(_ShowInstrument("float_float"))'    = "24"
+    '=COLUMNS(_ShowInstrument("float_float"))'    = "26"
     '=INDEX(_ShowInstrument("float_float"),1,17)' = "spread_price"
-    '=INDEX(_ShowInstrument("float_float"),3,18)' = "TRUE"
+    '=INDEX(_ShowInstrument("float_float"),1,18)' = "spread_price_currency_unit"
+    '=INDEX(_ShowInstrument("float_float"),6,18)' = "USD, CENT"
+    '=INDEX(_ShowInstrument("float_float"),1,19)' = "spread_price_quantity_unit"
+    '=INDEX(_ShowInstrument("float_float"),3,19)' = "TRUE"
+    '=INDEX(_ShowInstrument("float_float"),1,20)' = "second_schedule_method"
+    '=INDEX(_ShowInstrument("float_float"),3,20)' = "TRUE"
     "=COLUMNS(_ListInstruments())"    = "2"
     '=INDEX(_ShowInstrument("fixed_float"),1,1)'  = "field"
     '=INDEX(_ShowInstrument("fixed_float"),1,2)'  = "trade_id"
@@ -2374,11 +2379,13 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(WJ36,"all","day"),4,6)' = "-0.095"
     '=TEXT(INDEX(_ReportRisk(WJ36,"all","day"),4,7),"0.000000")' = "-0.000095"
     '=TEXT(INDEX(_ReportRisk(WJ36,"all","day"),4,8),"0.000000")' = "0.000095"
-    "=COLUMNS(util_ReadHandle(WJ34))"    = "26"
+    "=COLUMNS(util_ReadHandle(WJ34))"    = "28"
     "=INDEX(util_ReadHandle(WJ34),1,14)" = "spread_price"
     "=INDEX(util_ReadHandle(WJ34),3,14)" = "3.8"
-    "=INDEX(util_ReadHandle(WJ34),1,24)" = "offset"
-    "=INDEX(util_ReadHandle(WJ34),3,24)" = "-38000"
+    "=INDEX(util_ReadHandle(WJ34),3,15)" = "USD"
+    "=INDEX(util_ReadHandle(WJ34),3,16)" = "MMBTU"
+    "=INDEX(util_ReadHandle(WJ34),1,26)" = "offset"
+    "=INDEX(util_ReadHandle(WJ34),3,26)" = "-38000"
     "=INDEX(util_ReadHandle(WJ35),4,2)"  = "B"
     "=INDEX(util_ReadHandle(WJ35),3,10)" = "1"
     "=INDEX(util_ReadHandle(WJ35),4,10)" = "-1"
@@ -2398,11 +2405,64 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(WJ38),5,2)"  = "B"
     "=INDEX(util_ReadHandle(WJ38),5,7)"  = "-1"
     "=_CreateTrades(WJ5,WL10:WP10,WL11:WP11,WJ33)" = "#ERROR _CreateTrades: ValueError: indexes are 1, expected two with a float_float; a spread is the first index's price less the second's"
-    "=_CreateTrades(WJ5:WJ6,WL4:WP4,WL5:WP5,WJ33)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'fixed_price', expected a field of float_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, spread_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "=_CreateTrades(WJ5:WJ6,WL4:WP4,WL5:WP5,WJ33)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'fixed_price', expected a field of float_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, spread_price, spread_price_currency_unit, spread_price_quantity_unit, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
     "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ21)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
     "=_CreateTrades(WJ5:WJ6,WL10:WQ10,WL11:WQ11,WJ33)" = "#ERROR _CreateTrades: ValueError: broker of trade 1 at row 1 is 'ICAP', expected none on a float_float; a brokered spread is not built"
     "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ39)" = "#ERROR _CreateTrades: ValueError: route is 'cleared', expected 'bilateral' on a float_float; a cleared spread is not built"
     '=_CreateQuoteTemplate("float_float",WP1,WP2)' = "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'float_float', expected one a quote prices: 'fixed_float'"
+    # A crack, float-float-units.md: RB in USD per GAL with a LOT of 42,000 GAL less WTI in USD
+    # per BBL with a LOT of 1,000 BBL, 1,000 BBL of G27 at a spread price of 15.00 typed in USD
+    # per BBL, in YJ20, prepared in YJ21 and valued in YJ22 on the pair's SOFR at 0.95: 88,200
+    # less 70,000 less 15,000, one net payment of 3,200, mark 3,040, DV01 -0.304; one lot of RB
+    # and minus one of WTI; the unit read back beside the spread price and each leg's price in
+    # its own; 1,500 cents a barrel the same spread leg; and a template with no unit, a unit the
+    # tables lack, one of another measure and an energy index beside a volume one, by name.
+    '=MID(YJ20,FIND(":",YJ20)+1,14)' = "trades:RB-WTI:"
+    '=MID(YJ21,FIND(":",YJ21)+1,23)' = "prepared_trades:RB-WTI:"
+    '=MID(YJ22,FIND(":",YJ22)+1,21)' = "trade_results:RB-WTI:"
+    "=ROUND(INDEX(_ReportValues(YJ22),3,1),6)" = "3040"
+    "=INDEX(_ReportValues(YJ22),3,2)" = "0"
+    '=COLUMNS(_ReportRisk(YJ22,"all","day"))'   = "8"
+    '=INDEX(_ReportRisk(YJ22,"all","day"),2,2)' = "RB nominal_delta [LOT]"
+    '=INDEX(_ReportRisk(YJ22,"all","day"),2,4)' = "WTI nominal_delta [LOT]"
+    '=INDEX(_ReportRisk(YJ22,"all","day"),4,2)' = "1"
+    '=INDEX(_ReportRisk(YJ22,"all","day"),4,3)' = "0.95"
+    '=INDEX(_ReportRisk(YJ22,"all","day"),4,4)' = "-1"
+    '=INDEX(_ReportRisk(YJ22,"all","day"),4,5)' = "-0.95"
+    '=ROUND(INDEX(_ReportRisk(YJ22,"all","day"),4,6),9)' = "-0.304"
+    '=TEXT(INDEX(_ReportRisk(YJ22,"all","day"),4,7),"0.000000")' = "-0.000095"
+    '=TEXT(INDEX(_ReportRisk(YJ22,"all","day"),4,8),"0.000000")' = "0.000095"
+    "=COLUMNS(util_ReadHandle(YJ20))"    = "28"
+    "=INDEX(util_ReadHandle(YJ20),3,12)" = "BBL"
+    "=INDEX(util_ReadHandle(YJ20),3,14)" = "15"
+    "=INDEX(util_ReadHandle(YJ20),1,15)" = "spread_price_currency_unit"
+    "=INDEX(util_ReadHandle(YJ20),3,15)" = "USD"
+    "=INDEX(util_ReadHandle(YJ20),1,16)" = "spread_price_quantity_unit"
+    "=INDEX(util_ReadHandle(YJ20),3,16)" = "BBL"
+    "=INDEX(util_ReadHandle(YJ20),3,24)" = "42000"
+    "=INDEX(util_ReadHandle(YJ20),3,26)" = "-15000"
+    "=INDEX(util_ReadHandle(YJ21),3,2)"  = "RB"
+    "=INDEX(util_ReadHandle(YJ21),4,2)"  = "WTI"
+    "=INDEX(util_ReadHandle(YJ21),3,10)" = "1"
+    "=INDEX(util_ReadHandle(YJ21),4,10)" = "-1"
+    "=COLUMNS(util_ReadHandle(YJ22))"    = "33"
+    "=ROUND(INDEX(util_ReadHandle(YJ22),3,18),6)" = "3200"
+    "=ROUND(INDEX(util_ReadHandle(YJ22),3,19),6)" = "3040"
+    "=INDEX(util_ReadHandle(YJ22),3,30)" = "42000"
+    "=INDEX(util_ReadHandle(YJ22),4,30)" = "-1000"
+    "=INDEX(util_ReadHandle(YJ22),3,31)" = "2.1"
+    "=INDEX(util_ReadHandle(YJ22),4,31)" = "70"
+    "=INDEX(util_ReadHandle(YJ22),3,32)" = "USD/GAL"
+    "=INDEX(util_ReadHandle(YJ22),4,32)" = "USD/BBL"
+    "=ROUND(INDEX(util_ReadHandle(YJ22),3,33),6)" = "88200"
+    "=ROUND(INDEX(util_ReadHandle(YJ22),4,33),6)" = "-70000"
+    "=ROUND(INDEX(util_ReadHandle(YJ24),3,26),6)" = "-15000"
+    "=INDEX(util_ReadHandle(YJ24),3,15)" = "CENT"
+    "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ25)" = "#ERROR _CreateTrades: ValueError: spread_price_currency_unit is missing, expected a value in the template or a column in the ticket"
+    "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ26)" = "#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'EUR', expected USD or CENT"
+    "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ27)" = "#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
+    "=_CreateTrades(VSTACK(YJ7,WJ5),YL4:YP4,YL5:YP5,YJ19)" = "#ERROR _CreateTrades: ValueError: index 2 'A' measures ENERGY, expected VOLUME as index 1 'RB'; a spread across two measures needs a density or a heat content, which the unit tables do not carry"
+    '=_CreateTradeTemplate("fixed_float",HSTACK("route","spread_price_currency_unit"),HSTACK("bilateral","USD"))' = "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
     # A request for quote, rfq-quoting.md, on the quoting block's strip in UX5 and its market VA7,
     # January at 30 and February at 60: F27 at 100,000 and G27 at 300,000 in XA1:XB2, the
     # bilateral +1bd template VF3 paying 1 February at 0.99 and 1 March at 0.98 in XD1, the
@@ -3978,8 +4038,9 @@ $cells = [ordered]@{
     # in WJ33 over the pair's own field cells, the row of one lot of G27 at a spread price of 3.80
     # in WL10:WP11 with a broker's name beside it in WQ10:WQ11, booked in WJ34, prepared in WJ35
     # and valued in WJ36; the indexes B first in WJ37, B less A; the collection of the spread
-    # alone in WJ38; and a cleared template in WJ39, which no spread is booked under.
-    "WJ33" = '=_CreateTradeTemplate("float_float",HSTACK(WL1:WV1,"nearby"),HSTACK(WL2:WV2,1))'
+    # alone in WJ38; and a cleared template in WJ39, which no spread is booked under. Since
+    # float-float-units.md both templates type the spread price's unit, USD and MMBTU.
+    "WJ33" = '=_CreateTradeTemplate("float_float",HSTACK(WL1:WV1,"nearby","spread_price_currency_unit","spread_price_quantity_unit"),HSTACK(WL2:WV2,1,"USD","MMBTU"))'
     "WL10" = "trade_id"; "WM10" = "trade_date"; "WN10" = "contract_code"; "WO10" = "quantity"; "WP10" = "spread_price"; "WQ10" = "broker"
     "WL11" = "1"; "WM11" = "15-Dec-2026"; "WN11" = "G27"; "WO11" = "1"; "WP11" = "3.8"; "WQ11" = "ICAP"
     "WJ34" = "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ33)"
@@ -3987,7 +4048,60 @@ $cells = [ordered]@{
     "WJ36" = "=_EvaluateTrades(WJ35,WJ17:WK17,WJ20)"
     "WJ37" = "=_CreateTrades(WK5:WK6,WL10:WP10,WL11:WP11,WJ33)"
     "WJ38" = "=_AggregateResults(WJ36)"
-    "WJ39" = '=_CreateTradeTemplate("float_float",HSTACK(WL1:WO1,"route","settlement_method","clearing_house","payment_day","payment_holiday_calendar","settlement_frequency","nearby"),HSTACK(WL2:WO2,"cleared","financial","ICE Clear Europe",WT2,WJ2,"monthly",1))'
+    "WJ39" = '=_CreateTradeTemplate("float_float",HSTACK(WL1:WO1,"route","settlement_method","clearing_house","payment_day","payment_holiday_calendar","settlement_frequency","nearby","spread_price_currency_unit","spread_price_quantity_unit"),HSTACK(WL2:WO2,"cleared","financial","ICE Clear Europe",WT2,WJ2,"monthly",1,"USD","MMBTU"))'
+    # float-float-units.md: a crack. Two futures indexes over F27 to H27 in YA1:YB3, 1 January
+    # closed, RB in USD per GAL with a LOT of 42,000 GAL and WTI in USD per BBL with a LOT of
+    # 1,000 BBL, each defining one BBL, in YJ7 and YJ8; valued 4 January 2027 with two December
+    # settles behind each, G27 quoted 2.10 and 70.00, their markets in YJ18:YK18, on the pair's
+    # SOFR curve in WJ20. A float_float template with the spread price's unit first, USD and
+    # BBL, in YL1:YY2 and YJ19; 1,000 BBL of G27 at 15.00 in YL4:YP5, booked in YJ20, prepared
+    # in YJ21 and valued in YJ22; the same at 1,500 cents a barrel in YJ24 under YJ23; and three
+    # templates no crack is booked under: no currency unit in YJ25, EUR in YJ26 and MMBTU, a
+    # unit of another measure, in YJ27.
+    "YA1" = "F27"; "YA2" = "G27"; "YA3" = "H27"
+    "YB1" = "29-Dec-2026"; "YB2" = "27-Jan-2027"; "YB3" = "24-Feb-2027"
+    "YC1" = "1-Jan-2027"
+    "YD1" = "name"; "YE1" = "lot_size"; "YF1" = "lot_unit"; "YG1" = "brokerage_rate_per_lot"; "YH1" = "clearing_rate_per_lot"
+    "YD2" = "LOT"; "YE2" = "42000"; "YF2" = "GAL"; "YG2" = "0"; "YH2" = "0"
+    "YD3" = "BBL"; "YE3" = "1"; "YF3" = "BBL"; "YG3" = "0"; "YH3" = "0"
+    "YD5" = "LOT"; "YE5" = "1000"; "YF5" = "BBL"; "YG5" = "0"; "YH5" = "0"
+    "YD6" = "BBL"; "YE6" = "1"; "YF6" = "BBL"; "YG6" = "0"; "YH6" = "0"
+    "YA11" = "4-Jan-2027"
+    "YA12" = "31-Dec-2026"; "YA13" = "30-Dec-2026"
+    "YB12" = "2.05"; "YB13" = "2.04"; "YC12" = "70.5"; "YC13" = "70.4"
+    "YA15" = "2.1"; "YA16" = "2.2"; "YB15" = "70"; "YB16" = "71"
+    "YJ1" = "=_CreateFuturesSchedule(YA1:YA3,YB1:YB3)"
+    "YJ2" = "=_CreateHolidayCalendar(YC1)"
+    "YJ3" = '=_CreateIndexConventions("USD","GAL","USD","VOLUME","GAL")'
+    "YJ4" = '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
+    "YJ5" = "=_CreateContractSpecifications(YD1:YH1,YD2:YH3)"
+    "YJ6" = "=_CreateContractSpecifications(YD1:YH1,YD5:YH6)"
+    "YJ7" = '=_CreateIndex("RB","Crack leg RB, dollars a gallon",YJ1,YJ3,YJ5,YJ2,"LOT")'
+    "YJ8" = '=_CreateIndex("WTI","Crack leg WTI, dollars a barrel",YJ1,YJ4,YJ6,YJ2,"LOT")'
+    "YJ9" = "=_CreateValuationDate(YA11,0.5)"
+    "YJ10" = "=_CreateCalendar(YJ9,YJ7)"
+    "YJ11" = "=_CreateCalendar(YJ9,YJ8)"
+    "YJ12" = "=_CreateFuturesFixings(YA12:YA13,YB12:YB13,YJ7)"
+    "YJ13" = "=_CreateFuturesFixings(YA12:YA13,YC12:YC13,YJ8)"
+    "YJ14" = "=_CreateMarketHistory(YJ10,YJ12)"
+    "YJ15" = "=_CreateMarketHistory(YJ11,YJ13)"
+    "YJ16" = '=_CreatePriceVector("RB",YA15:YA16)'
+    "YJ17" = '=_CreatePriceVector("WTI",YB15:YB16)'
+    "YJ18" = "=_CreateMarket(YJ14,YJ16)"; "YK18" = "=_CreateMarket(YJ15,YJ17)"
+    "YL1" = "spread_price_currency_unit"; "YM1" = "spread_price_quantity_unit"; "YN1" = "quantity_unit"; "YO1" = "quantity_per"; "YP1" = "schedule_method"; "YQ1" = "second_schedule_method"; "YR1" = "route"; "YS1" = "settlement_method"; "YT1" = "counterparty"; "YU1" = "discount_curve_key"; "YV1" = "payment_day"; "YW1" = "payment_holiday_calendar"; "YX1" = "settlement_frequency"; "YY1" = "nearby"
+    "YL2" = "USD"; "YM2" = "BBL"; "YN2" = "BBL"; "YO2" = "month"; "YP2" = "lastday"; "YQ2" = "lastday"; "YR2" = "bilateral"; "YS2" = "financial"; "YT2" = "ACME Trading"; "YU2" = "SOFR"; "YV2" = "4-Jan-2028"; "YW2" = "=YJ2"; "YX2" = "monthly"; "YY2" = "1"
+    "YJ19" = '=_CreateTradeTemplate("float_float",YL1:YY1,YL2:YY2)'
+    "YL4" = "trade_id"; "YM4" = "trade_date"; "YN4" = "contract_code"; "YO4" = "quantity"; "YP4" = "spread_price"
+    "YL5" = "1"; "YM5" = "15-Dec-2026"; "YN5" = "G27"; "YO5" = "1000"; "YP5" = "15"
+    "YL7" = "1"; "YM7" = "15-Dec-2026"; "YN7" = "G27"; "YO7" = "1000"; "YP7" = "1500"
+    "YJ20" = "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ19)"
+    "YJ21" = "=_PrepareTrades(YJ20,YJ14:YJ15)"
+    "YJ22" = "=_EvaluateTrades(YJ21,YJ18:YK18,WJ20)"
+    "YJ23" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK("CENT",YM2:YY2))'
+    "YJ24" = "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL7:YP7,YJ23)"
+    "YJ25" = '=_CreateTradeTemplate("float_float",YM1:YY1,YM2:YY2)'
+    "YJ26" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK("EUR",YM2:YY2))'
+    "YJ27" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK("USD","MMBTU",YN2:YY2))'
     # The request for quote, rfq-quoting.md and dated-quotes.md, on the quoting block's strip as a
     # ticket's rows: the two months, their quantities and the request's payment days in XA1:XC2, 8
     # February and 1 March, and in XA4:XC5 paying 1 March and 8 March, under the headers XE1:XG1;

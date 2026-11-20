@@ -127,10 +127,21 @@ def test_the_catalog_holds_the_fixed_float_with_its_twenty_three_fields_in_order
 
 def test_the_float_float_is_the_fixed_float_with_a_spread_price_and_both_methods_required() -> None:
     # float-float-spread.md: a fixed_float's fields in its order, spread_price where fixed_price
-    # stood, the second index's method always required, and no part in a quote.
+    # stood, the second index's method always required, and no part in a quote; since
+    # float-float-units.md the spread price's two units after it, typed on every float_float.
     names = tuple([field.name for field in FLOAT_FLOAT.fields])
-    assert names == tuple(["spread_price" if name == "fixed_price" else name for name in FIELDS])
+    units = ("spread_price_currency_unit", "spread_price_quantity_unit")
+    assert names == tuple(
+        [
+            mine
+            for name in FIELDS
+            for mine in (("spread_price", *units) if name == "fixed_price" else (name,))
+        ]
+    )
     by_name = {field.name: field for field in FLOAT_FLOAT.fields}
+    assert [by_name[unit].type for unit in units] == [FieldType.CODE, FieldType.CODE]
+    assert by_name[units[0]].options == "USD, CENT"
+    assert not any(field.name in units for field in FIXED_FLOAT.fields)
     assert [field.name for field in FLOAT_FLOAT.fields if field.required] == [
         "trade_date",
         "schedule_method",
@@ -140,6 +151,8 @@ def test_the_float_float_is_the_fixed_float_with_a_spread_price_and_both_methods
         "quantity_unit",
         "quantity_per",
         "spread_price",
+        "spread_price_currency_unit",
+        "spread_price_quantity_unit",
         "second_schedule_method",
         "settlement_frequency",
         "nearby",
@@ -386,7 +399,7 @@ def test_the_show_spills_ten_rows_and_a_column_per_field() -> None:
 
 
 @pytest.mark.parametrize(
-    ("definition", "columns"), [(FIXED_FLOAT, 24), (FLOAT_FLOAT, 24), (CASHFLOW, 8)]
+    ("definition", "columns"), [(FIXED_FLOAT, 24), (FLOAT_FLOAT, 26), (CASHFLOW, 8)]
 )
 def test_the_show_page_shows_the_same_cells_as_the_spill(
     definition: Instrument, columns: int

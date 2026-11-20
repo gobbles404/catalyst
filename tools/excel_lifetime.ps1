@@ -1692,7 +1692,7 @@ $pairs = {
     # with its sign, 4,500.
     Put $state $sheet "L7" "trade_id"; Put $state $sheet "M7" "trade_date"; Put $state $sheet "N7" "contract_code"; Put $state $sheet "O7" "quantity"; Put $state $sheet "P7" "spread_price"
     Put $state $sheet "L8" "1"; Put $state $sheet "M8" "15-Dec-2026"; Put $state $sheet "N8" "G27"; Put $state $sheet "O8" "1"; Put $state $sheet "P8" "3.8"
-    Put $state $sheet "J30" '=_CreateTradeTemplate("float_float",HSTACK(L1:V1,"nearby"),HSTACK(L2:V2,1))'
+    Put $state $sheet "J30" '=_CreateTradeTemplate("float_float",HSTACK(L1:V1,"nearby","spread_price_currency_unit","spread_price_quantity_unit"),HSTACK(L2:V2,1,"USD","MMBTU"))'
     Put $state $sheet "J31" "=_CreateTrades(J5:J6,L7:P7,L8:P8,J30)"
     Put $state $sheet "J32" "=_PrepareTrades(J31,J13:J14)"
     Put $state $sheet "J33" "=_EvaluateTrades(J32,J17:K17,J20)"

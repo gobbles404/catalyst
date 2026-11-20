@@ -57,6 +57,7 @@ from catalyst.trades.terms import (
     FREQUENCIES,
     LegInputs,
     PaymentTerms,
+    PriceUnit,
     ResolvedTrades,
     Route,
     Settlement,
@@ -70,6 +71,7 @@ from catalyst.trades.terms import (
     reporting_lot_of,
     resolved_trades,
     spread_legs,
+    spread_pair,
     spread_rules,
     trade_schedule_of,
     whole_nearbys,
@@ -230,7 +232,15 @@ def resolved(
     second's against its one spread_price, the field read where a fixed_float's fixed_price is.
     The kernel's rules for it are applied here as well, each before the step that would
     otherwise refuse it in other words: two indexes, before a leg's field is read, and the
-    bilateral route with no named broker, before a conditional field is.
+    bilateral route with no named broker, before a conditional field is. Since
+    float-float-units.md the spread's pair rules over the two indexes' conventions, spread_pair,
+    are applied with the first, so that an energy index beside a volume one is refused as two
+    measures and never as a quantity unit the second index does not define; and its spread
+    price's unit is two fields of the batch,
+    spread_price_currency_unit and spread_price_quantity_unit, required as any required field
+    is and one each as the route is, the template's value or a column every row agrees on,
+    handed to the kernel as given and read for their meaning by the encoding, which has the
+    unit tables.
 
     Then the kernel's rules, through resolved_trades: whole quantities, zero included, and finite
     prices, each named by its trade, a financial settlement with penultimate, last3day and asian,
@@ -252,6 +262,7 @@ def resolved(
     spread = template.instrument is FLOAT_FLOAT
     if spread:
         spread_legs(len(indexes))
+        spread_pair(index, indexes[1])
     _the_required(fields)
     specifications, by_unit = _each_distinct(
         fields, "quantity_unit", partial(_the_specification, index, owner=_owner(index, paired))
@@ -265,10 +276,15 @@ def resolved(
     frequencies, by_frequency = _each_distinct(
         fields, "settlement_frequency", settlement_frequency_of
     )
+    price_unit = None
     if spread:
         # The trade IDs are read for a refusal's words alone, so only where a row is refused.
         spread_rules(
             route, fields.labels("broker"), lambda i: named_trade(fields.ids("trade_id"), i)
+        )
+        price_unit = PriceUnit(
+            fields.one_text("spread_price_currency_unit"),
+            fields.one_text("spread_price_quantity_unit"),
         )
     _the_conditions(fields, route, settlement)
     _the_leg_fields(fields, paired)
@@ -362,6 +378,7 @@ def resolved(
         discount_curve_key=fields.keys("discount_curve_key"),
         schedule_month=months,
         second_leg=second_leg,
+        price_unit=price_unit,
     )
     return terms, legs, periods.entered
 

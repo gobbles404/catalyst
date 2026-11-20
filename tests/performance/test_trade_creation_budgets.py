@@ -352,6 +352,8 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         # float-float-spread.md: the price's field by its instrument, read once by the
         # resolution, to read the column, and once by the kernel, to name it
         "price_words": 2,
+        # float-float-units.md: a price's unit present exactly on a float_float, none here
+        "spread_unit": 1,
         "_the_keys": 1,  # the keys present exactly on the bilateral route, since slice 3
         "_the_selections": 1,  # each occurrence's unit, method, basis and frequency in range
         "_the_method": 1,
@@ -709,6 +711,9 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "encoded": 1,
         "_the_groups": 1,
         "_the_amounts": 1,  # two-index-fixed-float.md: the leg's two amounts per component
+        # float-float-units.md: the selected specifications' sizes in the quote unit, the
+        # conversions the amounts made inline before, one factor per distinct selection still
+        "_the_sizes": 1,
         "_the_price_leg": 1,  # the trade's own side, once: a fixed leg, or a spread leg
         "_the_group_offsets": 1,  # the trade's own sides by group
         "_the_exposures": 1,  # the leg's slots' exposures
