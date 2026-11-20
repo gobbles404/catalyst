@@ -201,7 +201,9 @@ def valuation_calls(curves: int) -> dict[str, int]:
 
 def valuation_numpy(curves: int) -> dict[str, int]:
     return {
-        "ndarray.any": 2 + curves,  # a total not finite twice, and each curve's days covered
+        # A period not finite twice, the curves' own totals not finite once, since the review
+        # of #260, and each curve's days covered.
+        "ndarray.any": 3 + curves,
         "ndarray.astype": 11 + curves,
         "generic.astype": 2,  # the period starts
         "ndarray.searchsorted": 4,  # the display axes' places
@@ -209,7 +211,7 @@ def valuation_numpy(curves: int) -> dict[str, int]:
         "ndarray.ravel": 4 + 2 * curves,  # 2 before on one curve: the by-curve places and weights
         "ndarray.reshape": 3,  # none before: the three views, a row a curve
         "ndarray.sum": 4,  # 3 before: the three totals and the curves' own
-        "ufunc.reduce": 6 + curves,
+        "ufunc.reduce": 7 + curves,
         "numpy.arange": 3,  # 2 before: the display periods, and the curves' rows
         "numpy.asanyarray": 2 * curves,
         "numpy.count_nonzero": 1,  # the unpaid groups counted

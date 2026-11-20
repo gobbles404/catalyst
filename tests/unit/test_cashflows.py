@@ -920,6 +920,54 @@ def test_a_group_past_the_largest_number_is_refused_by_its_day_and_key() -> None
     )
 
 
+# The review's case on #260: eight annual payment days from 4 January 4850, each receiving 8e307
+# on SOFR and paying 8e307 on FFOIS, both curves at 1 throughout, valued 4 January 2027. A
+# payment that far out has a DV01 of some 2.26e307, 0.0001 times 2,823 years and more times its
+# amount.
+FAR_DAYS = [f"{year}-01-04" for year in range(4850, 4858)]
+FAR_AMOUNT = 8e307
+
+
+def far_curves() -> DiscountCurveSet:
+    flat = ((AS_OF, 1.0), (FAR_DAYS[-1], 1.0))
+    return collected(curve_of(*flat), curve_of(*flat, name="FFOIS"))
+
+
+def far_ticket(days: list[str], first: str = "SOFR", second: str = "FFOIS") -> FieldValues:
+    """On each of those days the amount received on the first key and paid on the second."""
+    return keyed(
+        [FAR_AMOUNT, -FAR_AMOUNT] * len(days),
+        [first, second] * len(days),
+        [d for d in days for _ in range(2)],
+    )
+
+
+def test_a_curves_own_total_past_the_largest_number_is_refused_by_its_curve() -> None:
+    curves = far_curves()
+    # Seven days: every total is finite, the batch's nothing and each curve's seven DV01s.
+    seven = valued(booked(far_ticket(FAR_DAYS[:7]), UNKEYED), curve=curves)
+    years_out = (dates(*FAR_DAYS[:7]) - np.datetime64(AS_OF)).astype(np.float64) / 365.0
+    by_hand = -0.0001 * FAR_AMOUNT * float(years_out.sum())  # some -1.58e308, inside the range
+    sofr, ffois = seven.rate_contributions
+    assert math.isfinite(by_hand) and sofr.dv01 == pytest.approx(by_hand, **CLOSE)
+    assert ffois.dv01 == -sofr.dv01
+    assert seven.mark == 0.0 and seven.cash == 0.0
+    assert abs(seven.dv01) <= 1e-9 * abs(by_hand)  # the curves' totals cancel in the batch's
+    # The eighth: the receipts still cancel the payments in the batch's mark and DV01, and each
+    # curve's months and years hold one payment day apiece, so the batch's totals and every
+    # period are finite; each curve's own total is not, and the first in key order is named.
+    eight = booked(far_ticket(FAR_DAYS), UNKEYED)
+    assert refused_valuation(eight, curve=curves) == (
+        "the batch has -inf of DV01 on SOFR in all, expected a finite amount of USD per basis "
+        "point; the curve's payments' DV01s, each finite, sum past the largest number"
+    )
+    other_way = booked(far_ticket(FAR_DAYS, "FFOIS", "SOFR"), UNKEYED)
+    assert refused_valuation(other_way, curve=curves) == (
+        "the batch has -inf of DV01 on FFOIS in all, expected a finite amount of USD per basis "
+        "point; the curve's payments' DV01s, each finite, sum past the largest number"
+    )
+
+
 # --- the same through the seam --------------------------------------------------------------------
 
 
@@ -1015,3 +1063,31 @@ def test_the_seam_refuses_a_curve_where_the_collection_goes_and_a_key_naming_non
         "#ERROR _CreateCashflows: ValueError: discount_curve_key is missing, expected a value in "
         "the template or a column in the ticket"
     )
+
+
+def test_the_seam_publishes_no_results_whose_curve_total_is_past_the_largest_number() -> None:
+    # The review's reproduction on #260, through the worksheet functions: results were published
+    # with a mark of nothing, and the risk report and the collection then failed on SOFR's total.
+    template = ENTRY["_CreateTradeTemplate"]("cashflow", row("currency"), row("USD"))
+    body = [
+        [serial(AS_OF), sign * FAR_AMOUNT, serial(day), key]
+        for day in FAR_DAYS
+        for sign, key in ((1.0, "SOFR"), (-1.0, "FFOIS"))
+    ]
+    batch = ENTRY["_CreateCashflows"](
+        row("trade_date", "amount", "payment_date", "discount_curve_key"),
+        Cells.from_rows(body),
+        template,
+    )
+    date = ENTRY["_CreateValuationDate"](serial(AS_OF), 0.5)
+    flat = Cells.from_rows([[serial(AS_OF), 1.0], [serial(FAR_DAYS[-1]), 1.0]])
+    sofr = ENTRY["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, flat)
+    ffois = ENTRY["_CreateDiscountCurve"]("FFOIS", CURVE_HEADERS, flat)
+    curves = ENTRY["_CollectDiscountCurves"](Cells.from_rows([[sofr], [ffois]]))
+    live = bridge.live_handles()[0]
+    assert ENTRY["_EvaluateCashflows"](batch, date, curves) == (
+        "#ERROR _EvaluateCashflows: ValueError: the batch has -inf of DV01 on SOFR in all, "
+        "expected a finite amount of USD per basis point; the curve's payments' DV01s, each "
+        "finite, sum past the largest number"
+    )
+    assert bridge.live_handles()[0] == live  # refused before anything was published

@@ -82,7 +82,9 @@ In this order, the first failure being the message:
 Then, per group: a group on or before the valuation day is cash, at factor 1; an unpaid
 group reads its key's curve for its day, one factor a group. The mark, the cash and the DV01
 are the groups' sums, each finite. Per curve: its groups' DV01 summed onto the batch's days,
-months and years, one rate contribution a curve.
+months and years, one rate contribution a curve, each period finite and, since the review
+of #260, the curve's own total finite too: a receipt on one curve against a payment on
+another cancels in the batch's DV01, so the batch's total says nothing of a curve's.
 
 A changed curve makes a new evaluation over the same booked cashflows. A result already held
 is the snapshot it was.
@@ -114,6 +116,7 @@ In the words the build pins:
 | A key the collection lacks | `discount_curve_key 'SONIA' of trade 1002 at row 2 names no curve of the collection, which holds 'SOFR' and 'FFOIS'; expected a curve of that name` |
 | A selected curve starting on another day | `discount curve 'SOFR' starts on 2027-01-05, expected 2027-01-04, the valuation date; a curve is never rebased` |
 | An unpaid day past its curve | `the payment on 2029-01-04 on SOFR is past the discount curve 'SOFR', which runs from 2027-01-04 to 2028-01-04; expected every unpaid payment day covered` |
+| A curve's own DV01 past the largest number, the batch's finite | `the batch has -inf of DV01 on SOFR in all, expected a finite amount of USD per basis point; the curve's payments' DV01s, each finite, sum past the largest number` |
 | A group's amounts summing past the largest number | `the payments on 2028-01-04 on SOFR sum to inf, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number` |
 
 ## Hand-priced acceptance

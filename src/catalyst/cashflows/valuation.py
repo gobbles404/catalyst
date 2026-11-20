@@ -144,10 +144,13 @@ def cashflow_results(
     for an amount receivable; a paid group's amount is cash, at factor 1, with no value and no
     DV01. The mark, the cash and the DV01 are the sums. Each curve's DV01 is summed onto the
     batch's days, months and years, one reduction a view for every curve at once, a row a
-    curve, and each curve's total is its days' sum; each of the three totals and each curve's
-    two period views is finite or the first that is not is refused, by the batch or by its
-    period and its curve. The display axes run from the valuation day's month or year through
-    the last payment period; a paid group holds no DV01, so nothing stands before the start.
+    curve, and each curve's total is its days' sum; each of the three totals, each curve's two
+    period views and then each curve's own total is finite or the first that is not is
+    refused, by the batch, by its period and its curve, or by its curve: the batch's DV01 does
+    not answer for a curve's, since a receipt on one curve against a payment on another
+    cancels in the batch's while each curve's runs past the largest number. The display axes
+    run from the valuation day's month or year through the last payment period; a paid group
+    holds no DV01, so nothing stands before the start.
 
     Work: one curve selected per distinct key, one factor read and one payment valued per
     unpaid group and seven reductions, reported to the counter; nothing per row of the batch,
@@ -229,6 +232,17 @@ def cashflow_results(
                 f"in all, expected a finite amount of {currency} per basis point; its payments' "
                 "DV01s sum past the largest number"
             )
+    # Each curve's own total, which the batch's does not answer for: a receipt on one curve
+    # against a payment on another cancels in the batch's DV01 while each curve's runs past
+    # the largest number, and the reports and the collection read the curve's.
+    outrun = ~np.isfinite(dv01_of_curve)
+    if outrun.any():
+        k = int(outrun.argmax())
+        raise ValueError(
+            f"the batch has {float(dv01_of_curve[k])!r} of DV01 on {curves[k].name} in all, "
+            f"expected a finite amount of {currency} per basis point; the curve's payments' DV01s, "
+            "each finite, sum past the largest number"
+        )
     by_month = period_axis(as_of, NO_DAYS, months, "M")
     by_year = period_axis(as_of, NO_DAYS, years, "Y")
     is_paid = ~unpaid
