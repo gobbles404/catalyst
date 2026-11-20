@@ -265,6 +265,7 @@ NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float | int]]] = Mappi
         "trade_id": trade_id_of,
         "quantity": quantity_of,
         "fixed_price": price_of,
+        "spread_price": price_of,  # a float_float's one price, float-float-spread.md
         "marketing_reserve": marketing_reserve_of,
         "cva_reserve": cva_reserve_of,  # signed, since cva-reserve.md
         "nearby": nearby_of,  # a position from the prompt, nearby-selection.md

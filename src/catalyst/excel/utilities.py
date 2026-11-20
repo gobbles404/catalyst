@@ -64,7 +64,13 @@ from catalyst.trades.resolution import Trades
 from catalyst.trades.results import LegResults, TradeResults
 from catalyst.trades.schedule_methods import METHOD_NAMES
 from catalyst.trades.template import DayOrRule, TradeTemplate
-from catalyst.trades.terms import BASIS_NAMES, FREQUENCY_NAMES, booked_words, period_words
+from catalyst.trades.terms import (
+    BASIS_NAMES,
+    FREQUENCY_NAMES,
+    booked_words,
+    period_words,
+    price_words,
+)
 
 
 @singledispatch
@@ -561,7 +567,9 @@ def trades_table(obj: Trades) -> MixedArray:
     # two-index-fixed-float.md, shows the second leg's second_schedule_method after the first's
     # method, one row per component still, and a single index shows no such column; since
     # two-index-one-price.md fixed_price and offset are the trade's, one price and one fixed
-    # leg whatever the legs, and no column is a leg's price.
+    # leg whatever the legs, and no column is a leg's price; a float_float, since
+    # float-float-spread.md, shows its one price under its own name, spread_price, in the same
+    # place, and offset is its spread leg.
     terms, encoding = obj.resolved, obj.encoded
     leg, leg_encoding = terms.legs[0], encoding.legs[0]  # the first leg's, the batch's own
     paired = len(terms.legs) > 1
@@ -608,7 +616,7 @@ def trades_table(obj: Trades) -> MixedArray:
         tuple(np.array(leg.index.specifications.names, dtype=object)[leg.specification[rows]]),
     )
     text("quantity_per", tuple(BASIS_NAMES[terms.quantity_per[rows]]))
-    numbers("fixed_price", "float64", terms.fixed_price)
+    numbers(price_words(terms.instrument)[0], "float64", terms.price)
     if terms.payment is not None:
         headers.append("payment_day")  # as the ticket or the template wrote, each kind its own
         types.append("date or text")

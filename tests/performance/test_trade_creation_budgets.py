@@ -348,7 +348,10 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_choices": 2,
         "_the_contract_column": 1,  # the leg's contract rows, each a row of its schedule
         "_the_component_column": 2,  # the contract column and the price column, one per component
-        "_the_fixed_prices": 1,  # two-index-one-price.md: the trade's one price column, finite
+        "_the_prices": 1,  # two-index-one-price.md: the trade's one price column, finite
+        # float-float-spread.md: the price's field by its instrument, read once by the
+        # resolution, to read the column, and once by the kernel, to name it
+        "price_words": 2,
         "_the_keys": 1,  # the keys present exactly on the bilateral route, since slice 3
         "_the_selections": 1,  # each occurrence's unit, method, basis and frequency in range
         "_the_method": 1,
@@ -706,8 +709,8 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "encoded": 1,
         "_the_groups": 1,
         "_the_amounts": 1,  # two-index-fixed-float.md: the leg's two amounts per component
-        "_the_fixed_leg": 1,  # two-index-one-price.md: the trade's fixed leg, once
-        "_the_group_offsets": 1,  # the trade's fixed legs by group
+        "_the_price_leg": 1,  # the trade's own side, once: a fixed leg, or a spread leg
+        "_the_group_offsets": 1,  # the trade's own sides by group
         "_the_exposures": 1,  # the leg's slots' exposures
         "_distinct": 2,  # the groups by period and day, the slots by group, day and contract
         "_the_references": 1,

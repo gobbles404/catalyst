@@ -4,7 +4,7 @@ fields, and the catalog is the instruments in the order the library declares the
 are frozen library data, changed by a reviewed change to this file and by nothing a workbook
 does. docs/library/instruments/show-instrument.md shows them as the sheet sees them."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
 # The metadata rows of a shown instrument, down its first column, in this order: the seven of
@@ -377,6 +377,158 @@ FIXED_FLOAT = Instrument(
     ),
 )
 
+_BOOKED = {field.name: field for field in FIXED_FLOAT.fields}
+
+
+def _as_booked(name: str) -> Field:
+    """A fixed_float's field as a float_float books it, since float-float-spread.md: the same
+    seven facts of booking, one definition of each, and no part in a quote, since no quote
+    prices a spread."""
+    return replace(
+        _BOOKED[name], quote_allowed=False, quote_required=False, quote_required_when=NONE
+    )
+
+
+# The fields of a fixed_float, with spread_price where fixed_price stood and the second index's
+# method always required; a field whose choices this instrument narrows says so in its own words,
+# and what it does not build is refused by name, float-float-spread.md.
+FLOAT_FLOAT = Instrument(
+    "float_float",
+    "A floating-for-floating position on two reference contracts, the first index's price less "
+    "the second's against one agreed spread price, with explicit observation and settlement "
+    "terms.",
+    (
+        TRADE_ID,
+        TRADE_DATE,
+        _as_booked("contract_code"),
+        _as_booked("start_date"),
+        _as_booked("end_date"),
+        Field(
+            "schedule_method",
+            "How observations determine the first index's floating price",
+            True,
+            NONE,
+            FieldType.CODE,
+            "asian, lastday, penultimate, last3day",
+            "The first index's method, a library rule selected by the trade; all four are built "
+            "on a futures index, asian averaging the month's pricing days; lastday alone on an "
+            "IFERC index, its published month",
+        ),
+        Field(
+            "route",
+            "The route the trade settles by, bilateral",
+            True,
+            NONE,
+            FieldType.CODE,
+            "bilateral",
+            "bilateral exactly, the one route a spread is built on: valued on the curve "
+            "_EvaluateTrades requires, with no clearing reserve; cleared is refused by name",
+        ),
+        Field(
+            "settlement_method",
+            "How the trade finally settles, a financial payment",
+            True,
+            NONE,
+            FieldType.CODE,
+            "financial",
+            "financial exactly: the batch requires payment_day and payment_holiday_calendar and "
+            "each month pays one net amount on its payment day, the row's date or the day its "
+            "rule finds; physical is refused by name",
+        ),
+        Field(
+            "clearing_house",
+            "The clearing organization a cleared trade clears through; none for a float_float",
+            False,
+            "route = cleared",
+            FieldType.TEXT,
+            "no fixed list",
+            "Refused with any value: a float_float is on the bilateral route alone, where no "
+            "clearing house stands",
+        ),
+        _as_booked("counterparty"),
+        _as_booked("discount_curve_key"),
+        Field(
+            "broker",
+            "The broker named for the deal; none for a float_float",
+            False,
+            NONE,
+            FieldType.TEXT,
+            "none, in any case",
+            "Omit the field, or enter none in any case; a named broker is refused by name, a "
+            "brokered spread not being built, so no brokerage is reserved",
+        ),
+        Field(
+            "quantity",
+            "Signed size of the position, a count of the quantity unit",
+            True,
+            NONE,
+            FieldType.NUMBER,
+            "a signed whole count, zero included",
+            "A whole count of the selected quantity definition: a positive quantity buys the "
+            "spread, receiving the first index and paying the second and the spread price, a "
+            "negative one sells it; a zero row is kept, has no exposure, keeps a marketing or "
+            "CVA reserve it entered and can be filled in later",
+        ),
+        Field(
+            "quantity_unit",
+            "The desk's word for a quantity of both indexes, a contract specification each defines",
+            True,
+            NONE,
+            FieldType.TEXT,
+            "a specification name both indexes define",
+            "Selects the lot size and unit on each index given to _CreateTrades, exactly as named "
+            "there, the two one quantity per entered unit; the template may supply it, and the "
+            "indexes own what it means",
+        ),
+        _as_booked("quantity_per"),
+        Field(
+            "spread_price",
+            "The spread price agreed when the deal was executed",
+            True,
+            NONE,
+            FieldType.NUMBER,
+            "no fixed list",
+            "A finite number of either sign or zero in the quote unit the two indexes share, the "
+            "same for every month of a strip: the first index's price less the second's is paid "
+            "against it; a constant of the contract, never a market price",
+        ),
+        Field(
+            "second_schedule_method",
+            "How observations determine the second index's floating price",
+            True,
+            NONE,
+            FieldType.CODE,
+            "asian, lastday, penultimate, last3day",
+            "The second index's method, the same choices as schedule_method under the second "
+            "index's kind, lastday alone on an IFERC index",
+        ),
+        _as_booked("payment_day"),
+        _as_booked("payment_holiday_calendar"),
+        _as_booked("marketing_reserve"),
+        _as_booked("cva_reserve"),
+        Field(
+            "settlement_frequency",
+            "How many calculation periods the row's days make, one per calendar month",
+            True,
+            NONE,
+            FieldType.CODE,
+            "monthly",
+            "monthly exactly: one period per calendar month the row covers, each with its own "
+            "observations, weights and quantity and one net payment; onetime is refused by name",
+        ),
+        Field(
+            "nearby",
+            "Which listed contract prices each observation day, counted from the prompt contract",
+            True,
+            NONE,
+            FieldType.NUMBER,
+            "1",
+            "1 exactly, the prompt contract on each observation day; a later nearby is refused "
+            "by name",
+        ),
+    ),
+)
+
 CASHFLOW = Instrument(
     "cashflow",
     "A known signed amount in one currency, payable on one explicit date.",
@@ -476,7 +628,7 @@ def catalog(*instruments: Instrument) -> tuple[Instrument, ...]:
     return instruments
 
 
-CATALOG = catalog(FIXED_FLOAT, CASHFLOW)
+CATALOG = catalog(FIXED_FLOAT, FLOAT_FLOAT, CASHFLOW)
 
 
 def instrument(name: str, instruments: tuple[Instrument, ...] = CATALOG) -> Instrument:

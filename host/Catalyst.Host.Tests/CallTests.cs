@@ -266,14 +266,14 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd", ExcelEmpty.Value }, "#ERROR util_ShiftDate: holiday_calendar is blank, expected holiday calendar handle" };
             yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+7cd", "x:holiday_calendar:9" }, "#ERROR util_ShiftDate: holiday_calendar is text 'x:holiday_calendar:9' naming no live object, expected holiday calendar handle" };
             // The instrument catalog's show: one exact name in. Another case, a blank, a number and a left-out name fail, the name in the library's words and the rest in the seam's; the spills are in the catalog fact below.
-            yield return new object[] { "_ShowInstrument", new object[] { "Future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'" };
-            yield return new object[] { "_ShowInstrument", new object[] { "future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float', 'cashflow'" };  // the name until #174
+            yield return new object[] { "_ShowInstrument", new object[] { "Future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'" };
+            yield return new object[] { "_ShowInstrument", new object[] { "future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float', 'float_float', 'cashflow'" };  // the name until #174
             yield return new object[] { "_ShowInstrument", new object[] { ExcelEmpty.Value }, "#ERROR _ShowInstrument: instrument is blank, expected text" };
             yield return new object[] { "_ShowInstrument", new object[] { 1.0 }, "#ERROR _ShowInstrument: instrument is number 1.0, expected text" };
             yield return new object[] { "_ShowInstrument", new object[] { ExcelMissing.Value }, "#ERROR _ShowInstrument: instrument is missing, expected text" };
             // A row or rows of an instrument's fields, through the two probes: the name in another case in the library's words, then the width, the headers in input order, exact, and the cells column by column, in the seam's; a handle cell naming no live object; two rows where one is wanted.
             yield return new object[] { "CountFieldRows", new object[] { "fixed_float", Row("quantity", "fixed_price"), new object[,] { { 1.0, 3.1 }, { 2.0, 3.2 }, { 3.0, 3.3 } } }, 3.0 };
-            yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'" };
+            yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields cell (1, 2) is text 'quantity', already given at cell (1, 1)" };
@@ -282,7 +282,7 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("payment_holiday_calendar"), "x:holiday_calendar:9" }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'x:holiday_calendar:9' naming no live object, expected holiday calendar handle" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity"), Column(1.0, 2.0) }, "#ERROR EchoFieldRow: values is 2x1 array, expected one row of field values" };
             // The trade template: the name in another case in the library's words; two rows where one is wanted, the extra row filled or blank, and a number where text is expected in the seam's; a value against its field's own rule in the library's. The trades: the index and the template left out, and a text naming no live object, in the seam's words, before any binding; the batch itself is in the fact below.
-            yield return new object[] { "_CreateTradeTemplate", new object[] { "Future", Row("quantity_unit"), "NYMEX NG" }, "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "Future", Row("quantity_unit"), "NYMEX NG" }, "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit"), Column("NYMEX NG", "NYMEX NG") }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit"), Column("NYMEX NG", ExcelEmpty.Value) }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit"), 1.0 }, "#ERROR _CreateTradeTemplate: values cell (1, 1) is number 1.0, expected text" };
@@ -756,6 +756,81 @@ namespace Catalyst.Host.Tests
             Assert.StartsWith("#ERROR _CreateTrades: fields cell (1, 6) is text 'second_fixed_price', expected a field of fixed_float: trade_id,", (string)Seam.Call("_CreateTrades", Column(a, b), Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "second_fixed_price"), Row(1.0, 46371.0, "G27", 1.0, 3.30, -0.30), template));
         }
 
+        // float-float-spread.md: the pair's two indexes under a float_float, A less B against one spread price.
+        // One NYMEX NG lot of G27 at a spread price of 3.80, A quoted 3.50 and B -0.40, 3.90 apart: one net
+        // payment of 1,000 a year on at 0.95, the handles reading as a difference, A's delta one lot and B's
+        // minus one, one DV01, the second leg read back with its sign; then what a spread does not book,
+        // refused by name: one index, the other instrument's price, a cleared route, a broker and a quote.
+        [Fact]
+        public void a_spread_of_two_indexes_is_booked_prepared_and_valued_as_one_net_payment()
+        {
+            var a = Index((string)Seam.Call("_CreateFuturesSchedule", Column("F27", "G27", "H27"), Column(46385.0, 46414.0, 46442.0), ExcelMissing.Value), (string)Seam.Call("_CreateHolidayCalendar", 46388.0), "A");
+            var b = Index((string)Seam.Call("_CreateIfercSchedule", Column("Z26", "F27", "G27", "H27"), Column(46357.0, 46391.0, 46419.0, 46447.0)), ExcelMissing.Value, "B");
+            var date = (string)Seam.Call("_CreateValuationDate", 46391.0, 0.5);
+            var historyA = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", date, a), (string)Seam.Call("_CreateFuturesFixings", Column(46387.0, 46386.0), Column(3.60, 3.58), a));
+            var historyB = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", date, b), (string)Seam.Call("_CreateIfercFixings", Column("Z26"), Column(-0.30), b));
+            var marketA = (string)Seam.Call("_CreateMarket", historyA, (string)Seam.Call("_CreatePriceVector", "A", Column(3.50, 3.60)));
+            var marketB = (string)Seam.Call("_CreateMarket", historyB, (string)Seam.Call("_CreatePriceVector", "B", Column(-0.38, -0.40, -0.42)));
+            var curves = (string)Seam.Call("_CollectDiscountCurves", (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 } }));
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "float_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "spread_price");
+            var row = Row(1.0, 46371.0, "G27", 1.0, 3.80);
+            var trades = (string)Seam.Call("_CreateTrades", Column(a, b), headers, row, template);
+            Assert.StartsWith(Pid + ":trades:A-B:", trades);
+            var prepared = (string)Seam.Call("_PrepareTrades", trades, Column(historyB, historyA));
+            Assert.StartsWith(Pid + ":prepared_trades:A-B:", prepared);
+            var results = (string)Seam.Call("_EvaluateTrades", prepared, Row(marketA, marketB), curves);
+            Assert.StartsWith(Pid + ":trade_results:A-B:", results);
+            var values = (object[,])Seam.Call("_ReportValues", results);
+            Assert.Equal("bilateral_mark", values[0, 0]);
+            Assert.Equal(950.0, (double)values[2, 0], 9);
+            Assert.Equal(0.0, values[2, 1]);
+            var risk = (object[,])Seam.Call("_ReportRisk", results, "all", "day");
+            Assert.Equal(8, risk.GetLength(1));
+            Assert.Equal("A nominal_delta [NYMEX NG]", risk[1, 1]);
+            Assert.Equal("B delta [NYMEX NG]", risk[1, 4]);
+            Assert.Equal("SOFR USD dv01 [USD per basis point]", risk[1, 5]);
+            Assert.Equal("B SOFR cross_gamma [NYMEX NG per basis point]", risk[1, 7]);
+            Assert.Equal("Total", risk[3, 0]);
+            Assert.Equal(1.0, (double)risk[3, 1], 12);
+            Assert.Equal(0.95, (double)risk[3, 2], 12);
+            Assert.Equal(-1.0, (double)risk[3, 3], 12);  // the second index, paid: its lots of the opposite sign
+            Assert.Equal(-0.95, (double)risk[3, 4], 12);
+            Assert.Equal(-0.095, (double)risk[3, 5], 12);
+            Assert.Equal(-0.000095, (double)risk[3, 6], 12);
+            Assert.Equal(0.000095, (double)risk[3, 7], 12);
+            var read = (object[,])Seam.Call("util_ReadHandle", results);
+            Assert.Equal(4, read.GetLength(0));
+            Assert.Equal("A", read[2, 1]);
+            Assert.Equal("B", read[3, 1]);
+            Assert.Equal(10000.0, (double)read[2, Heading(read, "observation_coefficient")], 9);
+            Assert.Equal(-10000.0, (double)read[3, Heading(read, "observation_coefficient")], 9);
+            Assert.Equal(35000.0, (double)read[2, Heading(read, "floating_contribution")], 9);
+            Assert.Equal(4000.0, (double)read[3, Heading(read, "floating_contribution")], 9);
+            Assert.Equal(-1, Heading(read, "leg_dv01"));  // no value is a leg's
+            var booked = (object[,])Seam.Call("util_ReadHandle", trades);
+            Assert.Equal(3, booked.GetLength(0));
+            Assert.Equal(3.8, (double)booked[2, Heading(booked, "spread_price")], 12);
+            Assert.Equal(-1, Heading(booked, "fixed_price"));  // a spread has no fixed price
+            Assert.Equal(-38000.0, (double)booked[2, Heading(booked, "offset")], 9);  // the spread leg, once
+            var reserves = (object[,])Seam.Call("_ReportReserves", results);
+            Assert.Equal(0.0, (double)reserves[2, 0], 9);
+            Assert.Equal(0.0, (double)reserves[2, 1], 9);
+            // The other order is the other spread, and the handle says so.
+            Assert.StartsWith(Pid + ":trades:B-A:", (string)Seam.Call("_CreateTrades", Row(b, a), headers, row, template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: indexes are 1, expected two with a float_float; a spread is the first index's price less the second's", Seam.Call("_CreateTrades", a, headers, row, template));
+            Assert.StartsWith("#ERROR _CreateTrades: fields cell (1, 5) is text 'fixed_price', expected a field of float_float: trade_id,", (string)Seam.Call("_CreateTrades", Column(a, b), Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price"), row, template));
+            var pair = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays));
+            Assert.StartsWith("#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of fixed_float: trade_id,", (string)Seam.Call("_CreateTrades", Column(a, b), headers, row, pair));
+            var clearedFields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
+            var cleared = (string)Seam.Call("_CreateTradeTemplate", "float_float", clearedFields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "cleared", "financial", "ICE Clear Europe", 46756.0, holidays));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: route is 'cleared', expected 'bilateral' on a float_float; a cleared spread is not built", Seam.Call("_CreateTrades", Column(a, b), headers, row, cleared));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: broker of trade 7 at row 1 is 'ICAP', expected none on a float_float; a brokered spread is not built", Seam.Call("_CreateTrades", Column(a, b), Row("trade_id", "trade_date", "contract_code", "quantity", "spread_price", "broker"), Row(7.0, 46371.0, "G27", 1.0, 3.80, "ICAP"), template));
+            Assert.Equal("#ERROR _CreateQuoteTemplate: ValueError: instrument is 'float_float', expected one a quote prices: 'fixed_float'", Seam.Call("_CreateQuoteTemplate", "float_float", Row("route"), Row("bilateral")));
+        }
+
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;
         // the shown fixed_float spills ten rows by twenty-three columns, the seven rows of booking and since
         // template-based-quoting.md the three of quoting, the labels down the first column, the fields across
@@ -764,13 +839,27 @@ namespace Catalyst.Host.Tests
         public void the_instrument_catalog_is_listed_and_the_future_shown()
         {
             var listed = (object[,])Seam.Call("_ListInstruments");
-            Assert.Equal(3, listed.GetLength(0));
+            Assert.Equal(4, listed.GetLength(0));
             Assert.Equal(2, listed.GetLength(1));
             Assert.Equal("instrument", listed[0, 0]);
             Assert.Equal("description", listed[0, 1]);
             Assert.Equal("fixed_float", listed[1, 0]);
-            Assert.Equal("cashflow", listed[2, 0]);
+            Assert.Equal("float_float", listed[2, 0]);  // float-float-spread.md, beside the instrument it shares its fields with
+            Assert.Equal("cashflow", listed[3, 0]);
             Assert.Equal(8, ((object[,])Seam.Call("_ShowInstrument", "cashflow")).GetLength(1));
+            // The float_float: a fixed_float's columns, spread_price where fixed_price stands, the second index's
+            // method always required, and no field a quote may hold.
+            var spread = (object[,])Seam.Call("_ShowInstrument", "float_float");
+            Assert.Equal(10, spread.GetLength(0));
+            Assert.Equal(24, spread.GetLength(1));
+            Assert.Equal("spread_price", spread[0, 16]);
+            Assert.Equal(true, spread[2, 16]);
+            Assert.Equal("second_schedule_method", spread[0, 17]);
+            Assert.Equal(true, spread[2, 17]);
+            Assert.Equal("none", spread[3, 17]);
+            Assert.Equal("bilateral", spread[5, 7]);
+            Assert.Equal(false, spread[7, 6]);
+            Assert.Equal(false, spread[8, 6]);
             var shown = (object[,])Seam.Call("_ShowInstrument", "fixed_float");
             Assert.Equal(10, shown.GetLength(0));
             Assert.Equal(24, shown.GetLength(1));  // twenty-three fields, nearby last since nearby-selection.md

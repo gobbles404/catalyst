@@ -227,7 +227,7 @@ def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
         terms.end_date,
         dates("2026-12-31", "2026-12-31", "2027-01-31", "2027-01-31", "2026-12-31"),
     )
-    np.testing.assert_array_equal(terms.fixed_price, [3.1, 3.15, 3.4, 3.35, 3.1])
+    np.testing.assert_array_equal(terms.price, [3.1, 3.15, 3.4, 3.35, 3.1])
     assert terms.payment is None
     assert batch.encoded.terms is terms
     np.testing.assert_array_equal(
@@ -279,7 +279,7 @@ def test_a_strip_makes_one_component_per_month_on_its_one_occurrence() -> None:
     np.testing.assert_array_equal(terms.occurrence, [0, 0, 1])
     np.testing.assert_array_equal(terms.legs[0].contract, [1, 2, 2])
     np.testing.assert_array_equal(terms.quantity, [3, 3, -1])  # the strip's quantity in every month
-    np.testing.assert_array_equal(terms.fixed_price, [3.2, 3.2, 3.3])
+    np.testing.assert_array_equal(terms.price, [3.2, 3.2, 3.3])
     assert terms.payment is not None
     np.testing.assert_array_equal(
         terms.payment.date, dates("2026-11-30", "2026-12-31", "2026-12-31")
@@ -1955,8 +1955,8 @@ def test_the_ticket_and_the_template_are_of_one_instrument_the_future() -> None:
     with pytest.raises(ValueError) as refusal:
         resolved((NG,), a_ticket(NG_TICKET), a_template({"route": "cleared"}, other), WorkCounter())
     assert str(refusal.value) == (
-        "template is of instrument 'swap', expected fixed_float, the one instrument whose trades "
-        "are built"
+        "template is of instrument 'swap', expected fixed_float or float_float, the instruments "
+        "whose trades are built"
     )
 
 
@@ -2940,7 +2940,7 @@ def test_an_iferc_basis_future_observes_publication_day_and_pays_from_it() -> No
     np.testing.assert_array_equal(terms.end_date, dates("2026-12-31"))
     np.testing.assert_array_equal(terms.covered_days, [31])
     np.testing.assert_array_equal(terms.quantity, [1])
-    np.testing.assert_array_equal(terms.fixed_price, [-0.5])
+    np.testing.assert_array_equal(terms.price, [-0.5])
     assert terms.payment is not None
     assert terms.payment.entered.texts == ("+2bd",)
     assert terms.payment.calendar == (WAHA_PAYS,)

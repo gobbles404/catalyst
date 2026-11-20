@@ -23,9 +23,10 @@ It spills a header and one row per inspectable definition, with exactly these tw
 | instrument | description |
 |---|---|
 | fixed_float | A fixed-for-floating position on a specified reference contract, with explicit observation and settlement terms. |
+| float_float | A floating-for-floating position on two reference contracts, the first index's price less the second's against one agreed spread price, with explicit observation and settlement terms. |
 | cashflow | A known signed amount in one currency, payable on one explicit date. |
 
-Two rows since #200, the cashflow's beside the fixed_float's; another row comes when an
+Three rows, the float_float's, [float-float-spread.md](../../engineering-tickets/trade-valuation-pipeline/float-float-spread.md), and the cashflow's beside the fixed_float's; another row comes when an
 instrument's field contract is defined and inspectable. Being listed establishes schema availability, not support for
 every product or valuation measure. The definitions are `src/catalyst/instruments/definitions.py`,
 frozen library data authored and checked there, each name once and nonempty, each description
