@@ -1,6 +1,6 @@
 # A closed physical contract past its expiry, as cash
 
-**Status:** Built in #NNN, from main after #253, agreed with the owner on 20 November 2026
+**Status:** Built in #258, from main after #253, agreed with the owner on 20 November 2026
 for [issue #256](https://github.com/gobbles404/catalyst/issues/256), this page in its first
 commit. It changes the one rule that refuses every physical `fixed_float` past its expiry,
 and adds one rule at creation. No instrument, field or function is added.
