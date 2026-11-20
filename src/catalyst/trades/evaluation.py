@@ -28,7 +28,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from catalyst.globals.discount_curve import DiscountCurve
-from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.globals.discount_curve_set import DiscountCurveSet, curve_named, no_curve_named
 from catalyst.globals.payments import compensated, curve_starts_on, discounted, factors_on
 from catalyst.instrumentation.work_counts import KERNEL, WorkCounter
 from catalyst.market.market import Market
@@ -287,24 +287,19 @@ def _cleared_leg(
     )
 
 
-def _listed(names: tuple[str, ...]) -> str:
-    """Names in a message: `SOFR`, `SOFR and FFOIS`, `SOFR, FFOIS and SONIA`."""
-    if len(names) == 1:
-        return names[0]
-    return f"{', '.join(names[:-1])} and {names[-1]}"
-
-
 def _the_curves(
     prepared: PreparedTrades, curve_set: DiscountCurveSet | None
 ) -> tuple[DiscountCurve, ...]:
     """A bilateral batch's rules, since #176 and named-curves-slice-3.md, in this order, the first
     failure being the message: financial, since a physical delivery has no payment to discount; a
     collection of curves supplied; each distinct key of the batch bound to the curve of that exact
-    name in the collection, in key order, case and all, the first unbound named with its key, the
-    first row booking it and the names the collection holds, no fallback to the first curve, a
-    collection of one included; then each selected curve, in key order, starting on the valuation
-    date, never rebased, and covering its own unpaid payment days, the first uncovered group named
-    by its contract, its day, its key and the curve's range. A curve nobody selects is read for
+    name in the collection, in key order, by the step every caller shares since
+    shared-curve-binding.md, curve_named, case and all and with no fallback to the first curve,
+    a collection of one included, the first unbound refused in that step's one sentence with
+    its key, the first row booking it and the names the collection holds; then each selected
+    curve, in key order, starting on the valuation date, never rebased, and covering its own
+    unpaid payment days, the first uncovered group named by its contract, its day, its key
+    and the curve's range. A curve nobody selects is read for
     nothing, a paid group needs no factor, and a batch paid in full still binds its keys and
     checks each selected curve's start. The curves selected, in key order."""
     encoded = prepared.encoded
@@ -320,18 +315,13 @@ def _the_curves(
             "discount_curve_set is missing, expected a collection of discount curves with a "
             "bilateral batch, whose payments it discounts"
         )
-    by_name = {curve.name: curve for curve in curve_set.curves}
     keyed = cast(tuple[str, ...], terms.discount_curve_key)  # bilateral: the kernel's rule
     curves: list[DiscountCurve] = []
     for key in encoded.keys:
-        curve = by_name.get(key)
+        curve = curve_named(curve_set, key)  # the rule every caller binds a key by
         if curve is None:
             row = keyed.index(key)  # the first row booking the key
-            raise ValueError(
-                f"discount_curve_key {key!r} of {named_trade(terms.trade_ids, row)} names no curve "
-                f"of the collection, which holds {_listed(curve_set.names)}; expected a curve of "
-                "that name"
-            )
+            raise no_curve_named(curve_set, key, named_trade(terms.trade_ids, row))
         curves.append(curve)
     as_of = leg.history.calendar.valuation_date.as_of
     pays = cast(UnpaidPayments, prepared.unpaid_payments)  # bilateral and financial: made with it

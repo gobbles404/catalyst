@@ -3519,7 +3519,7 @@ namespace Catalyst.Host.Tests
             var ffoisCurve = (string)Seam.Call("_CreateDiscountCurve", "FFOIS", Row("date", "discount_factor"), new object[,] { { 46358.0, 1.0 }, { 46392.0, 0.98 } });
             var bothCurves = (string)Seam.Call("_CollectDiscountCurves", Column(facedCurve, ffoisCurve));
             var keyedPrepared = (string)Seam.Call("_PrepareTrades", keyed, history);
-            Assert.Equal("#ERROR _EvaluateTrades: ValueError: discount_curve_key 'FFOIS' of trade 102 at row 2 names no curve of the collection, which holds SOFR; expected a curve of that name", Seam.Call("_EvaluateTrades", keyedPrepared, Market(), facedCurves));
+            Assert.Equal("#ERROR _EvaluateTrades: ValueError: discount_curve_key 'FFOIS' of trade 102 at row 2 names no curve of the collection, which holds 'SOFR'; expected a curve of that name", Seam.Call("_EvaluateTrades", keyedPrepared, Market(), facedCurves));
             var keyedResults = (string)Seam.Call("_EvaluateTrades", keyedPrepared, Market(), bothCurves);
             Assert.Equal(1260.0, (double)((object[,])Seam.Call("_ReportValues", keyedResults))[2, 0], 9);
             var perDay = 0.0001 * 34 / 365;

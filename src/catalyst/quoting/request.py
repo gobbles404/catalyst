@@ -31,7 +31,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from catalyst.globals.discount_curve import DiscountCurve
-from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.globals.discount_curve_set import DiscountCurveSet, curve_named, no_curve_named
 from catalyst.globals.payments import curve_starts_on, factors_on
 from catalyst.index_definitions.contract_codes import schedule_months
 from catalyst.index_definitions.date_offsets import Instruction, shift_days
@@ -345,10 +345,12 @@ def the_curve(
     terms: Terms, curve_set: DiscountCurveSet | None, as_of: np.datetime64, counter: WorkCounter
 ) -> DiscountCurve | None:
     """The curve a bilateral quote is given, bound once from the collection by the template's
-    key, exactly, case and all, no fallback to the first curve, a collection of one included,
-    and starting on the valuation day, never rebased; the collection is required with a bilateral
-    quote and refused with a cleared one, which discounts nothing. Since fit-to-curve-price.md
-    it is taken the same way under either pricing, so one formula serves both: a flat price
+    key, by the step every caller shares since shared-curve-binding.md, curve_named, exactly,
+    case and all, no fallback to the first curve, a collection of one included, a key naming
+    none refused in that step's one sentence, and starting on the valuation day, never rebased;
+    the collection is required with a bilateral quote and refused with a cleared one, which
+    discounts nothing. Since fit-to-curve-price.md it is taken the same way under either
+    pricing, so one formula serves both: a flat price
     discounts on it, its coverage checked once the payment days are known, and a fit-to-curve
     price reads no factor of it. No other curve of the collection is read."""
     match terms.route:
@@ -367,24 +369,14 @@ def the_curve(
                     f"discount_curve_set is missing, expected a collection of discount curves "
                     f"holding {key!r} with route = bilateral, under flat and ftc alike"
                 )
-            curve = next((each for each in curve_set.curves if each.name == key), None)
+            curve = curve_named(curve_set, key)  # the rule every caller binds a key by
             if curve is None:
-                raise ValueError(
-                    f"discount_curve_key {key!r} names no curve of the collection, which holds "
-                    f"{_listed(curve_set.names)}; expected a curve of that name"
-                )
+                raise no_curve_named(curve_set, key)
             counter.hit(CURVES_SELECTED, 1)
             curve_starts_on(curve, as_of)
             return curve
         case _:
             assert_never(terms.route)
-
-
-def _listed(names: tuple[str, ...]) -> str:
-    quoted = [repr(name) for name in names]
-    if len(quoted) == 1:
-        return quoted[0]
-    return f"{', '.join(quoted[:-1])} and {quoted[-1]}"
 
 
 def the_method(terms: Terms, schedule: FuturesSchedule | IfercSchedule) -> None:

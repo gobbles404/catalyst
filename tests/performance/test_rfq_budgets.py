@@ -126,7 +126,7 @@ QUOTE_LEDGER = {
     "choice": 1,
     "on_its_index": 1,  # the market over the request's index, the check its prices share
     "the_curve": 1,
-    "the_curve.<locals>.<genexpr>": 2,
+    "curve_named": 1,  # the shared step, shared-curve-binding.md
     "DiscountCurve.start_date": 2,
     "curve_starts_on": 1,
     "DiscountCurve.max_date": 1,

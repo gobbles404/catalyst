@@ -347,6 +347,7 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
         "_the_lots_checked": 1,
         "_discounted_leg": 1,  # the leg's results over them
         "_the_curves": 1,  # the rules and the keys bound, before any quote is read
+        "curve_named": 1,  # the shared step, shared-curve-binding.md
         "curve_starts_on": 1,  # the start rule, shared with the cashflows since #200
         "DiscountCurve.start_date": 2,  # the rule's look and the factors' positions
         "DiscountCurve.max_date": 1,  # the coverage rule
@@ -647,6 +648,7 @@ def test_a_bilateral_tick_on_several_curves_does_no_work_per_curve_over_the_slot
         "_the_lots_checked": 1,
         "_discounted_leg": 1,  # the leg's results over them
         "_the_curves": 1,
+        "curve_named": curves,  # the shared step, shared-curve-binding.md, once per key
         "curve_starts_on": curves,  # the per-curve rules, once per curve selected
         "DiscountCurve.start_date": 2 * curves,
         "DiscountCurve.max_date": curves,

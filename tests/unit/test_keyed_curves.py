@@ -304,7 +304,7 @@ def test_a_key_naming_no_curve_is_refused_first_in_key_order_with_its_first_row(
         valued_on(both, curve_set(SONIA))
     assert str(refused.value) == (
         "discount_curve_key 'SOFR' of trade 1001 at row 1 names no curve of the collection, "
-        "which holds SONIA; expected a curve of that name"
+        "which holds 'SONIA'; expected a curve of that name"
     )
     # Case and all, the first row booking the key, and the collection's names as it holds them.
     three = prepared(keyed((TEN_LOTS, FIVE_SHORT, TEN_LOTS), ("SOFR", "FFOIS", "Sonia")))
@@ -312,7 +312,7 @@ def test_a_key_naming_no_curve_is_refused_first_in_key_order_with_its_first_row(
         valued_on(three, curve_set(SOFR, FFOIS, SONIA))
     assert str(refused.value) == (
         "discount_curve_key 'Sonia' of trade 1003 at row 3 names no curve of the collection, "
-        "which holds SOFR, FFOIS and SONIA; expected a curve of that name"
+        "which holds 'SOFR', 'FFOIS' and 'SONIA'; expected a curve of that name"
     )
     twice = prepared(keyed((TEN_LOTS, FIVE_SHORT, TEN_LOTS), ("SOFR", "FFOIS", "FFOIS")))
     with pytest.raises(ValueError, match=r"^discount_curve_key 'FFOIS' of trade 1002 at row 2 "):

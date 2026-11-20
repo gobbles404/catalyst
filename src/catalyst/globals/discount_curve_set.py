@@ -3,8 +3,9 @@ trades will select among by name, gathered as they are and held by reference, no
 factors constructed or combined; each name once, since a key must select one curve. Which curves
 must start on the valuation day and cover which payments is the evaluation's to decide, for the
 curves a batch selects, so a collection checks no date and holds curves of any spans, and a
-curve nobody selects costs nothing. docs/library/globals/collect-discount-curves.md is the
-page."""
+curve nobody selects costs nothing. And, since shared-curve-binding.md, the one step that binds
+a key to its curve, the exact name found or refused in one sentence, which the trades' evaluation
+and the quotes share. docs/library/globals/collect-discount-curves.md is the page."""
 
 from dataclasses import dataclass
 
@@ -44,3 +45,37 @@ def collect_discount_curves(
             )
     counter.hit(CURVES_COLLECTED, len(curves))
     return DiscountCurveSet(curves)
+
+
+def curve_named(curve_set: DiscountCurveSet, key: str) -> DiscountCurve | None:
+    """The collection's curve of that exact name, or none, shared-curve-binding.md: the one rule
+    a key is bound by, whoever binds it, a batch of trades for each of its keys or a quote for
+    its template's one. The name is matched as it is, case and all; there is no fallback to the
+    first curve, a collection of one included; and no curve is read for anything but its name.
+    A caller that finds none raises no_curve_named, with who booked the key where it has
+    someone to name."""
+    for curve in curve_set.curves:
+        if curve.name == key:
+            return curve
+    return None
+
+
+def no_curve_named(curve_set: DiscountCurveSet, key: str, booked_by: str = "") -> ValueError:
+    """The one refusal of a key that names no curve of the collection, for whoever looked to
+    raise: the key, who booked it where the caller says, a trade by its row, and the names the
+    collection holds, each quoted as a name is in every message, in the collection's order.
+    Made on the failing path alone, so that naming who booked a key costs nothing where the
+    key is found."""
+    whose = f" of {booked_by}" if booked_by else ""
+    return ValueError(
+        f"discount_curve_key {key!r}{whose} names no curve of the collection, which holds "
+        f"{_quoted(curve_set.names)}; expected a curve of that name"
+    )
+
+
+def _quoted(names: tuple[str, ...]) -> str:
+    """Names in a message: `'SOFR'`, `'SOFR' and 'FFOIS'`, `'SOFR', 'FFOIS' and 'SONIA'`."""
+    quoted = [repr(name) for name in names]
+    if len(quoted) == 1:
+        return quoted[0]
+    return f"{', '.join(quoted[:-1])} and {quoted[-1]}"

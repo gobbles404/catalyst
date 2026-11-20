@@ -787,7 +787,7 @@ $curves = {
     $results = Text $state $sheet "D31"
     Put $state $sheet "O7" "SONIA"
     Check "a renamed key remakes the batch" ((Text $state $sheet "D27") -ne $trades -and (Text $state $sheet "D27").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D27")
-    Check "and fails the results naming the key, the row and the collection's names" ((Text $state $sheet "D31") -eq "#ERROR _EvaluateTrades: ValueError: discount_curve_key 'SONIA' of trade at row 2 names no curve of the collection, which holds FFOIS and SOFR; expected a curve of that name") (Text $state $sheet "D31")
+    Check "and fails the results naming the key, the row and the collection's names" ((Text $state $sheet "D31") -eq "#ERROR _EvaluateTrades: ValueError: discount_curve_key 'SONIA' of trade at row 2 names no curve of the collection, which holds 'FFOIS' and 'SOFR'; expected a curve of that name") (Text $state $sheet "D31")
     Check "and its reports with it" ((Text $state $sheet "D32") -eq "#REF!" -or (Text $state $sheet "D32").StartsWith("#ERROR")) (Text $state $sheet "D32")
     $c = Settle $state $sheet { param($c) $c.Live -eq 18 }
     Check "the failed results own nothing: eighteen live, the old batch, preparation and results released, two more published" ($c.Live -eq 18 -and $c.Published -eq 26 -and $c.Released -eq 8) $c.Text

@@ -47,6 +47,17 @@ Nothing else is checked. Which curves must start on the valuation day and cover 
 
 Nothing is published by a refusal.
 
+## Binding a key
+
+A trade's row or a quote's template names its curve by a key, `discount_curve_key`, and whoever discounts binds that key to a curve of the collection. The step is one, since [shared-curve-binding.md](../../engineering-tickets/trade-valuation-pipeline/shared-curve-binding.md), `curve_named` in `src/catalyst/globals/discount_curve_set.py`, for every caller: the curve whose name is the key, matched exactly, case and all, with nothing trimmed or guessed; no fallback to the first curve, a collection of one included; and no curve read for anything but its name. A key that names none is refused in one sentence, `no_curve_named`, raised by whoever looked: the key, who booked it where the caller has someone to name, a trade by its row, and the names the collection holds, each quoted, in the collection's order.
+
+| Caller | Refused as |
+|---|---|
+| `_EvaluateTrades`, a bilateral batch, each distinct key in key order, [evaluate-trades.md](../trades/evaluate-trades.md) | `discount_curve_key 'Sonia' of trade 1003 at row 3 names no curve of the collection, which holds 'SOFR', 'FFOIS' and 'SONIA'; expected a curve of that name` |
+| `_Quote`, `_QuoteByDates` and `_QuoteRFQ`, a bilateral template's one key, [quote.md](../quoting/quote.md) | `discount_curve_key 'SOFR' names no curve of the collection, which holds 'FFOIS'; expected a curve of that name` |
+
+What each caller keeps is its own: whether a collection is required or refused, that a selected curve starts on the valuation day, `curve_starts_on` in `globals/payments.py`, and that it covers the caller's own unpaid payment days.
+
 ## Reading it back
 
 `util_ReadHandle` spills one row per curve in the order given: `name`, `start_date`, `end_date` and `days`, the span the curve covers, inclusive; not the daily factors, which each curve's own handle spills. The collection of row 8 above:
@@ -79,6 +90,8 @@ The record and the rule are `tests/unit/test_discount_curve_set.py`; the seam's 
 | two curves collect in the order given, the objects themselves, counting each; a collection of one; curves of any spans together; equal factors under two names and two cases of one name are distinct curves; the record is frozen and the curves stand | example |
 | the same curve twice, a later snapshot, two names each twice and a repeat not first: refused naming the first repeat and the cell it repeats, nothing counted | example |
 | for any distinct names, the collection is the curves in order, each counted; for any names with a repeat, the first repeat and the cell it repeats are named | property |
+| binding a key, since [shared-curve-binding.md](../../engineering-tickets/trade-valuation-pipeline/shared-curve-binding.md): the curve of the exact name whatever the collection's order, another case or a space naming none, a collection of one no fallback; the refusal's sentence with and without who booked the key, the names quoted in the collection's order for one, two and three | example |
+| for any names and any key, the key is bound exactly when the collection holds its name, and refused naming every name it holds otherwise | property |
 | a column, a row and a cell of curves collect under a compact handle, read back as their names in the order given; a bumped curve collects under its source's name; a scenario's members through cells referring to them; the curves stand as they were | example, through the seam |
 | each name once through the seam, the same handle twice, a later snapshot and a bump of a member included; nothing published by a refusal | example, through the seam |
 | every refusal above in the seam's words, a consumer of a failed collection showing the creator's text once, nothing published | example, through the seam |
