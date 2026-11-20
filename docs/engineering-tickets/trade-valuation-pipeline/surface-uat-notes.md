@@ -1022,7 +1022,7 @@ mark plus cash less the reserves with the day before.
 
 ## 38. One shared step binds a discount curve key to its curve
 
-Agreed 20 November 2026 and built in #NNN, issue #257:
+Agreed 20 November 2026 and built in #259, issue #257:
 [shared-curve-binding.md](shared-curve-binding.md), stacked on #258. Nothing a sheet types
 changes and no number moves. The rule that finds a key's curve in a collection is written
 once where the trades and the quotes each wrote it, and the one thing a reader sees is in

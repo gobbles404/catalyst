@@ -1,6 +1,6 @@
 # One shared step binds a discount curve key to its curve
 
-**Status:** Built in #NNN, stacked on #258, agreed with the owner on 20 November 2026 for
+**Status:** Built in #259, stacked on #258, agreed with the owner on 20 November 2026 for
 [issue #257](https://github.com/gobbles404/catalyst/issues/257), this page in its first
 commit. One rule written twice becomes one function two callers share, ahead of the
 cashflows of [issue #254](https://github.com/gobbles404/catalyst/issues/254), which would
