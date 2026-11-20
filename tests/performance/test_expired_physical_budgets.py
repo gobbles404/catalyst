@@ -26,7 +26,7 @@ from test_trade_budgets import (
 from catalyst.globals.unit_conversions import UNITS
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT
-from catalyst.trades.encoding import Encoded, counts_left, encoded
+from catalyst.trades.encoding import Encoded, encoded, position_counts
 from catalyst.trades.evaluation import trade_results
 from catalyst.trades.preparation import prepared_trades
 from catalyst.trades.schedule_methods import METHODS, ScheduleMethod
@@ -92,32 +92,30 @@ PHYSICAL_ENCODING_LEDGER = {
         if name not in ("_payments_after_observations", "payments_after_observations")
     },
     "_the_closed_groups": 1,
-    "counts_left": 1,
+    "position_counts": 1,
 }
 # The numpy of a physical batch's encoding. The closed contracts' part, measured against main on
-# the same batch: one any more with its reduction, the flags reduced by group; one reshape, the
-# counts by group and unit; one setflags, the flags frozen; one error state; and the look for a
-# group and unit past what a running sum adds, a nonzero with its ravel and its asanyarray. The
-# two bincounts are C functions no ledger sees.
+# the same batch: two anys more with their reductions, whether any group and unit holds 2^53 or
+# more and the flags reduced by group; two reshapes, the counts left and the counts held by group
+# and unit; one setflags, the flags frozen; and one error state. The two bincounts are C
+# functions no ledger sees.
 PHYSICAL_ENCODING_NUMPY = {
-    "ndarray.any": 13,  # 12 before
+    "ndarray.any": 14,  # 12 before
     "ndarray.argsort": 4,
     "ndarray.astype": 7,
     "ndarray.cumsum": 6,
     "ndarray.flatten": 5,
-    "ndarray.nonzero": 1,  # none before
-    "ndarray.ravel": 1,  # none before
-    "ndarray.reshape": 5,  # 4 before
+    "ndarray.reshape": 6,  # 4 before
     "ndarray.searchsorted": 1,
     "ndarray.setflags": 21,  # 20 before
     "ndarray.sort": 1,
     "ndarray.sum": 1,
     "numpy._make_extobj": 7,  # 6 before
     "numpy._unique_hash": 1,
-    "numpy.asanyarray": 11,  # 10 before
+    "numpy.asanyarray": 10,
     "numpy.empty": 12,
     "numpy.zeros": 1,
-    "ufunc.reduce": 14,  # 13 before
+    "ufunc.reduce": 15,  # 13 before
 }
 
 
@@ -150,11 +148,11 @@ def test_a_physical_encoding_finds_its_closed_contracts_in_one_sum_at_any_size(
 
 def test_the_counts_are_summed_in_three_temporaries_of_the_components_size() -> None:
     # The place of each component among the groups and units, its count's size and the two
-    # sums: 24 bytes a component at the peak, freed on return, at two thousand trades and at
-    # twenty thousand over the same contracts.
+    # sums, the counts left and the counts held: 24 bytes a component at the peak, freed on
+    # return, at two thousand trades and at twenty thousand over the same contracts.
     for components in (2_000, 20_000):
         enc = a_physical_batch(components, 24)
-        peak = least_peak(lambda e=enc: counts_left(e.terms, e.group_of_component, 24))
+        peak = least_peak(lambda e=enc: position_counts(e.terms, e.group_of_component, 24))
         assert peak <= 24 * components + SLACK
 
 
@@ -245,7 +243,7 @@ def test_the_count_left_is_made_again_on_the_failing_path_alone(
         "_the_slot_rows": 1,
         "calendar_rows": 1,
         "_open_past_expiry": 1,
-        "counts_left": 1,
+        "position_counts": 1,
         "ResolvedTrades.named": 1,
         "named_trade": 1,
         "WorkCounter.__init__": 1,

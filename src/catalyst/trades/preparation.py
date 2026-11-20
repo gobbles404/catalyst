@@ -22,7 +22,13 @@ from catalyst.index_definitions.index_conventions import IndexConventions
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market.market_history import MarketHistory
 from catalyst.trades.display_axes import EarlyRisk, PeriodAxis, early_risk, period_axis
-from catalyst.trades.encoding import Encoded, EncodedLeg, PaymentAxes, counts_left, group_words
+from catalyst.trades.encoding import (
+    Encoded,
+    EncodedLeg,
+    PaymentAxes,
+    group_words,
+    position_counts,
+)
 from catalyst.trades.terms import Route, price_words
 
 PREPARED_SLOTS = "prepared_slots"  # slots placed on the calendar and told live from fixed
@@ -377,7 +383,7 @@ def _open_past_expiry(encoded: Encoded, g: int, expiry: np.datetime64, as_of: np
     encoding having kept the flag and nothing else."""
     terms = encoded.terms
     leg = encoded.legs[0]
-    left = counts_left(terms, encoded.group_of_component, encoded.offset_of_group.size)[g]
+    left = position_counts(terms, encoded.group_of_component, encoded.offset_of_group.size)[0][g]
     unit = int((left != 0).argmax())
     entered = leg.leg.specification[terms.occurrence]
     k = int(((encoded.group_of_component == g) & (entered == unit)).argmax())

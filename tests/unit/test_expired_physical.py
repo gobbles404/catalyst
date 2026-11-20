@@ -2,7 +2,7 @@
 docs/engineering-tickets/trade-valuation-pipeline/expired-physical-cash.md. The page's hand-priced
 lifecycle through the kernel and on the sheet, the positions that close and the ones that do not,
 each quantity unit counted by itself, the one clearing house a physical batch names, the counts a
-running sum cannot add, and the fees that stand as booked."""
+number cannot add exactly, refused, and the fees that stand as booked."""
 
 import itertools
 import re
@@ -30,7 +30,7 @@ from catalyst.market.market import market
 from catalyst.market.market_history import MarketHistory, market_history
 from catalyst.market_data.futures_fixings import futures_fixings
 from catalyst.market_data.price_vector import price_vector
-from catalyst.trades.encoding import EXACT_COUNTS, Encoded, counts_left, encoded
+from catalyst.trades.encoding import EXACT_COUNTS, Encoded, encoded, position_counts
 from catalyst.trades.evaluation import trade_results
 from catalyst.trades.observations import observed
 from catalyst.trades.preparation import PreparedTrades, prepared_trades
@@ -304,7 +304,8 @@ def test_each_quantity_unit_is_counted_by_itself() -> None:
     # A lot bought and its 10,000 MMBTU sold in the smaller unit net to no exposure and are two
     # counts all the same: nothing is converted, and the first unit with a count left is named.
     enc = encoded_of(terms_of(BUY, (Z26, -10_000.0, 3.10, MMBTU)))
-    np.testing.assert_array_equal(counts_left(enc.terms, enc.group_of_component, 1), [[1, -10_000]])
+    left, _ = position_counts(enc.terms, enc.group_of_component, 1)
+    np.testing.assert_array_equal(left, [[1, -10_000]])
     np.testing.assert_array_equal(enc.closed, [False])
     assert prepared_on(enc, "2026-11-18").legs[0].nominal_delta_total == 0.0
     assert refusal(enc, "2026-11-19") == (
@@ -372,30 +373,81 @@ def test_a_correction_that_leaves_a_count_open_fails_and_the_row_put_right_recov
     assert prepared_on(encoded_of(terms_of(BUY, SELL)), "2026-11-19").cash == 1_000.0
 
 
-# --- counts a running sum cannot add --------------------------------------------------------
+# --- counts a number cannot add -------------------------------------------------------------
+
+HELD = (
+    "buys and sells together, expected under 9007199254740992.0; a physical position is closed "
+    "by its whole counts adding to zero, and past 2^53 a number does not add them exactly"
+)
 
 
-def test_counts_past_what_a_running_sum_adds_are_summed_exactly() -> None:
-    big = EXACT_COUNTS  # 2^53: one more is no float, and a running sum would lose a lot of one
-    left = encoded_of(terms_of((Z26, big, 3.0), (Z26, 1.0, 3.0), (Z26, -big, 3.0)))
-    np.testing.assert_array_equal(left.closed, [False])
-    np.testing.assert_array_equal(counts_left(left.terms, left.group_of_component, 1), [[1, 0]])
-    assert refusal(left, "2026-11-19") == (
+def refused_when_made(*rows: Row) -> str:
+    with pytest.raises(ValueError) as refused:
+        encoded_of(terms_of(*rows))
+    return str(refused.value)
+
+
+def test_counts_under_what_a_number_adds_exactly_close_and_leave_exactly() -> None:
+    half = EXACT_COUNTS / 2  # 2^52
+    # Under 2^53 in all, buys and sells together, every count and every sum is a whole number
+    # a float holds: nine quadrillion lots bought and sold are closed, and one lot left among
+    # them is one lot.
+    closed = encoded_of(terms_of((Z26, half - 1, 3.0), (Z26, -(half - 1), 3.0)))
+    np.testing.assert_array_equal(closed.closed, [True])
+    one = encoded_of(terms_of((Z26, half - 1, 3.0), (Z26, -(half - 2), 3.0)))
+    left, held = position_counts(one.terms, one.group_of_component, 1)
+    np.testing.assert_array_equal(left, [[1, 0]])
+    np.testing.assert_array_equal(held, [[EXACT_COUNTS - 3, 0]])
+    assert refusal(one, "2026-11-19") == (
         "Z26 expired 2026-11-18, before valuation date 2026-11-19, with 1.0 of 'LOT' open, "
         f"trade 1001 at row 1 among them; {OPEN}"
     )
-    for rows in itertools.permutations(
-        ((Z26, big, 3.0), (Z26, 1.0, 3.0), (Z26, -big, 3.0), (Z26, -1.0, 3.0))
-    ):
-        np.testing.assert_array_equal(encoded_of(terms_of(*rows)).closed, [True])
-    # Counts far past it, where a running sum would read nothing left: one lot is one lot.
-    far = encoded_of(terms_of((Z26, 1e300, 3.0), (Z26, 1.0, 3.0), (Z26, -1e300, 3.0)))
-    np.testing.assert_array_equal(far.closed, [False])
-    gone = encoded_of(terms_of((Z26, 1e300, 3.0), (Z26, -1e300, 3.0)))
-    np.testing.assert_array_equal(gone.closed, [True])
-    # Just under it the running sum is exact and is the one made.
-    under = encoded_of(terms_of((Z26, big / 2 - 1, 3.0), (Z26, 1.0, 3.0), (Z26, -big / 2, 3.0)))
-    np.testing.assert_array_equal(under.closed, [True])
+
+
+def test_counts_a_number_cannot_add_exactly_are_refused_when_the_batch_is_made() -> None:
+    half = EXACT_COUNTS / 2
+    # At 2^53 one count more is no number: the batch is refused when it is made, by the contract
+    # and the unit, whatever its rows add to and whether or not the contract has expired.
+    assert refused_when_made((Z26, half, 3.0), (Z26, -half, 3.0)) == (
+        f"Z26 holds 9007199254740992.0 of 'LOT' in all, {HELD}"
+    )
+    assert refused_when_made(BUY, SELL, (F27, half, 3.0, MMBTU), (F27, -half, 3.0, MMBTU)) == (
+        f"F27 holds 9007199254740992.0 of 'MMBTU' in all, {HELD}"
+    )
+    assert refused_when_made((Z26, 1e300, 3.0), (Z26, 1.0, 3.0), (Z26, -1e300, 3.0)) == (
+        f"Z26 holds 2e+300 of 'LOT' in all, {HELD}"
+    )
+    # One unit past it and another under: the first unit past it is the one named.
+    assert refused_when_made(BUY, SELL, (Z26, EXACT_COUNTS, 3.0, MMBTU)).startswith(
+        "Z26 holds 9007199254740992.0 of 'MMBTU' in all, "
+    )
+
+
+def test_a_quantity_per_day_whose_product_rounds_is_refused_and_never_read_closed() -> None:
+    # The review of #258. A quantity per calendar day is counted as the quantity times its
+    # days, and 2^49 + 1 a day over December's 31 days is a count no number holds: it rounds
+    # up by one. Against 2^49 a day sold, 32 a month more sold leaves one short in truth and
+    # read as closed, and 31 closes in truth and read as one long. Neither is told now: the
+    # counts are past what a number adds, and the batch is refused when it is made.
+    day = 2.0**49
+    for last in (-32.0, -31.0):
+        told = refused_when_made(
+            (Z26, day + 1, 3.0, LOT, "calday"), (Z26, -day, 3.0, LOT, "calday"), (Z26, last, 3.0)
+        )
+        assert told.startswith("Z26 holds 3.49028971121214") and told.endswith(HELD)
+    # The same shape a quarter the size is under 2^53 in all and exact both ways: 2^47 + 1 a
+    # day against 2^47 a day leaves 31, which 31 a month closes and 32 a month oversells by one.
+    day = 2.0**47
+    rows = ((Z26, day + 1, 3.0, LOT, "calday"), (Z26, -day, 3.0, LOT, "calday"))
+    closed = encoded_of(terms_of(*rows, (Z26, -31.0, 3.0)))
+    np.testing.assert_array_equal(closed.closed, [True])
+    np.testing.assert_array_equal(prepared_on(closed, "2026-11-19").is_settled, [True])
+    short = encoded_of(terms_of(*rows, (Z26, -32.0, 3.0)))
+    np.testing.assert_array_equal(short.closed, [False])
+    assert refusal(short, "2026-11-19") == (
+        "Z26 expired 2026-11-18, before valuation date 2026-11-19, with -1.0 of 'LOT' open, "
+        f"trade 1001 at row 1 among them; {OPEN}"
+    )
 
 
 # --- the clearing house ---------------------------------------------------------------------

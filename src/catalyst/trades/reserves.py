@@ -147,7 +147,7 @@ def _summed_once(
     reserved_occurrences."""
     if amounts is None:
         return 0.0
-    total = exact_total(amounts)
+    total = _exact_total(amounts)
     if not math.isfinite(total):
         raise ValueError(
             f"the batch has {total!r} of {name} reserve in all, expected a finite amount of "
@@ -157,15 +157,13 @@ def _summed_once(
     return total
 
 
-def exact_total(amounts: NDArray[np.float64]) -> float:
+def _exact_total(amounts: NDArray[np.float64]) -> float:
     """The amounts' one total, the correctly rounded sum of the finite amounts whatever their order
     and however they cancel, since cva-reserve.md's review: a dollar beside ten thousand trillion
     and its negative is a dollar in whichever row it stands, where a running sum rounds it away or
-    keeps it by the order the rows came in. The encoding's too, since expired-physical-cash.md,
-    for the counts of a contract too large for a running sum to add exactly. Shewchuk's exact
-    partials, math.fsum, over the amounts as they are, so that a tiny amount keeps every bit
-    beside zero rows; fsum refuses a running sum past the largest number, which a total that
-    is not past it may still pass on the way, and
+    keeps it by the order the rows came in. Shewchuk's exact partials, math.fsum, over the amounts
+    as they are, so that a tiny amount keeps every bit beside zero rows; fsum refuses a running
+    sum past the largest number, which a total that is not past it may still pass on the way, and
     then, and only then, the amounts are summed as the integers they are and rounded to a number
     once, an infinity of its sign when the total itself passes the largest number, so that the
     caller's one rule judges the total and never a step."""

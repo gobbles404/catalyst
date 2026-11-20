@@ -56,11 +56,13 @@ closed[g]   = every left[g, u] is zero
 
 A group of a physical batch is one contract month. The component quantity is the count the
 terms formed, the entered quantity under `month` and the entered quantity times its covered
-days under `calday`, whole either way. The sums are of whole numbers and are exact: a
-running sum of numbers is exact while the counts of one contract and unit are under 2^53 in
-all, and past that the counts are summed by the reserves' exact total, so a closed position
-of any size reads closed and an open one never does. The encoding keeps `closed`, one flag
-per group, and nothing else; a financial batch keeps none and does none of this.
+days under `calday`, whole either way. The counts and their sums are exact while one
+contract holds under 2^53 of one unit in all, buys and sells together: below it every
+count, a quantity per day times its days among them, and every partial sum is a whole
+number a number holds. A physical batch holding 2^53 or more is refused when it is made,
+since past it a lot may be rounded away or in, and a position read closed that is not.
+The encoding keeps `closed`, one flag per group, and nothing else; a financial batch keeps
+none and does none of this.
 
 At preparation, per group:
 
@@ -83,6 +85,7 @@ In the words the build pins:
 | Entered | Refused as |
 |---|---|
 | A second clearing house on a physical batch, at creation | `clearing_house of trade 1002 at row 2 is 'ICE Clear Europe', expected 'CME Clearing' as at row 1; a physical batch clears through one clearing house` |
+| One contract holding 2^53 or more of one unit, buys and sells together, at creation | `Z26 holds 9007199254740992.0 of 'LOT' in all, buys and sells together, expected under 9007199254740992.0; a physical position is closed by its whole counts adding to zero, and past 2^53 a number does not add them exactly` |
 | An expired contract with a count left, at preparation | `Z26 expired 2026-11-25, before valuation date 2026-11-26, with 16.0 of 'NYMEX NG' open, trade 1001 at row 1 among them; a physical position open past its expiry is a delivery, which is not modeled` |
 
 The second replaces `a physical fixed_float after its expiry is not supported` on a batch.
@@ -120,8 +123,9 @@ per day against a quantity per month that count the same closed; a contract hold
 rows alone closed and carrying nothing; one open expired contract failing a batch whose
 other expired contract is closed; a later expiry judged on its own day; a correction that
 leaves a count open refused and the same batch good again once the row is put right; a batch
-that prepares where each row alone is refused; counts past 2^53 that close and counts past
-it that leave one; two clearing houses refused on a physical batch and made on a financial
+that prepares where each row alone is refused; counts under 2^53 that close and that leave
+one, exactly, and a contract holding 2^53 or more of a unit refused when the batch is made, a
+quantity per day whose product with its days rounds among them; two clearing houses refused on a physical batch and made on a financial
 one; and every existing refusal of a physical batch.
 
 ## Engineering boundaries and delivery
