@@ -922,6 +922,83 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3", Seam.Call("_CreateTrades", Column(rb, wti), headers, row, energy));
         }
 
+        // Since expired-physical-cash.md a physical contract past its expiry is cash where the batch holds no
+        // position on it. GAS in USD per MMBTU, LOT 10,000 MMBTU at 10 of brokerage and 4 of clearing a lot;
+        // X26 expires 46342, Z26 on 46344, 18 November 2026, and F27 on 46385. One lot bought at 3.00 and sold
+        // at 3.10 through ION under one clearing house: on the expiry day 1,000 of mark at any quote, the day
+        // after 1,000 of cash whatever the expiry settled at, the slot fixed and its contract settled, no lot
+        // at risk and 20 and 8 of fees on both days. The buy alone is a delivery, refused by its count; a
+        // second clearing house is refused when the batch is made.
+        [Fact]
+        public void a_closed_physical_contract_past_its_expiry_is_cash_and_an_open_one_is_refused()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46342.0, 46344.0, 46385.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46381.0);
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "LOT", 10000.0, "MMBTU", 10.0, 4.0 }, { "MMBTU", 1.0, "MMBTU", 0.0, 0.0 } });
+            var index = (string)Seam.Call("_CreateIndex", "GAS", "Gas with a contract to close", schedule, conventions, specifications, holidays, "LOT");
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "broker");
+            var values = Row("LOT", "month", "monthly", 1.0, "lastday", "cleared", "physical", "ION");
+            var housed = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "broker", "clearing_house"), Row("LOT", "month", "monthly", 1.0, "lastday", "cleared", "physical", "ION", "CME Clearing"));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
+            var pair = new object[,] { { 1001.0, 46301.0, "Z26", 1.0, 3.00 }, { 1002.0, 46301.0, "Z26", -1.0, 3.10 } };
+            var trades = (string)Seam.Call("_CreateTrades", index, headers, pair, housed);
+            Assert.StartsWith(Pid + ":trades:GAS:", trades);
+            string History(double asOf, object[,] days, object[,] settles)
+            {
+                var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", asOf, 0.5), index);
+                return (string)Seam.Call("_CreateMarketHistory", calendar, (string)Seam.Call("_CreateFuturesFixings", days, settles, index));
+            }
+            string Valued(string batch, string history, params object[] quotes)
+            {
+                var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "GAS", Column(quotes)));
+                return (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", batch, history), market, ExcelMissing.Value);
+            }
+            // The expiry day: live, the locked-in 1,000 the mark at any quote.
+            var onTheDay = History(46344.0, Column(46343.0), Column(3.05));
+            foreach (var quote in new[] { 3.20, 9.00 })
+            {
+                var live = (object[,])Seam.Call("_ReportValues", Valued(trades, onTheDay, quote, 3.50));
+                Assert.Equal("cleared_mark", live[0, 0]);
+                Assert.Equal(1000.0, (double)live[2, 0], 9);
+                Assert.Equal(0.0, (double)live[2, 1], 9);
+            }
+            // The day after: cash, whatever the expiry settled at, the fees as booked and nothing at risk.
+            foreach (var settle in new[] { 3.05, 9.00 })
+            {
+                var after = History(46345.0, Column(46344.0, 46343.0), Column(settle, 3.05));
+                var results = Valued(trades, after, 3.50);
+                var cash = (object[,])Seam.Call("_ReportValues", results);
+                Assert.Equal("cleared_cash", cash[0, 1]);
+                Assert.Equal(0.0, (double)cash[2, 0], 9);
+                Assert.Equal(1000.0, (double)cash[2, 1], 9);
+                var reserves = (object[,])Seam.Call("_ReportReserves", results);
+                Assert.Equal(20.0, (double)reserves[2, 0], 12);
+                Assert.Equal(8.0, (double)reserves[2, 1], 12);
+                var risk = (object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "day");
+                Assert.Equal("Total", risk[3, 0]);
+                Assert.Equal(0.0, (double)risk[3, 1], 12);
+                var slots = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_PrepareTrades", trades, after));
+                Assert.Equal(3, slots.GetLength(0));
+                Assert.Equal("Z26", slots[2, Heading(slots, "pricing_contract")]);
+                Assert.Equal(true, slots[2, Heading(slots, "is_fixed")]);
+                Assert.Equal(true, slots[2, Heading(slots, "is_settled")]);
+                Assert.Equal(0.0, (double)slots[2, Heading(slots, "live_lots")], 12);
+            }
+            // The buy alone: a lot open past its expiry is a delivery, refused by the contract and the count.
+            var past = History(46345.0, Column(46344.0, 46343.0), Column(3.05, 3.05));
+            var held = (string)Seam.Call("_CreateTrades", index, headers, Row(1001.0, 46301.0, "Z26", 1.0, 3.00), housed);
+            Assert.Equal("#ERROR _PrepareTrades: ValueError: Z26 expired 2026-11-18, before valuation date 2026-11-19, with 1.0 of 'LOT' open, trade 1001 at row 1 among them; a physical position open past its expiry is a delivery, which is not modeled", Seam.Call("_PrepareTrades", held, past));
+            // A lot against its 10,000 MMBTU in the smaller unit nets to no exposure and is two counts.
+            var unitless = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "broker", "clearing_house"), Row("month", "monthly", 1.0, "lastday", "cleared", "physical", "ION", "CME Clearing"));
+            var twoUnits = (string)Seam.Call("_CreateTrades", index, Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price"), new object[,] { { 1001.0, 46301.0, "Z26", 1.0, "LOT", 3.00 }, { 1002.0, 46301.0, "Z26", -10000.0, "MMBTU", 3.10 } }, unitless);
+            Assert.Equal("#ERROR _PrepareTrades: ValueError: Z26 expired 2026-11-18, before valuation date 2026-11-19, with 1.0 of 'LOT' open, trade 1001 at row 1 among them; a physical position open past its expiry is a delivery, which is not modeled", Seam.Call("_PrepareTrades", twoUnits, past));
+            // A physical batch clears through one clearing house, refused when the batch is made.
+            var houses = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, values);
+            var ticket = new object[,] { { 1001.0, 46301.0, "Z26", 1.0, 3.00, "CME Clearing" }, { 1002.0, 46301.0, "Z26", -1.0, 3.10, "ICE Clear Europe" } };
+            Assert.Equal("#ERROR _CreateTrades: ValueError: clearing_house of trade 1002 at row 2 is 'ICE Clear Europe', expected 'CME Clearing' as at row 1; a physical batch clears through one clearing house", Seam.Call("_CreateTrades", index, Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "clearing_house"), ticket, houses));
+        }
+
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;
         // the shown fixed_float spills ten rows by twenty-three columns, the seven rows of booking and since
         // template-based-quoting.md the three of quoting, the labels down the first column, the fields across

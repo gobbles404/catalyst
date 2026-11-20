@@ -113,7 +113,8 @@ With F27 beside it, 2 lots bought at 3.40 and still live at 3.50 on 19 November:
 Z26's 1,000, the mark F27's 2,000 and the delta F27's 2 lots.
 
 Also pin: the refusal of a long lot, of a short lot and of a buy entered twice against one
-sell; long 1 `LOT` against short 10,000 of a one-MMBTU unit refused with each unit's count;
+sell; long 1 `LOT` against short 10,000 of a one-MMBTU unit refused, the first unit with
+a count left named;
 one buy against two sells, a pair entered twice and the rows in any order closed; a quantity
 per day against a quantity per month that count the same closed; a contract holding zero
 rows alone closed and carrying nothing; one open expired contract failing a batch whose
@@ -132,8 +133,9 @@ refusal in place of the blanket one; the readback, where `is_settled` already st
 the tests, a host fact, a smoke block, a lifetime group and a block of the kept workbook;
 the owning pages, a history row and a UAT item.
 
-Measure before and after. A financial batch's work counts, ledgers and pins stand. A
-physical batch gains, at creation, one sum over its components, whatever its rows; at
+Measure before and after. A financial batch's work counts, numpy ledgers and pins stand;
+its function ledger gains one call at creation, the one-house rule, which looks at the
+settlement and returns. A physical batch gains, at creation, one sum over its components, whatever its rows; at
 preparation it reads the flag per group and sums the settled groups' fixed legs, and no
 longer runs the compensated sum of set amounts it had no settled group to use on. A tick is
 as it was. The pull request states the counts it measured.

@@ -14,7 +14,8 @@ every settle or quote of that date multiplies. Per pricing reference, since #186
 calendar month and year, the axes a delta report by month or by year sums onto. And the
 reserves, since #170, the brokerage the brokered rows' components incur and the clearing every
 component incurs on a cleared route, charged where the booking says so since #188, summed for the
-batch.
+batch. And for a physical batch, since expired-physical-cash.md, which of its contracts hold no
+position, the counts of each quantity unit adding to zero.
 Nothing here changes on a tick, a fixing
 or a roll of the valuation date. docs/library/trades/kernel.md is the page."""
 
@@ -34,7 +35,7 @@ from catalyst.index_definitions.index_conventions import CURRENCY, a_unit_of, li
 from catalyst.index_definitions.kind import with_holiday_calendar
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.trades.observations import Observations
-from catalyst.trades.reserves import Reserves, reserves
+from catalyst.trades.reserves import Reserves, exact_total, reserves
 from catalyst.trades.schedule_methods import METHODS, requires_booked_reference
 from catalyst.trades.terms import (
     ELECTRICITY,
@@ -61,6 +62,10 @@ ENCODED_PAIR_DAYS = "encoded_pair_days"  # a pair's distinct observation days ov
 # since two-index-fixed-float.md: the unit tables' products of a few factors agree to a few
 # ulps, 1e-16 of the size, and two quantities that are not one differ by a ratio of units.
 UNIT_ROUNDOFF = 1e-12
+# The whole numbers a running sum adds exactly, since expired-physical-cash.md: while the counts
+# of one contract and unit are under 2^53 in all, every partial sum is a whole number a float
+# holds, and at or past it they are summed by the reserves' exact total.
+EXACT_COUNTS = 2.0**53
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,7 +265,14 @@ class Encoded:
     union of their days with the first leg's observation days, PaymentAxes, made once here for a
     bilateral batch and None for a cleared or a physical one; the month and year displays are
     the preparation's since #186. And pair, since the ticket's third pull request, a pair's
-    observation-day axis with each leg's places, PairAxes, None for one leg."""
+    observation-day axis with each leg's places, PairAxes, None for one leg.
+
+    And closed, since expired-physical-cash.md, for a physical batch and None for a financial
+    one: closed[g], whether the group's contract holds no position, the component quantities
+    of each quantity unit entered on it adding to exactly zero, whole counts added as whole
+    numbers, nothing converted and no allowance, a contract of zero rows alone among them. A
+    fact of the rows and of no valuation date, made once here; the preparation settles a closed
+    contract past its expiry and refuses an open one."""
 
     terms: ResolvedTrades
     legs: tuple[EncodedLeg, ...]
@@ -274,6 +286,7 @@ class Encoded:
     keys: tuple[str, ...]
     key_of_group: NDArray[np.intp] | None
     pair: PairAxes | None
+    closed: NDArray[np.bool_] | None
 
 
 def encoded(
@@ -380,7 +393,11 @@ def encoded(
 
     For a financial settlement, each group pays after its last observation, else its contract and
     its two days are named, since a payment before the last settle exists would have nothing to
-    pay. The fees of the specification are read once, since #170, for the reserves, each
+    pay. For a physical settlement, since expired-physical-cash.md, the contracts that hold no
+    position are found, _the_closed_groups, the component quantities summed by group and
+    quantity unit as the whole counts they are, for the preparation to settle a closed contract
+    past its expiry and refuse an open one. The fees of the specification are read once, since
+    #170, for the reserves, each
     charged component's count times its specification's rate per lot and the batch's two sums,
     brokerage over the brokered rows' components and clearing over every component of a cleared
     batch since #188,
@@ -390,7 +407,8 @@ def encoded(
 
     Work: one component per component, one group per payment group, one observation per
     observation and one slot per slot, reported to the counter; one conversion per distinct
-    specification the batch selects; the reserves once over the components each fee charges; and,
+    specification the batch selects; the reserves once over the components each fee charges; for
+    a physical batch, the components' counts summed once more by group and quantity unit; and,
     for a bilateral batch, one payment day per distinct payment day, the axes made once.
     """
     if len(observations) != len(terms.legs):
@@ -535,6 +553,9 @@ def encoded(
     group_of_component.setflags(write=False)
     heads.setflags(write=False)
     reserved = reserves(terms, counter)
+    # A physical batch's closed contracts, expired-physical-cash.md: one sum over its components,
+    # here, where the rows are; a financial batch pays on its days and makes none of it.
+    closed = _the_closed_groups(terms, group_of_component, groups) if payment_date is None else None
     return Encoded(
         terms,
         tuple(legs),
@@ -548,6 +569,7 @@ def encoded(
         keys,
         key_of_group,
         pair,
+        closed,
     )
 
 
@@ -920,6 +942,44 @@ def _distinct(*keys: NDArray[Any]) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
     tuple_of_item = np.empty(order.size, dtype=np.intp)
     tuple_of_item[order] = tuple_of_sorted
     return tuple_of_item, order[first]
+
+
+def _the_closed_groups(
+    terms: ResolvedTrades, group_of_component: NDArray[np.intp], groups: int
+) -> NDArray[np.bool_]:
+    """Which groups of a physical batch are closed, since expired-physical-cash.md: those whose
+    counts left are zero in every quantity unit, counts_left's, frozen. A group of a physical
+    batch is one contract month."""
+    closed = ~counts_left(terms, group_of_component, groups).any(axis=1)
+    closed.setflags(write=False)
+    return closed
+
+
+def counts_left(
+    terms: ResolvedTrades, group_of_component: NDArray[np.intp], groups: int
+) -> NDArray[np.float64]:
+    """The position each group of a physical batch holds, by quantity unit, since
+    expired-physical-cash.md: left[g, u], the sum of the group's component quantities entered in
+    the first leg's specification u, the counts the terms formed, the entered quantity under
+    month and the entered quantity times its covered days under calday, signed and whole. Each
+    unit is counted by itself: nothing is converted, so a lot bought and its size in a smaller
+    unit sold are two counts and no closed position, and no allowance is made, the counts being
+    whole numbers. One bincount of the counts and one of their sizes; the sum of a group and
+    unit whose sizes reach EXACT_COUNTS in all, where a running sum may round, is the exact
+    total instead, the reserves' own, so that a count of one beside two counts past 2^53 that
+    cancel is one, and an infinity of its sign where the counts themselves sum past the largest
+    number. The encoding reads it once for the flags; the preparation's refusal reads it again
+    for the count it names, on the failing path alone."""
+    leg = terms.legs[0]  # a physical batch has one leg, the kernel's rule
+    units = len(leg.index.specifications.names)
+    place = group_of_component * units + leg.specification[terms.occurrence]
+    counts = terms.component_quantity
+    with np.errstate(over="ignore", invalid="ignore"):  # the exact total below is the judge
+        left = np.bincount(place, weights=counts, minlength=groups * units)
+        sizes = np.bincount(place, weights=np.abs(counts), minlength=groups * units)
+    for at in np.flatnonzero(sizes >= EXACT_COUNTS):  # no batch of lots comes here
+        left[at] = exact_total(counts[place == at])
+    return left.reshape(groups, units)
 
 
 def _the_curve_axes(

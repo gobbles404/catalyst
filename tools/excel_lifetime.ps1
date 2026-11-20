@@ -50,6 +50,10 @@
 #          a changed quantity remaking it, a code naming nothing and a payment day on the
 #          expiry failing it and typed back rebuilding it. check.ps1 runs this group beside
 #          core.
+#   physical  a closed physical position, expired-physical-cash.md: a lot pair of n26 marked
+#          before its expiry and cash the day after; the sell corrected to leave a lot open,
+#          failing the preparation and the results as its consumer; typed back, both rebuilt.
+#          check.ps1 runs this group beside core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
@@ -58,7 +62,7 @@
 # hidden_excel.ps1, which makes the refused call again until it is taken or its time runs out;
 # inside a bounded wait that time is the wait's own deadline, never more. A property is read
 # through Read-ExcelProperty, since a refused read made with a dot comes back as nothing.
-param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "bumps", "curves", "cashflows", "quotes", "pairs", "rfq", "quit"), [int]$Patience = 20)
+param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "bumps", "curves", "cashflows", "quotes", "pairs", "rfq", "physical", "quit"), [int]$Patience = 20)
 $ErrorActionPreference = "Stop"
 $Groups = @($Groups | ForEach-Object { $_ -split "," })
 $root = Split-Path $PSScriptRoot -Parent
@@ -1822,7 +1826,92 @@ $rfq = {
     Close-Book $state $book
 }
 
-$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; bumps = $bumps; curves = $curves; cashflows = $cashflows; quotes = $quotes; pairs = $pairs; rfq = $rfq; quit = $quit }
+# --- physical -------------------------------------------------------------------------------------
+# A closed physical position through its expiry, expired-physical-cash.md. The chain, a cleared
+# physical template under one clearing house in D14 and a batch of two NYMEX lots of n26 bought at
+# 70 and sold at 72 in D15, prepared in D17 and evaluated in D18: on 26 May the locked-in 4,000 is
+# the mark, nothing is cash and the contract is unsettled. The valuation day moves past n26's
+# expiry, to Tuesday 23 June, with a settle for every business day through the 22nd and the vector
+# trimmed to q26's price, all under manual calculation: the 4,000 is cash, the mark nothing and
+# the contract settled. Then the sell is corrected to one lot, which leaves a lot open past the
+# expiry: the batch publishes anew, the preparation fails by the contract and the count, the
+# results fail as its consumer and the reads show #REF!, no number standing; typed back to two,
+# the preparation and the results rebuild and the cash reads 4,000 again. check.ps1 runs this
+# group beside core.
+$physical = {
+    param($state)
+    $book = New-Book $state
+    $sheet = Sheet $state $book
+    Build-Chain $state $sheet
+    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "settlement_frequency"; Put $state $sheet "R1" "nearby"
+    Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "month"; Put $state $sheet "M2" "lastday"; Put $state $sheet "N2" "cleared"; Put $state $sheet "O2" "physical"; Put $state $sheet "P2" "CME Clearing"; Put $state $sheet "Q2" "monthly"; Put $state $sheet "R2" "1"
+    Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
+    Put $state $sheet "K5" "11-May-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
+    Put $state $sheet "K6" "12-May-2026"; Put $state $sheet "L6" "N26"; Put $state $sheet "M6" "-2"; Put $state $sheet "N6" "72"
+    Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",K1:R1,K2:R2)'
+    Put $state $sheet "D15" "=_CreateTrades(D5,K4:N4,K5:N6,D14)"
+    Put $state $sheet "D17" "=_PrepareTrades(D15,D9)"
+    Put $state $sheet "D18" "=_EvaluateTrades(D17,D11)"
+    Put $state $sheet "D19" "=INDEX(_ReportValues(D18),3,1)"
+    Put $state $sheet "D20" '=INDEX(_ReportRisk(D18,"nominal_delta","year"),4,2)'
+    Put $state $sheet "D21" "=INDEX(_ReportValues(D18),3,2)"
+    Put $state $sheet "D22" "=INDEX(util_ReadHandle(D17),3,5)"
+    $id = Id $state
+    Check "the physical batch's cell shows its handle" ((Text $state $sheet "D15").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D15")
+    Check "before the expiry the locked-in 4,000 is the mark, two lots of 2 over 70" ((Text $state $sheet "D19") -eq "4000") (Text $state $sheet "D19")
+    Check "the two lots bought and sold leave no delta" ((Text $state $sheet "D20") -eq "0") (Text $state $sheet "D20")
+    Check "nothing is cash" ((Text $state $sheet "D21") -eq "0") (Text $state $sheet "D21")
+    Check "and n26 is unsettled" ((Text $state $sheet "D22") -eq "FALSE") (Text $state $sheet "D22")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 4) }
+    Check "fifteen creators, fifteen live publications" ($c.Live -eq 15 -and $c.Published -eq 15 -and $c.Released -eq 0) $c.Text
+
+    # The valuation day moves past the expiry with the fixings through the 22nd and the vector
+    # trimmed to the one contract left, together under manual calculation: the 4,000 is cash.
+    $trades = Text $state $sheet "D15"
+    $prepared = Text $state $sheet "D17"
+    Invoke-ExcelCall "manual calculation" { $state.Excel.Calculation = -4135 }
+    $last = Put-Fixings $state $sheet ([datetime]"2026-06-22") "72.5"
+    Put $state $sheet "D8" "=_CreateFuturesFixings(T1:T$last,U1:U$last,D5)"
+    Put $state $sheet "D10" "=_CreatePriceVector(A1,A11)"
+    Put $state $sheet "A6" "23-Jun-2026"
+    Invoke-ExcelCall "calculation" { $state.Excel.Calculate() }
+    Invoke-ExcelCall "automatic calculation" { $state.Excel.Calculation = -4105 }
+    Check "the day moved past the expiry gives the preparation a new handle" ((Text $state $sheet "D17") -ne $prepared -and (Text $state $sheet "D17").StartsWith("${id}:prepared_trades:WTI NYMEX:")) (Text $state $sheet "D17")
+    Check "over the same batch, which no valuation day remakes" ((Text $state $sheet "D15") -eq $trades) (Text $state $sheet "D15")
+    Check "the closed contract is settled" ((Text $state $sheet "D22") -eq "TRUE") (Text $state $sheet "D22")
+    Check "its 4,000 is cash, whatever the expiry settled at" ((Text $state $sheet "D21") -eq "4000") (Text $state $sheet "D21")
+    Check "the mark is 0" ((Text $state $sheet "D19") -eq "0") (Text $state $sheet "D19")
+    Check "and the delta 0" ((Text $state $sheet "D20") -eq "0") (Text $state $sheet "D20")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 4) -and $c.Released -ge 8 }
+    Check "the old date, calendar, fixings, history, vector, market, preparation and results are released; fifteen live, eight more published" ($c.Live -eq 15 -and $c.Released -eq 8 -and $c.Published -eq 23 -and $c.Misses -eq 0) $c.Text
+
+    # The sell corrected to one lot leaves a lot open past the expiry: a delivery. The batch
+    # publishes anew; the preparation fails by the contract and the count, and the results as
+    # its consumer; the reads show #REF!, no number standing.
+    $refused = "#ERROR _PrepareTrades: ValueError: n26 expired 2026-06-22, before valuation date 2026-06-23, with 1.0 of 'NYMEX' open, trade at row 1 among them; a physical position open past its expiry is a delivery, which is not modeled"
+    Put $state $sheet "M6" "-1"
+    Check "the corrected batch has a new handle" ((Text $state $sheet "D15") -ne $trades -and (Text $state $sheet "D15").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D15")
+    Check "a lot left open past the expiry fails the preparation by the contract and the count" ((Text $state $sheet "D17") -eq $refused) (Text $state $sheet "D17")
+    Check "the results fail as the preparation's consumer" ((Text $state $sheet "D18") -eq "#ERROR _EvaluateTrades: prepared is the creator's failure, expected prepared trades handle: $refused") (Text $state $sheet "D18")
+    Check "the cash read through INDEX shows #REF!, no number" ((Text $state $sheet "D21") -eq "#REF!") (Text $state $sheet "D21")
+    Check "the mark read likewise" ((Text $state $sheet "D19") -eq "#REF!") (Text $state $sheet "D19")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 2) -and $c.Released -ge 11 }
+    Check "the preparation and the results own nothing: thirteen live, the old batch, preparation and results released" ($c.Live -eq 13 -and $c.Released -eq 11 -and $c.Published -eq 24 -and $c.Misses -eq 0) $c.Text
+
+    # The row put right: the batch, the preparation and the results rebuild and the cash reads
+    # as it did.
+    Put $state $sheet "M6" "-2"
+    Check "the quantity typed back rebuilds the preparation" ((Text $state $sheet "D17").StartsWith("${id}:prepared_trades:WTI NYMEX:")) (Text $state $sheet "D17")
+    Check "and the results" ((Text $state $sheet "D18").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "D18")
+    Check "the 4,000 is cash again" ((Text $state $sheet "D21") -eq "4000") (Text $state $sheet "D21")
+    Check "the mark 0" ((Text $state $sheet "D19") -eq "0") (Text $state $sheet "D19")
+    Check "and the contract settled" ((Text $state $sheet "D22") -eq "TRUE") (Text $state $sheet "D22")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 4) -and $c.Released -ge 12 }
+    Check "fifteen live again, three more published, the open batch released, no misses, no disposal errors" ($c.Live -eq 15 -and $c.Released -eq 12 -and $c.Published -eq 27 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Close-Book $state $book
+}
+
+$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; bumps = $bumps; curves = $curves; cashflows = $cashflows; quotes = $quotes; pairs = $pairs; rfq = $rfq; physical = $physical; quit = $quit }
 foreach ($name in $Groups) {
     if (-not $bodies.Contains($name)) { throw "no group named $name; the groups are $($bodies.Keys -join ', ')" }
     Run-Group $name $bodies[$name]

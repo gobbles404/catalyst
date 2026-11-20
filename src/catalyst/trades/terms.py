@@ -198,10 +198,12 @@ class ResolvedTrades:
     system's whole number of at most 15 digits held as an int64 since #168, clearing_house[i] its
     clearing organization, counterparty[i] since #175 the counterparty it faces and broker[i] its
     broker, the IDs an array and the three labels tuples, each None as a whole when the field was
-    not given, each kept as given and read for nothing but a message's words and, since #188, the
-    broker's text for brokered[i], whether the row names a broker and so charges brokerage:
-    False for every row when the field was not given and where the row's text is none in any
-    case, the desk's word for a screen trade, reserve-fee-applicability.md; marketing_reserve[i]
+    not given, each kept as given and read for nothing but a message's words, since
+    expired-physical-cash.md the clearing house's for the one house a physical batch names, and,
+    since #188, the broker's text for brokered[i], whether the row names a broker and so
+    charges brokerage: False for every row when the field was not given and where the row's
+    text is none in any case, the desk's word for a screen trade,
+    reserve-fee-applicability.md; marketing_reserve[i]
     since #175 the marketing cost the row booked once, a finite amount of zero or more in the
     settlement currency, None as a whole when neither the template nor the ticket supplied it,
     read by the reserves alone; cva_reserve[i] since cva-reserve.md the credit valuation
@@ -338,7 +340,9 @@ def resolved_trades(
     lot, since the batch's delta is a count of that lot and a batch without one could not report
     its risk. The occurrences are the ticket's
     rows: one date each, and one trade ID, a whole number of at most 15 digits the caller read
-    by whole_trade_ids since #168, clearing house and broker each where those are given;
+    by whole_trade_ids since #168, clearing house and broker each where those are given, a
+    physical batch's clearing house one for the batch since expired-physical-cash.md, the first
+    row naming another refused;
     one specification, method and basis each, the specification a row of the index's
     specifications, since the lot size and the lot unit are read there, its quantities counting
     it, whatever the desk's word for it, an exchange lot or a bare unit the index defines with a
@@ -440,6 +444,7 @@ def resolved_trades(
         partial(named_trade, trade_ids),
     )
     _the_method(schedule_method, settlement, trade_ids, index.kind)
+    _the_clearing_house(settlement, clearing_house, trade_ids)
     _the_components(occurrence, quantity, start_date, end_date, trade_ids, occurrences)
     onetime = settlement_frequency[occurrence] == FREQUENCIES.index(SettlementFrequency.ONETIME)
     _the_monthly_components(start_date, end_date, onetime, trade_ids, occurrence)
@@ -1073,6 +1078,34 @@ def _the_keys(route: Route, discount_curve_key: tuple[str, ...] | None) -> None:
                 )
         case _:
             assert_never(route)
+
+
+def _the_clearing_house(
+    settlement: Settlement,
+    clearing_house: tuple[str, ...] | None,
+    trade_ids: NDArray[np.int64] | None,
+) -> None:
+    """A physical batch clears through one clearing house, since expired-physical-cash.md: a
+    position on one contract at two houses is two positions, neither closing the other, so the
+    first row naming a house other than the first row's is refused by its trade. The labels are
+    compared as given. A financial batch may name several, and a batch naming none, a bilateral
+    one, is held to nothing here."""
+    match settlement:
+        case Settlement.FINANCIAL:
+            return
+        case Settlement.PHYSICAL:
+            if clearing_house is None:
+                return
+            houses = tuple(dict.fromkeys(clearing_house))  # distinct, by first appearance
+            if len(houses) == 1:
+                return
+            i = clearing_house.index(houses[1])
+            raise ValueError(
+                f"clearing_house of {named_trade(trade_ids, i)} is {houses[1]!r}, expected "
+                f"{houses[0]!r} as at row 1; a physical batch clears through one clearing house"
+            )
+        case _:
+            assert_never(settlement)
 
 
 def _the_components(

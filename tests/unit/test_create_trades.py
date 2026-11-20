@@ -2653,7 +2653,14 @@ def test_a_mixed_tickets_refusals_name_the_first_offending_row() -> None:
         "schedule_method": ["lastday"] * 4,
         "quantity_per": ["month", "calday", "month", "calday"],
     }
-    batch, _ = created(MIXED, lastday_rows, physical)
+    # A physical batch clears through one clearing house, since expired-physical-cash.md: the
+    # ticket's second house is refused by its row, after the methods, and the rows under one
+    # house are made, each still choosing its own unit and basis.
+    assert refused(MIXED, lastday_rows, physical) == (
+        "clearing_house of trade 2 at row 2 is 'Clearer B', expected 'Clearer A' as at row 1; a "
+        "physical batch clears through one clearing house"
+    )
+    batch, _ = created(MIXED, {**lastday_rows, "clearing_house": ["Clearer A"] * 4}, physical)
     np.testing.assert_array_equal(batch.resolved.component_quantity, [1.0, -62.0, 3.0, 682.0])
 
 

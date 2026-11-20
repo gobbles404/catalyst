@@ -813,9 +813,11 @@ def test_a_contract_stays_live_on_its_expiry_day_and_is_expired_the_day_after() 
     np.testing.assert_array_equal(on_the_day.legs[0].is_fixed, [False, False])
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, (history_on(NG, "2026-11-26", {"Z26": 3.22}),), WorkCounter())
+    # The example holds 16 lots of Z26, 10, -4 and 10: open past its expiry, a delivery.
     assert str(refused.value) == (
-        "trade 1001 at row 1 on Z26 expired 2026-11-25, before valuation date 2026-11-26; "
-        "a physical fixed_float after its expiry is not supported"
+        "Z26 expired 2026-11-25, before valuation date 2026-11-26, with 16.0 of 'NYMEX NG' open, "
+        "trade 1001 at row 1 among them; a physical position open past its expiry is a delivery, "
+        "which is not modeled"
     )
 
 
@@ -2049,9 +2051,9 @@ def test_adding_rows_kept_ready_changes_no_number_of_the_batch() -> None:
 
 
 def test_a_zero_row_bypasses_no_rule_of_the_market_the_calendar_or_identity() -> None:
-    # A quote missing for the zero row's contract is still missing, a physical contract past its
-    # expiry is still past it, and an all-zero batch is held to the identity rules, whether
-    # anything is held on a contract or nothing.
+    # A quote missing for the zero row's contract is still missing, a physical contract held
+    # past its expiry is still a delivery whatever zero row stands beside it, and an all-zero
+    # batch is held to the identity rules, whether anything is held on a contract or nothing.
     terms = entry_terms((2.0, 0.0))
     enc = encoded(terms, (observed_of(terms),), UNITS, WorkCounter())
     history = history_on(NG, "2026-11-24", {})
@@ -2060,14 +2062,20 @@ def test_a_zero_row_bypasses_no_rule_of_the_market_the_calendar_or_identity() ->
         ValueError, match=r"^requested contract 'F27' is beyond live-price coverage"
     ):
         trade_results(prep, (quoted(history, 3.10),), WorkCounter())
-    nothing = entry_terms((0.0, 0.0))
-    enc = encoded(nothing, (observed_of(nothing),), UNITS, WorkCounter())
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, (history_on(NG, "2026-11-26", {"Z26": 3.22}),), WorkCounter())
     assert str(refused.value) == (
-        "trade 1001 at row 1 on Z26 expired 2026-11-25, before valuation date 2026-11-26; "
-        "a physical fixed_float after its expiry is not supported"
+        "Z26 expired 2026-11-25, before valuation date 2026-11-26, with 2.0 of 'NYMEX NG' open, "
+        "trade 1001 at row 1 among them; a physical position open past its expiry is a delivery, "
+        "which is not modeled"
     )
+    # Since expired-physical-cash.md a contract holding zero rows alone holds no position: past
+    # its expiry it is settled, with nothing of cash, where it was refused as any other.
+    nothing = entry_terms((0.0, 0.0))
+    enc = encoded(nothing, (observed_of(nothing),), UNITS, WorkCounter())
+    past = prepared_trades(enc, (history_on(NG, "2026-11-26", {"Z26": 3.22}),), WorkCounter())
+    np.testing.assert_array_equal(past.is_settled, [True, False])
+    assert (past.cash, past.offset_unsettled, past.set_unsettled) == (0.0, 0.0, (0.0,))
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, (history_on(an_index(), "2026-11-24", {}),), WorkCounter())
     assert str(refused.value) == (
