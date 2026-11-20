@@ -1,6 +1,6 @@
 # A named discount curve for each cashflow
 
-**Status:** Built in #NNN, stacked on #259, agreed with the owner on 20 November 2026 for
+**Status:** Built in #260, stacked on #259, agreed with the owner on 20 November 2026 for
 [issue #254](https://github.com/gobbles404/catalyst/issues/254), this page in its first
 commit. A batch of cashflows discounts each payment on the curve its row names, where the
 whole batch took one curve. It extends the cashflow instrument of
