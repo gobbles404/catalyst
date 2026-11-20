@@ -1034,3 +1034,18 @@ UAT: in a bilateral block of the kept workbook, type a name the collection does 
 over a ticket's `discount_curve_key` and read the refusal in the results cell, the key, the
 trade and the collection's names in quote marks; put the key back and the results return.
 Do the same to a quote template's key and read the same list.
+
+## 39. A named discount curve for each cashflow
+
+Agreed 20 November 2026 and built in #NNN, issue #254:
+[cashflow-curve-keys.md](cashflow-curve-keys.md), stacked on #259. A batch of cashflows now
+discounts each payment on the curve its row names. Every cashflow sheet changes in two
+places, and each fails by name until it does: the template or the ticket gains
+`discount_curve_key`, the curve's exact name, and the third argument of `_EvaluateCashflows`
+points at a `_CollectDiscountCurves` cell where it pointed at one curve. A batch on one
+curve passes a collection of one. Payments on one day net only within one key, so 10,000
+received on SOFR against 10,000 paid on FFOIS is worth 500 at factors of 0.95 and 0.90, and
+never nothing. The risk report shows a DV01 column per curve. The key is the last column of
+both readbacks, so no column a sheet already reads has moved.
+
+UAT: the block of the kept workbook the build adds.
