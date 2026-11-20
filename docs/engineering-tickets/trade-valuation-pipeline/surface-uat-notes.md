@@ -993,3 +993,17 @@ and MMBTU and nothing it shows moved. Then clear a unit cell of a template and r
 field named as missing; book a C5 leg in cents a gallon against WTI at a spread price of
 -9.10 and read zero at 145 and 70.00; and book one of the desk's cracks from the record
 and compare the mark with the record's NPV.
+
+## 37. A closed physical contract past its expiry, as cash
+
+Agreed 20 November 2026 and built in #NNN, issue #256:
+[expired-physical-cash.md](expired-physical-cash.md). A physical `fixed_float` whose
+contract has expired no longer fails its batch when the position is closed: the buy and the
+sell stay as booked and their locked-in profit or loss moves from `cleared_mark` to
+`cleared_cash` the day after the expiry. Closed means the quantities of each `quantity_unit`
+on the contract add to exactly zero, counted as whole numbers. An expired contract with a
+count left still fails, naming the contract, the count and its unit. A physical batch names
+one clearing house. The brokerage and the clearing stay as booked, so mark plus cash less
+the reserves reads the same before and after the expiry.
+
+UAT: the block of the kept workbook the build adds.
