@@ -1822,7 +1822,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(QV27),3,9)"    = "SOFR"
     "=INDEX(util_ReadHandle(QV27),4,9)"    = "FFOIS"
     "=INDEX(util_ReadHandle(QV32),3,5)"    = "SOFR, FFOIS"
-    "=_EvaluateTrades(QV28,QV9,QW12)"      = "#ERROR _EvaluateTrades: ValueError: discount_curve_key 'FFOIS' of trade 1002 at row 2 names no curve of the collection, which holds SOFR; expected a curve of that name"
+    "=_EvaluateTrades(QV28,QV9,QW12)"      = "#ERROR _EvaluateTrades: ValueError: discount_curve_key 'FFOIS' of trade 1002 at row 2 names no curve of the collection, which holds 'SOFR'; expected a curve of that name"
     '=INDEX(_ReportRisk(QV8,"all","month"),17,1)' = "46753"
     '=INDEX(_ReportRisk(QV8,"all","month"),17,3)' = "0"
     '=INDEX(_ReportRisk(QV8,"all","month"),17,4)' = "-0.0095"
@@ -1977,7 +1977,7 @@ $formulas = [ordered]@{
     # gone, and a key naming no curve of the collection, FFOIS alone where the rows say SOFR.
     "=LEFT(_EvaluateTrades(QV7,QV9,QV12),69)" = "#ERROR _EvaluateTrades: discount_curve_set is discount curve handle '"
     "=LEFT(_EvaluateTrades(QV7,QV9,QW14),71)" = "#ERROR _EvaluateTrades: ValueError: discount_curve_key 'SOFR' of trade "
-    "=RIGHT(_EvaluateTrades(QV7,QV9,QW14),82)" = "names no curve of the collection, which holds FFOIS; expected a curve of that name"
+    "=RIGHT(_EvaluateTrades(QV7,QV9,QW14),84)" = "names no curve of the collection, which holds 'FFOIS'; expected a curve of that name"
     # The collection, aggregate-risk-excel-integration.md: QV8, QV22 and QV24 collected down a column
     # in RT8 and across a row in RT9, a handle of its own kind; the same reader over it, all three by
     # month: one UNIT group, 20 nominal and 20.5 discounted, and two curve groups, QV12's 0.0085 as

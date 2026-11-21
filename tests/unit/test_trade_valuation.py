@@ -4955,7 +4955,7 @@ def test_the_curves_rules_reach_the_sheet_and_publish_nothing(unit: dict[str, An
     )
     assert evaluate(prepared, market, unnamed) == (
         "#ERROR _EvaluateTrades: ValueError: discount_curve_key 'SOFR' of trade 1001 at row 1 "
-        "names no curve of the collection, which holds FFOIS; expected a curve of that name"
+        "names no curve of the collection, which holds 'FFOIS'; expected a curve of that name"
     )
     assert evaluate(prepared, market, late) == (
         "#ERROR _EvaluateTrades: ValueError: discount curve 'SOFR' starts on 2027-01-05, "
@@ -5024,7 +5024,7 @@ def test_a_batch_keyed_on_two_curves_reads_back_each_key_and_curve_and_reports_b
     prepared = str(ENTRY["_PrepareTrades"](trades, history))
     assert ENTRY["_EvaluateTrades"](prepared, market, curves_of(sofr)) == (
         "#ERROR _EvaluateTrades: ValueError: discount_curve_key 'FFOIS' of trade 1002 at row 2 "
-        "names no curve of the collection, which holds SOFR; expected a curve of that name"
+        "names no curve of the collection, which holds 'SOFR'; expected a curve of that name"
     )
     results = str(ENTRY["_EvaluateTrades"](prepared, market, both))
     assert valued(results) == (pytest.approx(3.0), 0.0, 0.0)

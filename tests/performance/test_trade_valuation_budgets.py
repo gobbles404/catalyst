@@ -350,6 +350,7 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
         "_the_lots_checked": 1,
         "_discounted_leg": 1,  # the leg's results over them
         "_the_curves": 1,  # the rules and the key bound, since named-curves-slice-3.md
+        "curve_named": 1,  # the shared step, shared-curve-binding.md
         "_each_period_finite": 2,  # each curve's DV01 views and cross-gamma views finite
         "curve_starts_on": 1,  # the start rule, shared with the cashflows since #200
         "DiscountCurve.start_date": 2,

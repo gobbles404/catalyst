@@ -280,7 +280,7 @@ LEDGER = {
     "nearby_rules": 1,
     "frequency_rules": 1,
     "the_curve": 1,
-    "the_curve.<locals>.<genexpr>": 2,  # the collection searched to SOFR, its first curve
+    "curve_named": 1,  # the shared step, shared-curve-binding.md: the collection searched to SOFR
     "DiscountCurve.start_date": 2,
     "curve_starts_on": 1,
     "DiscountCurve.max_date": 1,

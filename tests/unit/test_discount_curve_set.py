@@ -1,6 +1,7 @@
 """A collection of named discount curves, multiple-discount-curves.md: the curves as they are,
 by reference, in the order given, each name once; no date read, nothing of the factors made or
-combined. The seam's words and handles are test_globals.py."""
+combined. And, since shared-curve-binding.md, the one step that binds a key to its curve and
+its one refusal. The seam's words and handles are test_globals.py."""
 
 import pytest
 from hypothesis import given
@@ -8,7 +9,12 @@ from hypothesis import strategies as st
 from test_bilateral_kernel import A_YEAR, AS_OF, TWO_YEARS, curve_of
 
 from catalyst.globals.discount_curve import DiscountCurve
-from catalyst.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
+from catalyst.globals.discount_curve_set import (
+    DiscountCurveSet,
+    collect_discount_curves,
+    curve_named,
+    no_curve_named,
+)
 from catalyst.instrumentation.work_counts import WorkCounter
 
 SOFR = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))
@@ -139,3 +145,62 @@ def test_any_repeat_is_refused_naming_the_first_repeat_and_the_cell_it_repeats(
             f"curve_handles cell {earlier} and cell {later} are both named {name!r}, "
             "expected each name once"
         )
+
+
+# --- binding a key to its curve, shared-curve-binding.md ------------------------------------------
+
+SONIA = curve_of((AS_OF, 1.0), (A_YEAR, 0.97), name="SONIA")
+
+
+def test_a_key_is_bound_to_the_curve_of_its_exact_name_and_to_no_other() -> None:
+    both = collected(SOFR, FFOIS)
+    assert curve_named(both, "SOFR") is SOFR and curve_named(both, "FFOIS") is FFOIS
+    assert curve_named(collected(FFOIS, SOFR), "SOFR") is SOFR  # by name, whatever the order
+    # Case and all, and nothing trimmed or guessed: another spelling names no curve.
+    for key in ("sofr", "Sofr", "SOFR ", " SOFR", "SOF", ""):
+        assert curve_named(both, key) is None
+
+
+def test_a_collection_of_one_is_no_fallback() -> None:
+    one = collected(SOFR)
+    assert curve_named(one, "SOFR") is SOFR
+    assert curve_named(one, "FFOIS") is None  # the one curve is not handed to another key
+
+
+def test_the_refusal_names_the_key_who_booked_it_and_the_collections_names_quoted() -> None:
+    # One sentence for every caller: a trade names the row booking the key, a quote nobody.
+    three = collected(SOFR, FFOIS, SONIA)
+    assert str(no_curve_named(three, "Sonia", "trade 1003 at row 3")) == (
+        "discount_curve_key 'Sonia' of trade 1003 at row 3 names no curve of the collection, "
+        "which holds 'SOFR', 'FFOIS' and 'SONIA'; expected a curve of that name"
+    )
+    assert str(no_curve_named(collected(FFOIS), "SOFR")) == (
+        "discount_curve_key 'SOFR' names no curve of the collection, which holds 'FFOIS'; "
+        "expected a curve of that name"
+    )
+    # The names in the collection's order: one alone, two joined by and, more by commas.
+    assert " which holds 'SOFR' and 'FFOIS'; " in str(no_curve_named(collected(SOFR, FFOIS), "x"))
+    assert " which holds 'FFOIS' and 'SOFR'; " in str(no_curve_named(collected(FFOIS, SOFR), "x"))
+    assert isinstance(no_curve_named(three, "x"), ValueError)
+
+
+LETTERS = "SOFRsofr1"  # few letters in both cases, so a key often misses by case alone
+
+
+@given(
+    names=st.lists(st.text(LETTERS, min_size=1, max_size=4), min_size=1, max_size=6, unique=True),
+    key=st.text(LETTERS + " ", max_size=4),
+)
+def test_any_key_is_bound_exactly_when_the_collection_holds_its_name(
+    names: list[str], key: str
+) -> None:
+    curves = [curve_of((AS_OF, 1.0), name=name) for name in names]
+    held = collected(*curves)
+    found = curve_named(held, key)
+    if key in names:
+        assert found is curves[names.index(key)]
+    else:
+        assert found is None
+        told = str(no_curve_named(held, key))
+        assert told.startswith(f"discount_curve_key {key!r} names no curve of the collection, ")
+        assert all(repr(name) in told for name in names)

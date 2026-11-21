@@ -1019,3 +1019,18 @@ to B3505 are the refusals of the buy alone, of a lot against 10,000 of the one-M
 and of a second clearing house on a physical ticket. Then book a closed position of the
 desk's own past its expiry and compare the cash with the record's realized amount, and
 mark plus cash less the reserves with the day before.
+
+## 38. One shared step binds a discount curve key to its curve
+
+Agreed 20 November 2026 and built in #259, issue #257:
+[shared-curve-binding.md](shared-curve-binding.md), stacked on #258. Nothing a sheet types
+changes and no number moves. The rule that finds a key's curve in a collection is written
+once where the trades and the quotes each wrote it, and the one thing a reader sees is in
+the refusal of a key that names no curve: the trades' message now lists the collection's
+names in quote marks, as the quotes' always did, `which holds 'SOFR' and 'FFOIS'` where it
+read `which holds SOFR and FFOIS`.
+
+UAT: in a bilateral block of the kept workbook, type a name the collection does not hold
+over a ticket's `discount_curve_key` and read the refusal in the results cell, the key, the
+trade and the collection's names in quote marks; put the key back and the results return.
+Do the same to a quote template's key and read the same list.
