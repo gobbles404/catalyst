@@ -47,7 +47,7 @@ In this order, the first failure being the message, after the seam has typed eve
 | each trade ID, where supplied, is a whole number of at most 15 digits, the trades' rule and words | as [create-trades.md](../trades/create-trades.md) says |
 | each amount is finite, zero and fractions included, the whole payment in whole units of the currency | `amount row 2 is inf, expected a finite amount` |
 | each key is a curve's name by the curve's own rule, [discount-curve.md](../globals/discount-curve.md), exact, case and all, with no whitespace around it: the template's one key read when the template is made and named by the field, a ticket column's each distinct text read once and named with its first row; no curve is looked for | `discount_curve_key row 2 is ' SOFR', expected a name with no whitespace around it` |
-| the rows' amounts in one payment group, a payment day and a key, sum to a finite amount, under numpy's flags down | `the payments on 2028-01-04 on SOFR sum to inf, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number` |
+| the rows' amounts in one payment group, a payment day and a key, sum to a finite amount, under numpy's flags down | `the payments on 2028-01-04 on SOFR sum to inf, expected a finite amount of DOLLAR; the rows' amounts, each finite, sum past the largest number` |
 
 A payment day is a date, used as entered, past, present or future, never rolled and never held to the trade date; a repeated row is a second payment; a zero amount is a row kept. Nothing is read from a counterparty or a description.
 

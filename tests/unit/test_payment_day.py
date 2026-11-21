@@ -78,7 +78,7 @@ def test_the_first_payment_on_or_before_its_observation_is_named_in_the_callers_
 
 # Z26 through F28, each month expiring on its own last business day with weekends alone closed,
 # so F27 expires Friday 29 January 2027 and Z27 Friday 31 December 2027: the ticket's synthetic
-# schedule, not NYMEX's. One specification of one MMBtu, quoted in USD per MMBtu.
+# schedule, not NYMEX's. One specification of one MMBtu, quoted in DOLLAR per MMBtu.
 LETTERS = "FGHJKMNQUVXZ"
 MONTHS = np.arange("2026-12", "2028-02", dtype="datetime64[M]")
 EXPIRIES = np.busday_offset(

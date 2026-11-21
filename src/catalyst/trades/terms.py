@@ -125,7 +125,7 @@ ELECTRICITY: Final = frozenset({"MWH", "KWH"})
 class PriceUnit:
     """The unit a float_float's spread price is in, since float-float-units.md, typed on the
     batch and never taken from an index: the currency unit and the quantity unit it is per, two
-    codes of the unit tables as entered, USD and BBL for dollars a barrel. Held as given by the
+    codes of the unit tables as entered, DOLLAR and BBL for dollars a barrel. Held as given by the
     terms; the encoding, which has the tables, reads the two for their meaning once."""
 
     currency_unit: str

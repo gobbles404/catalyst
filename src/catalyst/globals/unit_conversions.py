@@ -1,6 +1,8 @@
 """The library's fixed unit definitions and the conversion between them: four categories,
 VOLUME, MASS, ENERGY and USD, each a reference unit and the size of every unit of it in that
-reference unit. A category's name is a code, in capitals like the units it holds, since the desk
+reference unit; USD is a currency, the category of its money units, DOLLAR and CENT, since
+currency-and-currency-unit.md, where the dollar was spelled as the currency is.
+A category's name is a code, in capitals like the units it holds, since the desk
 types it as the quantity type of an index. docs/library/globals/unit-conversions.md is the page.
 
 Nothing here crosses the seam: no worksheet function, no handle, no workbook table. The
@@ -197,12 +199,13 @@ UNITS: Final = unit_conversions(
         UnitDefinition("MWH", "MMBTU", 3.4121416331279417),
         UnitDefinition("KWH", "MMBTU", 0.0034121416331279417),
     ),
-    # USD the U.S. dollar and CENT its cent: a scale of dollar amounts, never a currency
-    # conversion.
+    # USD the currency, the category; DOLLAR the U.S. dollar, its reference unit, and CENT its
+    # cent: a scale of dollar amounts, never a currency conversion. The category keeps the
+    # currency's name and no unit shares it, since currency-and-currency-unit.md.
     category(
         "USD",
-        "USD",
-        UnitDefinition("USD", "USD", 1.0),
-        UnitDefinition("CENT", "USD", 0.01),
+        "DOLLAR",
+        UnitDefinition("DOLLAR", "DOLLAR", 1.0),
+        UnitDefinition("CENT", "DOLLAR", 0.01),
     ),
 )

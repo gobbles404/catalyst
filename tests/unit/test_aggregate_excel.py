@@ -348,7 +348,7 @@ def test_the_readback_lists_the_membership_in_the_order_given(sheet: dict[str, A
             serial(AS_OF),
             0.0,
             PER_BP,
-            "USD",
+            "DOLLAR",
         ],
         [
             2.0,
@@ -363,7 +363,7 @@ def test_the_readback_lists_the_membership_in_the_order_given(sheet: dict[str, A
             serial(AS_OF),
             pytest.approx(-0.00095),
             PER_BP,
-            "USD",
+            "DOLLAR",
         ],
         [
             3.0,
@@ -378,7 +378,7 @@ def test_the_readback_lists_the_membership_in_the_order_given(sheet: dict[str, A
             serial(AS_OF),
             0.0,
             PER_BP,
-            "USD",
+            "DOLLAR",
         ],
         [
             4.0,
@@ -393,7 +393,7 @@ def test_the_readback_lists_the_membership_in_the_order_given(sheet: dict[str, A
             serial(AS_OF),
             pytest.approx(-0.00038),
             PER_BP,
-            "USD",
+            "DOLLAR",
         ],
     ]
     repeated = spilled(ENTRY["util_ReadHandle"](collected(b2, b3, b2)))
@@ -671,8 +671,8 @@ def test_the_reader_takes_either_kind_and_the_other_reports_take_one(sheet: dict
 
 # --- trades and cashflows in one collection, named-curves-slice-2.md -----------------------------
 
-SOFR_USD = "SOFR USD dv01 [USD per basis point]"
-FFOIS_USD = "FFOIS USD dv01 [USD per basis point]"
+SOFR_USD = "SOFR USD dv01 [DOLLAR per basis point]"
+FFOIS_USD = "FFOIS USD dv01 [DOLLAR per basis point]"
 HNG_NOMINAL_LOT = "HNG nominal_delta [LOT]"
 HNG_DELTA_LOT = "HNG delta [LOT]"
 CASHFLOWS_ALONE = (
@@ -772,7 +772,7 @@ def test_a_cashflow_on_another_curve_is_a_column_of_its_own_and_cashflows_alone_
         serial(AS_OF),
         "-",
         "-",
-        "USD",  # the unit of its currency, a cashflow's whole dollars
+        "DOLLAR",  # the unit of its currency, a cashflow's whole dollars
     ]
     assert table[4] == [
         3.0,
@@ -787,7 +787,7 @@ def test_a_cashflow_on_another_curve_is_a_column_of_its_own_and_cashflows_alone_
         serial(AS_OF),
         "-",
         "-",
-        "USD",
+        "DOLLAR",
     ]
 
 
@@ -802,9 +802,9 @@ def test_two_snapshots_of_one_name_are_both_qualified_in_a_collection(
     table = report(four, "dv01", "year")
     assert table[1] == [
         "period",
-        "SOFR (curve_1) USD dv01 [USD per basis point]",
+        "SOFR (curve_1) USD dv01 [DOLLAR per basis point]",
         FFOIS_USD,
-        "SOFR (curve_2) USD dv01 [USD per basis point]",
+        "SOFR (curve_2) USD dv01 [DOLLAR per basis point]",
     ]
     assert table[3] == ["Total", pytest.approx(0.8405), pytest.approx(0.88), pytest.approx(-0.0096)]
     table = report(four, "cross_gamma", "year")
@@ -852,7 +852,7 @@ def cent_settled_index(name: str, expiry: str) -> str:
         bridge.MISSING,
     )
     calendar = ENTRY["_CreateHolidayCalendar"](column([serial(day) for day in UNIT_HOLIDAYS]))
-    conventions = ENTRY["_CreateIndexConventions"]("USD", "BBL", "CENT", "VOLUME", "BBL")
+    conventions = ENTRY["_CreateIndexConventions"]("DOLLAR", "BBL", "CENT", "VOLUME", "BBL")
     specifications = ENTRY["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
         rows(["LOT", 1.0, "BBL", 0.0, 0.0]),
@@ -907,7 +907,7 @@ def test_a_cent_settled_batch_is_a_column_of_its_own_beside_the_dollar_column(
         ["cashflow", "SOFR", "USD"],
         ["bilateral", "SOFR", "USD"],
     ]
-    assert [line[-1] for line in members[2:]] == ["USD", "USD", "CENT"]
+    assert [line[-1] for line in members[2:]] == ["DOLLAR", "DOLLAR", "CENT"]
     assert [line[8] for line in members[2:]] == [
         pytest.approx(-0.0095),
         pytest.approx(0.85),

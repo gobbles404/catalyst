@@ -21,9 +21,9 @@ def _EvaluateCashflows(
 | 14 | `=_ReportValues(A13)` | | | | |
 | | cashflow_mark | cashflow_cash | currency | as_of | currency_unit |
 | | float64 | float64 | str | datetime64[D] | str |
-| | 500 | 250 | USD | 4-Jan-2027 | USD |
+| | 500 | 250 | USD | 4-Jan-2027 | DOLLAR |
 | 18 | `=_ReportRisk(A13,"dv01","year")` | 4-Jan-2027 | | | |
-| | period | SOFR USD dv01 [USD per basis point] | | | |
+| | period | SOFR USD dv01 [DOLLAR per basis point] | | | |
 | | str \| datetime64[D] | float64 | | | |
 | | Total | 0.85 | | | |
 | | 1-Jan-2027 | 0 | | | |
@@ -59,9 +59,9 @@ In this order, the first failure being the message; a failure publishes no handl
 | each distinct key of the batch, in the order its rows first name them, names a curve of the collection by its exact name, the step [collect-discount-curves.md](../globals/collect-discount-curves.md#binding-a-key) owns, with no fallback to the first curve, a collection of one included; the first row booking the key is named, and the collection's order changes nothing | `discount_curve_key 'FFOIS' of trade at row 2 names no curve of the collection, which holds 'SOFR'; expected a curve of that name` |
 | each selected curve, in key order, starts on the valuation day, never rebased, the rule the trades share; a curve nobody selects is read for nothing, and a batch paid in full still binds its keys and holds each selected curve to its start | `discount curve 'SOFR' starts on 2027-01-05, expected 2027-01-04, the valuation date; a curve is never rebased` |
 | and covers its own unpaid payment days, another curve's days nothing to it, a curve's start and its cover both judged before the next curve's; a paid day needs no factor, so a curve of one day serves a key paid in full | `the payment on 2029-01-03 on SOFR is past the discount curve 'SOFR', which runs from 2027-01-04 to 2028-01-04; expected every unpaid payment day covered` |
-| the mark, the cash and the DV01 are finite in all, under numpy's flags down | `the batch has inf of mark in all, expected a finite amount of USD; the payments, each finite, sum past the largest number` |
-| each curve's DV01 by month and by year is finite in every period | `the payment month from 2028-01-01 has inf of DV01 on SOFR in all, expected a finite amount of USD per basis point; its payments' DV01s sum past the largest number` |
-| each curve's own DV01 is finite in all, a rule of its own since the review of #260: the batch's DV01 does not answer for a curve's, a receipt on one curve against a payment on another cancelling in the batch's while each curve's sum runs past the largest number, and the reports and the collection read the curve's; the first curve in key order is named | `the batch has -inf of DV01 on SOFR in all, expected a finite amount of USD per basis point; the curve's payments' DV01s, each finite, sum past the largest number` |
+| the mark, the cash and the DV01 are finite in all, under numpy's flags down | `the batch has inf of mark in all, expected a finite amount of DOLLAR; the payments, each finite, sum past the largest number` |
+| each curve's DV01 by month and by year is finite in every period | `the payment month from 2028-01-01 has inf of DV01 on SOFR in all, expected a finite amount of DOLLAR per basis point; its payments' DV01s sum past the largest number` |
+| each curve's own DV01 is finite in all, a rule of its own since the review of #260: the batch's DV01 does not answer for a curve's, a receipt on one curve against a payment on another cancelling in the batch's while each curve's sum runs past the largest number, and the reports and the collection read the curve's; the first curve in key order is named | `the batch has -inf of DV01 on SOFR in all, expected a finite amount of DOLLAR per basis point; the curve's payments' DV01s, each finite, sum past the largest number` |
 
 `_ReportRisk` takes `dv01` by `day`, `month` or `year`, and `all`, which shows the DV01 alone, a column per curve on one date axis; `nominal_delta`, `delta` and `cross_gamma` are refused by name, `risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk`, rather than shown over an index the batch has not. `_ReportReserves` and `_AggregateResults` take a batch of trades' results and refuse these by kind; the collection is the next ticket's.
 

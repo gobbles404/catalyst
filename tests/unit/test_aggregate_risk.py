@@ -64,7 +64,7 @@ from catalyst.trades.terms import Route
 
 MONTHS = (("Z26", "2026-12-31"), ("F27", "2027-01-04"), ("F29", "2029-01-05"))
 HNG = an_index(
-    "HNG", MONTHS, ("2027-12-27",), ("USD", "BBL"), ("VOLUME", "BBL"), ("LOT", 1.0, "BBL")
+    "HNG", MONTHS, ("2027-12-27",), ("DOLLAR", "BBL"), ("VOLUME", "BBL"), ("LOT", 1.0, "BBL")
 )
 # WTI's F27 expires a day later, so its lastday observation is 5 January: the two indexes observe
 # on different days of one month, and D's payment on 4 January 2028 comes 364 days after it.
@@ -72,7 +72,7 @@ WTI = an_index(
     "WTI",
     (("Z26", "2026-12-31"), ("F27", "2027-01-05"), ("F29", "2029-01-05")),
     ("2027-12-27",),
-    ("USD", "BBL"),
+    ("DOLLAR", "BBL"),
     ("VOLUME", "BBL"),
     ("LOT", 1.0, "BBL"),
 )
@@ -84,8 +84,8 @@ A_DAY, B_DAY = np.datetime64(AS_OF), np.datetime64("2027-01-05")
 JAN_27, JAN_28, JAN_29 = "2027-01-01", "2028-01-01", "2029-01-01"
 HNG_NOMINAL, HNG_DELTA = "HNG nominal_delta [LOT]", "HNG delta [LOT]"
 WTI_NOMINAL, WTI_DELTA = "WTI nominal_delta [LOT]", "WTI delta [LOT]"
-CURVE_1 = "SOFR USD dv01 [USD per basis point]"
-CLEARED_USD = "cleared USD dv01 [USD per basis point]"
+CURVE_1 = "SOFR USD dv01 [DOLLAR per basis point]"
+CLEARED_USD = "cleared USD dv01 [DOLLAR per basis point]"
 HNG_CROSS = "HNG SOFR cross_gamma [LOT per basis point]"
 HNG_CLEARED_CROSS = "HNG cleared cross_gamma [LOT per basis point]"
 WTI_CROSS = "WTI SOFR cross_gamma [LOT per basis point]"
@@ -161,7 +161,9 @@ def test_the_two_hng_sources_combine_by_index_and_by_curve(
     a, b = sources["a"], sources["b"]
     counter = WorkCounter()
     agg = aggregate_results([a, b], counter)
-    assert agg.as_of == A_DAY and agg.sources == (a, b) and agg.currency_units == (("USD", "USD"),)
+    assert (
+        agg.as_of == A_DAY and agg.sources == (a, b) and agg.currency_units == (("USD", "DOLLAR"),)
+    )
     (group,) = agg.index_groups
     assert group.index is HNG and group.reporting_lot.name == "LOT"
     assert group.history is HNG_HISTORY and group.price_vector is HNG_MARKET.price_vector
@@ -409,7 +411,7 @@ def test_the_collection_refuses_what_does_not_belong_in_the_order_given(
         "results 2 is valued on 2027-01-05, expected 2027-01-04, the valuation day of results 1"
     )
     twin = an_index(
-        "HNG", MONTHS, ("2027-12-27",), ("USD", "BBL"), ("VOLUME", "BBL"), ("LOT", 1.0, "BBL")
+        "HNG", MONTHS, ("2027-12-27",), ("DOLLAR", "BBL"), ("VOLUME", "BBL"), ("LOT", 1.0, "BBL")
     )
     twin_history = history_on(twin, AS_OF, {})
     on_twin = valued_on(
@@ -477,8 +479,8 @@ def test_curves_group_by_object_and_currency_unit_and_are_named_by_first_appeara
     ]
     view = aggregate_view(agg, Risk.DV01, Bucket.DAY)
     assert view.labels == (
-        "SOFR (curve_1) USD dv01 [USD per basis point]",
-        "SOFR (curve_2) USD dv01 [USD per basis point]",
+        "SOFR (curve_1) USD dv01 [DOLLAR per basis point]",
+        "SOFR (curve_2) USD dv01 [DOLLAR per basis point]",
     )
     assert view.totals == (pytest.approx(0.0085, **CLOSE), pytest.approx(0.0085, **CLOSE))
     np.testing.assert_allclose(view.columns[1], [-0.0095, 0.018], **TIGHT)
@@ -489,7 +491,7 @@ def test_curves_group_by_object_and_currency_unit_and_are_named_by_first_appeara
         futures_schedule(
             ("Z26", "F27", "F29"), dates("2026-12-31", "2027-01-04", "2029-01-05"), None
         ),
-        index_conventions("USD", "BBL", "CENT", "VOLUME", "BBL", UNITS),
+        index_conventions("DOLLAR", "BBL", "CENT", "VOLUME", "BBL", UNITS),
         contract_specifications(
             ("LOT",), numbers(1.0), ("BBL",), numbers(0.0), numbers(0.0), UNITS
         ),
@@ -513,10 +515,10 @@ def test_curves_group_by_object_and_currency_unit_and_are_named_by_first_appeara
     assert (in_cents.reserves.currency, in_cents.reserves.currency_unit) == ("USD", "CENT")
     agg = collected(b, in_cents)
     assert [(r.word, r.currency, r.currency_unit) for r in agg.rate_groups] == [
-        ("SOFR", "USD", "USD"),
+        ("SOFR", "USD", "DOLLAR"),
         ("SOFR", "USD", "CENT"),
     ]
-    assert agg.currency_units == (("USD", "USD"), ("USD", "CENT"))
+    assert agg.currency_units == (("USD", "DOLLAR"), ("USD", "CENT"))
     view = aggregate_view(agg, Risk.DV01, Bucket.YEAR)
     assert view.labels == (CURVE_1, "SOFR USD dv01 [CENT per basis point]")
     np.testing.assert_allclose(view.columns[1], [0.0, -0.95, 1.8], **TIGHT)  # 2027 to 2029
@@ -529,7 +531,7 @@ def test_a_collection_with_no_curve_reports_a_dv01_of_nothing_per_currency(
     # A and C, both cleared: no rate group; the DV01 report one column of nothing for USD over no
     # day, and all three on the two observation days with that column zero on both.
     agg = collected(sources["a"], sources["c"])
-    assert agg.rate_groups == () and agg.currency_units == (("USD", "USD"),)
+    assert agg.rate_groups == () and agg.currency_units == (("USD", "DOLLAR"),)
     assert agg.by_day.paid.size == 0 and agg.by_day.paid_in == ()
     dv01 = aggregate_view(agg, Risk.DV01, Bucket.DAY)
     assert dv01.dates.size == 0 and dv01.labels == (CLEARED_USD,) and dv01.totals == (0.0,)
@@ -727,8 +729,8 @@ def test_the_headings_are_spelled_once_for_both_paths(sources: dict[str, TradeRe
         HNG_NOMINAL,
         HNG_DELTA,
     )
-    assert dv01_label("SOFR", "USD", "USD") == CURVE_1
-    assert dv01_label("cleared", "USD", "USD") == CLEARED_USD
+    assert dv01_label("SOFR", "USD", "DOLLAR") == CURVE_1
+    assert dv01_label("cleared", "USD", "DOLLAR") == CLEARED_USD
     # The currency, then in the brackets the unit of it, currency-and-currency-unit.md.
     assert dv01_label("SOFR", "USD", "CENT") == "SOFR USD dv01 [CENT per basis point]"
     for result in results:
@@ -853,7 +855,7 @@ def test_a_result_on_two_curves_collected_alone_reports_what_its_single_curve_re
         same_view(risk_view(mixed, Risk.ALL, bucket), aggregate_view(alone, Risk.ALL, bucket))
     view = aggregate_view(alone, Risk.DV01, Bucket.DAY)
     assert column(view, CURVE_1)[0] == pytest.approx(-0.0095, **CLOSE)  # the first row's
-    ffois = column(view, "FFOIS USD dv01 [USD per basis point]")
+    ffois = column(view, "FFOIS USD dv01 [DOLLAR per basis point]")
     assert ffois[0] == pytest.approx(0.0184, **CLOSE)  # -10 at 0.92 two years out
     assert first.dv01 == pytest.approx(-0.0095, **CLOSE)
     assert second_row.dv01 == pytest.approx(0.0184, **CLOSE)
@@ -869,8 +871,8 @@ def test_a_result_on_two_snapshots_of_one_name_qualifies_both_in_every_heading(
         assert [r.word for r in agg.rate_groups] == ["SOFR (curve_1)", "SOFR (curve_2)"]
     view = aggregate_view(alone, Risk.ALL, Bucket.YEAR)
     assert view.labels[2:] == (
-        "SOFR (curve_1) USD dv01 [USD per basis point]",
-        "SOFR (curve_2) USD dv01 [USD per basis point]",
+        "SOFR (curve_1) USD dv01 [DOLLAR per basis point]",
+        "SOFR (curve_2) USD dv01 [DOLLAR per basis point]",
         "HNG SOFR (curve_1) cross_gamma [LOT per basis point]",
         "HNG SOFR (curve_2) cross_gamma [LOT per basis point]",
     )
@@ -925,8 +927,8 @@ def test_a_cashflow_on_another_curve_is_a_column_of_its_own(
     agg = collected(b, cashflows_valued(booked_on(ffois), curve=ffois))
     assert [r.word for r in agg.rate_groups] == ["SOFR", "FFOIS"]
     view = aggregate_view(agg, Risk.DV01, Bucket.YEAR)
-    assert view.labels == (CURVE_1, "FFOIS USD dv01 [USD per basis point]")
-    total, by_year = column(view, "FFOIS USD dv01 [USD per basis point]")
+    assert view.labels == (CURVE_1, "FFOIS USD dv01 [DOLLAR per basis point]")
+    total, by_year = column(view, "FFOIS USD dv01 [DOLLAR per basis point]")
     assert total == pytest.approx(0.88, **CLOSE)
     np.testing.assert_allclose(by_year, [0.0, -0.96, 1.84], **TIGHT)
     unmoved = aggregate_view(collected(b), Risk.DV01, Bucket.YEAR)
@@ -940,7 +942,7 @@ def test_a_collection_of_cashflows_alone_reports_the_dv01_and_refuses_the_commod
     cashflow = cashflows_valued(booked(), curve=FLAT)
     agg = collected(cashflow)
     assert agg.index_groups == () and agg.cross_groups == () and len(agg.rate_groups) == 1
-    assert agg.currency_units == (("USD", "USD"),)
+    assert agg.currency_units == (("USD", "DOLLAR"),)
     for bucket in Bucket:
         same_view(aggregate_view(agg, Risk.DV01, bucket), cashflow.report(Risk.DV01, bucket))
         same_view(aggregate_view(agg, Risk.ALL, bucket), cashflow.report(Risk.ALL, bucket))

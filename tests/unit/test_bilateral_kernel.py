@@ -78,7 +78,7 @@ UNIT = an_index(
     "UNIT",
     (("Z26", "2026-12-31"), ("F27", "2027-01-04"), ("F29", "2029-01-05")),
     ("2027-12-27",),
-    ("USD", "BBL"),
+    ("DOLLAR", "BBL"),
     ("VOLUME", "BBL"),
     ("UNIT", 1.0, "BBL"),
 )
@@ -92,7 +92,7 @@ TRIO = index(
     "TRIO",
     "TRIO index",
     futures_schedule(("Z26", "F27", "F29"), dates("2026-12-31", "2027-01-04", "2029-01-05"), None),
-    index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS),
+    index_conventions("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL", UNITS),
     contract_specifications(
         ("BBL", "TRIO"),
         numbers(1.0, 3.0),
@@ -607,7 +607,7 @@ def test_an_amount_past_the_largest_number_is_refused_by_its_group_or_as_cash() 
     with pytest.raises(ValueError) as refused:
         valued(prepared_on(terms), (1e308, 50.0), curve_of((AS_OF, 1.0), (A_YEAR, 1.0)))
     assert str(refused.value) == (
-        "the payment of F27 on 2028-01-04 on SOFR is inf, expected a finite amount of USD; its "
+        "the payment of F27 on 2028-01-04 on SOFR is inf, expected a finite amount of DOLLAR; its "
         "fixed, set and live legs sum past the largest number"
     )
     fixed = prepared_on(terms, "2027-01-05", {"F27": 1e308})
@@ -621,7 +621,7 @@ def test_an_amount_past_the_largest_number_is_refused_by_its_group_or_as_cash() 
                 {"F27": 1e308},
             )
         assert str(refused.value) == (
-            "the batch has inf of cash in all, expected a finite amount of USD; the settled "
+            "the batch has inf of cash in all, expected a finite amount of DOLLAR; the settled "
             "groups' offsets and set amounts sum past the largest number"
         )
 
@@ -646,8 +646,8 @@ def test_a_discounted_sensitivity_past_the_largest_number_is_refused_by_its_cont
     with pytest.raises(ValueError) as refused:
         valued(prep, (0.0, 50.0), curve_of((AS_OF, 1.0), (TWO_YEARS, 1.0)))
     assert str(refused.value) == (
-        "F27 has inf of discounted price sensitivity, expected a finite amount of USD per USD/BBL; "
-        "its discounted lots times the lot's coefficient outrun the largest number"
+        "F27 has inf of discounted price sensitivity, expected a finite amount of DOLLAR per "
+        "DOLLAR/BBL; its discounted lots times the lot's coefficient outrun the largest number"
     )
 
 
@@ -664,7 +664,7 @@ def test_a_contribution_past_the_largest_number_is_refused_before_either_route_s
         assert str(refused.value) == (
             "trade 1001 at row 1 on 2027-01-04, a day F27 prices, quoted at "
             "1.7976931348623157e+308, has inf of live contribution, expected a finite amount of "
-            "USD; its exposure times the quote outruns the largest number"
+            "DOLLAR; its exposure times the quote outruns the largest number"
         )
 
 
@@ -676,7 +676,7 @@ def test_a_contribution_past_the_largest_number_is_refused_before_either_route_s
 ALL_LABELS = (
     "UNIT nominal_delta [UNIT]",
     "UNIT delta [UNIT]",
-    "SOFR USD dv01 [USD per basis point]",
+    "SOFR USD dv01 [DOLLAR per basis point]",
     "UNIT SOFR cross_gamma [UNIT per basis point]",
 )
 
@@ -746,7 +746,7 @@ def test_groups_paying_on_one_day_share_it_and_days_in_one_month_share_the_month
             ("F29", "2029-01-05"),
         ),
         ("2027-12-27",),
-        ("USD", "BBL"),
+        ("DOLLAR", "BBL"),
         ("VOLUME", "BBL"),
         ("PAIR", 1.0, "BBL"),
     )
@@ -870,7 +870,7 @@ def test_a_cleared_result_has_no_rate_axis_and_its_views_share_the_nominal_array
     np.testing.assert_array_equal(delta.columns[0], prep.legs[0].monthly_lots)
     dv01 = risk_view(result, Risk.DV01, Bucket.YEAR)
     assert dv01.dates.size == 0 and dv01.columns[0].size == 0 and dv01.totals == (0.0,)
-    assert dv01.labels == ("cleared USD dv01 [USD per basis point]",)
+    assert dv01.labels == ("cleared USD dv01 [DOLLAR per basis point]",)
     everything = risk_view(result, Risk.ALL, Bucket.DAY)
     assert everything.dates is prep.encoded.legs[0].days
     assert (
@@ -881,7 +881,7 @@ def test_a_cleared_result_has_no_rate_axis_and_its_views_share_the_nominal_array
     np.testing.assert_array_equal(everything.columns[3], [0.0])
     assert everything.labels == (
         *ALL_LABELS[:2],
-        "cleared USD dv01 [USD per basis point]",
+        "cleared USD dv01 [DOLLAR per basis point]",
         "UNIT cleared cross_gamma [UNIT per basis point]",
     )
 
@@ -908,7 +908,7 @@ def test_a_dv01_bucket_past_the_largest_number_is_refused_by_its_payment_day() -
         ),
     )
     big = an_index(
-        "BIG", contracts, ("2027-12-27",), ("USD", "BBL"), ("VOLUME", "BBL"), ("BIG", 1.0, "BBL")
+        "BIG", contracts, ("2027-12-27",), ("DOLLAR", "BBL"), ("VOLUME", "BBL"), ("BIG", 1.0, "BBL")
     )
     runs = 32
     prep = prepared_on(
@@ -925,5 +925,5 @@ def test_a_dv01_bucket_past_the_largest_number_is_refused_by_its_payment_day() -
         valued(prep, (LARGEST,) * 512, flat_from_a_year)
     assert str(refused.value) == (
         "the payment day 2100-01-04 has -inf of DV01 on SOFR in all, expected a finite amount of "
-        "USD per basis point; its groups' DV01s sum past the largest number"
+        "DOLLAR per basis point; its groups' DV01s sum past the largest number"
     )

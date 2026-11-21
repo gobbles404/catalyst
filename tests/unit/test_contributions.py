@@ -108,7 +108,7 @@ def test_a_curve_named_cleared_keeps_its_columns_apart_from_a_cleared_batch() ->
         hng((10.0,), (A_YEAR,), Route.BILATERAL, key=CLEARED), HNG_HISTORY, HNG_MARKET, named
     )
     assert risk_view(on_named, Risk.ALL, Bucket.DAY).labels[2:] == (
-        "cleared (curve_1) USD dv01 [USD per basis point]",
+        "cleared (curve_1) USD dv01 [DOLLAR per basis point]",
         "HNG cleared (curve_1) cross_gamma [LOT per basis point]",
     )
     cleared = valued_on(hng((10.0,), (A_YEAR,), Route.CLEARED), HNG_HISTORY, HNG_MARKET, None)
@@ -118,7 +118,7 @@ def test_a_curve_named_cleared_keeps_its_columns_apart_from_a_cleared_batch() ->
         "HNG cleared (curve_1) cross_gamma [LOT per basis point]",
     )
     assert aggregate_view(both, Risk.DV01, Bucket.DAY).labels == (
-        "cleared (curve_1) USD dv01 [USD per basis point]",
+        "cleared (curve_1) USD dv01 [DOLLAR per basis point]",
     )
 
 
@@ -177,5 +177,7 @@ def test_a_batch_of_cashflows_reports_under_the_word_its_collection_shows() -> N
         for bucket in Bucket:
             direct = result.report(Risk.DV01, bucket)
             collected = aggregate_view(alone, Risk.DV01, bucket)
-            assert direct.labels == collected.labels == (f"{word} USD dv01 [USD per basis point]",)
+            assert (
+                direct.labels == collected.labels == (f"{word} USD dv01 [DOLLAR per basis point]",)
+            )
             assert direct.totals == collected.totals == (result.dv01,)

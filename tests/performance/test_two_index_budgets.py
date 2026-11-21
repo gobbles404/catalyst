@@ -67,7 +67,7 @@ def futures_index() -> Index:
         "A",
         "Index A",
         futures_schedule(tuple(c for c, _ in contracts), dates(*(e for _, e in contracts)), None),
-        index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+        index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
         contract_specifications(
             ("LOT", "MMBTU"), sizes, ("MMBTU", "MMBTU"), sizes * 0.01, sizes * 0.005, UNITS
         ),
@@ -86,7 +86,7 @@ def iferc_index() -> Index:
             ("Z26", "F27", "G27", "H27", "J27"),
             dates("2026-12-01", "2027-01-04", "2027-02-01", "2027-03-01", "2027-04-01"),
         ),
-        index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+        index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
         contract_specifications(
             ("LOT", "MMBTU"), sizes, ("MMBTU", "MMBTU"), sizes * 0.5, sizes * 0.5, UNITS
         ),

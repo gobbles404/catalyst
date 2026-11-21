@@ -87,7 +87,7 @@ def dv01_label(group: str, currency: str, currency_unit: str) -> str:
     """The DV01 column's heading over the group its caller named, the curve's word, its name or
     the name qualified where a collection holds two objects of it, or `cleared` where no curve
     values; then the currency, and in the brackets the unit of it the values are in, two facts
-    since currency-and-currency-unit.md: `SOFR USD dv01 [USD per basis point]`, and `SOFR USD
+    since currency-and-currency-unit.md: `SOFR USD dv01 [DOLLAR per basis point]`, and `SOFR USD
     dv01 [CENT per basis point]` over an index settled in cents. Which group, which currency
     and which unit are the caller's."""
     return f"{group} {currency} dv01 [{currency_unit} per basis point]"

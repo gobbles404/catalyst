@@ -2,7 +2,7 @@
 
 Built in #71; the category codes in capitals since #129.
 
-The library's fixed unit definitions and the conversion between them: four categories, `VOLUME`, `MASS`, `ENERGY` and `USD`, each a reference unit and the size of every unit of it in that reference unit. Why these choices, and what they cost, are on this page. It has no worksheet surface and needs nothing from the seam. The code is `src/catalyst/globals/unit_conversions.py`: the records, the two builders that check the definitions once, the shipped definitions at its foot, and the collection they make, `UNITS`.
+The library's fixed unit definitions and the conversion between them: four categories, `VOLUME`, `MASS`, `ENERGY` and `USD`, each a reference unit and the size of every unit of it in that reference unit. `USD` is a currency, the category of its money units, `DOLLAR` and `CENT`: since [currency-and-currency-unit.md](../../engineering-tickets/trade-valuation-pipeline/currency-and-currency-unit.md) the dollar's unit is spelled `DOLLAR`, where it shared the currency's name. Why these choices, and what they cost, are on this page. It has no worksheet surface and needs nothing from the seam. The code is `src/catalyst/globals/unit_conversions.py`: the records, the two builders that check the definitions once, the shipped definitions at its foot, and the collection they make, `UNITS`.
 
 ## Not a worksheet function
 
@@ -149,10 +149,10 @@ These exact meanings must stay written down beside the codes.
 
 | unit | reference_unit | size_in_reference_unit |
 |---|---|---:|
-| USD | USD | 1 |
-| CENT | USD | 0.01 |
+| DOLLAR | DOLLAR | 1 |
+| CENT | DOLLAR | 0.01 |
 
-Scales U.S.-dollar amounts. Not a currency conversion; no FX rate is involved.
+Scales U.S.-dollar amounts. Not a currency conversion; no FX rate is involved. The category is the currency, `USD`, and no unit of it carries that name: `DOLLAR` is the whole dollar and `CENT` a hundredth of it, so 1.05 `DOLLAR` per `GAL` and 105 `CENT` per `GAL` are one price. `USD` typed where a unit goes is refused by the sentence that lists the units, `quote_currency_unit is 'USD', expected DOLLAR or CENT`.
 
 ## Conversion
 
@@ -174,7 +174,7 @@ Grouping the four categories in one collection does not permit conversion betwee
 | 1 GAL → 3.785411784 L; 1 M3 → 1000 L | example | `tests/unit/test_unit_conversions.py` |
 | 1 MT → 1000 KG; 1 ST → 2000 LB; 1 LT → 2240 LB; 1 OZT → 31.1034768 G; 1 CWT_US → 100 LB | example | `tests/unit/test_unit_conversions.py` |
 | 1 MWH → 3.6 GJ; 1 MMBTU → 1000000 BTU; 1 MMBTU → 10 THERM; 1 MWH → 1000 KWH | example | `tests/unit/test_unit_conversions.py` |
-| 1 USD → 100 CENT; 100 CENT → 1 USD; 250 CENT → 2.5 USD | example | `tests/unit/test_unit_conversions.py` |
+| 1 DOLLAR → 100 CENT; 100 CENT → 1 DOLLAR; 250 CENT → 2.5 DOLLAR | example | `tests/unit/test_unit_conversions.py` |
 | zero converts to zero; a negative quantity keeps its sign; a column converts in one go and is left as it was | example | `tests/unit/test_unit_conversions.py` |
 | for any quantity and any pair in a category, there and back returns the original within tolerance, and the factor one way is the reciprocal of the other | property | `tests/unit/test_unit_conversions.py` |
 | duplicate or missing unit code fails definition validation | example | `tests/unit/test_unit_conversions.py` |
@@ -195,5 +195,5 @@ last place, the tests allowing 1e-15 relative. Display rounding must never chang
 
 An Excel constructor, a handle, a companion worksheet function, FX. Cross-category
 conversion, which needs a density or heat content the tables do not carry; prices such as
-USD/BBL or cents/gal, which are pairs of units and have no type here; and the `contract`
+DOLLAR/BBL or cents/gal, which are pairs of units and have no type here; and the `contract`
 category, all excluded above. The check that `_CreateIndexConventions`' five codes are among these categories and units: that builder's since #110, reading this collection by key, `USD` the currency category and the other three the measures a quantity type may name. A work counter: library code takes none yet, parked with the measurement session as [README.md](../README.md) says, and a conversion's work is pinned directly instead.

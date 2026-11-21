@@ -18,7 +18,7 @@ from numpy.typing import NDArray
 from catalyst.globals.discount_curve import DiscountCurve
 from catalyst.trades.display_axes import EarlyRisk
 
-# The word a heading gives a batch on no curve, `cleared USD dv01 [USD per basis point]` and
+# The word a heading gives a batch on no curve, `cleared USD dv01 [DOLLAR per basis point]` and
 # `HNG cleared cross_gamma [LOT per basis point]`; never a curve's word.
 CLEARED = "cleared"
 

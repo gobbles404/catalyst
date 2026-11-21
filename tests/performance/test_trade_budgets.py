@@ -99,7 +99,7 @@ GAS = index(
     "gas",
     "Sample gas index",
     futures_schedule(CODES, EXPIRIES, None),
-    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
@@ -478,7 +478,7 @@ ASIAN_GAS = index(
     "gas",
     "Sample gas index",
     futures_schedule(CODES, MONTH_ENDS, None),
-    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
@@ -1048,7 +1048,7 @@ MIXED_GAS = index(
     "gas",
     "Sample gas index",
     futures_schedule(CODES, MONTH_ENDS, None),
-    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot", "MMBTU"),
         np.array([10_000.0, 1.0]),
@@ -1252,7 +1252,7 @@ ROLLING_GAS = index(
     "rolling",
     "Sample gas index with rolling contracts",
     futures_schedule(ROLLING_CODES, ROLLING_EXPIRIES, None),
-    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
@@ -1382,7 +1382,7 @@ BASIS = index(
     "basis",
     "Sample basis index",
     iferc_schedule(CODES, IFERC_PUBLICATION),
-    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot",), np.array([2_500.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),

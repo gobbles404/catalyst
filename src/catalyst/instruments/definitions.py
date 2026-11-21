@@ -323,7 +323,7 @@ FIXED_FLOAT = Instrument(
             NONE,
             FieldType.NUMBER,
             "a finite amount of zero or more",
-            "In the index's settlement currency, counted once per ticket row whatever its months, "
+            "In the unit the index settles in, counted once per ticket row whatever its months, "
             "quantity or days; left out of the template and the ticket, zero; static, never a "
             "contribution to value",
         ),
@@ -334,7 +334,7 @@ FIXED_FLOAT = Instrument(
             NONE,
             FieldType.NUMBER,
             "a finite amount of either sign",
-            "In the index's settlement currency, counted once per ticket row whatever its months, "
+            "In the unit the index settles in, counted once per ticket row whatever its months, "
             "quantity or days, its sign as entered, positive, zero or negative, whatever the "
             "quantity's; left out of the template and the ticket, zero; static, never a "
             "contribution to value",
@@ -498,9 +498,9 @@ FLOAT_FLOAT = Instrument(
             True,
             NONE,
             FieldType.CODE,
-            "USD, CENT",
+            "DOLLAR, CENT",
             "A currency unit of the unit tables, exactly as coded, typed and never taken from an "
-            "index: 15 with USD and BBL is fifteen dollars a barrel; one for the batch, the "
+            "index: 15 with DOLLAR and BBL is fifteen dollars a barrel; one for the batch, the "
             "template's or a column every row agrees on",
         ),
         Field(

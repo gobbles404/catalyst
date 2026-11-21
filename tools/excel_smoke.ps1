@@ -132,7 +132,7 @@ $formulas = [ordered]@{
     # cashflows alone in UT4, their own report and the commodity selectors refused; the batch on a
     # second curve named FFOIS collected beside in UT8, a column of its own; the readback's cashflow
     # row; and a cashflows handle among the results refused at its cell naming both kinds.
-    '=INDEX(_ReportRisk(UT3,"all","year"),2,4)' = "SOFR USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(UT3,"all","year"),2,4)' = "SOFR USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(UT3,"all","year"),2,5)' = "UNIT SOFR cross_gamma [UNIT per basis point]"
     '=INDEX(_ReportRisk(UT3,"all","year"),4,3)' = "0.5"
     '=INDEX(_ReportRisk(UT3,"all","year"),4,4)' = "0.8585"
@@ -144,8 +144,8 @@ $formulas = [ordered]@{
     '=ROWS(_ReportRisk(UT4,"dv01","year"))' = "7"
     '=INDEX(_ReportRisk(UT4,"dv01","year"),4,2)' = "0.85"
     '=_ReportRisk(UT4,"delta","day")' = "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a collection of cashflows alone, which has no commodity risk"
-    '=INDEX(_ReportRisk(UT8,"dv01","year"),2,2)' = "SOFR USD dv01 [USD per basis point]"
-    '=INDEX(_ReportRisk(UT8,"dv01","year"),2,3)' = "FFOIS USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(UT8,"dv01","year"),2,2)' = "SOFR USD dv01 [DOLLAR per basis point]"
+    '=INDEX(_ReportRisk(UT8,"dv01","year"),2,3)' = "FFOIS USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(UT8,"dv01","year"),4,2)' = "0.8585"
     '=INDEX(_ReportRisk(UT8,"dv01","year"),4,3)' = "0.88"
     "=INDEX(util_ReadHandle(UT3),4,2)" = "-"
@@ -193,6 +193,14 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AP2),3,2)" = "GAL"
     "=_CreateIndexConventions(AO2,AO3,AO4,AO8,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected VOLUME, MASS or ENERGY"
     "=_CreateIndexConventions(AO2,AO9,AO4,AO5,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
+    # Since currency-and-currency-unit.md the dollar's unit is DOLLAR, AO2 and AO4, and USD is
+    # the currency alone: typed where a unit goes it is refused by the sentence that lists the
+    # codes, and DOLLAR typed where a cashflow's currency goes by the one that names the currency.
+    "=INDEX(util_ReadHandle(AP1),3,1)" = "DOLLAR"
+    "=INDEX(util_ReadHandle(AP1),3,3)" = "DOLLAR"
+    '=_CreateIndexConventions("USD",AO3,AO4,AO5,AO6)' = "#ERROR _CreateIndexConventions: ValueError: quote_currency_unit is 'USD', expected DOLLAR or CENT"
+    '=_CreateIndexConventions(AO2,AO3,"USD",AO5,AO6)' = "#ERROR _CreateIndexConventions: ValueError: currency_unit is 'USD', expected DOLLAR or CENT"
+    '=_CreateTradeTemplate("cashflow","currency","DOLLAR")' = "#ERROR _CreateTradeTemplate: ValueError: currency is 'DOLLAR', expected USD, the one currency this version books"
     # The contract specifications: a creator over a header row and a table of two words for a
     # quantity of WTI, a thousand-barrel lot and the bare gallon, read back through util_ReadHandle
     # with the lot units as text; a lot size with a fraction, a lot size of zero, a negative fee, a
@@ -689,7 +697,7 @@ $formulas = [ordered]@{
     '=COLUMNS(_ShowInstrument("float_float"))'    = "26"
     '=INDEX(_ShowInstrument("float_float"),1,17)' = "spread_price"
     '=INDEX(_ShowInstrument("float_float"),1,18)' = "spread_price_currency_unit"
-    '=INDEX(_ShowInstrument("float_float"),6,18)' = "USD, CENT"
+    '=INDEX(_ShowInstrument("float_float"),6,18)' = "DOLLAR, CENT"
     '=INDEX(_ShowInstrument("float_float"),1,19)' = "spread_price_quantity_unit"
     '=INDEX(_ShowInstrument("float_float"),3,19)' = "TRUE"
     '=INDEX(_ShowInstrument("float_float"),1,20)' = "second_schedule_method"
@@ -840,7 +848,7 @@ $formulas = [ordered]@{
     # Since currency-and-currency-unit.md the unit of the currency the two amounts are in, last.
     "=INDEX(_ReportValues(FG7),1,5)" = "currency_unit"
     "=INDEX(_ReportValues(FG7),2,5)" = "str"
-    "=INDEX(_ReportValues(FG7),3,5)" = "USD"
+    "=INDEX(_ReportValues(FG7),3,5)" = "DOLLAR"
     '=ROWS(_ReportRisk(FG7,"all","year"))'      = "5"
     '=COLUMNS(_ReportRisk(FG7,"all","year"))'   = "5"
     '=INDEX(_ReportRisk(FG7,"all","year"),2,5)' = "Henry Hub NYMEX cleared cross_gamma [lots per basis point]"
@@ -854,7 +862,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(FG7,"all","year"),2,1)' = "period"
     '=INDEX(_ReportRisk(FG7,"all","year"),2,2)' = "Henry Hub NYMEX nominal_delta [lots]"
     '=INDEX(_ReportRisk(FG7,"all","year"),2,3)' = "Henry Hub NYMEX delta [lots]"
-    '=INDEX(_ReportRisk(FG7,"all","year"),2,4)' = "cleared USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(FG7,"all","year"),2,4)' = "cleared USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(FG7,"all","year"),3,1)' = "str | datetime64[D]"
     '=INDEX(_ReportRisk(FG7,"all","year"),3,2)' = "float64"
     '=INDEX(_ReportRisk(FG7,"all","year"),4,1)' = "Total"
@@ -883,7 +891,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(FG7),3,10)" = "2"
     "=INDEX(util_ReadHandle(FG7),3,11)" = "2"
     "=INDEX(util_ReadHandle(FG7),1,12)" = "sensitivity_unit"
-    "=INDEX(util_ReadHandle(FG7),3,12)" = "USD per USD/BBL"
+    "=INDEX(util_ReadHandle(FG7),3,12)" = "DOLLAR per DOLLAR/BBL"
     "=INDEX(util_ReadHandle(FG7),3,13)" = "lots of lots (1000 BBL)"
     "=INDEX(util_ReadHandle(FG7),1,14)" = "payment_factor"
     "=INDEX(util_ReadHandle(FG7),1,17)" = "group_dv01"
@@ -1063,7 +1071,7 @@ $formulas = [ordered]@{
     # results in KA14 the contract's delta of nothing on every slot, and since
     # observation-prices-readback.md each slot's own settle and contribution, last: A's 20 of
     # coefficient at 71, 75 and 73, 1,420, 1,500 and 1,460, and B's -10, -710, -750 and -730,
-    # under USD/MMBTU.
+    # under DOLLAR/MMBTU.
     "=INDEX(util_ReadHandle(JT5),3,13)"  = "+1bd"
     "=INDEX(util_ReadHandle(JT5),4,13)"  = "+3bd"
     "=INDEX(util_ReadHandle(JT5),3,14)"  = "46363"
@@ -1084,7 +1092,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(KA14,"nominal_delta","year"),4,2)'      = "0"
     "=COLUMNS(util_ReadHandle(KA14))"    = "32"
     "=INDEX(util_ReadHandle(KA14),1,32)" = "currency_unit"
-    "=INDEX(util_ReadHandle(KA14),3,32)" = "USD"
+    "=INDEX(util_ReadHandle(KA14),3,32)" = "DOLLAR"
     "=INDEX(util_ReadHandle(KA14),1,11)"  = "contract_nominal_delta"
     "=INDEX(util_ReadHandle(KA14),6,11)"  = "0"
     "=INDEX(util_ReadHandle(KA14),1,28)"  = "observation_coefficient"
@@ -1096,7 +1104,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(KA14),3,29)"  = "71"
     "=INDEX(util_ReadHandle(KA14),4,29)"  = "75"
     "=INDEX(util_ReadHandle(KA14),5,29)"  = "73"
-    "=INDEX(util_ReadHandle(KA14),3,30)"  = "USD/MMBTU"
+    "=INDEX(util_ReadHandle(KA14),3,30)"  = "DOLLAR/MMBTU"
     "=INDEX(util_ReadHandle(KA14),3,31)"  = "1420"
     "=INDEX(util_ReadHandle(KA14),4,31)"  = "1500"
     "=INDEX(util_ReadHandle(KA14),6,28)"  = "-10"
@@ -1131,7 +1139,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(LC34,"nominal_delta","year"),4,2)'      = "85"
     '=INDEX(_ReportRisk(LC34,"nominal_delta","year"),2,2)'      = "MIXED nominal_delta [GAL]"
     "=INDEX(util_ReadHandle(LC34),1,13)" = "sensitivity_unit"
-    "=INDEX(util_ReadHandle(LC34),3,13)" = "USD per USD/GAL"
+    "=INDEX(util_ReadHandle(LC34),3,13)" = "DOLLAR per DOLLAR/GAL"
     "=INDEX(util_ReadHandle(LC34),3,14)" = "lots of GAL (1 GAL)"
     "=ROWS(util_ReadHandle(LC33))"       = "25"
     "=INDEX(util_ReadHandle(LC33),3,4)"  = "46387"
@@ -1259,7 +1267,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(MY8,"nominal_delta","year"),6,1)'  = "46388"
     '=INDEX(_ReportRisk(MY8,"nominal_delta","year"),6,2)'  = "1.2"
     '=COLUMNS(_ReportRisk(MY8,"all","month"))'            = "5"
-    '=INDEX(_ReportRisk(MY8,"all","month"),2,4)'          = "cleared USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(MY8,"all","month"),2,4)'          = "cleared USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(MY8,"all","month"),4,3)'          = "1.2"
     '=INDEX(_ReportRisk(MY8,"all","month"),5,4)'          = "0"
     '=ROWS(_ReportRisk(MY8,"dv01","day"))'                = "4"
@@ -1365,7 +1373,7 @@ $formulas = [ordered]@{
     "=COLUMNS(_ReportReserves(OR23))"      = "6"
     "=INDEX(_ReportReserves(OR23),1,6)"    = "currency_unit"
     "=INDEX(_ReportReserves(OR23),2,6)"    = "str"
-    "=INDEX(_ReportReserves(OR23),3,6)"    = "USD"
+    "=INDEX(_ReportReserves(OR23),3,6)"    = "DOLLAR"
     "=INDEX(_ReportReserves(OR23),1,1)"    = "brokerage_reserve"
     "=INDEX(_ReportReserves(OR23),1,2)"    = "clearing_reserve"
     "=INDEX(_ReportReserves(OR23),1,3)"    = "marketing_reserve"
@@ -1384,7 +1392,7 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(OR23))"         = "3"
     "=COLUMNS(util_ReadHandle(OR23))"      = "32"
     "=INDEX(util_ReadHandle(OR23),1,32)"   = "currency_unit"
-    "=INDEX(util_ReadHandle(OR23),3,32)"   = "USD"
+    "=INDEX(util_ReadHandle(OR23),3,32)"   = "DOLLAR"
     "=INDEX(util_ReadHandle(OR23),1,19)"   = "brokerage_reserve"
     "=INDEX(util_ReadHandle(OR23),1,23)"   = "currency"
     "=INDEX(util_ReadHandle(OR23),3,19)"   = "50"
@@ -1400,8 +1408,8 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(IY16),24,23)"  = "-"
     "=_ReportReserves(C2)"                 = "#ERROR _ReportReserves: results is blank, expected trade results handle"
     '=_ReportReserves("x:trade_results:9")' = "#ERROR _ReportReserves: results is text 'x:trade_results:9' naming no live object, expected trade results handle"
-    "=_CreateTrades(OR27,OR10:OW10,OR28:OW28,OR9)" = "#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, expected a finite amount of USD; 2.0 of 'LOT' at 9e+307 a lot"
-    "=_CreateTrades(OR27,OR10:OW10,OR29:OW30,OR9)" = "#ERROR _CreateTrades: ValueError: the batch has inf of brokerage reserve in all, expected a finite amount of USD; the components' reserves, each finite, sum past the largest number"
+    "=_CreateTrades(OR27,OR10:OW10,OR28:OW28,OR9)" = "#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, expected a finite amount of DOLLAR; 2.0 of 'LOT' at 9e+307 a lot"
+    "=_CreateTrades(OR27,OR10:OW10,OR29:OW30,OR9)" = "#ERROR _CreateTrades: ValueError: the batch has inf of brokerage reserve in all, expected a finite amount of DOLLAR; the components' reserves, each finite, sum past the largest number"
     # Since #190, reject-nonfinite-trade-arithmetic.md: 9E+307 LOT of Z26 is a quote quantity past
     # the largest number, refused when the batch is made, by the trade and the operation, before
     # any handle is published.
@@ -1464,7 +1472,7 @@ $formulas = [ordered]@{
     # batch; a blank amount refused by the seam; the field from both refused.
     "=COLUMNS(_ReportReserves(OR86))"      = "6"
     "=INDEX(_ReportReserves(OR86),1,6)" = "currency_unit"
-    "=INDEX(_ReportReserves(OR86),3,6)" = "USD"
+    "=INDEX(_ReportReserves(OR86),3,6)" = "DOLLAR"
     "=INDEX(_ReportReserves(OR86),1,4)"    = "cva_reserve"
     "=INDEX(_ReportReserves(OR86),2,4)"    = "float64"
     "=INDEX(_ReportReserves(OR86),3,1)"    = "60"
@@ -1494,8 +1502,8 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(OR101),3,1)"     = "1260"
     "=INDEX(util_ReadHandle(OR98),1,9)"    = "cva_reserve"
     "=INDEX(util_ReadHandle(OR98),3,9)"    = "-40"
-    "=_CreateTrades(OR5,OR80:OX80,OR103:OX104,OR9)" = "#ERROR _CreateTrades: ValueError: the batch has inf of cva reserve in all, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number"
-    "=_CreateTrades(OR5,OR80:OX80,OR105:OX106,OR9)" = "#ERROR _CreateTrades: ValueError: the batch has -inf of cva reserve in all, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number"
+    "=_CreateTrades(OR5,OR80:OX80,OR103:OX104,OR9)" = "#ERROR _CreateTrades: ValueError: the batch has inf of cva reserve in all, expected a finite amount of DOLLAR; the rows' amounts, each finite, sum past the largest number"
+    "=_CreateTrades(OR5,OR80:OX80,OR105:OX106,OR9)" = "#ERROR _CreateTrades: ValueError: the batch has -inf of cva reserve in all, expected a finite amount of DOLLAR; the rows' amounts, each finite, sum past the largest number"
     "=_CreateTrades(OR5,OR80:OX80,OR108:OX108,OR9)" = "#ERROR _CreateTrades: trade_rows cell (1, 7) is blank, expected number"
     "=_CreateTrades(OR5,OR80:OX80,OR81:OX83,OR98)" = "#ERROR _CreateTrades: ValueError: cva_reserve is supplied by the template and by the ticket, expected by one of them"
     # cva-reserve.md's review: the exact total whatever the rows' order, a dollar beside ten thousand
@@ -1792,7 +1800,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(QV8,"all","month"),2,1)' = "period"
     '=INDEX(_ReportRisk(QV8,"all","month"),2,2)' = "UNIT nominal_delta [UNIT]"
     '=INDEX(_ReportRisk(QV8,"all","month"),2,3)' = "UNIT delta [UNIT]"
-    '=INDEX(_ReportRisk(QV8,"all","month"),2,4)' = "SOFR USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(QV8,"all","month"),2,4)' = "SOFR USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(QV8,"all","month"),3,1)' = "str | datetime64[D]"
     '=INDEX(_ReportRisk(QV8,"all","month"),3,4)' = "float64"
     '=INDEX(_ReportRisk(QV8,"all","month"),4,1)' = "Total"
@@ -1814,8 +1822,8 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(QV31),3,1)"      = "3"
     "=INDEX(_ReportValues(QV31),3,2)"      = "0"
     '=COLUMNS(_ReportRisk(QV31,"all","month"))'   = "7"
-    '=INDEX(_ReportRisk(QV31,"dv01","year"),2,2)' = "SOFR USD dv01 [USD per basis point]"
-    '=INDEX(_ReportRisk(QV31,"dv01","year"),2,3)' = "FFOIS USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(QV31,"dv01","year"),2,2)' = "SOFR USD dv01 [DOLLAR per basis point]"
+    '=INDEX(_ReportRisk(QV31,"dv01","year"),2,3)' = "FFOIS USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(QV31,"dv01","year"),4,2)' = "-0.0095"
     '=INDEX(_ReportRisk(QV31,"dv01","year"),4,3)' = "0.0184"
     '=INDEX(_ReportRisk(QV31,"cross_gamma","year"),2,2)' = "UNIT SOFR cross_gamma [UNIT per basis point]"
@@ -1826,7 +1834,7 @@ $formulas = [ordered]@{
     '=ROUND(INDEX(_ReportRisk(QV31,"delta","year"),4,2),12)' = "0.3"
     "=COLUMNS(util_ReadHandle(QV31))"      = "32"
     "=INDEX(util_ReadHandle(QV31),1,32)" = "currency_unit"
-    "=INDEX(util_ReadHandle(QV31),3,32)" = "USD"
+    "=INDEX(util_ReadHandle(QV31),3,32)" = "DOLLAR"
     "=INDEX(util_ReadHandle(QV31),1,28)"   = "observation_coefficient"
     "=INDEX(util_ReadHandle(QV31),1,26)"   = "discount_curve_key"
     "=INDEX(util_ReadHandle(QV31),1,27)"   = "discount_curve"
@@ -1854,7 +1862,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(QV8,"delta","year"),5,1)' = "46388"
     '=INDEX(_ReportRisk(QV8,"delta","year"),5,2)' = "0.5"
     '=ROWS(_ReportRisk(QV8,"dv01","day"))'       = "6"
-    '=INDEX(_ReportRisk(QV8,"dv01","day"),2,2)'  = "SOFR USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(QV8,"dv01","day"),2,2)'  = "SOFR USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(QV8,"dv01","day"),4,2)'  = "0.0085"
     '=INDEX(_ReportRisk(QV8,"dv01","day"),5,1)'  = "46756"
     '=INDEX(_ReportRisk(QV8,"dv01","day"),5,2)'  = "-0.0095"
@@ -1885,7 +1893,7 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(QV8))"         = "4"
     "=COLUMNS(util_ReadHandle(QV8))"      = "32"
     "=INDEX(util_ReadHandle(QV8),1,32)" = "currency_unit"
-    "=INDEX(util_ReadHandle(QV8),3,32)" = "USD"
+    "=INDEX(util_ReadHandle(QV8),3,32)" = "DOLLAR"
     "=INDEX(util_ReadHandle(QV8),1,26)"   = "discount_curve_key"
     "=INDEX(util_ReadHandle(QV8),3,26)"   = "SOFR"
     "=INDEX(util_ReadHandle(QV8),1,27)"   = "discount_curve"
@@ -1935,7 +1943,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(QV24,"delta","year"),4,2)'       = "10"
     '=INDEX(_ReportRisk(QV24,"dv01","year"),4,2)' = "0"
     '=ROWS(_ReportRisk(QV24,"dv01","day"))'       = "4"
-    '=INDEX(_ReportRisk(QV24,"dv01","day"),2,2)'  = "cleared USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(QV24,"dv01","day"),2,2)'  = "cleared USD dv01 [DOLLAR per basis point]"
     '=COLUMNS(_ReportRisk(QV24,"all","day"))'     = "5"
     '=INDEX(_ReportRisk(QV24,"all","day"),5,4)'   = "0"
     '=INDEX(_ReportRisk(QV24,"all","day"),2,5)'   = "UNIT cleared cross_gamma [UNIT per basis point]"
@@ -2031,8 +2039,8 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(RT8,"all","month"),1,5)' = "-"
     '=INDEX(_ReportRisk(RT8,"all","month"),2,2)' = "UNIT nominal_delta [UNIT]"
     '=INDEX(_ReportRisk(RT8,"all","month"),2,3)' = "UNIT delta [UNIT]"
-    '=INDEX(_ReportRisk(RT8,"all","month"),2,4)' = "SOFR (curve_1) USD dv01 [USD per basis point]"
-    '=INDEX(_ReportRisk(RT8,"all","month"),2,5)' = "SOFR (curve_2) USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(RT8,"all","month"),2,4)' = "SOFR (curve_1) USD dv01 [DOLLAR per basis point]"
+    '=INDEX(_ReportRisk(RT8,"all","month"),2,5)' = "SOFR (curve_2) USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(RT8,"all","month"),3,5)' = "float64"
     '=INDEX(_ReportRisk(RT8,"all","month"),4,1)' = "Total"
     '=INDEX(_ReportRisk(RT8,"all","month"),4,2)' = "20"
@@ -2076,7 +2084,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(RT9,"all","month"),4,3)' = "20.5"
     '=INDEX(_ReportRisk(RT9,"dv01","day"),4,3)'  = "-0.01"
     '=ROWS(_ReportRisk(RT10,"dv01","day"))'      = "4"
-    '=INDEX(_ReportRisk(RT10,"dv01","day"),2,2)' = "cleared USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(RT10,"dv01","day"),2,2)' = "cleared USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(RT10,"dv01","day"),4,2)' = "0"
     '=COLUMNS(_ReportRisk(RT10,"all","day"))'    = "5"
     '=INDEX(_ReportRisk(RT10,"cross_gamma","year"),2,2)' = "UNIT cleared cross_gamma [UNIT per basis point]"
@@ -2085,7 +2093,7 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(RT8))"         = "5"
     "=COLUMNS(util_ReadHandle(RT8))"      = "13"
     "=INDEX(util_ReadHandle(RT8),1,13)" = "currency_unit"
-    "=INDEX(util_ReadHandle(RT8),3,13)" = "USD"
+    "=INDEX(util_ReadHandle(RT8),3,13)" = "DOLLAR"
     "=INDEX(util_ReadHandle(RT8),1,11)"   = "cross_gamma"
     "=INDEX(util_ReadHandle(RT8),3,11)"   = "0.00085"
     "=INDEX(util_ReadHandle(RT8),4,11)"   = "-0.001"
@@ -2141,14 +2149,14 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(QJ28),3,COLUMNS(util_ReadHandle(QJ28)))" = "CENT"
     '=INDEX(util_ReadHandle(QJ28),3,MATCH("currency",INDEX(util_ReadHandle(QJ28),1,0),0))' = "USD"
     '=COLUMNS(_ReportRisk(QJ31,"dv01","year"))'   = "3"
-    '=INDEX(_ReportRisk(QJ31,"dv01","year"),2,2)' = "SOFR USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(QJ31,"dv01","year"),2,2)' = "SOFR USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(QJ31,"dv01","year"),2,3)' = "SOFR USD dv01 [CENT per basis point]"
     '=ROUND(INDEX(_ReportRisk(QJ31,"dv01","year"),4,2),9)' = "0.0085"
     '=ROUND(INDEX(_ReportRisk(QJ31,"dv01","year"),4,3),9)' = "-0.95"
     "=COLUMNS(util_ReadHandle(QJ31))"     = "13"
     "=INDEX(util_ReadHandle(QJ31),1,13)"  = "currency_unit"
     "=INDEX(util_ReadHandle(QJ31),3,6)"   = "USD"
-    "=INDEX(util_ReadHandle(QJ31),3,13)"  = "USD"
+    "=INDEX(util_ReadHandle(QJ31),3,13)"  = "DOLLAR"
     "=INDEX(util_ReadHandle(QJ31),4,2)"   = "UNITC"
     "=INDEX(util_ReadHandle(QJ31),4,6)"   = "USD"
     "=INDEX(util_ReadHandle(QJ31),4,13)"  = "CENT"
@@ -2243,7 +2251,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(UF8),3,1)" = "500"
     "=INDEX(_ReportValues(UF8),3,2)" = "250"
     "=INDEX(_ReportValues(UF8),3,3)" = "USD"
-    '=INDEX(_ReportRisk(UF8,"dv01","year"),2,2)' = "SOFR USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(UF8,"dv01","year"),2,2)' = "SOFR USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(UF8,"dv01","year"),4,2)' = "0.85"
     '=INDEX(_ReportRisk(UF8,"dv01","year"),6,2)' = "-0.95"
     '=INDEX(_ReportRisk(UF8,"dv01","year"),7,2)' = "1.8"
@@ -2259,7 +2267,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(ZV4),3,8)" = "FFOIS"
     "=COLUMNS(util_ReadHandle(UF8))" = "14"
     "=INDEX(util_ReadHandle(UF8),1,14)" = "currency_unit"
-    "=INDEX(util_ReadHandle(UF8),3,14)" = "USD"
+    "=INDEX(util_ReadHandle(UF8),3,14)" = "DOLLAR"
     "=INDEX(util_ReadHandle(UF8),1,13)" = "discount_curve_key"
     "=INDEX(util_ReadHandle(UF8),5,13)" = "SOFR"
     '=_ReportRisk(UF8,"delta","day")' = "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk"
@@ -2290,8 +2298,8 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(ZV16),3,2)" = "0"
     '=ROWS(_ReportRisk(ZV16,"dv01","day"))' = "5"
     '=COLUMNS(_ReportRisk(ZV16,"dv01","day"))' = "3"
-    '=INDEX(_ReportRisk(ZV16,"dv01","day"),2,2)' = "SOFR USD dv01 [USD per basis point]"
-    '=INDEX(_ReportRisk(ZV16,"dv01","day"),2,3)' = "FFOIS USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(ZV16,"dv01","day"),2,2)' = "SOFR USD dv01 [DOLLAR per basis point]"
+    '=INDEX(_ReportRisk(ZV16,"dv01","day"),2,3)' = "FFOIS USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(ZV16,"dv01","day"),4,2)' = "-0.95"
     '=INDEX(_ReportRisk(ZV16,"dv01","day"),4,3)' = "0.9"
     "=ROWS(util_ReadHandle(ZV16))" = "4"
@@ -2384,7 +2392,7 @@ $formulas = [ordered]@{
     '=COLUMNS(_ReportRisk(WJ24,"all","day"))'   = "8"
     '=INDEX(_ReportRisk(WJ24,"all","day"),2,2)' = "A nominal_delta [NYMEX NG]"
     '=INDEX(_ReportRisk(WJ24,"all","day"),2,5)' = "B delta [NYMEX NG]"
-    '=INDEX(_ReportRisk(WJ24,"all","day"),2,6)' = "SOFR USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(WJ24,"all","day"),2,6)' = "SOFR USD dv01 [DOLLAR per basis point]"
     '=INDEX(_ReportRisk(WJ24,"all","day"),2,8)' = "B SOFR cross_gamma [NYMEX NG per basis point]"
     '=INDEX(_ReportRisk(WJ24,"all","day"),4,2)' = "1"
     '=INDEX(_ReportRisk(WJ24,"all","day"),4,5)' = "0.95"
@@ -2415,7 +2423,7 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(WJ24))"       = "4"
     "=COLUMNS(util_ReadHandle(WJ24))"    = "34"
     "=INDEX(util_ReadHandle(WJ24),1,34)" = "currency_unit"
-    "=INDEX(util_ReadHandle(WJ24),3,34)" = "USD"
+    "=INDEX(util_ReadHandle(WJ24),3,34)" = "DOLLAR"
     # since observation-prices-readback.md each leg's slot at its own quote, last: A's 10,000
     # at G27's 3.50, 35,000, and B's at -0.40, -4,000, each under its index's quote unit
     "=INDEX(util_ReadHandle(WJ24),1,30)" = "observation_coefficient"
@@ -2423,14 +2431,14 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(WJ24),3,30)" = "10000"
     "=INDEX(util_ReadHandle(WJ24),3,31)" = "3.5"
     "=INDEX(util_ReadHandle(WJ24),4,31)" = "-0.4"
-    "=INDEX(util_ReadHandle(WJ24),3,32)" = "USD/MMBTU"
+    "=INDEX(util_ReadHandle(WJ24),3,32)" = "DOLLAR/MMBTU"
     "=ROUND(INDEX(util_ReadHandle(WJ24),3,33),6)" = "35000"
     "=ROUND(INDEX(util_ReadHandle(WJ24),4,33),6)" = "-4000"
     # cva-reserve.md: the pair's row with a CVA column in WL7:WQ8 books -40 once, though two legs,
     # the bilateral unbrokered template charging no fee; the batch's readback a column wider.
     "=COLUMNS(_ReportReserves(WJ32))"    = "6"
     "=INDEX(_ReportReserves(WJ32),1,6)" = "currency_unit"
-    "=INDEX(_ReportReserves(WJ32),3,6)" = "USD"
+    "=INDEX(_ReportReserves(WJ32),3,6)" = "DOLLAR"
     "=INDEX(_ReportReserves(WJ32),3,1)"  = "0"
     "=INDEX(_ReportReserves(WJ32),3,4)"  = "-40"
     "=INDEX(_ReportReserves(WJ32),3,5)"  = "USD"
@@ -2492,7 +2500,7 @@ $formulas = [ordered]@{
     "=COLUMNS(util_ReadHandle(WJ34))"    = "28"
     "=INDEX(util_ReadHandle(WJ34),1,14)" = "spread_price"
     "=INDEX(util_ReadHandle(WJ34),3,14)" = "3.8"
-    "=INDEX(util_ReadHandle(WJ34),3,15)" = "USD"
+    "=INDEX(util_ReadHandle(WJ34),3,15)" = "DOLLAR"
     "=INDEX(util_ReadHandle(WJ34),3,16)" = "MMBTU"
     "=INDEX(util_ReadHandle(WJ34),1,26)" = "offset"
     "=INDEX(util_ReadHandle(WJ34),3,26)" = "-38000"
@@ -2501,7 +2509,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(WJ35),4,10)" = "-1"
     "=COLUMNS(util_ReadHandle(WJ36))"    = "34"
     "=INDEX(util_ReadHandle(WJ36),1,34)" = "currency_unit"
-    "=INDEX(util_ReadHandle(WJ36),3,34)" = "USD"
+    "=INDEX(util_ReadHandle(WJ36),3,34)" = "DOLLAR"
     "=INDEX(util_ReadHandle(WJ36),3,18)" = "1000"
     "=INDEX(util_ReadHandle(WJ36),3,19)" = "950"
     "=INDEX(util_ReadHandle(WJ36),3,30)" = "10000"
@@ -2522,8 +2530,8 @@ $formulas = [ordered]@{
     "=_CreateTrades(WJ5:WJ6,WL10:WQ10,WL11:WQ11,WJ33)" = "#ERROR _CreateTrades: ValueError: broker of trade 1 at row 1 is 'ICAP', expected none on a float_float; a brokered spread is not built"
     "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ39)" = "#ERROR _CreateTrades: ValueError: route is 'cleared', expected 'bilateral' on a float_float; a cleared spread is not built"
     '=_CreateQuoteTemplate("float_float",WP1,WP2)' = "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'float_float', expected one a quote prices: 'fixed_float'"
-    # A crack, float-float-units.md: RB in USD per GAL with a LOT of 42,000 GAL less WTI in USD
-    # per BBL with a LOT of 1,000 BBL, 1,000 BBL of G27 at a spread price of 15.00 typed in USD
+    # A crack, float-float-units.md: RB in DOLLAR per GAL with a LOT of 42,000 GAL less WTI in DOLLAR
+    # per BBL with a LOT of 1,000 BBL, 1,000 BBL of G27 at a spread price of 15.00 typed in DOLLAR
     # per BBL, in YJ20, prepared in YJ21 and valued in YJ22 on the pair's SOFR at 0.95: 88,200
     # less 70,000 less 15,000, one net payment of 3,200, mark 3,040, DV01 -0.304; one lot of RB
     # and minus one of WTI; the unit read back beside the spread price and each leg's price in
@@ -2548,7 +2556,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(YJ20),3,12)" = "BBL"
     "=INDEX(util_ReadHandle(YJ20),3,14)" = "15"
     "=INDEX(util_ReadHandle(YJ20),1,15)" = "spread_price_currency_unit"
-    "=INDEX(util_ReadHandle(YJ20),3,15)" = "USD"
+    "=INDEX(util_ReadHandle(YJ20),3,15)" = "DOLLAR"
     "=INDEX(util_ReadHandle(YJ20),1,16)" = "spread_price_quantity_unit"
     "=INDEX(util_ReadHandle(YJ20),3,16)" = "BBL"
     "=INDEX(util_ReadHandle(YJ20),3,24)" = "42000"
@@ -2559,24 +2567,24 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(YJ21),4,10)" = "-1"
     "=COLUMNS(util_ReadHandle(YJ22))"    = "34"
     "=INDEX(util_ReadHandle(YJ22),1,34)" = "currency_unit"
-    "=INDEX(util_ReadHandle(YJ22),3,34)" = "USD"
+    "=INDEX(util_ReadHandle(YJ22),3,34)" = "DOLLAR"
     "=ROUND(INDEX(util_ReadHandle(YJ22),3,18),6)" = "3200"
     "=ROUND(INDEX(util_ReadHandle(YJ22),3,19),6)" = "3040"
     "=INDEX(util_ReadHandle(YJ22),3,30)" = "42000"
     "=INDEX(util_ReadHandle(YJ22),4,30)" = "-1000"
     "=INDEX(util_ReadHandle(YJ22),3,31)" = "2.1"
     "=INDEX(util_ReadHandle(YJ22),4,31)" = "70"
-    "=INDEX(util_ReadHandle(YJ22),3,32)" = "USD/GAL"
-    "=INDEX(util_ReadHandle(YJ22),4,32)" = "USD/BBL"
+    "=INDEX(util_ReadHandle(YJ22),3,32)" = "DOLLAR/GAL"
+    "=INDEX(util_ReadHandle(YJ22),4,32)" = "DOLLAR/BBL"
     "=ROUND(INDEX(util_ReadHandle(YJ22),3,33),6)" = "88200"
     "=ROUND(INDEX(util_ReadHandle(YJ22),4,33),6)" = "-70000"
     "=ROUND(INDEX(util_ReadHandle(YJ24),3,26),6)" = "-15000"
     "=INDEX(util_ReadHandle(YJ24),3,15)" = "CENT"
     "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ25)" = "#ERROR _CreateTrades: ValueError: spread_price_currency_unit is missing, expected a value in the template or a column in the ticket"
-    "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ26)" = "#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'EUR', expected USD or CENT"
+    "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ26)" = "#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'EUR', expected DOLLAR or CENT"
     "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ27)" = "#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     "=_CreateTrades(VSTACK(YJ7,WJ5),YL4:YP4,YL5:YP5,YJ19)" = "#ERROR _CreateTrades: ValueError: index 2 'A' measures ENERGY, expected VOLUME as index 1 'RB'; a spread across two measures needs a density or a heat content, which the unit tables do not carry"
-    '=_CreateTradeTemplate("fixed_float",HSTACK("route","spread_price_currency_unit"),HSTACK("bilateral","USD"))' = "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    '=_CreateTradeTemplate("fixed_float",HSTACK("route","spread_price_currency_unit"),HSTACK("bilateral","DOLLAR"))' = "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
     # A closed physical contract past its expiry, expired-physical-cash.md: one LOT of Z26 bought
     # at 3.00 and sold at 3.10 through ION under one clearing house, in ZJ19. On the expiry day,
     # 18 November, the 1,000 is the mark, ZJ21; the day after it is cash, ZJ23, whatever the
@@ -2783,7 +2791,7 @@ $cells = [ordered]@{
     # The index conventions: five codes as the desk types them and one creator cell; a category in
     # another case and an energy unit, for the conventions to refuse; and the gasoline index's
     # quoted units, cents a gallon, with a second creator cell settling in dollars a barrel.
-    "AO2" = "USD"; "AO3" = "BBL"; "AO4" = "USD"; "AO5" = "VOLUME"; "AO6" = "BBL"
+    "AO2" = "DOLLAR"; "AO3" = "BBL"; "AO4" = "DOLLAR"; "AO5" = "VOLUME"; "AO6" = "BBL"
     "AP1" = "=_CreateIndexConventions(AO2,AO3,AO4,AO5,AO6)"
     "AO8" = "Volume"; "AO9" = "MMBTU"
     "AO10" = "CENT"; "AO11" = "GAL"
@@ -2896,7 +2904,7 @@ $cells = [ordered]@{
     "GJ1" = "trade_id"; "GK1" = "trade_date"; "GL1" = "contract_code"; "GM1" = "quantity"; "GN1" = "fixed_price"
     "GJ2" = "1001"; "GK2" = "24-Sep-2026"; "GL2" = "Z26"; "GM2" = "10"; "GN2" = "3.1"
     "GJ3" = "1003"; "GK3" = "25-Sep-2026"; "GL3" = "F27"; "GM3" = "7"; "GN3" = "3.4"
-    "FM1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "FM1" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "FM2" = "=_CreateContractSpecifications(EI1:EM1,FN2:FR2)"
     "FM3" = "=_CreateFuturesSchedule(FS1:FS4,FT1:FT4)"
     "FM4" = "=_CreateHolidayCalendar(FU1:FU3)"
@@ -2948,7 +2956,7 @@ $cells = [ordered]@{
     "HC3" = "4-Dec-2026"; "HC4" = "1-Jan-2026"
     "HC1" = "=_CreateHolidayCalendar(HC3)"
     "HC2" = "=_CreateHolidayCalendar(HC4)"
-    "HD1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "HD1" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "HE2" = "UNIT"; "HF2" = "1"; "HG2" = "MMBTU"; "HH2" = "0"; "HI2" = "0"
     "HE1" = "=_CreateContractSpecifications(EI1:EM1,HE2:HI2)"
     "HA5" = '=_CreateIndex("SYN","Synthetic gas index for the last3day example",HA4,HD1,HE1,HC1,"UNIT")'
@@ -2996,7 +3004,7 @@ $cells = [ordered]@{
     "IC3" = "25-Dec-2026"; "IC4" = "1-Jan-2027"; "IC5" = "1-Jan-2027"
     "IC1" = "=_CreateHolidayCalendar(IC3:IC4)"
     "IC2" = "=_CreateHolidayCalendar(IC5)"
-    "ID1" = '=_CreateIndexConventions("USD","GAL","USD","VOLUME","GAL")'
+    "ID1" = '=_CreateIndexConventions("DOLLAR","GAL","DOLLAR","VOLUME","GAL")'
     "IE2" = "GAL"; "IF2" = "1"; "IG2" = "GAL"; "IH2" = "0"; "II2" = "0"
     "IE1" = "=_CreateContractSpecifications(EI1:EM1,IE2:II2)"
     "IA6" = '=_CreateIndex("ETHANE","Ethane - synthetic volume index",IA5,ID1,IE1,IC1,"GAL")'
@@ -3073,7 +3081,7 @@ $cells = [ordered]@{
     "JB4" = "=_CreateFuturesSchedule(JB1:JB3,JC1:JC3)"
     "JD3" = "1-Jan-2026"
     "JD1" = "=_CreateHolidayCalendar(JD3)"
-    "JE1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "JE1" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "JF2" = "UNIT"; "JG2" = "1"; "JH2" = "MMBTU"; "JI2" = "0"; "JJ2" = "0"
     "JF1" = "=_CreateContractSpecifications(EI1:EM1,JF2:JJ2)"
     "JB5" = '=_CreateIndex("PAYS","Synthetic gas index for the payment-groups example",JB4,JE1,JF1,JD1,"UNIT")'
@@ -3098,7 +3106,7 @@ $cells = [ordered]@{
     "KA12" = "=_CreateMarket(KA9,KA11)"
     "KA13" = "=_PrepareTrades(JT5,KA9)"
     "KA14" = "=_EvaluateTrades(KA13,KA12)"
-    # Mixed fields in one batch, mixed-trade-fields.md: the index MIXED, USD per GAL, X26, Z26, F27
+    # Mixed fields in one batch, mixed-trade-fields.md: the index MIXED, DOLLAR per GAL, X26, Z26, F27
     # and G27 expiring 30-Nov-2026, 31-Dec-2026, 29-Jan-2027 and 26-Feb-2027 in KD1:KE4 and its
     # schedule in KD5, the market closed on 25 December in KF1 over KF3, the payment calendar
     # closed on New Year's Day in KF2 over KF4, the volume conventions in gallons in KG1, two
@@ -3122,7 +3130,7 @@ $cells = [ordered]@{
     "KF3" = "25-Dec-2026"; "KF4" = "1-Jan-2027"
     "KF1" = "=_CreateHolidayCalendar(KF3)"
     "KF2" = "=_CreateHolidayCalendar(KF4)"
-    "KG1" = '=_CreateIndexConventions("USD","GAL","USD","VOLUME","GAL")'
+    "KG1" = '=_CreateIndexConventions("DOLLAR","GAL","DOLLAR","VOLUME","GAL")'
     "KH2" = "GAL"; "KI2" = "1"; "KJ2" = "GAL"; "KK2" = "0"; "KL2" = "0"
     "KH3" = "BBL"; "KI3" = "1"; "KJ3" = "BBL"; "KK3" = "0"; "KL3" = "0"
     "KH1" = "=_CreateContractSpecifications(EI1:EM1,KH2:KL3)"
@@ -3180,7 +3188,7 @@ $cells = [ordered]@{
     "MA5" = "=_CreateFuturesSchedule(MA1:MA4,MB1:MB4)"
     "MC1" = "25-Dec-2026"; "MC2" = "1-Jan-2027"
     "MC3" = "=_CreateHolidayCalendar(MC1:MC2)"
-    "MD1" = '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
+    "MD1" = '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     "ME1" = "BBL"; "MF1" = "1"; "MG1" = "BBL"; "MH1" = "0"; "MI1" = "0"
     "ME2" = "LOT"; "MF2" = "1000"; "MG2" = "BBL"; "MH2" = "0"; "MI2" = "0"
     "ME3" = "=_CreateContractSpecifications(EI1:EM1,ME1:MI2)"
@@ -3264,7 +3272,7 @@ $cells = [ordered]@{
     "NH4" = "=_CreateIfercSchedule(NH1:NH3,NJ1:NJ3)"
     "NK1" = "1-Jan-2027"
     "NK2" = "=_CreateHolidayCalendar(NK1)"
-    "NL1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "NL1" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "NM1" = "LOT"; "NN1" = "2500"; "NO1" = "MMBTU"; "NP1" = "0"; "NQ1" = "0"
     "NM2" = "MMBTU"; "NN2" = "1"; "NO2" = "MMBTU"; "NP2" = "0"; "NQ2" = "0"
     "NM3" = "=_CreateContractSpecifications(EI1:EM1,NM1:NQ2)"
@@ -3751,7 +3759,7 @@ $cells = [ordered]@{
     "PD5" = "=_CreateFuturesSchedule(PD1:PD4,PE1:PE4)"
     "PF3" = "1-Jan-2030"
     "PF1" = "=_CreateHolidayCalendar(PF3)"
-    "PG1" = '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
+    "PG1" = '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     "PH2" = "BBL"; "PI2" = "1"; "PJ2" = "BBL"; "PK2" = "0"; "PL2" = "0"
     "PH3" = "LOT"; "PI3" = "1000"; "PJ3" = "BBL"; "PK3" = "0"; "PL3" = "0"
     "PH1" = "=_CreateContractSpecifications(EI1:EM1,PH2:PL3)"
@@ -3806,7 +3814,7 @@ $cells = [ordered]@{
     "QJ4" = "=_CreateFuturesSchedule(QJ1:QJ3,QK1:QK3)"
     "QL1" = "27-Dec-2027"; "QL2" = "1-Jan-2030"
     "QJ5" = "=_CreateHolidayCalendar(QL1)"
-    "QJ6" = '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
+    "QJ6" = '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     "QM1" = "name"; "QN1" = "lot_size"; "QO1" = "lot_unit"; "QP1" = "brokerage_rate_per_lot"; "QQ1" = "clearing_rate_per_lot"
     "QM2" = "UNIT"; "QN2" = "1"; "QO2" = "BBL"; "QP2" = "0"; "QQ2" = "0"
     "QJ7" = "=_CreateContractSpecifications(QM1:QQ1,QM2:QQ2)"
@@ -3939,7 +3947,7 @@ $cells = [ordered]@{
     # twin, its schedule, holidays and specification, quoted in dollars a barrel as UNIT is;
     # the ticket's first row under the bilateral template, valued on 4 January 2027 at 80 on
     # the collection QV8 is valued on; and QV8 and it collected, in that order.
-    "QJ20" = '=_CreateIndexConventions("USD","BBL","CENT","VOLUME","BBL")'
+    "QJ20" = '=_CreateIndexConventions("DOLLAR","BBL","CENT","VOLUME","BBL")'
     "QJ21" = '=_CreateIndex("UNITC","One-barrel index settled in cents",QJ4,QJ20,QJ7,QJ5,"UNIT")'
     "QJ22" = "=_CreateTrades(QJ21,QM9:QR9,QM10:QR10,QJ10)"
     "QJ23" = "=_CreateCalendar(QV2,QJ21)"
@@ -3969,7 +3977,7 @@ $cells = [ordered]@{
     "SD2" = "LOT"; "SE2" = "1"; "SF2" = "MMBTU"; "SG2" = "0"; "SH2" = "0"
     "SA11" = "=_CreateFuturesSchedule(SA1:SA9,SB1:SB9)"
     "SA12" = "=_CreateHolidayCalendar(SC1)"
-    "SA13" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "SA13" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "SA14" = "=_CreateContractSpecifications(SD1:SH1,SD2:SH2)"
     "SA15" = '=_CreateIndex("HALF","Synthetic one-unit index for half-year strips",SA11,SA13,SA14,SA12,"LOT")'
     "SD4" = "quantity_unit"; "SE4" = "quantity_per"; "SF4" = "schedule_method"; "SG4" = "route"; "SH4" = "settlement_method"; "SI4" = "clearing_house"; "SJ4" = "payment_day"; "SK4" = "payment_holiday_calendar"; "SL4" = "settlement_frequency"
@@ -4021,7 +4029,7 @@ $cells = [ordered]@{
     "TJ2" = "LOT"; "TK2" = "1"; "TL2" = "MMBTU"; "TM2" = "0"; "TN2" = "0"
     "TE6" = "=_CreateFuturesSchedule(TG1:TG3,TH1:TH3)"
     "TE7" = "=_CreateHolidayCalendar(TI1)"
-    "TE8" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "TE8" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "TE9" = "=_CreateContractSpecifications(TJ1:TN1,TJ2:TN2)"
     "TE10" = '=_CreateIndex("ANCHORED","Synthetic index anchored on 9 October 2026",TE6,TE8,TE9,TE7,"LOT")'
     "TJ4" = "quantity_unit"; "TK4" = "quantity_per"; "TL4" = "schedule_method"; "TM4" = "route"; "TN4" = "settlement_method"; "TO4" = "clearing_house"; "TP4" = "payment_day"; "TQ4" = "payment_holiday_calendar"; "TR4" = "settlement_frequency"
@@ -4183,7 +4191,7 @@ $cells = [ordered]@{
     "WD6" = "4-Jan-2028"; "WE6" = "0.95"
     "WJ1" = "=_CreateFuturesSchedule(WA1:WA3,WB1:WB3)"
     "WJ2" = "=_CreateHolidayCalendar(WC1)"
-    "WJ3" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "WJ3" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "WJ4" = "=_CreateContractSpecifications(WD1:WH1,WD2:WH2)"
     "WJ5" = '=_CreateIndex("A","Pair leg A, a futures index",WJ1,WJ3,WJ4,WJ2,"NYMEX NG")'
     "WJ6" = '=_CreateIndex("B","Pair leg B, an IFERC index",WJ7,WJ3,WJ4,,"NYMEX NG")'
@@ -4229,8 +4237,8 @@ $cells = [ordered]@{
     # in WL10:WP11 with a broker's name beside it in WQ10:WQ11, booked in WJ34, prepared in WJ35
     # and valued in WJ36; the indexes B first in WJ37, B less A; the collection of the spread
     # alone in WJ38; and a cleared template in WJ39, which no spread is booked under. Since
-    # float-float-units.md both templates type the spread price's unit, USD and MMBTU.
-    "WJ33" = '=_CreateTradeTemplate("float_float",HSTACK(WL1:WV1,"nearby","spread_price_currency_unit","spread_price_quantity_unit"),HSTACK(WL2:WV2,1,"USD","MMBTU"))'
+    # float-float-units.md both templates type the spread price's unit, DOLLAR and MMBTU.
+    "WJ33" = '=_CreateTradeTemplate("float_float",HSTACK(WL1:WV1,"nearby","spread_price_currency_unit","spread_price_quantity_unit"),HSTACK(WL2:WV2,1,"DOLLAR","MMBTU"))'
     "WL10" = "trade_id"; "WM10" = "trade_date"; "WN10" = "contract_code"; "WO10" = "quantity"; "WP10" = "spread_price"; "WQ10" = "broker"
     "WL11" = "1"; "WM11" = "15-Dec-2026"; "WN11" = "G27"; "WO11" = "1"; "WP11" = "3.8"; "WQ11" = "ICAP"
     "WJ34" = "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ33)"
@@ -4238,12 +4246,12 @@ $cells = [ordered]@{
     "WJ36" = "=_EvaluateTrades(WJ35,WJ17:WK17,WJ20)"
     "WJ37" = "=_CreateTrades(WK5:WK6,WL10:WP10,WL11:WP11,WJ33)"
     "WJ38" = "=_AggregateResults(WJ36)"
-    "WJ39" = '=_CreateTradeTemplate("float_float",HSTACK(WL1:WO1,"route","settlement_method","clearing_house","payment_day","payment_holiday_calendar","settlement_frequency","nearby","spread_price_currency_unit","spread_price_quantity_unit"),HSTACK(WL2:WO2,"cleared","financial","ICE Clear Europe",WT2,WJ2,"monthly",1,"USD","MMBTU"))'
+    "WJ39" = '=_CreateTradeTemplate("float_float",HSTACK(WL1:WO1,"route","settlement_method","clearing_house","payment_day","payment_holiday_calendar","settlement_frequency","nearby","spread_price_currency_unit","spread_price_quantity_unit"),HSTACK(WL2:WO2,"cleared","financial","ICE Clear Europe",WT2,WJ2,"monthly",1,"DOLLAR","MMBTU"))'
     # float-float-units.md: a crack. Two futures indexes over F27 to H27 in YA1:YB3, 1 January
-    # closed, RB in USD per GAL with a LOT of 42,000 GAL and WTI in USD per BBL with a LOT of
+    # closed, RB in DOLLAR per GAL with a LOT of 42,000 GAL and WTI in DOLLAR per BBL with a LOT of
     # 1,000 BBL, each defining one BBL, in YJ7 and YJ8; valued 4 January 2027 with two December
     # settles behind each, G27 quoted 2.10 and 70.00, their markets in YJ18:YK18, on the pair's
-    # SOFR curve in WJ20. A float_float template with the spread price's unit first, USD and
+    # SOFR curve in WJ20. A float_float template with the spread price's unit first, DOLLAR and
     # BBL, in YL1:YY2 and YJ19; 1,000 BBL of G27 at 15.00 in YL4:YP5, booked in YJ20, prepared
     # in YJ21 and valued in YJ22; the same at 1,500 cents a barrel in YJ24 under YJ23; and three
     # templates no crack is booked under: no currency unit in YJ25, EUR in YJ26 and MMBTU, a
@@ -4262,8 +4270,8 @@ $cells = [ordered]@{
     "YA15" = "2.1"; "YA16" = "2.2"; "YB15" = "70"; "YB16" = "71"
     "YJ1" = "=_CreateFuturesSchedule(YA1:YA3,YB1:YB3)"
     "YJ2" = "=_CreateHolidayCalendar(YC1)"
-    "YJ3" = '=_CreateIndexConventions("USD","GAL","USD","VOLUME","GAL")'
-    "YJ4" = '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
+    "YJ3" = '=_CreateIndexConventions("DOLLAR","GAL","DOLLAR","VOLUME","GAL")'
+    "YJ4" = '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     "YJ5" = "=_CreateContractSpecifications(YD1:YH1,YD2:YH3)"
     "YJ6" = "=_CreateContractSpecifications(YD1:YH1,YD5:YH6)"
     "YJ7" = '=_CreateIndex("RB","Crack leg RB, dollars a gallon",YJ1,YJ3,YJ5,YJ2,"LOT")'
@@ -4279,7 +4287,7 @@ $cells = [ordered]@{
     "YJ17" = '=_CreatePriceVector("WTI",YB15:YB16)'
     "YJ18" = "=_CreateMarket(YJ14,YJ16)"; "YK18" = "=_CreateMarket(YJ15,YJ17)"
     "YL1" = "spread_price_currency_unit"; "YM1" = "spread_price_quantity_unit"; "YN1" = "quantity_unit"; "YO1" = "quantity_per"; "YP1" = "schedule_method"; "YQ1" = "second_schedule_method"; "YR1" = "route"; "YS1" = "settlement_method"; "YT1" = "counterparty"; "YU1" = "discount_curve_key"; "YV1" = "payment_day"; "YW1" = "payment_holiday_calendar"; "YX1" = "settlement_frequency"; "YY1" = "nearby"
-    "YL2" = "USD"; "YM2" = "BBL"; "YN2" = "BBL"; "YO2" = "month"; "YP2" = "lastday"; "YQ2" = "lastday"; "YR2" = "bilateral"; "YS2" = "financial"; "YT2" = "ACME Trading"; "YU2" = "SOFR"; "YV2" = "4-Jan-2028"; "YW2" = "=YJ2"; "YX2" = "monthly"; "YY2" = "1"
+    "YL2" = "DOLLAR"; "YM2" = "BBL"; "YN2" = "BBL"; "YO2" = "month"; "YP2" = "lastday"; "YQ2" = "lastday"; "YR2" = "bilateral"; "YS2" = "financial"; "YT2" = "ACME Trading"; "YU2" = "SOFR"; "YV2" = "4-Jan-2028"; "YW2" = "=YJ2"; "YX2" = "monthly"; "YY2" = "1"
     "YJ19" = '=_CreateTradeTemplate("float_float",YL1:YY1,YL2:YY2)'
     "YL4" = "trade_id"; "YM4" = "trade_date"; "YN4" = "contract_code"; "YO4" = "quantity"; "YP4" = "spread_price"
     "YL5" = "1"; "YM5" = "15-Dec-2026"; "YN5" = "G27"; "YO5" = "1000"; "YP5" = "15"
@@ -4291,9 +4299,9 @@ $cells = [ordered]@{
     "YJ24" = "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL7:YP7,YJ23)"
     "YJ25" = '=_CreateTradeTemplate("float_float",YM1:YY1,YM2:YY2)'
     "YJ26" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK("EUR",YM2:YY2))'
-    "YJ27" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK("USD","MMBTU",YN2:YY2))'
+    "YJ27" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK("DOLLAR","MMBTU",YN2:YY2))'
     # expired-physical-cash.md: a closed physical contract past its expiry. A futures index over
-    # X26, Z26 and F27 in ZA1:ZB3, Z26 expiring 18 November 2026, Christmas closed, quoted in USD
+    # X26, Z26 and F27 in ZA1:ZB3, Z26 expiring 18 November 2026, Christmas closed, quoted in DOLLAR
     # per MMBTU with a LOT of 10,000 MMBTU charging 10 and 4 a lot and a one-MMBTU unit, in ZJ5;
     # valued on the expiry day in ZJ6 and the day after in ZJ7, with the 17th's settle behind
     # the first and the expiry's 9.00 behind the second, their histories in ZJ12 and ZJ13 and
@@ -4314,7 +4322,7 @@ $cells = [ordered]@{
     "ZA11" = "3.2"; "ZA12" = "3.5"
     "ZJ1" = "=_CreateFuturesSchedule(ZA1:ZA3,ZB1:ZB3)"
     "ZJ2" = "=_CreateHolidayCalendar(ZC1)"
-    "ZJ3" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "ZJ3" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "ZJ4" = "=_CreateContractSpecifications(ZD1:ZH1,ZD2:ZH3)"
     "ZJ5" = '=_CreateIndex("PHYS","Gas with a contract to close",ZJ1,ZJ3,ZJ4,ZJ2,"LOT")'
     "ZJ6" = "=_CreateValuationDate(ZA5,0.5)"
@@ -4384,7 +4392,7 @@ $cells = [ordered]@{
     "XQ7" = "BBL"; "XR7" = "1"; "XS7" = "BBL"; "XT7" = "0"; "XU7" = "0"
     "XV1" = "=_CreateFuturesSchedule(XQ1:XQ5,XR1:XR5)"
     "XV2" = "=_CreateHolidayCalendar(XS1)"
-    "XV3" = '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
+    "XV3" = '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     "XV4" = "=_CreateContractSpecifications(EI1:EM1,XQ7:XU7)"
     "XV5" = '=_CreateIndex("ROLL","A futures index expiring mid-month",XV1,XV3,XV4,XV2,"BBL")'
     "XV6" = "=_CreateValuationDate(XS2,0.5)"

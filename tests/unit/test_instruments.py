@@ -140,7 +140,7 @@ def test_the_float_float_is_the_fixed_float_with_a_spread_price_and_both_methods
     )
     by_name = {field.name: field for field in FLOAT_FLOAT.fields}
     assert [by_name[unit].type for unit in units] == [FieldType.CODE, FieldType.CODE]
-    assert by_name[units[0]].options == "USD, CENT"
+    assert by_name[units[0]].options == "DOLLAR, CENT"
     assert not any(field.name in units for field in FIXED_FLOAT.fields)
     assert [field.name for field in FLOAT_FLOAT.fields if field.required] == [
         "trade_date",

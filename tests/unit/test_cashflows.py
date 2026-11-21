@@ -41,7 +41,7 @@ from catalyst.trades.template import TradeTemplate, trade_template
 
 DAY_BEFORE = "2027-01-03"
 CURVE = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))
-DV01_LABEL = "SOFR USD dv01 [USD per basis point]"
+DV01_LABEL = "SOFR USD dv01 [DOLLAR per basis point]"
 
 
 # --- the two records from Python, as the seam would build them ------------------------------------
@@ -363,6 +363,10 @@ def test_the_currency_is_usd_exactly_one_per_batch_and_cent_is_no_currency() -> 
     assert refused_booking(
         ticket(trade_date=[AS_OF], amount=[1.0], payment_day=[A_YEAR], currency=["CENT"]), bare
     ) == ("currency row 1 is 'CENT', expected USD, the one currency this version books")
+    # Nor is DOLLAR, the unit of it since currency-and-currency-unit.md: a currency is USD.
+    assert refused_booking(
+        ticket(trade_date=[AS_OF], amount=[1.0], payment_day=[A_YEAR], currency=["DOLLAR"]), bare
+    ) == ("currency row 1 is 'DOLLAR', expected USD, the one currency this version books")
     with pytest.raises(ValueError) as caught:
         template(currency="CENT")
     assert (
@@ -402,8 +406,8 @@ def test_amounts_are_finite_and_identifiers_whole_each_named_by_its_row() -> Non
     assert refused_booking(
         ticket(trade_date=[AS_OF] * 2, amount=[largest, largest], payment_day=[A_YEAR] * 2)
     ) == (
-        f"the payments on {A_YEAR} on SOFR sum to inf, expected a finite amount of USD; the rows' "
-        "amounts, each finite, sum past the largest number"
+        f"the payments on {A_YEAR} on SOFR sum to inf, expected a finite amount of DOLLAR; the "
+        "rows' amounts, each finite, sum past the largest number"
     )
 
 
@@ -431,14 +435,14 @@ def test_a_total_past_the_largest_number_is_refused_by_the_batch() -> None:
         ticket(trade_date=[AS_OF] * 2, amount=[largest, largest], payment_day=[A_YEAR, TWO_YEARS])
     )
     assert refused_valuation(batch) == (
-        "the batch has inf of mark in all, expected a finite amount of USD; the payments, each "
+        "the batch has inf of mark in all, expected a finite amount of DOLLAR; the payments, each "
         "finite, sum past the largest number"
     )
     paid = booked(
         ticket(trade_date=[AS_OF] * 2, amount=[largest, largest], payment_day=[DAY_BEFORE, AS_OF])
     )
     assert refused_valuation(paid) == (
-        "the batch has inf of cash in all, expected a finite amount of USD; the payments, each "
+        "the batch has inf of cash in all, expected a finite amount of DOLLAR; the payments, each "
         "finite, sum past the largest number"
     )
 
@@ -527,7 +531,7 @@ def test_the_seam_makes_the_two_handles_named_for_the_currency_and_values_the_ex
     assert values[0] == ["cashflow_mark", "cashflow_cash", "currency", "as_of", "currency_unit"]
     assert values[1] == ["float64", "float64", "str", "datetime64[D]", "str"]
     assert values[2][0] == pytest.approx(500.0, **CLOSE)
-    assert values[2][1:] == [250.0, "USD", serial(AS_OF), "USD"]
+    assert values[2][1:] == [250.0, "USD", serial(AS_OF), "DOLLAR"]
     risk = spilled(ENTRY["_ReportRisk"](sheet["results"], "dv01", "year"))
     assert risk[0] == ["as_of", serial(AS_OF)]
     assert risk[1] == ["period", DV01_LABEL]
@@ -588,14 +592,14 @@ def test_the_seam_reads_the_batch_and_the_results_back() -> None:
     assert first[:3] == [serial(DAY_BEFORE), 250.0, True] and first[3:7] == [1.0, 0.0, 250.0, 0.0]
     assert first[7:9] == ["USD", serial(AS_OF)]
     assert first[9] == pytest.approx(500.0, **CLOSE) and first[10] == 250.0
-    assert first[11] == pytest.approx(0.85, **CLOSE) and first[12:] == ["SOFR", "USD"]
+    assert first[11] == pytest.approx(0.85, **CLOSE) and first[12:] == ["SOFR", "DOLLAR"]
     assert second[:3] == [serial(A_YEAR), 10_000.0, False]
     assert second[4] == pytest.approx(9_500.0, **CLOSE) and second[6] == pytest.approx(
         -0.95, **CLOSE
     )
-    assert second[9:] == ["-", "-", "-", "SOFR", "USD"]  # the totals once, on the first row
+    assert second[9:] == ["-", "-", "-", "SOFR", "DOLLAR"]  # the totals once, on the first row
     assert third[:3] == [serial(TWO_YEARS), -10_000.0, False]
-    assert third[9:] == ["-", "-", "-", "SOFR", "USD"]
+    assert third[9:] == ["-", "-", "-", "SOFR", "DOLLAR"]
 
 
 def test_the_seam_refuses_in_its_own_words_and_relays_the_librarys() -> None:
@@ -664,7 +668,7 @@ def test_the_seam_refuses_in_its_own_words_and_relays_the_librarys() -> None:
 # keys under a template that names none.
 
 FFOIS = curve_of((AS_OF, 1.0), (A_YEAR, 0.90), (TWO_YEARS, 0.80), name="FFOIS")
-FFOIS_LABEL = "FFOIS USD dv01 [USD per basis point]"
+FFOIS_LABEL = "FFOIS USD dv01 [DOLLAR per basis point]"
 UNKEYED = template(currency="USD", discount_curve_key=None)
 
 
@@ -918,14 +922,14 @@ def test_the_report_shows_a_dv01_column_per_curve_on_one_date_axis() -> None:
 def test_a_group_past_the_largest_number_is_refused_by_its_day_and_key() -> None:
     largest = float(np.finfo(np.float64).max)
     assert refused_booking(keyed([1.0, largest, largest], ["SOFR", "FFOIS", "FFOIS"]), UNKEYED) == (
-        f"the payments on {A_YEAR} on FFOIS sum to inf, expected a finite amount of USD; the rows' "
-        "amounts, each finite, sum past the largest number"
+        f"the payments on {A_YEAR} on FFOIS sum to inf, expected a finite amount of DOLLAR; the "
+        "rows' amounts, each finite, sum past the largest number"
     )
     # The same amounts under two keys are two groups, each finite, and book.
     apart = booked(keyed([largest, largest], ["SOFR", "FFOIS"]), UNKEYED)
     assert apart.group_amounts.tolist() == [largest, largest]
     assert refused_valuation(apart, curve=collected(CURVE, FFOIS)) == (
-        "the batch has inf of mark in all, expected a finite amount of USD; the payments, each "
+        "the batch has inf of mark in all, expected a finite amount of DOLLAR; the payments, each "
         "finite, sum past the largest number"
     )
 
@@ -968,12 +972,12 @@ def test_a_curves_own_total_past_the_largest_number_is_refused_by_its_curve() ->
     # period are finite; each curve's own total is not, and the first in key order is named.
     eight = booked(far_ticket(FAR_DAYS), UNKEYED)
     assert refused_valuation(eight, curve=curves) == (
-        "the batch has -inf of DV01 on SOFR in all, expected a finite amount of USD per basis "
+        "the batch has -inf of DV01 on SOFR in all, expected a finite amount of DOLLAR per basis "
         "point; the curve's payments' DV01s, each finite, sum past the largest number"
     )
     other_way = booked(far_ticket(FAR_DAYS, "FFOIS", "SOFR"), UNKEYED)
     assert refused_valuation(other_way, curve=curves) == (
-        "the batch has -inf of DV01 on FFOIS in all, expected a finite amount of USD per basis "
+        "the batch has -inf of DV01 on FFOIS in all, expected a finite amount of DOLLAR per basis "
         "point; the curve's payments' DV01s, each finite, sum past the largest number"
     )
 
@@ -1028,10 +1032,10 @@ def test_the_seam_values_two_keys_and_reads_a_column_and_a_row_for_each() -> Non
     assert read[0][0] == "payment_date" and read[0][-2:] == ["discount_curve_key", "currency_unit"]
     assert len(read) == 4  # one payment day on two keys: two rows under the headings
     first, second = read[2], read[3]
-    assert first[:3] == [serial(A_YEAR), 10_000.0, False] and first[-2:] == ["SOFR", "USD"]
+    assert first[:3] == [serial(A_YEAR), 10_000.0, False] and first[-2:] == ["SOFR", "DOLLAR"]
     assert first[3:7] == pytest.approx([0.95, 9_500.0, 0.0, -0.95], **CLOSE)
     assert first[9:12] == pytest.approx([500.0, 0.0, -0.05], **CLOSE)  # the totals once
-    assert second[:3] == [serial(A_YEAR), -10_000.0, False] and second[-2:] == ["FFOIS", "USD"]
+    assert second[:3] == [serial(A_YEAR), -10_000.0, False] and second[-2:] == ["FFOIS", "DOLLAR"]
     assert second[3:7] == pytest.approx([0.90, -9_000.0, 0.0, 0.90], **CLOSE)
     assert second[9:12] == ["-", "-", "-"]
     # SOFR at 0.96: new results, 600, over the same booked cashflows, the held results as
@@ -1097,7 +1101,7 @@ def test_the_seam_publishes_no_results_whose_curve_total_is_past_the_largest_num
     live = bridge.live_handles()[0]
     assert ENTRY["_EvaluateCashflows"](batch, date, curves) == (
         "#ERROR _EvaluateCashflows: ValueError: the batch has -inf of DV01 on SOFR in all, "
-        "expected a finite amount of USD per basis point; the curve's payments' DV01s, each "
+        "expected a finite amount of DOLLAR per basis point; the curve's payments' DV01s, each "
         "finite, sum past the largest number"
     )
     assert bridge.live_handles()[0] == live  # refused before anything was published
@@ -1217,35 +1221,34 @@ def test_a_cashflows_unit_is_its_currencys_reference_unit_read_off_the_unit_tabl
     # currency's reference unit in the unit tables, whole units and never cents. The batch,
     # the results and the contribution carry both.
     batch = booked()
-    assert (batch.currency, batch.currency_unit) == ("USD", "USD")
-    result = valued(batch)
-    assert (result.currency, result.currency_unit) == ("USD", "USD")
-    assert [(c.currency, c.currency_unit) for c in result.rate_contributions] == [("USD", "USD")]
-    # The unit is the tables' and typed nowhere in the cashflows: under tables whose dollar is
-    # spelled DOLLAR the same ticket books in DOLLAR, the heading's brackets and every refusal
-    # of an amount say so, and the currency is USD as entered.
-    spelled = unit_conversions(
-        category(
-            "USD",
-            "DOLLAR",
-            UnitDefinition("DOLLAR", "DOLLAR", 1.0),
-            UnitDefinition("CENT", "DOLLAR", 0.01),
-        )
-    )
-    batch = cashflows(TICKET, TEMPLATE, spelled, WorkCounter())
     assert (batch.currency, batch.currency_unit) == ("USD", "DOLLAR")
     result = valued(batch)
     assert (result.currency, result.currency_unit) == ("USD", "DOLLAR")
-    assert result.report(Risk.DV01, Bucket.DAY).labels == (
-        "SOFR USD dv01 [DOLLAR per basis point]",
+    assert [(c.currency, c.currency_unit) for c in result.rate_contributions] == [("USD", "DOLLAR")]
+    # The unit is the tables' and typed nowhere in the cashflows: under tables whose dollar is
+    # spelled BUCK, a spelling of this test's alone, the same ticket books in BUCK, the
+    # heading's brackets and every refusal of an amount say so, and the currency is USD as
+    # entered.
+    spelled = unit_conversions(
+        category(
+            "USD",
+            "BUCK",
+            UnitDefinition("BUCK", "BUCK", 1.0),
+            UnitDefinition("CENT", "BUCK", 0.01),
+        )
     )
+    batch = cashflows(TICKET, TEMPLATE, spelled, WorkCounter())
+    assert (batch.currency, batch.currency_unit) == ("USD", "BUCK")
+    result = valued(batch)
+    assert (result.currency, result.currency_unit) == ("USD", "BUCK")
+    assert result.report(Risk.DV01, Bucket.DAY).labels == ("SOFR USD dv01 [BUCK per basis point]",)
     assert result.dv01 == pytest.approx(0.85, **CLOSE)  # the numbers as they were
     largest = float(np.finfo(np.float64).max)
     doubled = ticket(trade_date=[AS_OF] * 2, amount=[largest, largest], payment_day=[A_YEAR] * 2)
     with pytest.raises(ValueError) as caught:
         cashflows(doubled, TEMPLATE, spelled, WorkCounter())
     assert str(caught.value) == (
-        f"the payments on {A_YEAR} on SOFR sum to inf, expected a finite amount of DOLLAR; the "
+        f"the payments on {A_YEAR} on SOFR sum to inf, expected a finite amount of BUCK; the "
         "rows' amounts, each finite, sum past the largest number"
     )
     apart = ticket(
@@ -1259,6 +1262,6 @@ def test_a_cashflows_unit_is_its_currencys_reference_unit_read_off_the_unit_tabl
             WorkCounter(),
         )
     assert str(caught.value) == (
-        "the batch has inf of mark in all, expected a finite amount of DOLLAR; the payments, "
+        "the batch has inf of mark in all, expected a finite amount of BUCK; the payments, "
         "each finite, sum past the largest number"
     )

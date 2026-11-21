@@ -92,7 +92,7 @@ STRIP = an_index(
     "STRIP",
     (("Z26", "2026-12-15"), ("F27", "2027-01-29"), ("G27", "2027-02-26")),
     ("2027-01-01",),
-    ("USD", "BBL"),
+    ("DOLLAR", "BBL"),
     ("VOLUME", "BBL"),
     ("BBL", 1.0, "BBL"),
 )
@@ -402,7 +402,7 @@ WAHA = index(
     "WAHA",
     "Waha basis - ICE",
     iferc_schedule(("X26", "Z26", "F27"), dates("2026-11-02", "2026-12-01", "2027-01-04")),
-    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("LOT",), numbers(2500.0), ("MMBTU",), numbers(0.0), numbers(0.0), UNITS
     ),

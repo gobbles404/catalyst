@@ -79,7 +79,7 @@ HNG = an_index(
     "HNG",
     (("Z26", "2026-12-31"), ("G27", "2027-02-01"), ("F29", "2029-01-05")),
     ("2027-12-27",),
-    ("USD", "BBL"),
+    ("DOLLAR", "BBL"),
     ("VOLUME", "BBL"),
     ("LOT", 1.0, "BBL"),
 )
@@ -96,7 +96,7 @@ HNG_CLEARED = "HNG cleared cross_gamma [LOT per basis point]"
 HNG_LABELS = (
     "HNG nominal_delta [LOT]",
     "HNG delta [LOT]",
-    "SOFR USD dv01 [USD per basis point]",
+    "SOFR USD dv01 [DOLLAR per basis point]",
     HNG_CROSS,
 )
 
@@ -351,7 +351,7 @@ def test_a_partly_fixed_asian_keeps_the_cross_gamma_of_its_live_days_alone() -> 
         "ETH",
         (("U26", "2026-09-30"), ("V26", "2026-10-30"), ("X26", "2026-11-30")),
         ("2027-12-27",),
-        ("USD", "BBL"),
+        ("DOLLAR", "BBL"),
         ("VOLUME", "BBL"),
         ("LOT", 1.0, "BBL"),
     )
@@ -391,7 +391,7 @@ NG = an_index(
     "NG",
     (("V26", "2026-09-28"), ("X26", "2026-10-28"), ("Z26", "2026-11-25"), ("F27", "2026-12-29")),
     ("2030-01-01",),
-    ("USD", "BBL"),
+    ("DOLLAR", "BBL"),
     ("VOLUME", "BBL"),
     ("LOT", 1.0, "BBL"),
 )
@@ -478,7 +478,7 @@ def test_a_contract_month_before_the_valuation_month_is_a_saved_fact() -> None:
         "NG3",
         (("Q26", "2026-08-27"), ("U26", "2026-10-15"), ("X26", "2026-10-28")),
         ("2030-01-01",),
-        ("USD", "BBL"),
+        ("DOLLAR", "BBL"),
         ("VOLUME", "BBL"),
         ("LOT", 1.0, "BBL"),
     )
@@ -579,7 +579,7 @@ def test_a_cross_gamma_bucket_past_the_largest_number_is_refused_by_its_contract
             ("F29", "2029-01-05"),
         ),
         ("2027-12-27",),
-        ("USD", "BBL"),
+        ("DOLLAR", "BBL"),
         ("VOLUME", "BBL"),
         ("EIGHT", 1.0, "BBL"),
     )
@@ -677,7 +677,7 @@ def test_a_month_report_of_cross_gamma_before_the_valuation_month_is_refused() -
         "NG3",
         (("Q26", "2026-08-27"), ("U26", "2026-10-15"), ("X26", "2026-10-28")),
         ("2030-01-01",),
-        ("USD", "BBL"),
+        ("DOLLAR", "BBL"),
         ("VOLUME", "BBL"),
         ("LOT", 1.0, "BBL"),
     )
@@ -714,7 +714,7 @@ WTI = an_index(
     "WTI",
     (("Z26", "2026-12-31"), ("G27", "2027-02-02"), ("F29", "2029-01-05")),
     ("2027-12-27",),
-    ("USD", "BBL"),
+    ("DOLLAR", "BBL"),
     ("VOLUME", "BBL"),
     ("LOT", 1.0, "BBL"),
 )

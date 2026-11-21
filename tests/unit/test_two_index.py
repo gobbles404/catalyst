@@ -72,7 +72,7 @@ def futures(
     lot_size: float,
     brokerage: float,
     clearing: float,
-    quote_currency: str = "USD",
+    quote_currency: str = "DOLLAR",
     extra: tuple[str, ...] = (),
     spec: tuple[str, float, str] | None = None,
 ) -> Index:
@@ -93,7 +93,7 @@ def futures(
         name,
         f"Index {name}",
         futures_schedule(tuple(c for c, _ in contracts), dates(*(e for _, e in contracts)), None),
-        index_conventions(quote_currency, "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+        index_conventions(quote_currency, "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
         contract_specifications(
             names,
             sizes,
@@ -111,7 +111,7 @@ def futures(
 def iferc(
     name: str,
     lot_size: float,
-    quote_currency: str = "USD",
+    quote_currency: str = "DOLLAR",
     spec: tuple[str, float, str] | None = None,
 ) -> Index:
     names: tuple[str, ...] = ("LOT", "MMBTU")
@@ -126,7 +126,7 @@ def iferc(
             ("Z26", "F27", "G27", "H27", "J27"),
             dates("2026-12-01", "2027-01-04", "2027-02-01", "2027-03-01", "2027-04-01"),
         ),
-        index_conventions(quote_currency, "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+        index_conventions(quote_currency, "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
         contract_specifications(names, sizes, units, sizes * 0.5, sizes * 0.5, UNITS),
         None,
         "LOT",
@@ -714,8 +714,8 @@ def test_the_pair_is_two_distinct_indexes_of_one_quoting_on_a_financial_settleme
         "index 2 is another index named 'A', the name of index 1, expected one index for one name"
     )
     assert refused(indexes=(A, iferc("B", 2_500.0, "CENT"))) == (
-        "index 2 'B' quotes in CENT per MMBTU and settles in USD, expected USD per MMBTU settled "
-        "in USD as index 1 'A'; two legs' prices add in one unit"
+        "index 2 'B' quotes in CENT per MMBTU and settles in DOLLAR, expected DOLLAR per MMBTU "
+        "settled in DOLLAR as index 1 'A'; two legs' prices add in one unit"
     )
     physical = {
         k: v for k, v in CLEARED.items() if k not in ("payment_day", "payment_holiday_calendar")
@@ -908,7 +908,7 @@ def test_a_pairs_report_reads_as_the_collection_of_its_legs(cleared: bool) -> No
         "B delta [LOT]",
     )
     assert everything.labels[4] == ("cleared USD dv01" if cleared else "SOFR USD dv01") + (
-        " [USD per basis point]"
+        " [DOLLAR per basis point]"
     )
     assert len(everything.labels) == 7  # the two pairs, one DV01 column and a cross-gamma a leg
 
@@ -960,7 +960,9 @@ def test_the_pair_collects_with_a_single_index_source_and_a_cashflow() -> None:
     assert together.cross_groups[1].cross_gamma_total == pytest.approx(-0.00038, **CLOSE)
     view = together.report(Risk.ALL, Bucket.DAY)
     assert len(view.labels) == 7
-    assert column(view, "SOFR USD dv01 [USD per basis point]")[0] == pytest.approx(-0.1425, **CLOSE)
+    assert column(view, "SOFR USD dv01 [DOLLAR per basis point]")[0] == pytest.approx(
+        -0.1425, **CLOSE
+    )
     # A cashflow of 1,000 USD on the payment day, valued on SOFR: -0.095 of DV01 more on the
     # SOFR column and nothing else moved.
     cash = cashflow_results(
@@ -1092,8 +1094,8 @@ def test_the_prepared_and_valued_pair_read_back_one_row_per_slot_naming_its_leg(
     assert cell(table, 1, "observation_coefficient") == 10_000.0
     assert cell(table, 0, "observation_price") == 3.50
     assert cell(table, 1, "observation_price") == -0.40
-    assert cell(table, 0, "price_unit") == "USD/MMBTU"
-    assert cell(table, 1, "price_unit") == "USD/MMBTU"
+    assert cell(table, 0, "price_unit") == "DOLLAR/MMBTU"
+    assert cell(table, 1, "price_unit") == "DOLLAR/MMBTU"
     assert cell(table, 0, "floating_contribution") == pytest.approx(35_000.0, **CLOSE)
     assert cell(table, 1, "floating_contribution") == pytest.approx(-4_000.0, **CLOSE)
     headings = table[0]
@@ -1104,7 +1106,7 @@ def test_the_prepared_and_valued_pair_read_back_one_row_per_slot_naming_its_leg(
         "floating_contribution",
         "currency_unit",  # the batch's, once, since currency-and-currency-unit.md
     ]
-    assert [cell(table, r, "currency_unit") for r in range(2)] == ["USD", "-"]
+    assert [cell(table, r, "currency_unit") for r in range(2)] == ["DOLLAR", "-"]
     assert headings.index("brokerage_reserve") == headings.index("group_dv01") + 1
     # A cleared pair: the group facts are none, a dash on every row.
     cleared = grid(valued(booked(CLEARED), curve=None))
@@ -1214,7 +1216,7 @@ def the_sheet() -> dict[str, Any]:
     behind the histories, A quoted 3.50 and 3.60 and B -0.38, -0.40 and -0.42, SOFR at 0.95 a
     year on; a bilateral template carrying the second leg's method and the ticket's one row,
     G27 for one lot at the outright 3.00."""
-    conventions = SEAM["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
+    conventions = SEAM["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specs = SEAM["_CreateContractSpecifications"](
         across("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
         across("NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0),
@@ -1382,7 +1384,7 @@ def test_the_sheet_prepares_and_values_a_pair_from_ranges_in_either_order(
         "A delta [NYMEX NG]",
         "B nominal_delta [NYMEX NG]",
         "B delta [NYMEX NG]",
-        "SOFR USD dv01 [USD per basis point]",
+        "SOFR USD dv01 [DOLLAR per basis point]",
         "A SOFR cross_gamma [NYMEX NG per basis point]",
         "B SOFR cross_gamma [NYMEX NG per basis point]",
     ]

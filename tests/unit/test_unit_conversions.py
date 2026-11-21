@@ -43,7 +43,7 @@ def test_the_four_categories_each_with_their_own_reference_unit() -> None:
         ("VOLUME", "GAL"),
         ("MASS", "KG"),
         ("ENERGY", "MMBTU"),
-        ("USD", "USD"),
+        ("USD", "DOLLAR"),
     ]
     assert all(c.sizes[c.reference_unit] == 1.0 for c in UNITS.categories.values())
     assert all(UNITS.category(name) is c for name, c in UNITS.categories.items())
@@ -62,7 +62,7 @@ def test_the_units_of_each_category_as_the_page_lists_them() -> None:
         "CWT_US",
     ]
     assert list(UNITS.category("ENERGY").sizes) == ["MMBTU", "BTU", "THERM", "GJ", "MWH", "KWH"]
-    assert list(UNITS.category("USD").sizes) == ["USD", "CENT"]
+    assert list(UNITS.category("USD").sizes) == ["DOLLAR", "CENT"]
 
 
 # --- the page's conversions -------------------------------------------------
@@ -90,9 +90,9 @@ def test_barrels_and_gallons_both_ways_and_a_unit_to_itself() -> None:
         (1.0, "ENERGY", "MMBTU", "BTU", 1_000_000.0),
         (1.0, "ENERGY", "MMBTU", "THERM", 10.0),
         (1.0, "ENERGY", "MWH", "KWH", 1000.0),
-        (1.0, "USD", "USD", "CENT", 100.0),
-        (100.0, "USD", "CENT", "USD", 1.0),
-        (250.0, "USD", "CENT", "USD", 2.5),
+        (1.0, "USD", "DOLLAR", "CENT", 100.0),
+        (100.0, "USD", "CENT", "DOLLAR", 1.0),
+        (250.0, "USD", "CENT", "DOLLAR", 2.5),
     ],
 )
 def test_the_pages_relations_hold_within_tolerance(
@@ -110,7 +110,7 @@ def test_zero_stays_zero_and_a_negative_quantity_keeps_its_sign() -> None:
 
 def test_a_column_converts_in_one_go_and_the_column_is_left_as_it_was() -> None:
     quantities = np.array([1.0, 2.0, 3.0])
-    result = UNITS.convert(quantities, "USD", "USD", "CENT")
+    result = UNITS.convert(quantities, "USD", "DOLLAR", "CENT")
     assert result.tolist() == [100.0, 200.0, 300.0]
     assert quantities.tolist() == [1.0, 2.0, 3.0]
     assert result is not quantities
@@ -258,9 +258,9 @@ def test_the_first_unknown_unit_is_named() -> None:
         ),
         (
             "MASS",
-            "USD",
+            "DOLLAR",
             "GAL",
-            "cannot convert USD to GAL; USD and VOLUME are different categories",
+            "cannot convert DOLLAR to GAL; USD and VOLUME are different categories",
         ),
     ],
 )

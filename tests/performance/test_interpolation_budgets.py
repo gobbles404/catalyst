@@ -29,7 +29,7 @@ def futures_index(name: str, codes: tuple[str, ...], expiries: np.ndarray) -> In
         name,
         f"{name} index",
         futures_schedule(codes, expiries, None),
-        index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS),
+        index_conventions("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL", UNITS),
         contract_specifications(
             ("LOT",), np.array([1000.0]), ("BBL",), np.array([0.0]), np.array([0.0]), UNITS
         ),

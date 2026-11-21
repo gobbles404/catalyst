@@ -309,7 +309,7 @@ def encoded(
     per distinct specification the batch selects and gathered onto the components; one
     multiplication over the array, the sign kept. The
     coefficient: the quote quantity times the factor from the quote currency to the settlement
-    currency, USD or CENT to USD or CENT, so that a price in cents times it is an amount in
+    currency, DOLLAR or CENT to DOLLAR or CENT, so that a price in cents times it is an amount in
     dollars; every price the batch meets, a quote, a settle or the fixed price, multiplies the
     coefficient and never the quantity. The trade's fixed leg, since two-index-one-price.md
     once whatever the legs: minus the first leg's coefficient times the trade's one fixed

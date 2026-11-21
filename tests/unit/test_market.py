@@ -54,7 +54,7 @@ SCHEDULE = a_schedule(("m26", "2026-05-19"), ("n26", "2026-06-22"), ("q26", "202
 CLOSED_MAY_25 = holiday_calendar(dates("2026-05-25"))
 ELSEWHERE = holiday_calendar(dates("2026-01-01"))
 
-CONVENTIONS = index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS)
+CONVENTIONS = index_conventions("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL", UNITS)
 SPECIFICATIONS = contract_specifications(
     ("NYMEX",), np.array([1000.0]), ("BBL",), np.array([0.0]), np.array([0.0]), UNITS
 )

@@ -63,7 +63,7 @@ def numbers(*values: float) -> NDArray[np.float64]:
 
 
 # --- the page's index -----------------------------------------------------------------------
-# USD per MMBTU. Two quantity units: LOT, 10,000 MMBTU, charging 10.00 of brokerage and 4.00 of
+# DOLLAR per MMBTU. Two quantity units: LOT, 10,000 MMBTU, charging 10.00 of brokerage and 4.00 of
 # clearing a lot, and MMBTU, one, charging nothing. X26 bounds the calendar; Z26 expires on 18
 # November 2026, F27 on 29 December and G27 on 27 January 2027; no pricing holiday.
 
@@ -86,7 +86,7 @@ def an_index() -> Index:
         "GAS",
         "GAS index",
         schedule,
-        index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+        index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
         contract_specifications(
             ("LOT", "MMBTU"),
             numbers(10_000.0, 1.0),
@@ -557,7 +557,7 @@ def sheet() -> dict[str, Any]:
         "GAS",
         "GAS index",
         schedule,
-        ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU"),
+        ENTRY["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU"),
         ENTRY["_CreateContractSpecifications"](
             row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
             rows(["LOT", 10_000.0, "MMBTU", 10.0, 4.0], ["MMBTU", 1.0, "MMBTU", 0.0, 0.0]),
@@ -614,9 +614,16 @@ def test_the_sheet_reads_the_closed_contract_as_cash_with_its_fees_and_no_risk(
         assert spilled(ENTRY["_ReportValues"](results)) == [
             ["cleared_mark", "cleared_cash", "currency", "as_of", "currency_unit"],
             ["float64", "float64", "str", "datetime64[D]", "str"],
-            [mark, cash, "USD", serial(as_of), "USD"],
+            [mark, cash, "USD", serial(as_of), "DOLLAR"],
         ]
-        assert spilled(ENTRY["_ReportReserves"](results))[2] == [20.0, 8.0, 0.0, 0.0, "USD", "USD"]
+        assert spilled(ENTRY["_ReportReserves"](results))[2] == [
+            20.0,
+            8.0,
+            0.0,
+            0.0,
+            "USD",
+            "DOLLAR",
+        ]
         for bucket in ("day", "month", "year"):
             total = spilled(ENTRY["_ReportRisk"](results, "nominal_delta", bucket))[3]
             assert total == ["Total", 0.0]

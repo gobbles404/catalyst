@@ -79,7 +79,7 @@ def an_index(
         name,
         f"{name} index",
         schedule,
-        index_conventions("USD", measure[1], "USD", measure[0], measure[1], UNITS),
+        index_conventions("DOLLAR", measure[1], "DOLLAR", measure[0], measure[1], UNITS),
         contract_specifications(
             names,
             np.array([size for _, size, _ in lots]),
@@ -2040,7 +2040,7 @@ def sheet() -> dict[str, Any]:
         cells(["X26"], ["Z26"], ["F27"]), cells([46323.0], [46351.0], [46385.0]), bridge.MISSING
     )
     holidays = ENTRY["_CreateHolidayCalendar"](cells([46352.0], [46381.0]))
-    conventions = ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
+    conventions = ENTRY["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specs = ENTRY["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
         row("NYMEX NG", 10000.0, "MMBTU", 0.0, 0.0),
@@ -2520,7 +2520,7 @@ def test_a_dated_ticket_crosses_the_seam_and_spills_the_days_each_component_cove
 
 
 # --- mixed fields in one batch, mixed-trade-fields.md ---------------------------------------------
-# The ticket's four rows of Z26 at 10 on the MIXED index, USD per GAL, GAL and BBL specifications
+# The ticket's four rows of Z26 at 10 on the MIXED index, DOLLAR per GAL, GAL and BBL specifications
 # of one unit each, 42 gallons a barrel: A, 1 BBL a month under lastday; B, -2 GAL a day under
 # penultimate; C, 3 BBL a month under last3day; D, 22 GAL a month under asian; each its own unit,
 # basis, method and clearing house in the ticket, the template holding the rest. The kernel tests
@@ -2894,7 +2894,7 @@ WAHA = index(
     "WAHA",
     "Waha basis - ICE",
     iferc_schedule(("X26", "Z26", "F27"), dates("2026-11-02", "2026-12-01", "2027-01-04")),
-    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("LOT", "MMBTU"),
         np.array([2_500.0, 1.0]),
