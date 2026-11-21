@@ -966,7 +966,7 @@ def test_the_pair_collects_with_a_single_index_source_and_a_cashflow() -> None:
     cash = cashflow_results(
         cashflows(
             a_ticket(
-                {"trade_date": ["2026-12-15"], "amount": [1_000.0], "payment_date": [PAY]},
+                {"trade_date": ["2026-12-15"], "amount": [1_000.0], "payment_day": [PAY]},
                 CASHFLOW,
             ),
             a_template({"currency": "USD", "discount_curve_key": "SOFR"}, CASHFLOW),

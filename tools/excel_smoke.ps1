@@ -2220,6 +2220,17 @@ $formulas = [ordered]@{
     '=LEFT(_EvaluateCashflows(UF5,UF6,UF7),70)' = "#ERROR _EvaluateCashflows: discount_curve_set is discount curve handle"
     '=RIGHT(_EvaluateCashflows(UF5,UF6,UF7),36)' = ", expected discount curve set handle"
     "=_CreateCashflows(UH1:UL1,UH2:UL4,UF4)" = "#ERROR _CreateCashflows: ValueError: discount_curve_key is missing, expected a value in the template or a column in the ticket"
+    # A cashflow is booked under payment_day, cashflow-payment-day.md, the trades' header, where
+    # it was payment_date: the instrument's table and the booked readback under the new name in
+    # the place the old one had, the results' first column still payment_date, the resolved
+    # date; the old header refused as no field of the instrument, and a rule, the trades' other
+    # form, refused by its cell as text where a date goes.
+    '=INDEX(_ShowInstrument("cashflow"),1,6)' = "payment_day"
+    '=INDEX(_ShowInstrument("cashflow"),5,6)' = "date"
+    "=INDEX(util_ReadHandle(UF5),1,5)" = "payment_day"
+    "=INDEX(util_ReadHandle(UF8),1,1)" = "payment_date"
+    "=_CreateCashflows(ZV18:ZX18,ZV7:ZX7,ZV3)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'payment_date', expected a field of cashflow: trade_id, trade_date, amount, currency, payment_day, counterparty, description, discount_curve_key"
+    "=_CreateCashflows(ZV6:ZX6,ZV19:ZX19,ZV3)" = "#ERROR _CreateCashflows: cashflow_rows cell (1, 3) is text '+5bd', expected date"
     # A named curve for each cashflow, cashflow-curve-keys.md: 10,000 received on SOFR and 10,000
     # paid on FFOIS on one day, valued over the two curves collected, 0.95 and 0.90: two groups
     # worth 500, never one of nothing, a DV01 column a curve, -0.95 and 0.90, on the one payment
@@ -3964,7 +3975,7 @@ $cells = [ordered]@{
     "UF1" = "currency"; "UG1" = "counterparty"
     "UF2" = "USD"; "UG2" = "Firm A"
     "UF4" = '=_CreateTradeTemplate("cashflow",UF1:UG1,UF2:UG2)'
-    "UH1" = "trade_id"; "UI1" = "trade_date"; "UJ1" = "amount"; "UK1" = "payment_date"; "UL1" = "description"
+    "UH1" = "trade_id"; "UI1" = "trade_date"; "UJ1" = "amount"; "UK1" = "payment_day"; "UL1" = "description"
     "UH2" = "1"; "UI2" = "4-Jan-2027"; "UJ2" = "10000"; "UK2" = "4-Jan-2028"; "UL2" = "Receivable"
     "UH3" = "2"; "UI3" = "4-Jan-2027"; "UJ3" = "-10000"; "UK3" = "3-Jan-2029"; "UL3" = "Payable"
     "UH4" = "3"; "UI4" = "4-Jan-2027"; "UJ4" = "250"; "UK4" = "3-Jan-2027"; "UL4" = "Earlier rebate"
@@ -4008,7 +4019,7 @@ $cells = [ordered]@{
     # paid on FFOIS, both on 4 January 2028, keyed in the ticket's last column under the template
     # UF4, which holds no key; FFOIS at 0.90 a year out in ZV13 beside the cashflow block's SOFR at
     # 0.95, UF7, collected through cells referring to both, and the batch valued.
-    "ZV6" = "trade_date"; "ZW6" = "amount"; "ZX6" = "payment_date"; "ZY6" = "discount_curve_key"
+    "ZV6" = "trade_date"; "ZW6" = "amount"; "ZX6" = "payment_day"; "ZY6" = "discount_curve_key"
     "ZV7" = "4-Jan-2027"; "ZW7" = "10000"; "ZX7" = "4-Jan-2028"; "ZY7" = "SOFR"
     "ZV8" = "4-Jan-2027"; "ZW8" = "-10000"; "ZX8" = "4-Jan-2028"; "ZY8" = "FFOIS"
     "ZV9" = "=_CreateCashflows(ZV6:ZY6,ZV7:ZY8,UF4)"
@@ -4018,6 +4029,10 @@ $cells = [ordered]@{
     "ZV14" = "=UF7"; "ZW14" = "=ZV13"
     "ZV15" = "=_CollectDiscountCurves(ZV14:ZW14)"
     "ZV16" = "=_EvaluateCashflows(ZV9,UF6,ZV15)"
+    # A cashflow is booked under payment_day, cashflow-payment-day.md: the old header in ZX18 over
+    # the mixed block's first row, and a rule where the day goes in ZX19.
+    "ZV18" = "trade_date"; "ZW18" = "amount"; "ZX18" = "payment_date"
+    "ZV19" = "4-Jan-2027"; "ZW19" = "10000"; "ZX19" = "+5bd"
     "UT7" = "=QV8"; "UU7" = "=UT1"; "UV7" = "=UT6"
     "UT8" = "=_AggregateResults(UT7:UV7)"
     "UT9" = "=QV8"; "UT10" = "=UF5"

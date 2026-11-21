@@ -658,7 +658,7 @@ def cashflow_batch(key: str) -> str:
     )
     return str(
         ENTRY["_CreateCashflows"](
-            row("trade_id", "trade_date", "amount", "payment_date"),
+            row("trade_id", "trade_date", "amount", "payment_day"),
             rows(
                 [1.0, serial(AS_OF), 10_000.0, serial(A_YEAR_OUT)],
                 [2.0, serial(AS_OF), -10_000.0, serial(TWO_YEARS_OUT)],

@@ -818,7 +818,7 @@ $cashflows = {
     Build-Chain $state $sheet
     Put $state $sheet "A14" "currency"; Put $state $sheet "B14" "counterparty"; Put $state $sheet "C14" "discount_curve_key"
     Put $state $sheet "A15" "USD"; Put $state $sheet "B15" "Firm A"; Put $state $sheet "C15" "SOFR"
-    Put $state $sheet "A17" "trade_id"; Put $state $sheet "B17" "trade_date"; Put $state $sheet "C17" "amount"; Put $state $sheet "D17" "payment_date"; Put $state $sheet "E17" "description"
+    Put $state $sheet "A17" "trade_id"; Put $state $sheet "B17" "trade_date"; Put $state $sheet "C17" "amount"; Put $state $sheet "D17" "payment_day"; Put $state $sheet "E17" "description"
     Put $state $sheet "A18" "1"; Put $state $sheet "B18" "4-Jan-2027"; Put $state $sheet "C18" "10000"; Put $state $sheet "D18" "4-Jan-2028"; Put $state $sheet "E18" "Receivable"
     Put $state $sheet "A19" "2"; Put $state $sheet "B19" "4-Jan-2027"; Put $state $sheet "C19" "-10000"; Put $state $sheet "D19" "3-Jan-2029"; Put $state $sheet "E19" "Payable"
     Put $state $sheet "A20" "3"; Put $state $sheet "B20" "4-Jan-2027"; Put $state $sheet "C20" "250"; Put $state $sheet "D20" "3-Jan-2027"; Put $state $sheet "E20" "Earlier rebate"

@@ -37,7 +37,9 @@ class Cashflows:
     """The batch as booked and as it is valued, every array read-only. Per row, in the ticket's
     order: trade_id, the source system's whole numbers, or None when neither the template nor
     the ticket supplied the field; trade_date; amount, signed, positive received and negative
-    paid; payment_date; counterparty and description, labels as typed, or None when not
+    paid; payment_date, the date each row entered under payment_day, kept under the name the
+    library reports a payment's date by; counterparty and description, labels as typed, or
+    None when not
     supplied; and since cashflow-curve-keys.md discount_curve_key, the exact name of the curve
     the row's payment discounts on, the text alone and never a curve; currency, the one word
     every row shares. Then keys, the batch's distinct keys in the order the rows first name
@@ -80,8 +82,9 @@ def cashflows(ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
     The template is of the cashflow instrument, a template of another refused by name, as the
     trades refuse a cashflow template; the ticket is bound against the template's instrument, which
     the seam did; no field is supplied by both, even to the same value; every required field,
-    trade_date, amount, currency, payment_date and, since cashflow-curve-keys.md,
-    discount_curve_key, is present in one of them. The currency is USD exactly, the template's
+    trade_date, amount, currency, payment_day, the field's name since
+    cashflow-payment-day.md, and, since cashflow-curve-keys.md, discount_curve_key, is
+    present in one of them. The currency is USD exactly, the template's
     one value, read when the template was made, or a column every row holds, each distinct text
     read once in the order its first row comes and named with that row; so one batch holds one
     currency. The trade IDs, where supplied, are whole numbers of at most 15 digits, the kernel's
@@ -113,7 +116,7 @@ def cashflows(ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
     amount = fields.numbers("amount")
     finite_amounts(amount, partial(fields.where, "amount"))
     trade_date = fields.dates("trade_date")
-    payment_date = fields.dates("payment_date")
+    payment_date = fields.dates("payment_day")  # entered under the trades' header
     counterparty = fields.texts("counterparty") if fields.has("counterparty") else None
     description = fields.texts("description") if fields.has("description") else None
     keyed, keys = _the_keys(fields)
