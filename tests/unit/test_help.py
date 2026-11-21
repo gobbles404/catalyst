@@ -883,8 +883,8 @@ def test_the_cashflow_functions_explain_themselves() -> None:
     assert not hidden
     assert description == (
         "Values a batch of cashflows on the valuation day: each unpaid payment discounted on "
-        "the curve's factor for its day with its DV01, each paid one cash, and shows the "
-        "results' handle, the text the reports and util_ReadHandle take."
+        "the curve its discount_curve_key names, with its DV01, each paid one cash, and shows "
+        "the results' handle, the text the reports and util_ReadHandle take."
     )
     assert arguments == [
         (
@@ -898,10 +898,10 @@ def test_the_cashflow_functions_explain_themselves() -> None:
             "as B2, or a name for it; the day the unpaid payments are discounted to.",
         ),
         (
-            "discount_curve",
-            "The discount-curve handle: the cell showing _CreateDiscountCurve's result, such "
-            "as B5, or a name for it, starting on the valuation day and covering every unpaid "
-            "payment day.",
+            "discount_curve_set",
+            "The collection of discount curves: the cell showing _CollectDiscountCurves's "
+            "result, such as D2, or a name for it, holding a curve named by each "
+            "discount_curve_key of the batch.",
         ),
     ]
 

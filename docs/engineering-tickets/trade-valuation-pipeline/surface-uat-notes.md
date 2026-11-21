@@ -1034,3 +1034,31 @@ UAT: in a bilateral block of the kept workbook, type a name the collection does 
 over a ticket's `discount_curve_key` and read the refusal in the results cell, the key, the
 trade and the collection's names in quote marks; put the key back and the results return.
 Do the same to a quote template's key and read the same list.
+
+## 39. A named discount curve for each cashflow
+
+Agreed 20 November 2026 and built in #260, issue #254:
+[cashflow-curve-keys.md](cashflow-curve-keys.md), stacked on #259. A batch of cashflows now
+discounts each payment on the curve its row names. Every cashflow sheet changes in two
+places, and each fails by name until it does: the template or the ticket gains
+`discount_curve_key`, the curve's exact name, and the third argument of `_EvaluateCashflows`
+points at a `_CollectDiscountCurves` cell where it pointed at one curve. A batch on one
+curve passes a collection of one. Payments on one day net only within one key, so 10,000
+received on SOFR against 10,000 paid on FFOIS is worth 500 at factors of 0.95 and 0.90, and
+never nothing. The risk report shows a DV01 column per curve. The key is the last column of
+both readbacks, so no column a sheet already reads has moved.
+
+UAT: rows 3507 to 3550 of the kept workbook. B3516 books 10,000 received on SOFR and
+10,000 paid on FFOIS, both on 4 January 2028, each row naming its curve in the ticket's
+last column. B3526 values them on 4 January 2027 over SOFR at 0.95 and FFOIS at 0.90,
+collected in B3522: D3526 reads 500 and F3526 the DV01, -0.05. The risk report from B3533
+has a column for each curve, -0.95 and 0.90, and the readback from H3529 a row for each,
+the key last. B3527 values the same batch with SOFR at 0.96: 600. Type SONIA over FFOIS
+in F3515 and read the refusal in B3526, the key, the row and the collection's names; type
+FFOIS back and the 500 returns. Type 0.91 over FFOIS's factor in H3520 and see the mark
+fall to 400 with SOFR's column as it was. B3547 to B3549 are the refusals of a key the
+collection lacks, of a curve where the collection goes and of a ticket with no key, and
+row 3550 is the same two amounts under one key, one group of nothing. The older cashflow
+block from row 2864 is cut over, the key in D2866:D2867 and each evaluation on its curve's
+collection, with no number moved. Then cut one of the desk's own cashflow sheets over by
+the two edits and compare its mark with the day before.

@@ -1085,18 +1085,23 @@ def cashflows_table(obj: Cashflows) -> MixedArray:
         text("counterparty", obj.counterparty)
     if obj.description is not None:
         text("description", obj.description)
+    text("discount_curve_key", obj.discount_curve_key)  # last, cashflow-curve-keys.md
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
 
 @shown.register
 def cashflow_results_table(obj: CashflowResults) -> MixedArray:
-    # One row per distinct payment day of the batch, increasing, paid or not, since #200: the
-    # day, the amount the rows summed to on it, whether it has paid, its factor, 1 on a paid
-    # day, its npv, its cash and its dv01, with the currency and the valuation day on every row so
-    # that a row reads whole; then the batch's totals once, on the first row and a dash below,
-    # cashflow_mark, cashflow_cash and cashflow_dv01, the numbers the reports show, since a total
-    # repeated on every day would read as each day's and sum twice.
-    days = obj.cashflows.payment_days
+    # One row per payment group of the batch, a payment day and a key since
+    # cashflow-curve-keys.md, in day order and paid or not, where it was one per payment day,
+    # a batch on one key reading row for row as it did: the day, the amount the group's rows
+    # summed to, whether it has paid, its factor, 1 on a paid group, its npv, its cash and its
+    # dv01, with the currency and the valuation day on every row so that a row reads whole;
+    # then the batch's totals once, on the first row and a dash below, cashflow_mark,
+    # cashflow_cash and cashflow_dv01, the numbers the reports show, since a total repeated on
+    # every row would read as each row's and sum twice; and last the group's key, the name of
+    # the curve it is valued on, after every column a sheet already reads.
+    booked = obj.cashflows
+    days = booked.payment_days[booked.group_day]
     n = days.size
     table = MixedArray.table(
         [
@@ -1124,12 +1129,12 @@ def cashflow_results_table(obj: CashflowResults) -> MixedArray:
             ),
         ],
         days,
-        obj.cashflows.payment_amounts,
+        booked.group_amounts,
         obj.is_paid,
         obj.payment_factor,
         obj.npv,
         obj.payment_cash,
-        obj.rate_contributions[0].dv01_by_day,  # one curve values a batch of cashflows
+        obj.group_dv01,
         (obj.currency,) * n,
         np.full(n, obj.as_of, dtype="datetime64[D]"),
     )
@@ -1141,6 +1146,7 @@ def cashflow_results_table(obj: CashflowResults) -> MixedArray:
             _numbers_on("cashflow_mark", np.array([obj.mark]), once),
             _numbers_on("cashflow_cash", np.array([obj.cash]), once),
             _numbers_on("cashflow_dv01", np.array([obj.dv01]), once),
+            _words_on("discount_curve_key", np.array(booked.keys, dtype=object)[booked.group_key]),
         ],
     )
 

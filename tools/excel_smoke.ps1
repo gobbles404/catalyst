@@ -2178,14 +2178,19 @@ $formulas = [ordered]@{
     "=util_BumpDiscountCurve(AA1)" = "#ERROR util_BumpDiscountCurve: bump_bps is missing, expected number"
     "=util_BumpDiscountCurve(AA3,1)" = "#ERROR util_BumpDiscountCurve: curve is the creator's failure, expected discount curve handle: #ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
     "=util_BumpDiscountCurve(UC3,-1)" = "#ERROR util_BumpDiscountCurve: ValueError: discount_factor rises at row 2, from 1.0 to 1.0000002739726404"
-    # The cashflow instrument, cashflow-instrument.md: in the catalog with its eight columns; the
+    # The cashflow instrument, cashflow-instrument.md: in the catalog with its nine columns; the
     # ticket's three payments booked under a template of USD and Firm A and valued on 4 January 2027
     # over the curve 1, 0.95 and 0.90, 500 of mark, 250 of cash and 0.85 of DV01 through the reports
     # and the readback; delta refused by name, a fixed_float template at the first cashflow header,
-    # a curve of another day and a left-out date in their own words.
+    # a curve of another day and a left-out date in their own words. Since cashflow-curve-keys.md
+    # the batch names its curve and is valued on a collection: the key the last column of both
+    # readbacks, a curve given where the collection belongs refused by its kind, and a ticket
+    # with no key by the field.
     '=INDEX(_ShowInstrument("cashflow"),1,4)' = "amount"
     '=INDEX(_ShowInstrument("cashflow"),3,4)' = "TRUE"
-    '=COLUMNS(_ShowInstrument("cashflow"))' = "8"
+    '=COLUMNS(_ShowInstrument("cashflow"))' = "9"
+    '=INDEX(_ShowInstrument("cashflow"),1,9)' = "discount_curve_key"
+    '=INDEX(_ShowInstrument("cashflow"),3,9)' = "TRUE"
     "=INDEX(_ReportValues(UF8),1,1)" = "cashflow_mark"
     "=INDEX(_ReportValues(UF8),3,1)" = "500"
     "=INDEX(_ReportValues(UF8),3,2)" = "250"
@@ -2200,10 +2205,50 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(UF8),3,10)" = "500"
     "=INDEX(util_ReadHandle(UF8),4,10)" = "-"
     "=INDEX(util_ReadHandle(UF5),3,6)" = "Firm A"
+    "=COLUMNS(util_ReadHandle(UF5))" = "8"
+    "=INDEX(util_ReadHandle(UF5),1,8)" = "discount_curve_key"
+    "=INDEX(util_ReadHandle(UF5),5,8)" = "SOFR"
+    "=INDEX(util_ReadHandle(ZV4),3,8)" = "FFOIS"
+    "=COLUMNS(util_ReadHandle(UF8))" = "13"
+    "=INDEX(util_ReadHandle(UF8),1,13)" = "discount_curve_key"
+    "=INDEX(util_ReadHandle(UF8),5,13)" = "SOFR"
     '=_ReportRisk(UF8,"delta","day")' = "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk"
     "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
-    "=_EvaluateCashflows(UF5,UF6,AA1)" = "#ERROR _EvaluateCashflows: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2027-01-04, the valuation date; a curve is never rebased"
+    "=_EvaluateCashflows(UF5,UF6,UQ5)" = "#ERROR _EvaluateCashflows: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2027-01-04, the valuation date; a curve is never rebased"
     "=_EvaluateCashflows(UF5)" = "#ERROR _EvaluateCashflows: valuation_date is missing, expected valuation date handle"
+    "=_EvaluateCashflows(UF5,UF6)" = "#ERROR _EvaluateCashflows: discount_curve_set is missing, expected discount curve set handle"
+    '=LEFT(_EvaluateCashflows(UF5,UF6,UF7),70)' = "#ERROR _EvaluateCashflows: discount_curve_set is discount curve handle"
+    '=RIGHT(_EvaluateCashflows(UF5,UF6,UF7),36)' = ", expected discount curve set handle"
+    "=_CreateCashflows(UH1:UL1,UH2:UL4,UF4)" = "#ERROR _CreateCashflows: ValueError: discount_curve_key is missing, expected a value in the template or a column in the ticket"
+    # A named curve for each cashflow, cashflow-curve-keys.md: 10,000 received on SOFR and 10,000
+    # paid on FFOIS on one day, valued over the two curves collected, 0.95 and 0.90: two groups
+    # worth 500, never one of nothing, a DV01 column a curve, -0.95 and 0.90, on the one payment
+    # day they share, a readback row a key with the totals once and the key last; and a key the
+    # collection lacks refused with its row.
+    "=INDEX(_ReportValues(ZV16),3,1)" = "500"
+    "=INDEX(_ReportValues(ZV16),3,2)" = "0"
+    '=ROWS(_ReportRisk(ZV16,"dv01","day"))' = "5"
+    '=COLUMNS(_ReportRisk(ZV16,"dv01","day"))' = "3"
+    '=INDEX(_ReportRisk(ZV16,"dv01","day"),2,2)' = "SOFR USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(ZV16,"dv01","day"),2,3)' = "FFOIS USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(ZV16,"dv01","day"),4,2)' = "-0.95"
+    '=INDEX(_ReportRisk(ZV16,"dv01","day"),4,3)' = "0.9"
+    "=ROWS(util_ReadHandle(ZV16))" = "4"
+    "=INDEX(util_ReadHandle(ZV16),3,2)" = "10000"
+    "=INDEX(util_ReadHandle(ZV16),4,2)" = "-10000"
+    "=INDEX(util_ReadHandle(ZV16),3,4)" = "0.95"
+    "=INDEX(util_ReadHandle(ZV16),4,4)" = "0.9"
+    "=INDEX(util_ReadHandle(ZV16),3,5)" = "9500"
+    "=INDEX(util_ReadHandle(ZV16),4,5)" = "-9000"
+    "=INDEX(util_ReadHandle(ZV16),3,10)" = "500"
+    "=INDEX(util_ReadHandle(ZV16),4,10)" = "-"
+    '=TEXT(INDEX(util_ReadHandle(ZV16),3,12),"0.0000")' = "-0.0500"
+    "=INDEX(util_ReadHandle(ZV16),3,13)" = "SOFR"
+    "=INDEX(util_ReadHandle(ZV16),4,13)" = "FFOIS"
+    "=COLUMNS(util_ReadHandle(ZV9))" = "6"
+    "=INDEX(util_ReadHandle(ZV9),1,6)" = "discount_curve_key"
+    "=INDEX(util_ReadHandle(ZV9),4,6)" = "FFOIS"
+    "=_EvaluateCashflows(ZV9,UF6,UF9)" = "#ERROR _EvaluateCashflows: ValueError: discount_curve_key 'FFOIS' of trade at row 2 names no curve of the collection, which holds 'SOFR'; expected a curve of that name"
     # A quote, template-based-quoting.md: the ticket's strip on the STRIP index in UX5, valued
     # 31-Dec-2026 with both months live at 30 and 60, the bilateral template in VF3 and the cleared
     # calendar-day one in VF7, SOFR collected in VN6: the month price 88.5/1.97, the calendar-day
@@ -3913,7 +3958,9 @@ $cells = [ordered]@{
     "UD3" = "13-Sep-2026"; "UE3" = "1"
     "UC3" = '=_CreateDiscountCurve("SOFR",Y1:Z1,UD1:UE3)'
     # The cashflow instrument, cashflow-instrument.md: a template of USD and Firm A, the ticket's
-    # three payments, the valuation date and the curve, and the batch valued.
+    # three payments, the valuation date and the curve, and the batch valued; since
+    # cashflow-curve-keys.md each payment names its curve, SOFR in the ticket's last column UM, and
+    # the batch is valued on the curve collected in UF9.
     "UF1" = "currency"; "UG1" = "counterparty"
     "UF2" = "USD"; "UG2" = "Firm A"
     "UF4" = '=_CreateTradeTemplate("cashflow",UF1:UG1,UF2:UG2)'
@@ -3921,14 +3968,17 @@ $cells = [ordered]@{
     "UH2" = "1"; "UI2" = "4-Jan-2027"; "UJ2" = "10000"; "UK2" = "4-Jan-2028"; "UL2" = "Receivable"
     "UH3" = "2"; "UI3" = "4-Jan-2027"; "UJ3" = "-10000"; "UK3" = "3-Jan-2029"; "UL3" = "Payable"
     "UH4" = "3"; "UI4" = "4-Jan-2027"; "UJ4" = "250"; "UK4" = "3-Jan-2027"; "UL4" = "Earlier rebate"
-    "UF5" = "=_CreateCashflows(UH1:UL1,UH2:UL4,UF4)"
+    "UM1" = "discount_curve_key"
+    "UM2" = "SOFR"; "UM3" = "SOFR"; "UM4" = "SOFR"
+    "UF5" = "=_CreateCashflows(UH1:UM1,UH2:UM4,UF4)"
     "UN1" = "date"; "UO1" = "discount_factor"
     "UN2" = "4-Jan-2027"; "UO2" = "1"
     "UN3" = "4-Jan-2028"; "UO3" = "0.95"
     "UN4" = "3-Jan-2029"; "UO4" = "0.9"
     "UF6" = "=_CreateValuationDate(UN2,0.5)"
     "UF7" = '=_CreateDiscountCurve("SOFR",UN1:UO1,UN2:UO4)'
-    "UF8" = "=_EvaluateCashflows(UF5,UF6,UF7)"
+    "UF9" = "=_CollectDiscountCurves(UF7)"
+    "UF8" = "=_EvaluateCashflows(UF5,UF6,UF9)"
     # Named curves and their collection, named-curves-slice-1.md: AA1's table under a second name,
     # the two curves beside each other through cells referring to them and their collection, the
     # SOFR of AA1 beside the bumped SOFR of UC1, two snapshots of one name, and a collection of one.
@@ -3940,14 +3990,34 @@ $cells = [ordered]@{
     # Trades and cashflows in one collection, named-curves-slice-2.md: the cashflow batch UF5 on the
     # UNIT trade's curve QV12, collected with QV8 through cells referring to both; alone; the batch
     # on a second curve, FFOIS, the 0.96 and 0.92 table of RA:RB, collected beside; and the batch's
-    # own handle under QV8, a cashflows handle among the results.
-    "UT1" = "=_EvaluateCashflows(UF5,UF6,QV12)"
+    # own handle under QV8, a cashflows handle among the results. Since cashflow-curve-keys.md the
+    # batch is valued on the collection QW12 of QV12, and the second curve takes the same three
+    # payments keyed FFOIS in their template, ZV3 and ZV4, on the collection QW14.
+    "UT1" = "=_EvaluateCashflows(UF5,UF6,QW12)"
     "UT2" = "=QV8"; "UU2" = "=UT1"
     "UT3" = "=_AggregateResults(UT2:UU2)"
     "UT4" = "=_AggregateResults(UT1)"
     "UT5" = '=_CreateDiscountCurve("FFOIS",RA1:RB1,RA2:RB4)'
     "QW14" = "=_CollectDiscountCurves(UT5)"
-    "UT6" = "=_EvaluateCashflows(UF5,UF6,UT5)"
+    "ZV1" = "currency"; "ZW1" = "counterparty"; "ZX1" = "discount_curve_key"
+    "ZV2" = "USD"; "ZW2" = "Firm A"; "ZX2" = "FFOIS"
+    "ZV3" = '=_CreateTradeTemplate("cashflow",ZV1:ZX1,ZV2:ZX2)'
+    "ZV4" = "=_CreateCashflows(UH1:UL1,UH2:UL4,ZV3)"
+    "UT6" = "=_EvaluateCashflows(ZV4,UF6,QW14)"
+    # A named curve for each cashflow, cashflow-curve-keys.md: 10,000 received on SOFR and 10,000
+    # paid on FFOIS, both on 4 January 2028, keyed in the ticket's last column under the template
+    # UF4, which holds no key; FFOIS at 0.90 a year out in ZV13 beside the cashflow block's SOFR at
+    # 0.95, UF7, collected through cells referring to both, and the batch valued.
+    "ZV6" = "trade_date"; "ZW6" = "amount"; "ZX6" = "payment_date"; "ZY6" = "discount_curve_key"
+    "ZV7" = "4-Jan-2027"; "ZW7" = "10000"; "ZX7" = "4-Jan-2028"; "ZY7" = "SOFR"
+    "ZV8" = "4-Jan-2027"; "ZW8" = "-10000"; "ZX8" = "4-Jan-2028"; "ZY8" = "FFOIS"
+    "ZV9" = "=_CreateCashflows(ZV6:ZY6,ZV7:ZY8,UF4)"
+    "ZV11" = "4-Jan-2027"; "ZW11" = "1"
+    "ZV12" = "4-Jan-2028"; "ZW12" = "0.9"
+    "ZV13" = '=_CreateDiscountCurve("FFOIS",UN1:UO1,ZV11:ZW12)'
+    "ZV14" = "=UF7"; "ZW14" = "=ZV13"
+    "ZV15" = "=_CollectDiscountCurves(ZV14:ZW14)"
+    "ZV16" = "=_EvaluateCashflows(ZV9,UF6,ZV15)"
     "UT7" = "=QV8"; "UU7" = "=UT1"; "UV7" = "=UT6"
     "UT8" = "=_AggregateResults(UT7:UV7)"
     "UT9" = "=QV8"; "UT10" = "=UF5"

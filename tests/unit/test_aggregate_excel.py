@@ -649,10 +649,13 @@ CASHFLOWS_ALONE = (
 )
 
 
-def cashflow_batch() -> str:
+def cashflow_batch(key: str) -> str:
     """The cashflow ticket's batch as a handle: 10,000 receivable a year out, 10,000 payable two
-    years out and 250 paid the day before the valuation day, in USD."""
-    template = ENTRY["_CreateTradeTemplate"]("cashflow", row("currency"), row("USD"))
+    years out and 250 paid the day before the valuation day, in USD, every row on the curve of
+    that name since cashflow-curve-keys.md."""
+    template = ENTRY["_CreateTradeTemplate"](
+        "cashflow", row("currency", "discount_curve_key"), row("USD", key)
+    )
     return str(
         ENTRY["_CreateCashflows"](
             row("trade_id", "trade_date", "amount", "payment_date"),
@@ -667,10 +670,12 @@ def cashflow_batch() -> str:
 
 
 def cashflows_on(curve: str) -> str:
-    """That batch valued on the valuation day over the curve given: 0.85 of DV01 on the ticket's
-    curve, -0.95 a year out and +1.80 two years out."""
+    """That batch keyed on the curve given, by the name its handle shows, and valued on the
+    valuation day over a collection of that one curve: 0.85 of DV01 on the ticket's curve,
+    -0.95 a year out and +1.80 two years out."""
     date = ENTRY["_CreateValuationDate"](serial(AS_OF), 0.5)
-    return str(ENTRY["_EvaluateCashflows"](cashflow_batch(), date, curve))
+    batch = cashflow_batch(curve.split(":")[2])
+    return str(ENTRY["_EvaluateCashflows"](batch, date, ENTRY["_CollectDiscountCurves"](curve)))
 
 
 def test_a_trade_and_a_cashflow_collect_and_the_cashflow_moves_its_curves_dv01_alone(
@@ -790,7 +795,7 @@ def test_a_handle_of_another_kind_among_results_is_refused_naming_both_kinds(
     sheet: dict[str, Any],
 ) -> None:
     b3 = sheet["b3"]
-    batch = cashflow_batch()
+    batch = cashflow_batch("SOFR")
     live = bridge.live_handles()
     assert collected(b3, batch) == (
         f"#ERROR _AggregateResults: result_handles cell (2, 1) is cashflows handle {batch!r}, "

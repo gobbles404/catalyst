@@ -29,6 +29,7 @@ from catalyst.excel import bridge
 from catalyst.excel.bridge import Cells
 from catalyst.excel.utilities import shown
 from catalyst.globals.discount_curve import DiscountCurve, bump_discount_curve
+from catalyst.globals.discount_curve_set import collect_discount_curves
 from catalyst.globals.unit_conversions import UNITS
 from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
@@ -968,11 +969,11 @@ def test_the_pair_collects_with_a_single_index_source_and_a_cashflow() -> None:
                 {"trade_date": ["2026-12-15"], "amount": [1_000.0], "payment_date": [PAY]},
                 CASHFLOW,
             ),
-            a_template({"currency": "USD"}, CASHFLOW),
+            a_template({"currency": "USD", "discount_curve_key": "SOFR"}, CASHFLOW),
             WorkCounter(),
         ),
         valuation_date(day(AS_OF), 0.5),
-        SOFR,
+        collect_discount_curves((SOFR,), WorkCounter()),
         WorkCounter(),
     )
     with_cash = aggregate_results((pair, alone, cash), WorkCounter())

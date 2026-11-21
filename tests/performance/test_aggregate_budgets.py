@@ -476,7 +476,10 @@ def test_a_cashflow_source_adds_its_payment_entries_to_its_curves_group_and_noth
         curve_set(curve),
     )
     cashflows = cashflow_results(
-        a_cashflow_batch(2_000, 20), valuation_date(CASHFLOW_AS_OF, 0.5), curve, WorkCounter()
+        a_cashflow_batch(2_000, 20),
+        valuation_date(CASHFLOW_AS_OF, 0.5),
+        curve_set(curve),
+        WorkCounter(),
     )
     counter = WorkCounter()
     agg = aggregate_results([discounted, cashflows], counter)

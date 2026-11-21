@@ -25,7 +25,7 @@ from test_bilateral_kernel import (
     rate,
     terms_of,
 )
-from test_cashflows import DAY_BEFORE, booked
+from test_cashflows import DAY_BEFORE, booked, booked_on
 from test_cashflows import valued as cashflows_valued
 from test_trades import an_index, dates, history_on, numbers, observed_of, quoted
 
@@ -910,7 +910,7 @@ def test_a_cashflow_on_another_curve_is_a_column_of_its_own(
 ) -> None:
     b = sources["b"]
     ffois = curve_of((AS_OF, 1.0), (A_YEAR, 0.96), (TWO_YEARS, 0.92), name="FFOIS")
-    agg = collected(b, cashflows_valued(booked(), curve=ffois))
+    agg = collected(b, cashflows_valued(booked_on(ffois), curve=ffois))
     assert [r.word for r in agg.rate_groups] == ["SOFR", "FFOIS"]
     view = aggregate_view(agg, Risk.DV01, Bucket.YEAR)
     assert view.labels == (CURVE_1, "FFOIS USD dv01 [USD per basis point]")

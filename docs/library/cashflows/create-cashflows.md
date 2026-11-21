@@ -1,6 +1,6 @@
 # _CreateCashflows
 
-A batch of cashflows: known signed amounts in one currency, each on its own explicit payment day, booked from a template of the `cashflow` instrument and a ticket's rows as a batch of trades is booked from its template and ticket, with no index, schedule, quantity, market or preparation. A row is one payment: an unwind or termination payment, a fee, a broker's or an exchange's rebate, positive received and negative paid. The batch retains the rows as booked and sums the amounts once per distinct payment day, and [_EvaluateCashflows](evaluate-cashflows.md) values it. The instrument's fields are [show-instrument.md](../instruments/show-instrument.md)'s and the template [trade-template.md](../trades/trade-template.md)'s. The code is `src/catalyst/cashflows/booking.py`, the record and its builder, `src/catalyst/cashflows/rules.py`, the two rules of its own fields, and `src/catalyst/excel/cashflows.py`, the worksheet function. [The ticket](../../engineering-tickets/trade-valuation-pipeline/cashflow-instrument.md) has the decisions.
+A batch of cashflows: known signed amounts in one currency, each on its own explicit payment day, booked from a template of the `cashflow` instrument and a ticket's rows as a batch of trades is booked from its template and ticket, with no index, schedule, quantity, market or preparation. A row is one payment: an unwind or termination payment, a fee, a broker's or an exchange's rebate, positive received and negative paid. Each row names the curve it discounts on by `discount_curve_key`, since [cashflow-curve-keys.md](../../engineering-tickets/trade-valuation-pipeline/cashflow-curve-keys.md), text alone here, the curve found when the batch is valued. The batch retains the rows as booked and sums the amounts once per payment group, a distinct payment day and key, and [_EvaluateCashflows](evaluate-cashflows.md) values it. The instrument's fields are [show-instrument.md](../instruments/show-instrument.md)'s and the template [trade-template.md](../trades/trade-template.md)'s. The code is `src/catalyst/cashflows/booking.py`, the record and its builder, `src/catalyst/cashflows/rules.py`, the two rules of its own fields, and `src/catalyst/excel/cashflows.py`, the worksheet function. [The ticket](../../engineering-tickets/trade-valuation-pipeline/cashflow-instrument.md) has the instrument's decisions and [cashflow-curve-keys.md](../../engineering-tickets/trade-valuation-pipeline/cashflow-curve-keys.md) the keys'.
 
 ## Worksheet contract
 
@@ -12,9 +12,9 @@ def _CreateCashflows(
 
 | | A | B | C | D | E |
 |---|---|---|---|---|---|
-| 1 | currency | counterparty | | | |
-| 2 | USD | Firm A | | | |
-| 3 | `=_CreateTradeTemplate("cashflow",A1:B1,A2:B2)` | shows `30512:trade_template:2` | | | |
+| 1 | currency | counterparty | discount_curve_key | | |
+| 2 | USD | Firm A | SOFR | | |
+| 3 | `=_CreateTradeTemplate("cashflow",A1:C1,A2:C2)` | shows `30512:trade_template:2` | | | |
 | 4 | trade_id | trade_date | amount | payment_date | description |
 | 5 | 1 | 4-Jan-2027 | 10000 | 4-Jan-2028 | Receivable |
 | 6 | 2 | 4-Jan-2027 | -10000 | 3-Jan-2029 | Payable |
@@ -42,26 +42,27 @@ In this order, the first failure being the message, after the seam has typed eve
 |---|---|
 | the template is of the cashflow instrument | `template is of instrument 'fixed_float', expected cashflow, the one instrument whose cashflows are built` |
 | no field is supplied by both the template and the ticket, even to the same value | `currency is supplied by the template and by the ticket, expected by one of them` |
-| `trade_date`, `amount`, `currency` and `payment_date` are each in one of them; `trade_id`, `counterparty` and `description` may be left out of both | `amount is missing, expected a value in the template or a column in the ticket` |
+| `trade_date`, `amount`, `currency`, `payment_date` and `discount_curve_key` are each in one of them; `trade_id`, `counterparty` and `description` may be left out of both | `amount is missing, expected a value in the template or a column in the ticket` |
 | the currency is `USD` exactly, one per batch, read when the template is made or once per distinct text of the column; `CENT` is a scale of the dollar and no currency, and an amount is never read as cents | `currency row 2 is 'CAD', expected USD, the one currency this version books` |
 | each trade ID, where supplied, is a whole number of at most 15 digits, the trades' rule and words | as [create-trades.md](../trades/create-trades.md) says |
 | each amount is finite, zero and fractions included, the whole payment in whole units of the currency | `amount row 2 is inf, expected a finite amount` |
-| the rows' amounts on one payment day sum to a finite amount, under numpy's flags down | `the payments on 2028-01-04 sum to inf, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number` |
+| each key is a curve's name by the curve's own rule, [discount-curve.md](../globals/discount-curve.md), exact, case and all, with no whitespace around it: the template's one key read when the template is made and named by the field, a ticket column's each distinct text read once and named with its first row; no curve is looked for | `discount_curve_key row 2 is ' SOFR', expected a name with no whitespace around it` |
+| the rows' amounts in one payment group, a payment day and a key, sum to a finite amount, under numpy's flags down | `the payments on 2028-01-04 on SOFR sum to inf, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number` |
 
 A payment date is used as entered, past, present or future, never rolled and never held to the trade date; a repeated row is a second payment; a zero amount is a row kept. Nothing is read from a counterparty or a description.
 
 ## What it retains
 
-Per row, in the ticket's order: the trade ID where the batch has it, the trade date, the amount, the payment date, and the counterparty and the description where the batch has them, the template's value on every row; the one currency. Then the distinct payment days, increasing, with the rows' amounts summed on each and each row's place among them, the day's amount the one amount `_EvaluateCashflows` discounts, so that two payments on one day are one amount and two on different days stay apart whatever they net to; and the payment months and years those days fall in, the axes a DV01 report is summed onto, made once here. The batch reads the template and the ticket and keeps none of either.
+Per row, in the ticket's order: the trade ID where the batch has it, the trade date, the amount, the payment date, the counterparty and the description where the batch has them, and the key, the template's value on every row; the one currency; and the distinct keys in the order the rows first name them. Then the payment groups, the distinct pairs of payment day and key, in day order and within a day in key order, with the rows' amounts summed in each and each row's group, the group's amount the one amount `_EvaluateCashflows` discounts, so that two payments on one day under one key are one amount, and two on different days, or on one day under two keys, stay apart whatever they net to, a group netting to zero kept as any other; a batch on one key has a group a day. And the distinct payment days, increasing, with the payment months and years they fall in, the axes every curve's DV01 is summed onto, made once here and shared by the keys. The batch reads the template and the ticket and keeps none of either.
 
 ## Reading it back
 
-`util_ReadHandle` on the handle spills one row per payment booked, in the ticket's order, under the definition's field names in its order: `trade_id` where the batch has it, `trade_date`, `amount`, `currency`, `payment_date`, and `counterparty` and `description` where it has them, the template's value on every row; [read-handle.md](../utilities/read-handle.md). The summing by day is the results' to show.
+`util_ReadHandle` on the handle spills one row per payment booked, in the ticket's order, under the definition's field names in its order: `trade_id` where the batch has it, `trade_date`, `amount`, `currency`, `payment_date`, `counterparty` and `description` where it has them, and `discount_curve_key` last, after every column a sheet already read by its place, the template's value on every row; [read-handle.md](../utilities/read-handle.md). The summing by day and key is the results' to show.
 
 ## Tests
 
-The worked example, the rules in order, the summing by day and the seam's handle, readback and refusals are `tests/unit/test_cashflows.py`; the instrument's grid is `tests/unit/test_instruments.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`; the handle's life is the `cashflows` group of `tools/excel_lifetime.ps1`. What a call costs is `tests/performance/test_cashflow_budgets.py`, the rows booked and the days mapped, the same functions at three rows and at two thousand, the peaks by rows and days and the columns kept.
+The worked example, the rules in order, the summing by day and by key, the key from the template and from the ticket, and the seam's handle, readback and refusals are `tests/unit/test_cashflows.py`; the instrument's grid is `tests/unit/test_instruments.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Catalyst.Host.Tests/CallTests.cs`; the handle's life is the `cashflows` group of `tools/excel_lifetime.ps1`. What a call costs is `tests/performance/test_cashflow_budgets.py`, the rows booked, the days mapped and the groups formed, the same functions at three rows and at two thousand, a batch on several keys one more unique, the peaks by rows and days and the columns kept.
 
 ## Not here
 
-Any other currency, FX valuation or FX risk; a recurring schedule, a floating or contingent amount; a link to the deal a payment unwinds or the reserve it settles; counterparty netting, credit or legal treatment; a payment date held to the trade date; and the valuation itself, which [_EvaluateCashflows](evaluate-cashflows.md) owns. More rows are more payments; no schedule instrument is needed for that.
+Any other currency, FX valuation or FX risk; a recurring schedule, a floating or contingent amount; a link to the deal a payment unwinds or the reserve it settles; counterparty netting, credit or legal treatment; a payment date held to the trade date; a curve held by the batch or looked for at booking, the key being text until the batch is valued; and the valuation itself, which [_EvaluateCashflows](evaluate-cashflows.md) owns. More rows are more payments; no schedule instrument is needed for that.
