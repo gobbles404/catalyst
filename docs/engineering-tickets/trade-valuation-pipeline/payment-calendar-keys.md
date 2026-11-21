@@ -1,6 +1,6 @@
 # A payment calendar is chosen by key
 
-**Status:** The first of two pull requests built in #NNN, agreed with the owner on 21 November
+**Status:** The first of two pull requests built in #268, agreed with the owner on 21 November
 2026 for [issue #255](https://github.com/gobbles404/catalyst/issues/255), this page in its first
 commit; on `feat/payment-calendar-names`, stacked on `feat/fractional-quantities`, the branch of
 [fractional-quantities.md](fractional-quantities.md), #267. The second pull request, the cutover
@@ -39,7 +39,7 @@ So the payment calendar is chosen by name, as a discount curve is: `payment_cale
 
 | | What | State |
 |---|---|---|
-| 1 | The name and the collection: the optional name on `_CreateHolidayCalendar`, `_CollectPaymentCalendars`, their readbacks. No field changes and nothing reads a collection yet. | #NNN |
+| 1 | The name and the collection: the optional name on `_CreateHolidayCalendar`, `_CollectPaymentCalendars`, their readbacks. No field changes and nothing reads a collection yet. | #268 |
 | 2 | The cutover, trades and quotes together: `payment_calendar_key` replaces `payment_holiday_calendar`; the key's rule and its binding in `_CreateTrades` and `_CreateQuoteTemplate`; the holiday-calendar field type deleted. | stacked on the first |
 
 The field is one definition shared by trades and quotes, so it cannot change for one without

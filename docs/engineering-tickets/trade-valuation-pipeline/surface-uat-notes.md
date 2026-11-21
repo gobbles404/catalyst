@@ -1163,7 +1163,7 @@ booked and compare its mark with the desk's own.
 
 ## 44. A holiday calendar's name, and the collection of named calendars
 
-Agreed 21 November 2026 and built in #NNN, issue #255:
+Agreed 21 November 2026 and built in #268, issue #255:
 [payment-calendar-keys.md](payment-calendar-keys.md), the first of two pull requests.
 `_CreateHolidayCalendar` takes a second argument, a name, and it is optional: every
 calendar already on a sheet reads as it did. A calendar made with a name shows it in its
