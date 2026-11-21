@@ -1085,7 +1085,7 @@ of the desk's own cashflow sheets and compare its mark with the day before.
 
 ## 41. A result's currency and the unit of it
 
-Agreed 21 November 2026 and built in #NNN, issue #263:
+Agreed 21 November 2026 and built in #265, issue #263:
 [currency-and-currency-unit.md](currency-and-currency-unit.md), the first of two pull requests.
 A result now shows two things where it showed one: its currency, `USD`, and the unit of
 that currency its amounts are in, in a new last column, `currency_unit`. For an index

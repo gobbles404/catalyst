@@ -1,6 +1,6 @@
 # A result's currency and the unit of it
 
-**Status:** The first of two pull requests, built in #NNN, stacked on #264, agreed with the
+**Status:** The first of two pull requests, built in #265, stacked on #264, agreed with the
 owner on 21 November 2026 for
 [issue #263](https://github.com/gobbles404/catalyst/issues/263), this page in its first
 commit. A result carries two facts where one word stood for both: its currency, and the unit
