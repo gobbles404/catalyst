@@ -7,7 +7,9 @@ It follows [_CollectDiscountCurves](../globals/collect-discount-curves.md), whic
 ## Worksheet contract
 
 ```python
-def _CollectPaymentCalendars(calendar_handles: Handles[HolidayCalendar]) -> Handle[PaymentCalendars]: ...
+def _CollectPaymentCalendars(
+    calendar_handles: Handles[HolidayCalendar],
+) -> Handle[PaymentCalendars]: ...
 ```
 
 | | A | B | C |
