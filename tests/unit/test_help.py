@@ -720,7 +720,8 @@ def test_the_trades_creator_explains_itself() -> None:
         (  # optional, since payment-calendar-keys.md
             "[payment_calendars]",
             "The collection each row's payment_calendar_key selects from: the cell showing "
-            "_CollectPaymentCalendars's result, such as B4. Leave it out for a physically "
+            # I5, outside the ticket the other examples lay out in A4:E9, beside the indexes.
+            "_CollectPaymentCalendars's result, such as I5. Leave it out for a physically "
             "settled batch.",
         ),
     ]

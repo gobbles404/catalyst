@@ -97,7 +97,7 @@ def _CreateTrades(
     payment_calendars: Annotated[
         Handle[PaymentCalendars] | None,
         "The collection each row's payment_calendar_key selects from: the cell showing "
-        "_CollectPaymentCalendars's result, such as B4. Leave it out for a physically settled "
+        "_CollectPaymentCalendars's result, such as I5. Leave it out for a physically settled "
         "batch.",
     ] = None,
 ) -> Handle[Trades]:
