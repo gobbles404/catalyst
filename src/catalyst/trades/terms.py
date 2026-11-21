@@ -361,10 +361,13 @@ def resolved_trades(
     end date, the end on or after the start and both in one calendar month, since a component is
     one contract month's and a quantity per day over no day states nothing, the days counted
     here, and that month is its calculation period, derived here since onetime-averaging.md;
-    each quantity is a whole number, positive, negative or zero, the first profile's
-    convention, a signed count of the specification, a zero row kept ready for a deal and
-    contributing nothing; each fixed price is a finite number, the quantity, the days and the
-    price named by the trade they belong to, as the sheet counts its rows. Each component's
+    each quantity is a signed count of the specification, positive, negative or zero, a zero
+    row kept ready for a deal and contributing nothing, and since fractional-quantities.md
+    held to its settlement's rule, settled_quantities: any finite number under a financial
+    settlement, a lot and a half being 1.5, and a whole number under a physical one, whose
+    position is closed by whole counts adding to zero; each fixed price is a finite number, the
+    quantity, the days and the price named by the trade they belong to, as the sheet counts
+    its rows. Each component's
     quantity is then formed once by its occurrence's basis, the entered quantity under month and
     the entered quantity times its covered days under calday, finite, for the encoding to convert
     and nothing later to scale again. A financial settlement has payment terms, a lag and a
@@ -445,7 +448,7 @@ def resolved_trades(
     )
     _the_method(schedule_method, settlement, trade_ids, index.kind)
     _the_clearing_house(settlement, clearing_house, trade_ids)
-    _the_components(occurrence, quantity, start_date, end_date, trade_ids, occurrences)
+    _the_components(occurrence, quantity, start_date, end_date, trade_ids, occurrences, settlement)
     onetime = settlement_frequency[occurrence] == FREQUENCIES.index(SettlementFrequency.ONETIME)
     _the_monthly_components(start_date, end_date, onetime, trade_ids, occurrence)
     _the_contract_column(contract, occurrence, len(schedule.codes), "contract")
@@ -1115,9 +1118,12 @@ def _the_components(
     end_date: NDArray[np.datetime64],
     trade_ids: NDArray[np.int64] | None,
     occurrences: int,
+    settlement: Settlement,
 ) -> None:
     """The trade's columns, aligned, one or more, each of an occurrence and every occurrence
-    holding one; each component's end on or after its start, each quantity whole, zero included,
+    holding one; each component's end on or after its start, each quantity by its settlement's
+    rule since fractional-quantities.md, finite under a financial one and whole under a
+    physical one, zero included,
     the days or a quantity refused naming the trade it belongs to, since a strip's component is
     no row of the sheet; a monthly component's one calendar month is _the_monthly_components'
     rule, once the frequencies are known. A leg's contract column is _the_contract_column's and
@@ -1152,8 +1158,10 @@ def _the_components(
             f"end_date of {named_trade(trade_ids, int(occurrence[k]))} is {end_date[k]}, "
             f"expected a day on or after its start_date, {start_date[k]}"
         )
-    whole_quantities(
-        quantity, lambda k: f"quantity of {named_trade(trade_ids, int(occurrence[k]))}"
+    settled_quantities(
+        quantity,
+        settlement,
+        lambda k: f"quantity of {named_trade(trade_ids, int(occurrence[k]))}",
     )
 
 
@@ -1201,8 +1209,42 @@ def _the_contract_column(
         )
 
 
+def settled_quantities(
+    quantity: NDArray[np.float64], settlement: Settlement, where: Callable[[int], str]
+) -> None:
+    """Each quantity by the rule of its batch's settlement, the one owner of which rule that
+    is, since fractional-quantities.md: any finite number under a financial settlement,
+    finite_quantities, and a whole number under a physical one, whole_quantities. A financial
+    quantity is only ever multiplied, by prices, weights and factors, which a fraction does as
+    well as a whole number; a physical position is closed by its signed counts per contract
+    adding to exactly zero, position_counts in the encoding, and that sum is exact for whole
+    numbers alone. Read by the kernel for every component and by a template that holds both
+    the quantity and the settlement method."""
+    match settlement:
+        case Settlement.FINANCIAL:
+            finite_quantities(quantity, where)
+        case Settlement.PHYSICAL:
+            whole_quantities(quantity, where)
+        case _:
+            assert_never(settlement)
+
+
+def finite_quantities(quantity: NDArray[np.float64], where: Callable[[int], str]) -> None:
+    """Each quantity a finite number, positive, negative or zero, a fraction as good as a whole
+    number, since fractional-quantities.md: the rule of a financially settled quantity, and
+    the part of the rule every quantity is held to whatever its settlement, which a template
+    that does not yet know its settlement reads its quantity by. Nothing is rounded: the
+    quantity is used and read back as entered. The first that is a NaN or an infinity is
+    refused in the caller's words for its position."""
+    unfinished = ~np.isfinite(quantity)
+    if unfinished.any():
+        k = int(unfinished.argmax())
+        raise ValueError(f"{where(k)} is {float(quantity[k])!r}, expected a finite quantity")
+
+
 def whole_quantities(quantity: NDArray[np.float64], where: Callable[[int], str]) -> None:
-    """Each quantity a whole number, the first profile's convention, a signed count of the
+    """Each quantity a whole number, the rule of a physically settled quantity since
+    fractional-quantities.md and of every quantity before it, a signed count of the
     specification selected, zero included, since a row kept ready for a deal holds a zero and
     contributes nothing: the first that is not whole, a fraction, a NaN or an infinity, is
     refused, named by the caller's words for its position, the trade it belongs to in a batch

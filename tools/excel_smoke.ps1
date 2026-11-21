@@ -814,7 +814,20 @@ $formulas = [ordered]@{
     "=COLUMNS(util_ReadHandle(EW13))"    = "23"
     '=_CreateTradeTemplate("Future",EW1:FC1,EW2:FC2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'"
     '=_CreateTradeTemplate("fixed_float",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate, last3day or asian"
-    '=_CreateTradeTemplate("fixed_float",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
+    '=_CreateTradeTemplate("fixed_float",HSTACK(FA1,EZ4),HSTACK(FA2,EZ15))' = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
+    # fractional-quantities.md: a quantity's rule follows the settlement method. The fraction the
+    # physical template and batch refuse is held by a template that names no method, in EW16, and
+    # booked by the financial template in EW11, in EW17, two and a half lots of a thousand barrels
+    # read back as entered.
+    '=MID(EW16,FIND(":",EW16)+1,15)'     = "trade_template:"
+    "=INDEX(util_ReadHandle(EW16),1,2)"  = "quantity"
+    "=INDEX(util_ReadHandle(EW16),3,2)"  = "2.5"
+    '=MID(EW17,FIND(":",EW17)+1,23)'     = "trades:Henry Hub NYMEX:"
+    "=INDEX(util_ReadHandle(EW17),3,7)"  = "financial"
+    "=INDEX(util_ReadHandle(EW17),1,9)"  = "quantity"
+    "=INDEX(util_ReadHandle(EW17),3,9)"  = "2.5"
+    "=INDEX(util_ReadHandle(EW17),1,20)" = "quote_quantity"
+    "=INDEX(util_ReadHandle(EW17),3,20)" = "2500"
     '=_CreateTradeTemplate("fixed_float",{"payment_day"},{"+99999999999999999999bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_day has a count of 20 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
     '=_CreateTradeTemplate("fixed_float",{"payment_day"},{"2bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_day is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd"
     '=_CreateTradeTemplate("fixed_float",EW1:FC1,EW2:FA2)' = "#ERROR _CreateTradeTemplate: fields has 7 headers, expected 5, one per column of values"
@@ -2843,6 +2856,10 @@ $cells = [ordered]@{
     "EW13" = "=_CreateTrades(EB1,EX4:FA4,EX12:FA12,EW11)"
     "EW14" = "9"; "EX14" = "24-Sep-2026"; "EY14" = "F27"; "EZ14" = "1"; "FA14" = "70"
     "EW15" = "8"; "EX15" = "24-Sep-2026"; "EY15" = "u26"; "EZ15" = "2.5"; "FA15" = "70"
+    # fractional-quantities.md: the fraction held by a template that names no settlement method,
+    # and the row of two and a half lots booked under the financial template in EW11.
+    "EW16" = '=_CreateTradeTemplate("fixed_float",EZ4,EZ15)'
+    "EW17" = "=_CreateTrades(EB1,EW4:FA4,EW15:FA15,EW11)"
     # The valuation path's tickets: one row of two lots of n26 at 70 and one of a lot of m26, the
     # schedule's first contract; the batch on the index in ED1, whose schedule is CT4's m26 and
     # n26, under the physical template in EW3, prepared against the history in CT7 and evaluated
