@@ -1133,3 +1133,30 @@ column. Rows 3607 to 3609 hold the three refusals: `USD` in either unit place, a
 `DOLLAR` as a cashflow's currency. Then on one of the desk's own sheets change `USD` to
 `DOLLAR` in each conventions formula and in each spread price's unit, and compare every
 mark with the day before.
+
+## 43. A financially settled trade takes a fractional quantity
+
+Agreed 21 November 2026 and built in #NNN, issue #262:
+[fractional-quantities.md](fractional-quantities.md). A `quantity` on a financially
+settled row of a `fixed_float` or a `float_float` is any finite number, so a swap of a
+lot and a half is booked as 1.5 and read back as 1.5. Nothing is rounded. A physically
+settled row takes a whole number as before and refuses a fraction in the same words.
+Cleared and bilateral rows alike. No column, heading or number on an existing sheet
+moves. One thing reads differently without a fraction on a financial row: a template
+that holds a `quantity` and no `settlement_method` is now made with a fraction in it,
+and if the ticket then settles physically the refusal comes from `_CreateTrades`,
+naming the trade.
+
+UAT: the kept workbook, rows 3611 to 3658. B3614 is OIL, a crude index with a lot of
+1,000 barrels, quoted 70 in D3618. B3621 books the ticket's example on it: a bilateral
+swap of 1.5 lots bought at 68, one payment a year on at a factor of 0.95. Read K3627,
+the quantity as typed, 1.5, and W3627, 1,500 barrels. Read the mark in B3631, 2,850,
+and the Total row, 3636: 1.5 lots, 1.425 discounted, a DV01 of -0.285 and a cross gamma
+of -0.0001425. Type -0.25 over G3621 and read -475, then -0.25, -0.2375, 0.0475 and
+0.00002375, each a sixth of the first with the sign turned. Type 1.5 back. B3641 takes
+the same quantity from its template, B3640, and B3647 reads the same 2,850. B3649 is
+the row cleared, 3,000 in B3655 with no discounting. B3657 and B3658 are refused: 1.5
+under a template that settles physically, and 1.5 on a physically settled row, named
+by its trade. O1267 and O1268 hold the field's new words in the instrument's catalog.
+Then on one of the desk's own sheets enter the fractional swap that could not be
+booked and compare its mark with the desk's own.
