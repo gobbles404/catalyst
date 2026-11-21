@@ -161,7 +161,7 @@ def test_the_two_hng_sources_combine_by_index_and_by_curve(
     a, b = sources["a"], sources["b"]
     counter = WorkCounter()
     agg = aggregate_results([a, b], counter)
-    assert agg.as_of == A_DAY and agg.sources == (a, b) and agg.currencies == ("USD",)
+    assert agg.as_of == A_DAY and agg.sources == (a, b) and agg.currency_units == (("USD", "USD"),)
     (group,) = agg.index_groups
     assert group.index is HNG and group.reporting_lot.name == "LOT"
     assert group.history is HNG_HISTORY and group.price_vector is HNG_MARKET.price_vector
@@ -454,7 +454,7 @@ def test_the_collection_refuses_what_does_not_belong_in_the_order_given(
     np.testing.assert_array_equal(agg.index_groups[0].occurrences, [0, 1])
 
 
-def test_curves_group_by_object_and_currency_and_are_named_by_first_appearance(
+def test_curves_group_by_object_and_currency_unit_and_are_named_by_first_appearance(
     sources: dict[str, TradeResults],
 ) -> None:
     # B on FLAT and B again on a curve equal in every value but another object, both named SOFR:
@@ -504,12 +504,21 @@ def test_curves_group_by_object_and_currency_and_are_named_by_first_appearance(
         quoted(cents_history, 80.0, 50.0),
         FLAT,
     )
-    assert in_cents.currency == "CENT" and in_cents.dv01 == pytest.approx(0.85, **CLOSE)
+    # Two facts since currency-and-currency-unit.md: the currency is USD whatever the index
+    # settles in, and the unit of it says cents. The group is its own, as it was, the two
+    # columns told apart by the unit in the brackets and never added.
+    assert (in_cents.currency, in_cents.currency_unit) == ("USD", "CENT")
+    assert in_cents.dv01 == pytest.approx(0.85, **CLOSE)
+    assert [(c.currency, c.currency_unit) for c in in_cents.rate_contributions] == [("USD", "CENT")]
+    assert (in_cents.reserves.currency, in_cents.reserves.currency_unit) == ("USD", "CENT")
     agg = collected(b, in_cents)
-    assert [(r.word, r.currency) for r in agg.rate_groups] == [("SOFR", "USD"), ("SOFR", "CENT")]
-    assert agg.currencies == ("USD", "CENT")
+    assert [(r.word, r.currency, r.currency_unit) for r in agg.rate_groups] == [
+        ("SOFR", "USD", "USD"),
+        ("SOFR", "USD", "CENT"),
+    ]
+    assert agg.currency_units == (("USD", "USD"), ("USD", "CENT"))
     view = aggregate_view(agg, Risk.DV01, Bucket.YEAR)
-    assert view.labels == (CURVE_1, "SOFR CENT dv01 [CENT per basis point]")
+    assert view.labels == (CURVE_1, "SOFR USD dv01 [CENT per basis point]")
     np.testing.assert_allclose(view.columns[1], [0.0, -0.95, 1.8], **TIGHT)  # 2027 to 2029
     assert view.totals[1] == pytest.approx(0.85, **CLOSE)
 
@@ -520,7 +529,7 @@ def test_a_collection_with_no_curve_reports_a_dv01_of_nothing_per_currency(
     # A and C, both cleared: no rate group; the DV01 report one column of nothing for USD over no
     # day, and all three on the two observation days with that column zero on both.
     agg = collected(sources["a"], sources["c"])
-    assert agg.rate_groups == () and agg.currencies == ("USD",)
+    assert agg.rate_groups == () and agg.currency_units == (("USD", "USD"),)
     assert agg.by_day.paid.size == 0 and agg.by_day.paid_in == ()
     dv01 = aggregate_view(agg, Risk.DV01, Bucket.DAY)
     assert dv01.dates.size == 0 and dv01.labels == (CLEARED_USD,) and dv01.totals == (0.0,)
@@ -585,7 +594,7 @@ def test_the_collection_owns_its_membership_and_writes_nothing(
     np.testing.assert_array_equal(b.prepared.encoded.legs[0].days, kept["days"])
     scalars = {
         "index", "reporting_lot", "history", "price_vector", "nominal_delta_total",
-        "delta_total", "curve", "word", "currency", "dv01",
+        "delta_total", "curve", "word", "currency", "currency_unit", "dv01",
         "cross_gamma_total",
     }  # fmt: skip
     frozen: list[Any] = []
@@ -718,8 +727,10 @@ def test_the_headings_are_spelled_once_for_both_paths(sources: dict[str, TradeRe
         HNG_NOMINAL,
         HNG_DELTA,
     )
-    assert dv01_label("SOFR", "USD") == CURVE_1
-    assert dv01_label("cleared", "USD") == CLEARED_USD
+    assert dv01_label("SOFR", "USD", "USD") == CURVE_1
+    assert dv01_label("cleared", "USD", "USD") == CLEARED_USD
+    # The currency, then in the brackets the unit of it, currency-and-currency-unit.md.
+    assert dv01_label("SOFR", "USD", "CENT") == "SOFR USD dv01 [CENT per basis point]"
     for result in results:
         terms = result.prepared.encoded.terms
         group = result.curves[0].name if result.curves else "cleared"
@@ -727,21 +738,21 @@ def test_the_headings_are_spelled_once_for_both_paths(sources: dict[str, TradeRe
             view = risk_view(result, Risk.ALL, bucket)
             assert view.labels == (
                 *delta_labels(terms.legs[0].index, terms.legs[0].reporting_lot),
-                dv01_label(group, result.currency),
+                dv01_label(group, result.currency, result.currency_unit),
                 cross_gamma_label(terms.legs[0].index, group, terms.legs[0].reporting_lot),
             )
     agg = collected(*results)
     view = aggregate_view(agg, Risk.ALL, Bucket.DAY)
     pairs = [label for g in agg.index_groups for label in delta_labels(g.index, g.reporting_lot)]
     assert list(view.labels[: len(pairs)]) == pairs
-    rate_labels = {dv01_label(r.word, r.currency) for r in agg.rate_groups}
-    rate_labels |= {dv01_label("cleared", c) for c in agg.currencies}
+    rate_labels = {dv01_label(r.word, r.currency, r.currency_unit) for r in agg.rate_groups}
+    rate_labels |= {dv01_label("cleared", c, u) for c, u in agg.currency_units}
     cross_labels = {
         cross_gamma_label(c.index, "cleared" if c.word is None else c.word, c.reporting_lot)
         for c in agg.cross_groups
     }
     assert set(view.labels[len(pairs) :]) <= rate_labels | cross_labels
-    assert len(view.labels) == len(pairs) + (len(agg.rate_groups) or len(agg.currencies)) + len(
+    assert len(view.labels) == len(pairs) + (len(agg.rate_groups) or len(agg.currency_units)) + len(
         cross_labels
     )
 
@@ -774,6 +785,7 @@ def on_two_curves(
         return RateContribution(
             c.curve,
             c.currency,
+            c.currency_unit,
             c.dv01,
             axes.days,
             placed(axes.days.size, np.searchsorted(axes.days, c.days), c.dv01_by_day),
@@ -928,7 +940,7 @@ def test_a_collection_of_cashflows_alone_reports_the_dv01_and_refuses_the_commod
     cashflow = cashflows_valued(booked(), curve=FLAT)
     agg = collected(cashflow)
     assert agg.index_groups == () and agg.cross_groups == () and len(agg.rate_groups) == 1
-    assert agg.currencies == ("USD",)
+    assert agg.currency_units == (("USD", "USD"),)
     for bucket in Bucket:
         same_view(aggregate_view(agg, Risk.DV01, bucket), cashflow.report(Risk.DV01, bucket))
         same_view(aggregate_view(agg, Risk.ALL, bucket), cashflow.report(Risk.ALL, bucket))

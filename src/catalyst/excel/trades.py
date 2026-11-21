@@ -154,8 +154,8 @@ def _AggregateResults(
     ],
 ) -> Handle[AggregateResults]:
     """Collects evaluated batches' saved risk, trades' and cashflows', into one collection, the
-    lots by index, the DV01 by curve and currency and the cross-gamma by index and curve, nothing
-    valued again, and shows its handle, which _ReportRisk takes."""
+    lots by index, the DV01 by curve and currency unit and the cross-gamma by index and curve,
+    nothing valued again, and shows its handle, which _ReportRisk takes."""
     return aggregate_results(result_handles, WorkCounter())
 
 
@@ -182,18 +182,20 @@ def _ReportValues(
     ],
 ) -> MixedArray:
     """Reports the batch's values from its results: the mark and the cash under the route's
-    labels, or under cashflow for a batch of cashflows, the currency and the valuation day, as
-    evaluation stored them."""
+    labels, or under cashflow for a batch of cashflows, the currency, the valuation day and the
+    currency unit the two amounts are in, as evaluation stored them."""
     label = values_label(results)
     return MixedArray.table(
         [
-            (f"{label}_mark", f"{label}_cash", "currency", "as_of"),
-            ("float64", "float64", "str", "datetime64[D]"),
+            # currency_unit last, since currency-and-currency-unit.md, so that no column moves.
+            (f"{label}_mark", f"{label}_cash", "currency", "as_of", "currency_unit"),
+            ("float64", "float64", "str", "datetime64[D]", "str"),
         ],
         np.array([results.mark]),
         np.array([results.cash]),
         (results.currency,),
         np.array([results.as_of], dtype="datetime64[D]"),
+        (results.currency_unit,),
     )
 
 
@@ -209,7 +211,7 @@ def _ReportRisk(
         str,
         "Which risk: nominal_delta, delta, dv01, cross_gamma or all, exactly so; the deltas and "
         "the cross_gamma in lots of the reporting specification by observation day or contract "
-        "month or year, the DV01 in the currency per basis point by payment period.",
+        "month or year, the DV01 in the currency unit per basis point by payment period.",
     ],
     bucket: Annotated[
         str,
@@ -272,9 +274,9 @@ def _ReportReserves(
         "for it.",
     ],
 ) -> MixedArray:
-    """Reports the batch's booked reserves: brokerage on the trades naming a broker and clearing
-    on a cleared route, each trade's unsigned quantity times its specification's rate per lot,
-    summed; marketing and the signed CVA, once a row; and the currency."""
+    """Reports the batch's booked reserves: brokerage on trades naming a broker and clearing on
+    a cleared route, each trade's unsigned quantity times its specification's rate per lot,
+    summed; marketing and the signed CVA, once a row; the currency and its unit."""
     reserves = results.reserves
     return MixedArray.table(
         [
@@ -284,12 +286,14 @@ def _ReportReserves(
                 "marketing_reserve",
                 "cva_reserve",
                 "currency",
+                "currency_unit",  # last, currency-and-currency-unit.md
             ),
-            ("float64", "float64", "float64", "float64", "str"),
+            ("float64", "float64", "float64", "float64", "str", "str"),
         ],
         np.array([reserves.brokerage]),
         np.array([reserves.clearing]),
         np.array([reserves.marketing]),
         np.array([reserves.cva]),
         (reserves.currency,),
+        (reserves.currency_unit,),
     )

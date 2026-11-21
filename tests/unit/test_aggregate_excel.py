@@ -60,6 +60,7 @@ READBACK_HEADERS = [
     "as_of",
     "cross_gamma",
     "cross_gamma_unit",
+    "currency_unit",  # last, since currency-and-currency-unit.md
 ]
 READBACK_TYPES = [
     "int64",
@@ -73,6 +74,7 @@ READBACK_TYPES = [
     "float64",
     "datetime64[D]",
     "float64",
+    "str",
     "str",
 ]
 
@@ -333,7 +335,21 @@ def test_the_readback_lists_the_membership_in_the_order_given(sheet: dict[str, A
     table = spilled(ENTRY["util_ReadHandle"](collected(b2, b3, b4, b5)))
     assert table[:2] == [READBACK_HEADERS, READBACK_TYPES]
     assert table[2:] == [
-        [1.0, "HNG", "LOT", "cleared", "-", "USD", 10.0, 10.0, 0.0, serial(AS_OF), 0.0, PER_BP],
+        [
+            1.0,
+            "HNG",
+            "LOT",
+            "cleared",
+            "-",
+            "USD",
+            10.0,
+            10.0,
+            0.0,
+            serial(AS_OF),
+            0.0,
+            PER_BP,
+            "USD",
+        ],
         [
             2.0,
             "HNG",
@@ -347,8 +363,23 @@ def test_the_readback_lists_the_membership_in_the_order_given(sheet: dict[str, A
             serial(AS_OF),
             pytest.approx(-0.00095),
             PER_BP,
+            "USD",
         ],
-        [3.0, "WTI", "LOT", "cleared", "-", "USD", 2.0, 2.0, 0.0, serial(AS_OF), 0.0, PER_BP],
+        [
+            3.0,
+            "WTI",
+            "LOT",
+            "cleared",
+            "-",
+            "USD",
+            2.0,
+            2.0,
+            0.0,
+            serial(AS_OF),
+            0.0,
+            PER_BP,
+            "USD",
+        ],
         [
             4.0,
             "WTI",
@@ -362,6 +393,7 @@ def test_the_readback_lists_the_membership_in_the_order_given(sheet: dict[str, A
             serial(AS_OF),
             pytest.approx(-0.00038),
             PER_BP,
+            "USD",
         ],
     ]
     repeated = spilled(ENTRY["util_ReadHandle"](collected(b2, b3, b2)))
@@ -740,6 +772,7 @@ def test_a_cashflow_on_another_curve_is_a_column_of_its_own_and_cashflows_alone_
         serial(AS_OF),
         "-",
         "-",
+        "USD",  # the unit of its currency, a cashflow's whole dollars
     ]
     assert table[4] == [
         3.0,
@@ -754,6 +787,7 @@ def test_a_cashflow_on_another_curve_is_a_column_of_its_own_and_cashflows_alone_
         serial(AS_OF),
         "-",
         "-",
+        "USD",
     ]
 
 
@@ -802,3 +836,84 @@ def test_a_handle_of_another_kind_among_results_is_refused_naming_both_kinds(
         "expected trade results or cashflow results handle"
     )
     assert bridge.live_handles() == live
+
+
+# --- the currency and the unit of it, currency-and-currency-unit.md ------------------------------
+
+SOFR_CENT = "SOFR USD dv01 [CENT per basis point]"
+
+
+def cent_settled_index(name: str, expiry: str) -> str:
+    """one_unit_index's twin through the seam, quoted in dollars a barrel as it is and settled
+    in cents: a barrel a lot, F27 expiring on the day given."""
+    schedule = ENTRY["_CreateFuturesSchedule"](
+        rows(["Z26"], ["F27"], ["F29"]),
+        column([serial("2026-12-31"), serial(expiry), serial("2029-01-05")]),
+        bridge.MISSING,
+    )
+    calendar = ENTRY["_CreateHolidayCalendar"](column([serial(day) for day in UNIT_HOLIDAYS]))
+    conventions = ENTRY["_CreateIndexConventions"]("USD", "BBL", "CENT", "VOLUME", "BBL")
+    specifications = ENTRY["_CreateContractSpecifications"](
+        row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
+        rows(["LOT", 1.0, "BBL", 0.0, 0.0]),
+    )
+    return str(
+        ENTRY["_CreateIndex"](
+            name, f"{name} index", schedule, conventions, specifications, calendar, "LOT"
+        )
+    )
+
+
+def test_a_cent_settled_batch_is_a_column_of_its_own_beside_the_dollar_column(
+    sheet: dict[str, Any],
+) -> None:
+    # B3's trade again on an index settled in cents: ten lots at 80 against 70, a hundred
+    # dollars and so ten thousand cents a year out at 0.95, 9,500 cents of mark and -0.95 of
+    # DV01 where B3 has 95 dollars and -0.0095. Its currency is USD as B3's is; the unit says
+    # cents, on both reports, in the heading's brackets and in the readback's last column.
+    hngc = cent_settled_index("HNGC", "2027-01-04")
+    history = a_history(hngc, "2027-01-01", AS_OF, UNIT_HOLIDAYS, {})
+    state = {
+        **sheet,
+        "hngc": hngc,
+        "hngc_history": history,
+        "hngc_market": a_market(history, "HNGC", 80.0, 50.0),
+    }
+    in_cents = valued(state, "hngc", 1005, 10.0, 70.0, "+261bd", "bilateral", sheet["curve"])
+    assert spilled(ENTRY["_ReportValues"](in_cents))[2] == [
+        pytest.approx(9_500.0),
+        0.0,
+        "USD",
+        serial(AS_OF),
+        "CENT",
+    ]
+    assert spilled(ENTRY["_ReportReserves"](in_cents))[2] == [0.0, 0.0, 0.0, 0.0, "USD", "CENT"]
+    assert report(in_cents, "dv01", "year")[1] == ["period", SOFR_CENT]
+    own = spilled(ENTRY["util_ReadHandle"](in_cents))
+    assert own[0][-1] == "currency_unit" and own[2][-1] == "CENT"
+    assert own[2][own[0].index("currency")] == "USD"
+    # Collected with B3 and a cashflow on the same curve: the trade settled in dollars and the
+    # cashflow, whole dollars both, share the one column they shared, 0.85 - 0.0095; the
+    # cents stand beside it under the same curve and currency, told apart by the unit, and are
+    # added to nothing.
+    cashflow = cashflows_on(sheet["curve"])
+    together = collected(sheet["b3"], cashflow, in_cents)
+    table = report(together, "dv01", "year")
+    assert table[1] == ["period", SOFR_USD, SOFR_CENT]
+    assert table[3] == ["Total", pytest.approx(0.8405), pytest.approx(-0.95)]
+    members = spilled(ENTRY["util_ReadHandle"](together))
+    assert [line[3:6] for line in members[2:]] == [
+        ["bilateral", "SOFR", "USD"],
+        ["cashflow", "SOFR", "USD"],
+        ["bilateral", "SOFR", "USD"],
+    ]
+    assert [line[-1] for line in members[2:]] == ["USD", "USD", "CENT"]
+    assert [line[8] for line in members[2:]] == [
+        pytest.approx(-0.0095),
+        pytest.approx(0.85),
+        pytest.approx(-0.95),
+    ]
+    # In the other order the columns follow first appearance and hold the same numbers.
+    turned = report(collected(in_cents, cashflow, sheet["b3"]), "dv01", "year")
+    assert turned[1] == ["period", SOFR_CENT, SOFR_USD]
+    assert turned[3] == ["Total", pytest.approx(-0.95), pytest.approx(0.8405)]

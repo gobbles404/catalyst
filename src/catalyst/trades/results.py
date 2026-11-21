@@ -113,11 +113,13 @@ class LegResults:
 class TradeResults:
     """The preparation by reference, the legs, one LegResults per leg of the preparation in leg
     order, one today, each valued against its own market, and the snapshot the trade makes of
-    them together, read-only, since two-index-fixed-float.md. The route and the currency name
+    them together, read-only, since two-index-fixed-float.md. The route, the currency and,
+    since currency-and-currency-unit.md, currency_unit, the unit of the currency every amount
+    is in, the first index's settlement unit, name
     what the numbers are: for a cleared batch, mark is the undiscounted entry-to-current-price
     P&L of the groups not yet settled, live slots at their references' quotes and fixed slots at
     their settles, and cash the cumulative entry-to-final-price P&L of the groups settled by the
-    valuation date, both in the settlement currency; dv01 is zero: the cleared model is
+    valuation date, both in the settlement unit; dv01 is zero: the cleared model is
     undiscounted, so a rate move changes nothing, a result of the model and not a placeholder.
     as_of is the history's valuation day. reserves, since #170, is the batch's booked brokerage,
     clearing and since #175 marketing and their currency, the encoding's record by reference,
@@ -147,6 +149,7 @@ class TradeResults:
     legs: tuple[LegResults, ...]
     route: Route
     currency: str
+    currency_unit: str
     as_of: np.datetime64
     mark: float
     cash: float
@@ -187,7 +190,8 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
     through the later, each saved vector copied through the places the preparation saved and zero
     between them; a saved value before the start refuses the report in the words prepared where
     the vector was made. The labels name the index and its reporting lot for the deltas, `UNIT
-    delta [UNIT]`, the curve's name and the currency for a DV01, `SOFR USD dv01 [USD per basis
+    delta [UNIT]`, the curve's name, the currency and its unit for a DV01, `SOFR USD dv01 [USD
+    per basis
     point]`, `cleared USD dv01 [USD per basis point]` where no curve values, and the index, the
     curve's name and the lot per basis point for a cross-gamma, `UNIT SOFR cross_gamma [UNIT per
     basis point]`; a result on one curve names it bare, and two curves of one name on one result
@@ -210,7 +214,9 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
     crosses = leg.cross_contributions
     if rates or crosses:
         words = curve_words([c.curve for c in (*rates, *crosses)])
-        dv01_labels = tuple([dv01_label(words[id(c.curve)], c.currency) for c in rates])
+        dv01_labels = tuple(
+            [dv01_label(words[id(c.curve)], c.currency, c.currency_unit) for c in rates]
+        )
         cross_labels = tuple(
             [
                 cross_gamma_label(leg_terms.index, words[id(c.curve)], leg_terms.reporting_lot)
@@ -219,7 +225,7 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
         )
     else:
         # Cleared: no curve values, the one DV01 column and the one cross-gamma column of nothing.
-        dv01_labels = (dv01_label(CLEARED, results.currency),)
+        dv01_labels = (dv01_label(CLEARED, results.currency, results.currency_unit),)
         cross_labels = (cross_gamma_label(leg_terms.index, CLEARED, leg_terms.reporting_lot),)
     labels: Labels = (nominal_label, delta_label, dv01_labels, cross_labels)
     match bucket:
@@ -494,7 +500,9 @@ def _pair_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
     delta_words = tuple([pair[1] for pair in pairs])
     if rates or crosses:
         words = curve_words([c.curve for c in (*rates, *[c for _, c in crosses])])
-        dv01_labels = tuple([dv01_label(words[id(c.curve)], c.currency) for c in rates])
+        dv01_labels = tuple(
+            [dv01_label(words[id(c.curve)], c.currency, c.currency_unit) for c in rates]
+        )
         cross_labels = tuple(
             [
                 cross_gamma_label(terms[k].index, words[id(c.curve)], terms[k].reporting_lot)
@@ -503,7 +511,7 @@ def _pair_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
         )
     else:
         # Cleared: no curve values, the one DV01 column and a cross-gamma column of nothing a leg.
-        dv01_labels = (dv01_label(CLEARED, results.currency),)
+        dv01_labels = (dv01_label(CLEARED, results.currency, results.currency_unit),)
         cross_labels = tuple([cross_gamma_label(t.index, CLEARED, t.reporting_lot) for t in terms])
     labels: PairLabels = (nominal_labels, delta_words, dv01_labels, cross_labels)
     match bucket:

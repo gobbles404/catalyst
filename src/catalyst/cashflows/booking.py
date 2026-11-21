@@ -19,6 +19,7 @@ from numpy.typing import NDArray
 
 from catalyst.cashflows.rules import currency_of, finite_amounts
 from catalyst.globals.discount_curve import curve_name
+from catalyst.globals.unit_conversions import UnitConversions
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import CASHFLOW
 from catalyst.instruments.fields import FieldValues
@@ -42,7 +43,9 @@ class Cashflows:
     None when not
     supplied; and since cashflow-curve-keys.md discount_curve_key, the exact name of the curve
     the row's payment discounts on, the text alone and never a curve; currency, the one word
-    every row shares. Then keys, the batch's distinct keys in the order the rows first name
+    every row shares, and since currency-and-currency-unit.md currency_unit, the unit of it
+    every amount is in, the currency's reference unit in the unit tables, whole dollars and
+    never cents. Then keys, the batch's distinct keys in the order the rows first name
     them. Then per payment group, a payment day and a key, in day order and within a day in key
     order, so that a batch on one key has one group a day: group_day, the group's place among
     payment_days; group_key, its key's place among keys; group_amounts, its rows' amounts
@@ -55,6 +58,7 @@ class Cashflows:
     trade_date: NDArray[np.datetime64]
     amount: NDArray[np.float64]
     currency: str
+    currency_unit: str
     payment_date: NDArray[np.datetime64]
     counterparty: tuple[str, ...] | None
     description: tuple[str, ...] | None
@@ -75,7 +79,9 @@ class Cashflows:
         return self.amount.size
 
 
-def cashflows(ticket: FieldValues, template: TradeTemplate, counter: WorkCounter) -> Cashflows:
+def cashflows(
+    ticket: FieldValues, template: TradeTemplate, units: UnitConversions, counter: WorkCounter
+) -> Cashflows:
     """The one way to make Cashflows: the rules, checked in this order, the first failure being
     the message; then the amounts summed by payment group and the axes made.
 
@@ -87,7 +93,9 @@ def cashflows(ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
     present in one of them. The currency is USD exactly, the template's
     one value, read when the template was made, or a column every row holds, each distinct text
     read once in the order its first row comes and named with that row; so one batch holds one
-    currency. The trade IDs, where supplied, are whole numbers of at most 15 digits, the kernel's
+    currency, and its amounts are in that currency's reference unit, read off the unit tables
+    by the currency's name and typed nowhere else. The trade IDs, where supplied, are whole
+    numbers of at most 15 digits, the kernel's
     rule and the trades' words, the first bad row named; each amount is finite, zero and
     fractions included, the first bad row named; a date and a label are what they are. Each key
     is a curve's name by the curve's own rule, exact and with no whitespace around it, the
@@ -108,6 +116,7 @@ def cashflows(ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
     fields = _booked(template, ticket)
     _the_required(fields)
     currency = _the_currency(fields)
+    currency_unit = units.categories[currency].reference_unit  # whole units of the currency
     trade_id = (
         whole_trade_ids(fields.numbers("trade_id"), partial(fields.where, "trade_id"))
         if fields.has("trade_id")
@@ -140,8 +149,8 @@ def cashflows(ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
         g = int(outrun.argmax())
         raise ValueError(
             f"the payments on {days[group_day[g]]} on {keys[int(group_key[g])]} sum to "
-            f"{float(sums[g])!r}, expected a finite amount of {currency}; the rows' amounts, each "
-            "finite, sum past the largest number"
+            f"{float(sums[g])!r}, expected a finite amount of {currency_unit}; the rows' "
+            "amounts, each finite, sum past the largest number"
         )
     month_keys, month_of_day = np.unique(days.astype("datetime64[M]"), return_inverse=True)
     year_keys, year_of_month = np.unique(month_keys.astype("datetime64[Y]"), return_inverse=True)
@@ -170,6 +179,7 @@ def cashflows(ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
         trade_date,
         amount,
         currency,
+        currency_unit,
         payment_date,
         counterparty,
         description,

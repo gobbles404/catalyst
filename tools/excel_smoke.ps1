@@ -836,7 +836,11 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(FG7),3,2)" = "0"
     "=INDEX(_ReportValues(FG7),3,3)" = "USD"
     "=INDEX(_ReportValues(FG7),3,4)" = "46168"
-    "=COLUMNS(_ReportValues(FG7))"   = "4"
+    "=COLUMNS(_ReportValues(FG7))"   = "5"
+    # Since currency-and-currency-unit.md the unit of the currency the two amounts are in, last.
+    "=INDEX(_ReportValues(FG7),1,5)" = "currency_unit"
+    "=INDEX(_ReportValues(FG7),2,5)" = "str"
+    "=INDEX(_ReportValues(FG7),3,5)" = "USD"
     '=ROWS(_ReportRisk(FG7,"all","year"))'      = "5"
     '=COLUMNS(_ReportRisk(FG7,"all","year"))'   = "5"
     '=INDEX(_ReportRisk(FG7,"all","year"),2,5)' = "Henry Hub NYMEX cleared cross_gamma [lots per basis point]"
@@ -1078,7 +1082,9 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(KA14),3,1)"    = "-30"
     "=INDEX(_ReportValues(KA14),3,2)"    = "180"
     '=INDEX(_ReportRisk(KA14,"nominal_delta","year"),4,2)'      = "0"
-    "=COLUMNS(util_ReadHandle(KA14))"    = "31"
+    "=COLUMNS(util_ReadHandle(KA14))"    = "32"
+    "=INDEX(util_ReadHandle(KA14),1,32)" = "currency_unit"
+    "=INDEX(util_ReadHandle(KA14),3,32)" = "USD"
     "=INDEX(util_ReadHandle(KA14),1,11)"  = "contract_nominal_delta"
     "=INDEX(util_ReadHandle(KA14),6,11)"  = "0"
     "=INDEX(util_ReadHandle(KA14),1,28)"  = "observation_coefficient"
@@ -1356,7 +1362,10 @@ $formulas = [ordered]@{
     # at creation, two lots of one row past the largest number and one lot each of two rows
     # summing past it.
     "=ROWS(_ReportReserves(OR23))"         = "3"
-    "=COLUMNS(_ReportReserves(OR23))"      = "5"
+    "=COLUMNS(_ReportReserves(OR23))"      = "6"
+    "=INDEX(_ReportReserves(OR23),1,6)"    = "currency_unit"
+    "=INDEX(_ReportReserves(OR23),2,6)"    = "str"
+    "=INDEX(_ReportReserves(OR23),3,6)"    = "USD"
     "=INDEX(_ReportReserves(OR23),1,1)"    = "brokerage_reserve"
     "=INDEX(_ReportReserves(OR23),1,2)"    = "clearing_reserve"
     "=INDEX(_ReportReserves(OR23),1,3)"    = "marketing_reserve"
@@ -1373,7 +1382,9 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(OR23),3,1)"      = "1260"
     '=INDEX(_ReportRisk(OR23,"nominal_delta","year"),4,2)'        = "1"
     "=ROWS(util_ReadHandle(OR23))"         = "3"
-    "=COLUMNS(util_ReadHandle(OR23))"      = "31"
+    "=COLUMNS(util_ReadHandle(OR23))"      = "32"
+    "=INDEX(util_ReadHandle(OR23),1,32)"   = "currency_unit"
+    "=INDEX(util_ReadHandle(OR23),3,32)"   = "USD"
     "=INDEX(util_ReadHandle(OR23),1,19)"   = "brokerage_reserve"
     "=INDEX(util_ReadHandle(OR23),1,23)"   = "currency"
     "=INDEX(util_ReadHandle(OR23),3,19)"   = "50"
@@ -1451,7 +1462,9 @@ $formulas = [ordered]@{
     # columns side by side in OR92, 40 and -15; the template in OR98 booking -40 on each of the four
     # plain rows, -160, the mark as without; two rows of 9E+307 and of -9E+307 refused for the
     # batch; a blank amount refused by the seam; the field from both refused.
-    "=COLUMNS(_ReportReserves(OR86))"      = "5"
+    "=COLUMNS(_ReportReserves(OR86))"      = "6"
+    "=INDEX(_ReportReserves(OR86),1,6)" = "currency_unit"
+    "=INDEX(_ReportReserves(OR86),3,6)" = "USD"
     "=INDEX(_ReportReserves(OR86),1,4)"    = "cva_reserve"
     "=INDEX(_ReportReserves(OR86),2,4)"    = "float64"
     "=INDEX(_ReportReserves(OR86),3,1)"    = "60"
@@ -1811,7 +1824,9 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(QV31,"cross_gamma","year"),4,3)' = "0.00184"
     '=INDEX(_ReportRisk(QV31,"nominal_delta","year"),4,2)' = "0"
     '=ROUND(INDEX(_ReportRisk(QV31,"delta","year"),4,2),12)' = "0.3"
-    "=COLUMNS(util_ReadHandle(QV31))"      = "31"
+    "=COLUMNS(util_ReadHandle(QV31))"      = "32"
+    "=INDEX(util_ReadHandle(QV31),1,32)" = "currency_unit"
+    "=INDEX(util_ReadHandle(QV31),3,32)" = "USD"
     "=INDEX(util_ReadHandle(QV31),1,28)"   = "observation_coefficient"
     "=INDEX(util_ReadHandle(QV31),1,26)"   = "discount_curve_key"
     "=INDEX(util_ReadHandle(QV31),1,27)"   = "discount_curve"
@@ -1868,7 +1883,9 @@ $formulas = [ordered]@{
     '=ROWS(_ReportRisk(QV24,"cross_gamma","year"))' = "5"
     "=INDEX(_ReportReserves(QV8),3,3)"    = "10"
     "=ROWS(util_ReadHandle(QV8))"         = "4"
-    "=COLUMNS(util_ReadHandle(QV8))"      = "31"
+    "=COLUMNS(util_ReadHandle(QV8))"      = "32"
+    "=INDEX(util_ReadHandle(QV8),1,32)" = "currency_unit"
+    "=INDEX(util_ReadHandle(QV8),3,32)" = "USD"
     "=INDEX(util_ReadHandle(QV8),1,26)"   = "discount_curve_key"
     "=INDEX(util_ReadHandle(QV8),3,26)"   = "SOFR"
     "=INDEX(util_ReadHandle(QV8),1,27)"   = "discount_curve"
@@ -2066,7 +2083,9 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(RT10,"all","day"),4,2)'  = "10"
     '=INDEX(_ReportRisk(RT10,"all","day"),5,3)'  = "10"
     "=ROWS(util_ReadHandle(RT8))"         = "5"
-    "=COLUMNS(util_ReadHandle(RT8))"      = "12"
+    "=COLUMNS(util_ReadHandle(RT8))"      = "13"
+    "=INDEX(util_ReadHandle(RT8),1,13)" = "currency_unit"
+    "=INDEX(util_ReadHandle(RT8),3,13)" = "USD"
     "=INDEX(util_ReadHandle(RT8),1,11)"   = "cross_gamma"
     "=INDEX(util_ReadHandle(RT8),3,11)"   = "0.00085"
     "=INDEX(util_ReadHandle(RT8),4,11)"   = "-0.001"
@@ -2104,6 +2123,35 @@ $formulas = [ordered]@{
     "=_AggregateResults(RW1:RW2)"         = "#ERROR _AggregateResults: ValueError: results 2 is valued on 2027-01-05, expected 2027-01-04, the valuation day of results 1"
     "=_AggregateResults(RX1:RX2)"         = "#ERROR _AggregateResults: ValueError: results 2 is on index 'UNIT' quoted off another price vector than results 1, expected one price vector for one index"
     "=LEFT(_AggregateResults(QV7),68)"    = "#ERROR _AggregateResults: result_handles is prepared trades handle '"
+    # Since currency-and-currency-unit.md a result's currency and the unit of it are two facts.
+    # UNITC, UNIT's twin settled in cents, QJ28: the ticket's first row, ten barrels at 80
+    # against 70 paid a year out at 0.95, 9,500 cents of mark and -0.95 of DV01; its currency
+    # is USD and its unit CENT on both reports, in the heading's brackets and in the readback's
+    # last column. Collected after QV8 in QJ31, on the one curve: a column of its own beside the
+    # dollar column, told apart by the unit and added to nothing.
+    "=INDEX(_ReportValues(QJ28),1,5)"     = "currency_unit"
+    "=ROUND(INDEX(_ReportValues(QJ28),3,1),6)" = "9500"
+    "=INDEX(_ReportValues(QJ28),3,3)"     = "USD"
+    "=INDEX(_ReportValues(QJ28),3,5)"     = "CENT"
+    "=INDEX(_ReportReserves(QJ28),3,5)"   = "USD"
+    "=INDEX(_ReportReserves(QJ28),3,6)"   = "CENT"
+    '=INDEX(_ReportRisk(QJ28,"dv01","year"),2,2)' = "SOFR USD dv01 [CENT per basis point]"
+    '=ROUND(INDEX(_ReportRisk(QJ28,"dv01","year"),4,2),9)' = "-0.95"
+    "=INDEX(util_ReadHandle(QJ28),1,COLUMNS(util_ReadHandle(QJ28)))" = "currency_unit"
+    "=INDEX(util_ReadHandle(QJ28),3,COLUMNS(util_ReadHandle(QJ28)))" = "CENT"
+    '=INDEX(util_ReadHandle(QJ28),3,MATCH("currency",INDEX(util_ReadHandle(QJ28),1,0),0))' = "USD"
+    '=COLUMNS(_ReportRisk(QJ31,"dv01","year"))'   = "3"
+    '=INDEX(_ReportRisk(QJ31,"dv01","year"),2,2)' = "SOFR USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(QJ31,"dv01","year"),2,3)' = "SOFR USD dv01 [CENT per basis point]"
+    '=ROUND(INDEX(_ReportRisk(QJ31,"dv01","year"),4,2),9)' = "0.0085"
+    '=ROUND(INDEX(_ReportRisk(QJ31,"dv01","year"),4,3),9)' = "-0.95"
+    "=COLUMNS(util_ReadHandle(QJ31))"     = "13"
+    "=INDEX(util_ReadHandle(QJ31),1,13)"  = "currency_unit"
+    "=INDEX(util_ReadHandle(QJ31),3,6)"   = "USD"
+    "=INDEX(util_ReadHandle(QJ31),3,13)"  = "USD"
+    "=INDEX(util_ReadHandle(QJ31),4,2)"   = "UNITC"
+    "=INDEX(util_ReadHandle(QJ31),4,6)"   = "USD"
+    "=INDEX(util_ReadHandle(QJ31),4,13)"  = "CENT"
     '=LEFT(_ReportRisk(QV7,"all","day"),55)' = "#ERROR _ReportRisk: results is prepared trades handle '"
     "=LEFT(_ReportValues(RT8),59)"        = "#ERROR _ReportValues: results is aggregate results handle '"
     "=LEFT(_ReportReserves(RT8),61)"      = "#ERROR _ReportReserves: results is aggregate results handle '"
@@ -2209,7 +2257,9 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(UF5),1,8)" = "discount_curve_key"
     "=INDEX(util_ReadHandle(UF5),5,8)" = "SOFR"
     "=INDEX(util_ReadHandle(ZV4),3,8)" = "FFOIS"
-    "=COLUMNS(util_ReadHandle(UF8))" = "13"
+    "=COLUMNS(util_ReadHandle(UF8))" = "14"
+    "=INDEX(util_ReadHandle(UF8),1,14)" = "currency_unit"
+    "=INDEX(util_ReadHandle(UF8),3,14)" = "USD"
     "=INDEX(util_ReadHandle(UF8),1,13)" = "discount_curve_key"
     "=INDEX(util_ReadHandle(UF8),5,13)" = "SOFR"
     '=_ReportRisk(UF8,"delta","day")' = "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk"
@@ -2363,7 +2413,9 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(WJ23),4,5)"  = "46419"
     "=INDEX(util_ReadHandle(WJ23),4,10)" = "1"
     "=ROWS(util_ReadHandle(WJ24))"       = "4"
-    "=COLUMNS(util_ReadHandle(WJ24))"    = "33"
+    "=COLUMNS(util_ReadHandle(WJ24))"    = "34"
+    "=INDEX(util_ReadHandle(WJ24),1,34)" = "currency_unit"
+    "=INDEX(util_ReadHandle(WJ24),3,34)" = "USD"
     # since observation-prices-readback.md each leg's slot at its own quote, last: A's 10,000
     # at G27's 3.50, 35,000, and B's at -0.40, -4,000, each under its index's quote unit
     "=INDEX(util_ReadHandle(WJ24),1,30)" = "observation_coefficient"
@@ -2376,7 +2428,9 @@ $formulas = [ordered]@{
     "=ROUND(INDEX(util_ReadHandle(WJ24),4,33),6)" = "-4000"
     # cva-reserve.md: the pair's row with a CVA column in WL7:WQ8 books -40 once, though two legs,
     # the bilateral unbrokered template charging no fee; the batch's readback a column wider.
-    "=COLUMNS(_ReportReserves(WJ32))"    = "5"
+    "=COLUMNS(_ReportReserves(WJ32))"    = "6"
+    "=INDEX(_ReportReserves(WJ32),1,6)" = "currency_unit"
+    "=INDEX(_ReportReserves(WJ32),3,6)" = "USD"
     "=INDEX(_ReportReserves(WJ32),3,1)"  = "0"
     "=INDEX(_ReportReserves(WJ32),3,4)"  = "-40"
     "=INDEX(_ReportReserves(WJ32),3,5)"  = "USD"
@@ -2445,7 +2499,9 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(WJ35),4,2)"  = "B"
     "=INDEX(util_ReadHandle(WJ35),3,10)" = "1"
     "=INDEX(util_ReadHandle(WJ35),4,10)" = "-1"
-    "=COLUMNS(util_ReadHandle(WJ36))"    = "33"
+    "=COLUMNS(util_ReadHandle(WJ36))"    = "34"
+    "=INDEX(util_ReadHandle(WJ36),1,34)" = "currency_unit"
+    "=INDEX(util_ReadHandle(WJ36),3,34)" = "USD"
     "=INDEX(util_ReadHandle(WJ36),3,18)" = "1000"
     "=INDEX(util_ReadHandle(WJ36),3,19)" = "950"
     "=INDEX(util_ReadHandle(WJ36),3,30)" = "10000"
@@ -2501,7 +2557,9 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(YJ21),4,2)"  = "WTI"
     "=INDEX(util_ReadHandle(YJ21),3,10)" = "1"
     "=INDEX(util_ReadHandle(YJ21),4,10)" = "-1"
-    "=COLUMNS(util_ReadHandle(YJ22))"    = "33"
+    "=COLUMNS(util_ReadHandle(YJ22))"    = "34"
+    "=INDEX(util_ReadHandle(YJ22),1,34)" = "currency_unit"
+    "=INDEX(util_ReadHandle(YJ22),3,34)" = "USD"
     "=ROUND(INDEX(util_ReadHandle(YJ22),3,18),6)" = "3200"
     "=ROUND(INDEX(util_ReadHandle(YJ22),3,19),6)" = "3040"
     "=INDEX(util_ReadHandle(YJ22),3,30)" = "42000"
@@ -3877,6 +3935,22 @@ $cells = [ordered]@{
     "RT8" = "=_AggregateResults(RT3:RT5)"
     "RT9" = "=_AggregateResults(RT1:RV1)"
     "RT10" = "=_AggregateResults(QV24)"
+    # Since currency-and-currency-unit.md an index settled in cents: UNITC, the UNIT index's
+    # twin, its schedule, holidays and specification, quoted in dollars a barrel as UNIT is;
+    # the ticket's first row under the bilateral template, valued on 4 January 2027 at 80 on
+    # the collection QV8 is valued on; and QV8 and it collected, in that order.
+    "QJ20" = '=_CreateIndexConventions("USD","BBL","CENT","VOLUME","BBL")'
+    "QJ21" = '=_CreateIndex("UNITC","One-barrel index settled in cents",QJ4,QJ20,QJ7,QJ5,"UNIT")'
+    "QJ22" = "=_CreateTrades(QJ21,QM9:QR9,QM10:QR10,QJ10)"
+    "QJ23" = "=_CreateCalendar(QV2,QJ21)"
+    "QJ24" = "=_CreateFuturesFixings(QW1,QX1,QJ21)"
+    "QJ25" = "=_CreateMarketHistory(QJ23,QJ24)"
+    "QK26" = '=_CreatePriceVector("UNITC",QV10:QV11)'
+    "QJ26" = "=_CreateMarket(QJ25,QK26)"
+    "QJ27" = "=_PrepareTrades(QJ22,QJ25)"
+    "QJ28" = "=_EvaluateTrades(QJ27,QJ26,QW12)"
+    "QJ30" = "=QV8"; "QK30" = "=QJ28"
+    "QJ31" = "=_AggregateResults(QJ30:QK30)"
     # Half-year strips, half-year-strips.md: a one-unit index HALF of nine months, X26 the boundary
     # and N27 last, a cleared lastday template a lot a month at +2bd on a calendar closing 1 January
     # 2030; 1h27 and F27-M27 booked at 3 on 1 December 2026, valued on the 15th with every live
