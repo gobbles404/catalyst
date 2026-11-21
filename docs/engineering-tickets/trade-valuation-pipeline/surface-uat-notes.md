@@ -1186,7 +1186,7 @@ request.
 
 ## 45. A payment calendar is chosen by key
 
-Agreed 21 November 2026 and built in #NNN, issue #255:
+Agreed 21 November 2026 and built in #269, issue #255:
 [payment-calendar-keys.md](payment-calendar-keys.md), the second of two pull requests.
 The field `payment_holiday_calendar`, which took a calendar's handle, is replaced by
 `payment_calendar_key`, which takes a calendar's name, or several names joined by a plus
@@ -1209,11 +1209,13 @@ batch in B1292, which now names B3711; its readback in F1292 is one column wider
 in AC1294. Three readbacks moved right to make room for their new column: AK1626, AG1710
 and AG1756. Then rows 3741 to 3762, a ticket whose rows each choose their calendar: read
 the four payment days in B3761:E3761, 30 November, 1 December, 2 December and 2 December
-2026, and each row's key beneath them. Type PAY_B over PAY_A in G3747 and read B3761 move
-to 1 December; type PAY_A back. Type =DATE(2026,11,30) over D3662, the one day PAY_A is
-closed: the calendar, its collection and the batch are remade, the first row pays Friday
-27 November and the last two Tuesday 1 December; type =DATE(2026,11,26) back. B3766 is a
-payment on a stated Saturday, 5 December, as entered. Rows 3768 to 3772 are refused, each
+2026, and each row's key beneath them. A readback shows a day as Excel counts it, so the
+four cells read 46356, 46357, 46358 and 46358 until they are formatted as dates. Type
+PAY_B over PAY_A in G3747 and read B3761 move to 1 December, 46357; type PAY_A back. Type
+=DATE(2026,11,30) over D3662, the one day PAY_A is closed: the calendar, its collection
+and the batch are remade, the first row pays Friday 27 November, 46353, and the last two
+Tuesday 1 December; type =DATE(2026,11,26) back. B3766 is a payment on a stated Saturday,
+5 December, 46361, as entered. Rows 3768 to 3772 are refused, each
 in its own words, and B3779 is a quote template given no collection. Then on one of the
 desk's own sheets make the four changes and book a ticket whose rows name two calendars
 and both together.
