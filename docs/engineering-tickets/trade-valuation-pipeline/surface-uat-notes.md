@@ -1112,7 +1112,7 @@ desk's own sheets and check that no report meets an occupied cell on its right.
 
 ## 42. The dollar's unit is spelled DOLLAR
 
-Agreed 21 November 2026 and built in #NNN, issue #263:
+Agreed 21 November 2026 and built in #266, issue #263:
 [currency-and-currency-unit.md](currency-and-currency-unit.md), the second of two pull requests.
 `USD` is the currency and nothing else. Its units are `DOLLAR` and `CENT`, so a field
 that asks for a unit takes `DOLLAR` where it took `USD`: the first and the third

@@ -1,10 +1,10 @@
 # A result's currency and the unit of it
 
-**Status:** Built in two pull requests, #265 and, stacked on it, #NNN, agreed with the owner
+**Status:** Built in two pull requests, #265 and, stacked on it, #266, agreed with the owner
 on 21 November 2026 for
 [issue #263](https://github.com/gobbles404/catalyst/issues/263), this page in the first
 commit of each. #265: a result carries two facts where one word stood for both, its currency
-and the unit of that currency its amounts are in. #NNN: the dollar's unit is spelled `DOLLAR`,
+and the unit of that currency its amounts are in. #266: the dollar's unit is spelled `DOLLAR`,
 where it was spelled `USD` as the currency is. No number moves in either.
 [unit-conversions.md](../../library/globals/unit-conversions.md),
 [index-conventions.md](../../library/index-definitions/index-conventions.md),
@@ -53,7 +53,7 @@ factor of 0.95:
 
 ## What shows
 
-| Surface | Before | After #265 | After #NNN |
+| Surface | Before | After #265 | After #266 |
 |---|---|---|---|
 | DV01 heading, settled in dollars | `SOFR USD dv01 [USD per basis point]` | the same | `SOFR USD dv01 [DOLLAR per basis point]` |
 | DV01 heading, settled in cents | `SOFR CENT dv01 [CENT per basis point]` | `SOFR USD dv01 [CENT per basis point]` | the same |
@@ -101,7 +101,7 @@ A sheet with an index settled in cents sees two cells change: the `currency` of 
 reads `USD` where it read `CENT`, and its DV01 heading reads
 `SOFR USD dv01 [CENT per basis point]`.
 
-**After #NNN**, every sheet makes these edits, and each fails by name until it is made:
+**After #266**, every sheet makes these edits, and each fails by name until it is made:
 
 | Where | Was | Is |
 |---|---|---|
@@ -155,7 +155,7 @@ new column on the two reports and the three readbacks. Inside the library every 
 held the settlement unit under the name `currency` is renamed `currency_unit`, so that the
 name `currency` holds a currency wherever it stands.
 
-#NNN, on #265: the unit tables' group `USD` keeps its name and takes `DOLLAR` as its base
+#266, on #265: the unit tables' group `USD` keeps its name and takes `DOLLAR` as its base
 unit beside `CENT`, three lines of the tables; the help of the two unit arguments and the
 choices of `spread_price_currency_unit`; the two reserve fields' descriptions, which say
 the unit the index settles in where they said its currency. Everything else is the cut-over
