@@ -45,8 +45,8 @@ class RiskView:
     """One risk report's content, since #178, selected by reference and placed through saved
     places: dates, the bucket starts, increasing, observation days under the deltas, payment days
     under the DV01 and their union under all; labels, one heading per risk column, the index's
-    name and its reporting lot's for a delta, the curve's group and the currency for a DV01, the
-    index, the group and the lot per basis point for a cross-gamma;
+    name and its reporting lot's for a delta, the curve's group, the currency and the unit of
+    it for a DV01, the index, the group and the lot per basis point for a cross-gamma;
     totals, the saved scalars, one per label; and columns, one dated vector per label, the saved
     vector itself where the axis is its own and a copy placed on the shared axis under all, zero
     where that axis has no entry of its kind. Nothing is summed, sorted or converted here."""
@@ -83,12 +83,14 @@ def delta_labels(index: Index, reporting_lot: ReportingLot) -> tuple[str, str]:
     )
 
 
-def dv01_label(group: str, currency: str) -> str:
+def dv01_label(group: str, currency: str, currency_unit: str) -> str:
     """The DV01 column's heading over the group its caller named, the curve's word, its name or
     the name qualified where a collection holds two objects of it, or `cleared` where no curve
-    values, in the group's currency: `SOFR USD dv01 [USD per basis point]`. Which group and
-    which currency are the caller's."""
-    return f"{group} {currency} dv01 [{currency} per basis point]"
+    values; then the currency, and in the brackets the unit of it the values are in, two facts
+    since currency-and-currency-unit.md: `SOFR USD dv01 [USD per basis point]`, and `SOFR USD
+    dv01 [CENT per basis point]` over an index settled in cents. Which group, which currency
+    and which unit are the caller's."""
+    return f"{group} {currency} dv01 [{currency_unit} per basis point]"
 
 
 def cross_gamma_label(index: Index, group: str, reporting_lot: ReportingLot) -> str:

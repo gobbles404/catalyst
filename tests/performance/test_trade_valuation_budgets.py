@@ -260,8 +260,9 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
     live = bridge.live_handles()
     for name, numeric, dated in (
         ("_ReportValues", 3, True),
-        ("_ReportReserves", 4, False),  # four totals and a currency, no day, since #170 and
-        # cva-reserve.md
+        ("_ReportReserves", 4, False),  # four totals, a currency and its unit, no day, since
+        # #170, cva-reserve.md and currency-and-currency-unit.md, whose text column is no
+        # numeric one and adds no call to either report
     ):
         profile = call_profile(lambda name=name: PATH[name](results))
         expected = {
@@ -293,7 +294,9 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
 # report 1,967 and the risk report 1,948; the risk report 2,079 since #177, its sixth column, and
 # since #178 3,591 bytes for all three by day, 24 observation days under the Total in four
 # columns, the rectangle and the DV01 column of zeros, and since #197 4,233 for all four, the
-# cross-gamma's column of zeros beside the DV01's, within five slacks.
+# cross-gamma's column of zeros beside the DV01's, within five slacks. Since
+# currency-and-currency-unit.md each report's row holds the currency unit too, a word more: the
+# values report 1,994 bytes where it was 1,967 and the reserves report 1,259 where it was 1,151.
 RISK_PEAK = 5 * SLACK
 
 

@@ -38,9 +38,11 @@ RISK_REDUCTIONS = "risk_reductions"
 class CashflowResults:
     """The snapshot of a batch of cashflows on one valuation day over the curves its keys name,
     every array read-only: the batch by reference and, since cashflow-curve-keys.md, curves, the
-    curve each of the batch's keys was bound to, in key order; as_of and the currency; mark, the
+    curve each of the batch's keys was bound to, in key order; as_of, the currency and, since
+    currency-and-currency-unit.md, currency_unit, the unit of it every amount is in, the
+    batch's; mark, the
     discounted value of the unpaid payments in all; cash, the paid amounts in all; dv01, the
-    unpaid payments' in all, in the currency per basis point. Then per payment group of the
+    unpaid payments' in all, in that unit per basis point. Then per payment group of the
     batch, a payment day and a key, paid or not: is_paid; payment_factor, the group's own
     curve's on an unpaid day and 1 on a paid one, read for nothing; npv, the group's amount
     times its factor, zero on a paid group; payment_cash, the amount on a paid group and zero
@@ -55,6 +57,7 @@ class CashflowResults:
     curves: tuple[DiscountCurve, ...]
     as_of: np.datetime64
     currency: str
+    currency_unit: str
     mark: float
     cash: float
     dv01: float
@@ -91,7 +94,9 @@ class CashflowResults:
         # where the name is the cleared batch's word, the headings a collection of the batch
         # alone shows.
         words = curve_words([c.curve for c in contributions])
-        labels = tuple([dv01_label(words[id(c.curve)], self.currency) for c in contributions])
+        labels = tuple(
+            [dv01_label(words[id(c.curve)], c.currency, c.currency_unit) for c in contributions]
+        )
         totals = tuple([c.dv01 for c in contributions])
         match bucket:
             case Bucket.DAY:
@@ -158,6 +163,7 @@ def cashflow_results(
     """
     as_of = valuation_date.as_of
     currency = batch.currency
+    currency_unit = batch.currency_unit
     keys = batch.keys
     curves: list[DiscountCurve] = []
     for key in keys:
@@ -211,9 +217,9 @@ def cashflow_results(
         ).reshape(count, years.size)
         dv01_of_curve = dv01_by_day.sum(axis=1)
     for label, total, unit in (
-        ("mark", mark, currency),
-        ("cash", cash, currency),
-        ("DV01", dv01, f"{currency} per basis point"),
+        ("mark", mark, currency_unit),
+        ("cash", cash, currency_unit),
+        ("DV01", dv01, f"{currency_unit} per basis point"),
     ):
         if not np.isfinite(total):
             raise ValueError(
@@ -229,8 +235,8 @@ def cashflow_results(
             k, b = np.unravel_index(int(outrun.argmax()), outrun.shape)
             raise ValueError(
                 f"{label} {starts[b]} has {float(views[k, b])!r} of DV01 on {curves[int(k)].name} "
-                f"in all, expected a finite amount of {currency} per basis point; its payments' "
-                "DV01s sum past the largest number"
+                f"in all, expected a finite amount of {currency_unit} per basis point; its "
+                "payments' DV01s sum past the largest number"
             )
     # Each curve's own total, which the batch's does not answer for: a receipt on one curve
     # against a payment on another cancels in the batch's DV01 while each curve's runs past
@@ -240,8 +246,8 @@ def cashflow_results(
         k = int(outrun.argmax())
         raise ValueError(
             f"the batch has {float(dv01_of_curve[k])!r} of DV01 on {curves[k].name} in all, "
-            f"expected a finite amount of {currency} per basis point; the curve's payments' DV01s, "
-            "each finite, sum past the largest number"
+            f"expected a finite amount of {currency_unit} per basis point; the curve's "
+            "payments' DV01s, each finite, sum past the largest number"
         )
     by_month = period_axis(as_of, NO_DAYS, months, "M")
     by_year = period_axis(as_of, NO_DAYS, years, "Y")
@@ -255,6 +261,7 @@ def cashflow_results(
             RateContribution(
                 curve,
                 currency,
+                currency_unit,
                 float(dv01_of_curve[k]),
                 days,
                 dv01_by_day[k],
@@ -266,7 +273,7 @@ def cashflow_results(
                     f"{curve.name} {currency}",
                     "payment",
                     as_of,
-                    f"{currency} per basis point",
+                    f"{currency_unit} per basis point",
                     months,
                     dv01_by_month[k],
                     by_month.paid_from,
@@ -288,6 +295,7 @@ def cashflow_results(
         tuple(curves),
         as_of,
         currency,
+        currency_unit,
         mark,
         cash,
         dv01,

@@ -20,6 +20,7 @@ from catalyst.excel import bridge
 from catalyst.excel.bridge import Cells
 from catalyst.globals.discount_curve import DiscountCurve, discount_curve
 from catalyst.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
+from catalyst.globals.unit_conversions import UNITS
 from catalyst.globals.valuation_date import ValuationDate, valuation_date
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import CASHFLOW
@@ -102,7 +103,7 @@ def keyed_groups(rows: int, days: int, curves: int) -> tuple[int, int]:
 
 
 def a_batch(rows: int, days: int) -> Cashflows:
-    return cashflows(a_ticket(rows, days), TEMPLATE, WorkCounter())
+    return cashflows(a_ticket(rows, days), TEMPLATE, UNITS, WorkCounter())
 
 
 DATE: ValuationDate = valuation_date(AS_OF, 0.5)
@@ -231,7 +232,7 @@ def test_the_counters_report_rows_booked_days_mapped_and_unpaid_days_valued(
     rows: int, days: int
 ) -> None:
     counter = WorkCounter()
-    batch = cashflows(a_ticket(rows, days), TEMPLATE, counter)
+    batch = cashflows(a_ticket(rows, days), TEMPLATE, UNITS, counter)
     assert counter.freeze().as_dict() == {
         "cashflows_booked": rows,
         "payment_days_mapped": days,
@@ -252,8 +253,8 @@ def test_the_same_functions_and_numpy_calls_at_any_size(
     call_profile: CallProfile, numpy_calls: CallProfile, rows: int, days: int
 ) -> None:
     ticket = a_ticket(rows, days)
-    assert call_profile(lambda: cashflows(ticket, TEMPLATE, WorkCounter())) == BOOKING_CALLS
-    assert numpy_calls(lambda: cashflows(ticket, TEMPLATE, WorkCounter())) == BOOKING_NUMPY
+    assert call_profile(lambda: cashflows(ticket, TEMPLATE, UNITS, WorkCounter())) == BOOKING_CALLS
+    assert numpy_calls(lambda: cashflows(ticket, TEMPLATE, UNITS, WorkCounter())) == BOOKING_NUMPY
     batch = a_batch(rows, days)
     curve = a_set(days)
     assert call_profile(lambda: cashflow_results(batch, DATE, curve, WorkCounter())) == (
@@ -288,17 +289,19 @@ def test_a_key_a_row_books_by_group_and_values_by_group_and_by_curve(
     ticket = a_keyed_ticket(rows, days, curves)
     used, groups = keyed_groups(rows, days, curves)
     counter = WorkCounter()
-    batch = cashflows(ticket, UNKEYED, counter)
+    batch = cashflows(ticket, UNKEYED, UNITS, counter)
     assert len(batch.keys) == curves and batch.group_amounts.size == groups
     assert counter.freeze().as_dict() == {
         "cashflows_booked": rows,
         "payment_days_mapped": used,
         "payment_groups_formed": groups,
     }
-    assert call_profile(lambda: cashflows(ticket, UNKEYED, WorkCounter())) == (
+    assert call_profile(lambda: cashflows(ticket, UNKEYED, UNITS, WorkCounter())) == (
         keyed_booking_calls(curves)
     )
-    assert numpy_calls(lambda: cashflows(ticket, UNKEYED, WorkCounter())) == KEYED_BOOKING_NUMPY
+    assert (
+        numpy_calls(lambda: cashflows(ticket, UNKEYED, UNITS, WorkCounter())) == KEYED_BOOKING_NUMPY
+    )
     held = a_set(days, curves)
     counter = WorkCounter()
     result = cashflow_results(batch, DATE, held, counter)
@@ -345,7 +348,7 @@ def test_the_peaks_follow_the_rows_and_the_days_and_the_records_keep_their_colum
     rows: int, days: int
 ) -> None:
     ticket = a_ticket(rows, days)
-    assert least_peak(lambda: cashflows(ticket, TEMPLATE, WorkCounter())) <= (
+    assert least_peak(lambda: cashflows(ticket, TEMPLATE, UNITS, WorkCounter())) <= (
         56 * rows + 56 * days + 7 * SLACK
     )
     batch = a_batch(rows, days)
@@ -376,7 +379,7 @@ def test_a_keyed_valuations_peak_follows_its_groups_and_its_curves_days(
     rows: int, days: int, curves: int
 ) -> None:
     used, groups = keyed_groups(rows, days, curves)
-    batch = cashflows(a_keyed_ticket(rows, days, curves), UNKEYED, WorkCounter())
+    batch = cashflows(a_keyed_ticket(rows, days, curves), UNKEYED, UNITS, WorkCounter())
     held = a_set(days, curves)
     assert least_peak(lambda: cashflow_results(batch, DATE, held, WorkCounter())) <= (
         80 * groups + 24 * curves * used + 6 * SLACK
@@ -499,5 +502,8 @@ def test_the_creators_cost_their_rows_and_days_and_keep_their_columns_until_rele
     )
     # The key is a column more of each readback: a word a row, and a word a group.
     assert least_peak(lambda: ENTRY["util_ReadHandle"](batch)) <= 110 * rows + 3 * SLACK
-    assert least_peak(lambda: ENTRY["util_ReadHandle"](results)) <= 420 * days + 4 * SLACK
+    # Since currency-and-currency-unit.md the results' readback holds the currency unit too, a
+    # word a group more: 95 bytes a day, 1,010,049 bytes measured for two thousand days where
+    # it was 819,639.
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](results)) <= 515 * days + 4 * SLACK
     assert bridge.live_handles() == live  # the reports and the readback publish nothing

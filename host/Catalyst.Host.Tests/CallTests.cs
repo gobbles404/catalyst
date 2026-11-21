@@ -600,7 +600,9 @@ namespace Catalyst.Host.Tests
             Assert.Equal(0.88, (double)two[3, 2], 12);
             var members = (object[,])Seam.Call("util_ReadHandle", both);
             Assert.Equal(4, members.GetLength(0));
-            Assert.Equal(12, members.GetLength(1));
+            Assert.Equal(13, members.GetLength(1));  // the currency unit last, currency-and-currency-unit.md
+            Assert.Equal("currency_unit", members[0, 12]);
+            Assert.Equal("USD", members[2, 12]);
             Assert.Equal("-", members[2, 1]);
             Assert.Equal("-", members[2, 2]);
             Assert.Equal("cashflow", members[2, 3]);
@@ -651,7 +653,8 @@ namespace Catalyst.Host.Tests
             Assert.Equal(46756.0, risk[4, 0]);
             var read = (object[,])Seam.Call("util_ReadHandle", results);
             Assert.Equal(4, read.GetLength(0));  // one payment day on two keys: two rows
-            Assert.Equal(13, read.GetLength(1));
+            Assert.Equal(14, read.GetLength(1));
+            Assert.Equal("USD", read[2, Heading(read, "currency_unit")]);
             Assert.Equal("SOFR", read[2, Heading(read, "discount_curve_key")]);
             Assert.Equal("FFOIS", read[3, Heading(read, "discount_curve_key")]);
             Assert.Equal(9500.0, (double)read[2, Heading(read, "npv")], 9);
@@ -717,7 +720,9 @@ namespace Catalyst.Host.Tests
             Assert.Equal(1.8, (double)risk[6, 1], 12);
             var read = (object[,])Seam.Call("util_ReadHandle", results);
             Assert.Equal(5, read.GetLength(0));
-            Assert.Equal(13, read.GetLength(1));  // the key last, so that no earlier column moved
+            Assert.Equal(14, read.GetLength(1));  // the key, then since currency-and-currency-unit.md the currency unit, last, so that no earlier column moved
+            Assert.Equal("currency_unit", read[0, 13]);
+            Assert.Equal("USD", read[4, 13]);
             Assert.Equal("discount_curve_key", read[0, 12]);
             Assert.Equal("SOFR", read[4, 12]);
             Assert.Equal("cashflow_mark", read[0, 9]);
@@ -825,7 +830,7 @@ namespace Catalyst.Host.Tests
             // legs, the bilateral unbrokered template charging no fee.
             var pairCva = (string)Seam.Call("_CreateTrades", Column(a, b), Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "cva_reserve"), Row(1.0, 46371.0, "G27", 1.0, 3.00, -40.0), template);
             var pairReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", pairCva, Column(historyA, historyB)), Row(marketA, marketB), curves));
-            Assert.Equal(5, pairReserves.GetLength(1));
+            Assert.Equal(6, pairReserves.GetLength(1));
             Assert.Equal(0.0, (double)pairReserves[2, 0], 9);
             Assert.Equal(-40.0, (double)pairReserves[2, 3], 9);
             Assert.Equal("USD", pairReserves[2, 4]);
@@ -1347,7 +1352,12 @@ namespace Catalyst.Host.Tests
             Assert.StartsWith(Pid + ":trade_results:sample:", results);
             var values = (object[,])Seam.Call("_ReportValues", results);
             Assert.Equal(3, values.GetLength(0));
-            Assert.Equal(4, values.GetLength(1));
+            Assert.Equal(5, values.GetLength(1));  // the currency unit last, currency-and-currency-unit.md
+            Assert.Equal("currency", values[0, 2]);
+            Assert.Equal("USD", values[2, 2]);
+            Assert.Equal("currency_unit", values[0, 4]);
+            Assert.Equal("str", values[1, 4]);
+            Assert.Equal("USD", values[2, 4]);
             Assert.Equal("cleared_mark", values[0, 0]);
             Assert.Equal("cleared_cash", values[0, 1]);
             Assert.Equal(34000.0, (double)values[2, 0], 6);
@@ -1419,7 +1429,9 @@ namespace Catalyst.Host.Tests
             Assert.Equal("group_dv01", contributions[0, 16]);
             Assert.Equal("-", contributions[2, 13]);  // a cleared batch retains no payment facts
             Assert.Equal("brokerage_reserve", contributions[0, 17]);
-            Assert.Equal(30, contributions.GetLength(1));  // since #197 the contract's cross-gamma and its unit, since named-curves-slice-3.md the key and the curve, since observation-prices-readback.md the four price columns, last, since cva-reserve.md the CVA reserve among the reserves
+            Assert.Equal(31, contributions.GetLength(1));  // since #197 the contract's cross-gamma and its unit, since named-curves-slice-3.md the key and the curve, since observation-prices-readback.md the four price columns, since cva-reserve.md the CVA reserve among the reserves, since currency-and-currency-unit.md the currency unit, last
+            Assert.Equal("currency_unit", contributions[0, 30]);
+            Assert.Equal("USD", contributions[2, 30]);
             Assert.Equal("observation_coefficient", contributions[0, 26]);
             Assert.Equal(20000.0, contributions[2, 26]);
             Assert.Equal(72.1, (double)contributions[2, 27], 9);  // the live quote the contribution was made of
@@ -1467,7 +1479,9 @@ namespace Catalyst.Host.Tests
             Assert.Equal(1.0, ((object[,])Seam.Call("_ReportRisk", alone, "nominal_delta", "year"))[3, 1]);
             var members = (object[,])Seam.Call("util_ReadHandle", collection);
             Assert.Equal(4, members.GetLength(0));
-            Assert.Equal(12, members.GetLength(1));  // since #197 each source's cross-gamma and its unit
+            Assert.Equal(13, members.GetLength(1));  // since #197 each source's cross-gamma and its unit, since currency-and-currency-unit.md its currency unit, last
+            Assert.Equal("currency_unit", members[0, 12]);
+            Assert.Equal("USD", members[2, 12]);
             Assert.Equal("cross_gamma", members[0, 10]);
             Assert.Equal("cross_gamma_unit", members[0, 11]);
             Assert.Equal(0.0, members[2, 10]);
@@ -2092,7 +2106,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(150.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
             Assert.Equal(20.0, (double)((object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year"))[3, 1], 6);
             var mixed = (object[,])Seam.Call("util_ReadHandle", results);  // observation-prices-readback.md: the 2nd fixed at 71, the 3rd and the 4th live at 74, each slot's own, last
-            Assert.Equal(31, mixed.GetLength(1));  // since cva-reserve.md one more among the reserves
+            Assert.Equal(32, mixed.GetLength(1));  // since cva-reserve.md one more among the reserves, since currency-and-currency-unit.md the currency unit, last
             Assert.Equal("observation_coefficient", mixed[0, 27]);
             Assert.Equal("observation_price", mixed[0, 28]);
             Assert.Equal("price_unit", mixed[0, 29]);
@@ -2131,7 +2145,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(180.0, (double)values[2, 1], 6);
             Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", paid, "nominal_delta", "year"))[3, 1], 6);
             var contributions = (object[,])Seam.Call("util_ReadHandle", paid);
-            Assert.Equal(31, contributions.GetLength(1));  // since #197 two columns more, since slice 3 two more, since observation-prices-readback.md four more, last, since cva-reserve.md one more among the reserves
+            Assert.Equal(32, contributions.GetLength(1));  // since #197 two columns more, since slice 3 two more, since observation-prices-readback.md four more, since cva-reserve.md one more among the reserves, since currency-and-currency-unit.md the currency unit, last
             Assert.Equal("contract_nominal_delta", contributions[0, 10]);
             Assert.Equal("contract_delta", contributions[0, 11]);
             Assert.Equal(46365.0, contributions[5, 3]);
@@ -3401,7 +3415,10 @@ namespace Catalyst.Host.Tests
             Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year"))[3, 1], 6);
             var reserves = (object[,])Seam.Call("_ReportReserves", results);
             Assert.Equal(3, reserves.GetLength(0));
-            Assert.Equal(5, reserves.GetLength(1));  // since cva-reserve.md the signed CVA before the currency
+            Assert.Equal(6, reserves.GetLength(1));  // since cva-reserve.md the signed CVA before the currency, since currency-and-currency-unit.md the currency unit after it
+            Assert.Equal("currency_unit", reserves[0, 5]);
+            Assert.Equal("str", reserves[1, 5]);
+            Assert.Equal("USD", reserves[2, 5]);
             Assert.Equal("brokerage_reserve", reserves[0, 0]);
             Assert.Equal("cva_reserve", reserves[0, 3]);  // signed, since cva-reserve.md
             Assert.Equal("currency", reserves[0, 4]);
@@ -3414,7 +3431,9 @@ namespace Catalyst.Host.Tests
             Assert.Equal(0.0, (double)reserves[2, 3], 9);
             var table = (object[,])Seam.Call("util_ReadHandle", results);
             Assert.Equal(3, table.GetLength(0));
-            Assert.Equal(31, table.GetLength(1));  // since #197 the two cross-gamma columns, since slice 3 the key and the curve, since observation-prices-readback.md the four price columns, last, since cva-reserve.md the CVA reserve among the reserves
+            Assert.Equal(32, table.GetLength(1));  // since #197 the two cross-gamma columns, since slice 3 the key and the curve, since observation-prices-readback.md the four price columns, since cva-reserve.md the CVA reserve among the reserves, since currency-and-currency-unit.md the currency unit, last
+            Assert.Equal("currency_unit", table[0, 31]);
+            Assert.Equal("USD", table[2, 31]);
             Assert.Equal("brokerage_reserve", table[0, 18]);
             Assert.Equal("currency", table[0, 22]);
             Assert.Equal(50.0, (double)table[2, 18], 9);
@@ -3573,7 +3592,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("RESERVES SOFR cross_gamma [LOT per basis point]", facedAll[1, 4]);
             Assert.Equal(0.99, (double)facedAll[3, 2], 12);
             var facedReadback = (object[,])Seam.Call("util_ReadHandle", facedResults);
-            Assert.Equal(31, facedReadback.GetLength(1));
+            Assert.Equal(32, facedReadback.GetLength(1));
             Assert.Equal("contract_cross_gamma", facedReadback[0, 23]);
             Assert.Equal(-0.0001 * 34 / 365 * 0.99, (double)facedReadback[2, 23], 12);
             Assert.Equal("lots of LOT (1000 BBL) per basis point", facedReadback[2, 24]);

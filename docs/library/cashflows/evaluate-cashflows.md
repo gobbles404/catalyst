@@ -12,23 +12,23 @@ def _EvaluateCashflows(
 ) -> Handle[CashflowResults]: ...
 ```
 
-| | A | B | C | D |
-|---|---|---|---|---|
-| 10 | `=_CreateValuationDate(DATE(2027,1,4),0.5)` | shows `30512:valuation_date:4` | | |
-| 11 | `=_CreateDiscountCurve("SOFR",G1:H1,G2:H4)` | shows `30512:discount_curve:SOFR:5`, 1 on 4 January 2027, 0.95 a year out, 0.90 two years out | | |
-| 12 | `=_CollectDiscountCurves(A11)` | shows `30512:discount_curve_set:6`, the one curve the batch's key names | | |
-| 13 | `=_EvaluateCashflows(A8,A10,A12)` | shows `30512:cashflow_results:USD:7` | | |
-| 14 | `=_ReportValues(A13)` | | | |
-| | cashflow_mark | cashflow_cash | currency | as_of |
-| | float64 | float64 | str | datetime64[D] |
-| | 500 | 250 | USD | 4-Jan-2027 |
-| 18 | `=_ReportRisk(A13,"dv01","year")` | 4-Jan-2027 | | |
-| | period | SOFR USD dv01 [USD per basis point] | | |
-| | str \| datetime64[D] | float64 | | |
-| | Total | 0.85 | | |
-| | 1-Jan-2027 | 0 | | |
-| | 1-Jan-2028 | -0.95 | | |
-| | 1-Jan-2029 | 1.8 | | |
+| | A | B | C | D | E |
+|---|---|---|---|---|---|
+| 10 | `=_CreateValuationDate(DATE(2027,1,4),0.5)` | shows `30512:valuation_date:4` | | | |
+| 11 | `=_CreateDiscountCurve("SOFR",G1:H1,G2:H4)` | shows `30512:discount_curve:SOFR:5`, 1 on 4 January 2027, 0.95 a year out, 0.90 two years out | | | |
+| 12 | `=_CollectDiscountCurves(A11)` | shows `30512:discount_curve_set:6`, the one curve the batch's key names | | | |
+| 13 | `=_EvaluateCashflows(A8,A10,A12)` | shows `30512:cashflow_results:USD:7` | | | |
+| 14 | `=_ReportValues(A13)` | | | | |
+| | cashflow_mark | cashflow_cash | currency | as_of | currency_unit |
+| | float64 | float64 | str | datetime64[D] | str |
+| | 500 | 250 | USD | 4-Jan-2027 | USD |
+| 18 | `=_ReportRisk(A13,"dv01","year")` | 4-Jan-2027 | | | |
+| | period | SOFR USD dv01 [USD per basis point] | | | |
+| | str \| datetime64[D] | float64 | | | |
+| | Total | 0.85 | | | |
+| | 1-Jan-2027 | 0 | | | |
+| | 1-Jan-2028 | -0.95 | | | |
+| | 1-Jan-2029 | 1.8 | | | |
 
 The DV01 column's heading is the curve's word as [report-risk.md](../trades/report-risk.md) gives every heading, the name as created, or `cleared (curve_1)` for a curve named `cleared`, the same word a collection of the batch alone shows, and there is one column per curve the batch is valued on, in the order its rows first name the keys. Three handles, every one required: the batch, the cell showing [_CreateCashflows](create-cashflows.md)'s result; the valuation date, the cell showing `_CreateValuationDate`'s, which supplies `as_of` explicitly, the day's fraction elapsed read for nothing; and the collection, the cell showing [_CollectDiscountCurves](../globals/collect-discount-curves.md)'s, of one curve or several, a curve bumped by [util_BumpDiscountCurve](../utilities/bump-discount-curve.md) collected as any other; each resolved as any handle is and refused by its kind in the seam's words, a curve's own handle where the collection belongs among them, `discount_curve_set is discount curve handle '30512:discount_curve:SOFR:5', expected discount curve set handle`. A batch on one curve takes a collection of that one; no form takes a curve directly. The result is a handle, declared `Handle[CashflowResults]`, carrying the batch's currency, `30512:cashflow_results:USD:7`, and no new kind of reader or report: [_ReportValues](../trades/report-values.md) shows the mark and the cash under `cashflow_mark` and `cashflow_cash`, the cashflow mark being the discounted value of the unpaid payments, [_ReportRisk](../trades/report-risk.md) the DV01 by day, month or year, and `util_ReadHandle` the days. The worked example is the ticket's: 10,000 receivable a year out at 0.95 is 9,500 and -0.95 of DV01, 10,000 payable two years out at 0.90 is -9,000 and +1.80, and a rebate of 250 paid the day before is cash; the two nominal amounts net to nothing while their values and DV01s do not, since their days differ. Two curves in one batch, the keys' ticket's example: 10,000 received on `SOFR` and 10,000 paid on `FFOIS`, both on 4 January 2028, with SOFR at 0.95 and FFOIS at 0.90 for the day, are 9,500 less 9,000, a mark of 500 where one amount on one curve would be nothing; the DV01 is -0.95 under SOFR's heading and +0.90 under FFOIS's, -0.05 in all; and SOFR moved to 0.96 with FFOIS as it was is 600 and -0.96 in new results over the same batch, FFOIS's column as it was.
 
@@ -67,11 +67,11 @@ In this order, the first failure being the message; a failure publishes no handl
 
 ## What it retains
 
-The batch by reference and the curve each of its keys was bound to, in key order, `as_of` and the currency; the mark, the cash and the DV01; per payment group, a payment day and a key, in day order, paid or not, whether it has paid, its factor, its own curve's and 1 on a paid group, its value, its cash and its DV01; the two display axes from the valuation day's period; and one rate contribution per curve, `RateContribution` in `trades/contributions.py`, in key order, where the batch's one curve had one since [named-curves-slice-2.md](../../engineering-tickets/trade-valuation-pipeline/named-curves-slice-2.md): the curve's share of the DV01 by payment day, by month and by year on the batch's axes, which every curve shares, its total, and the facts refusing a month or a year report of a DV01 before the start, found once here and never found. The reports read the contributions and [_AggregateResults](../trades/aggregate-results.md) collects each into its curve's group. Nothing is valued again by a report.
+The batch by reference and the curve each of its keys was bound to, in key order, `as_of`, the currency and, since [currency-and-currency-unit.md](../../engineering-tickets/trade-valuation-pipeline/currency-and-currency-unit.md), the unit of it every amount is in, the currency's reference unit in the unit tables, whole dollars and the unit a trade settled in dollars shares; the mark, the cash and the DV01; per payment group, a payment day and a key, in day order, paid or not, whether it has paid, its factor, its own curve's and 1 on a paid group, its value, its cash and its DV01; the two display axes from the valuation day's period; and one rate contribution per curve, `RateContribution` in `trades/contributions.py`, in key order, where the batch's one curve had one since [named-curves-slice-2.md](../../engineering-tickets/trade-valuation-pipeline/named-curves-slice-2.md): the curve's share of the DV01 by payment day, by month and by year on the batch's axes, which every curve shares, its total, and the facts refusing a month or a year report of a DV01 before the start, found once here and never found. The reports read the contributions and [_AggregateResults](../trades/aggregate-results.md) collects each into its curve's group. Nothing is valued again by a report.
 
 ## Reading it back
 
-`util_ReadHandle` on the handle spills one row per payment group, a payment day and a key, in day order and within a day in the order the rows first name the keys, so a payment day on two keys is two rows and a batch on one key reads a row a day as it did: `payment_date`, `amount`, the group's rows' amounts summed, `is_paid`, `payment_factor`, `npv`, `cash` and `dv01`, with `currency` and `as_of` on every row so that a row reads whole; then the batch's totals once, on the first row and a dash below, `cashflow_mark`, `cashflow_cash` and `cashflow_dv01`, the numbers the reports show; and last `discount_curve_key`, the group's key and so its curve's name, after every column a sheet already read by its place; [read-handle.md](../utilities/read-handle.md).
+`util_ReadHandle` on the handle spills one row per payment group, a payment day and a key, in day order and within a day in the order the rows first name the keys, so a payment day on two keys is two rows and a batch on one key reads a row a day as it did: `payment_date`, `amount`, the group's rows' amounts summed, `is_paid`, `payment_factor`, `npv`, `cash` and `dv01`, with `currency` and `as_of` on every row so that a row reads whole; then the batch's totals once, on the first row and a dash below, `cashflow_mark`, `cashflow_cash` and `cashflow_dv01`, the numbers the reports show; then `discount_curve_key`, the group's key and so its curve's name, after every column a sheet already read by its place; and last, since [currency-and-currency-unit.md](../../engineering-tickets/trade-valuation-pipeline/currency-and-currency-unit.md), `currency_unit`, the unit of the currency on every row as the `currency` is; [read-handle.md](../utilities/read-handle.md).
 
 ## Tests
 
@@ -79,4 +79,4 @@ The worked example and the receipt of a hundred through a curve move, the paymen
 
 ## Not here
 
-A collection of cashflow results with a batch of trades' through `_AggregateResults`: built as [named-curves-slice-2.md](../../engineering-tickets/trade-valuation-pipeline/named-curves-slice-2.md), the batch's one rate contribution joining the group of its curve and currency and no commodity group, [aggregate-results.md](../trades/aggregate-results.md). A default curve for a row with no key, a curve chosen by counterparty or currency, and a curve found by anything but its exact name: none. Another currency, FX, credit adjustments, an overdue balance, a partial payment, an intraday cutoff and actual payment reconciliation: outside this instrument. The curve's own rules are [discount-curve.md](../globals/discount-curve.md)'s and the convention [evaluate-trades.md](../trades/evaluate-trades.md)'s, said once there.
+A collection of cashflow results with a batch of trades' through `_AggregateResults`: built as [named-curves-slice-2.md](../../engineering-tickets/trade-valuation-pipeline/named-curves-slice-2.md), the batch's one rate contribution joining the group of its curve and currency unit and no commodity group, [aggregate-results.md](../trades/aggregate-results.md). A default curve for a row with no key, a curve chosen by counterparty or currency, and a curve found by anything but its exact name: none. Another currency, FX, credit adjustments, an overdue balance, a partial payment, an intraday cutoff and actual payment reconciliation: outside this instrument. The curve's own rules are [discount-curve.md](../globals/discount-curve.md)'s and the convention [evaluate-trades.md](../trades/evaluate-trades.md)'s, said once there.

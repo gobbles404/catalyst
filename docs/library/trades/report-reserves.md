@@ -10,14 +10,14 @@ The batch's booked reserves, from its results: the brokerage the trades naming a
 def _ReportReserves(results: Handle[TradeResults]) -> MixedArray: ...
 ```
 
-| | A | B | C | D | E |
-|---|---|---|---|---|---|
-| 25 | `=_ReportReserves(A12)` | | | | |
-| | brokerage_reserve | clearing_reserve | marketing_reserve | cva_reserve | currency |
-| | float64 | float64 | float64 | float64 | str |
-| | 50 | 20 | 0 | 0 | USD |
+| | A | B | C | D | E | F |
+|---|---|---|---|---|---|---|
+| 25 | `=_ReportReserves(A12)` | | | | | |
+| | brokerage_reserve | clearing_reserve | marketing_reserve | cva_reserve | currency | currency_unit |
+| | float64 | float64 | float64 | float64 | str | str |
+| | 50 | 20 | 0 | 0 | USD | USD |
 
-One handle, required: the results, the cell showing `_EvaluateTrades`'s result or a name for it; a blank, a number or a handle of another kind fails in the seam's words, `results is blank, expected trade results handle`. The spill is three rows by five columns: the headers, the types and one row of the stored values. `brokerage_reserve` and `clearing_reserve` are positive costs in `currency`; `marketing_reserve` is the amount the rows booked, zero when neither the template nor the ticket supplied the field; `cva_reserve`, since [cva-reserve.md](../../engineering-tickets/trade-valuation-pipeline/cva-reserve.md), is the signed amount the rows booked, positive, zero or negative, zero when neither supplied it; `currency` is the index's settlement currency, the conventions' `currency_unit`, the one the specifications' rates are in.
+One handle, required: the results, the cell showing `_EvaluateTrades`'s result or a name for it; a blank, a number or a handle of another kind fails in the seam's words, `results is blank, expected trade results handle`. The spill is three rows by six columns: the headers, the types and one row of the stored values. `brokerage_reserve` and `clearing_reserve` are positive costs in `currency_unit`; `marketing_reserve` is the amount the rows booked, zero when neither the template nor the ticket supplied the field; `cva_reserve`, since [cva-reserve.md](../../engineering-tickets/trade-valuation-pipeline/cva-reserve.md), is the signed amount the rows booked, positive, zero or negative, zero when neither supplied it; `currency` is the money the index settles in, `USD`, and `currency_unit`, since [currency-and-currency-unit.md](../../engineering-tickets/trade-valuation-pipeline/currency-and-currency-unit.md), the last column, is the unit of it the specifications' rates and the four amounts are in, the conventions' `currency_unit`, `USD` for dollars or `CENT` for cents, two facts where one column held the unit under the currency's name.
 
 The example is the ticket's, on an index whose specifications charge LOT, a thousand barrels, 10.00 of brokerage and 4.00 of clearing a lot, and BBL, one barrel, 0.01 and 0.004, settled in USD, under a cleared template naming ION as broker; four trades of one month each:
 
@@ -69,7 +69,7 @@ The strip books its -40 once though it makes two components, the zero-quantity r
 
 | Item | Text |
 |---|---|
-| Function | Reports the batch's booked reserves: brokerage on the trades naming a broker and clearing on a cleared route, each trade's unsigned quantity times its specification's rate per lot, summed; marketing and the signed CVA, once a row; and the currency. |
+| Function | Reports the batch's booked reserves: brokerage on trades naming a broker and clearing on a cleared route, each trade's unsigned quantity times its specification's rate per lot, summed; marketing and the signed CVA, once a row; the currency and its unit. |
 | results | The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name for it. |
 
 ## The library checks
@@ -91,7 +91,7 @@ The specifications' own rule, each rate 0 or more, is [contract-specifications.m
 
 ## Reading it back
 
-`util_ReadHandle` on the results shows the same five columns after the payment groups' facts, `brokerage_reserve`, `clearing_reserve`, `marketing_reserve`, since [cva-reserve.md](../../engineering-tickets/trade-valuation-pipeline/cva-reserve.md) `cva_reserve`, and `currency`: the values on the first slot row, and a dash, `-`, in all five on every later row, since the totals are the batch's and no slot's, a total repeated on every slot would read as each slot's, and the seam's way out has no blank cell. The batch's own readback carries no reserve: the UAT notes moved the reserve view off the trade handle and onto the evaluated results.
+`util_ReadHandle` on the results shows the same five columns after the payment groups' facts, `brokerage_reserve`, `clearing_reserve`, `marketing_reserve`, since [cva-reserve.md](../../engineering-tickets/trade-valuation-pipeline/cva-reserve.md) `cva_reserve`, and `currency`: the values on the first slot row, and a dash, `-`, in all five on every later row, since the totals are the batch's and no slot's, a total repeated on every slot would read as each slot's, and the seam's way out has no blank cell. Since [currency-and-currency-unit.md](../../engineering-tickets/trade-valuation-pipeline/currency-and-currency-unit.md) the unit of the currency is the readback's last column, `currency_unit`, shown the same way, once on the first slot row and a dash below. The batch's own readback carries no reserve: the UAT notes moved the reserve view off the trade handle and onto the evaluated results.
 
 The batch's readback, `util_ReadHandle` on the trades handle, shows the broker column as typed where the batch has one, `None` included, since the terms keep the texts and read them for the one rule, and since [cva-reserve.md](../../engineering-tickets/trade-valuation-pipeline/cva-reserve.md) `cva_reserve` after `marketing_reserve` where the batch has it, the row's signed amount on each of its components, as the marketing column.
 
