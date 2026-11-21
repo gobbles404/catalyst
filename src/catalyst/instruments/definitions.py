@@ -578,15 +578,19 @@ CASHFLOW = Instrument(
             "USD exactly, the one currency this version books, one per batch; CENT is a scale of "
             "the dollar and no currency, and an amount is never read as cents; no conversion",
         ),
+        # payment_day since cashflow-payment-day.md, the header the trades book under, where it
+        # was payment_date; a date only here, the trades' a date or a rule.
         Field(
-            "payment_date",
-            "The scheduled payment date, past, present or future",
+            "payment_day",
+            "The day the payment falls due, as a date, past, present or future",
             True,
             NONE,
             FieldType.DATE,
-            "no fixed list",
-            "Used as entered, never rolled, never inferred from a schedule; on or before the "
-            "valuation day the amount is cash, after it the amount is discounted on the curve",
+            "a date",
+            "A date only, used as entered, never rolled, never inferred from a schedule; a rule "
+            "such as +1bd is a trade's, a cashflow having no observation day to count from; on "
+            "or before the valuation day the amount is cash, after it the amount is discounted "
+            "on the curve its key names",
         ),
         Field(
             "counterparty",

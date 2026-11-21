@@ -52,11 +52,11 @@ def a_ticket(rows: int, days: int) -> FieldValues:
     return FieldValues(
         CASHFLOW,
         rows,
-        ("trade_date", "amount", "payment_date"),
+        ("trade_date", "amount", "payment_day"),
         {
             "trade_date": np.full(rows, AS_OF, dtype="datetime64[D]"),
             "amount": 100.0 + np.arange(rows, dtype=np.float64),
-            "payment_date": pay.astype("datetime64[D]"),
+            "payment_day": pay.astype("datetime64[D]"),
         },
     )
 
@@ -83,11 +83,11 @@ def a_keyed_ticket(rows: int, days: int, curves: int) -> FieldValues:
     return FieldValues(
         CASHFLOW,
         rows,
-        ("trade_date", "amount", "payment_date", "discount_curve_key"),
+        ("trade_date", "amount", "payment_day", "discount_curve_key"),
         {
             "trade_date": np.full(rows, AS_OF, dtype="datetime64[D]"),
             "amount": 100.0 + turn.astype(np.float64),
-            "payment_date": pay.astype("datetime64[D]"),
+            "payment_day": pay.astype("datetime64[D]"),
             "discount_curve_key": tuple([NAMES[int(k)] for k in turn % curves]),
         },
     )
@@ -385,7 +385,7 @@ def test_a_keyed_valuations_peak_follows_its_groups_and_its_curves_days(
 
 # --- through the seam -----------------------------------------------------------------------------
 
-FIELDS = Cells.from_rows([["trade_date", "amount", "payment_date"]])
+FIELDS = Cells.from_rows([["trade_date", "amount", "payment_day"]])
 CURVE_HEADERS = Cells.from_rows([["date", "discount_factor"]])
 
 

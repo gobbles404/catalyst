@@ -1062,3 +1062,23 @@ row 3550 is the same two amounts under one key, one group of nothing. The older 
 block from row 2864 is cut over, the key in D2866:D2867 and each evaluation on its curve's
 collection, with no number moved. Then cut one of the desk's own cashflow sheets over by
 the two edits and compare its mark with the day before.
+
+## 40. A cashflow is booked under payment_day
+
+Agreed 20 November 2026 and built in #264, issue #261:
+[cashflow-payment-day.md](cashflow-payment-day.md). The cashflow's payment header is now
+`payment_day`, the one the trades already use, where it was `payment_date`. Every cashflow
+sheet changes that one header, in its ticket or its template, and fails by name until it
+does. It still takes a date only: a rule such as `+1bd` is a trade's. No number moves. The
+readback of the booked cashflows shows the column under its new name in the same place, and
+the results' readback still calls its first column `payment_date`, the resolved date.
+
+UAT: the kept workbook's two cashflow blocks, from rows 2864 and 3507. E2870, D2890 and
+E3513 are the tickets' payment headers, now `payment_day`, and every mark, cash and DV01
+of the two blocks reads as it did. L2884 and L3534 show the booked readbacks' column
+under the new name, and H2878 and H3529 the results' first column, still `payment_date`.
+Type `payment_date` over E3513 and read the refusal in B3516, which lists the fields;
+type `payment_day` back and the block returns. Type a rule such as +5bd over the first
+row's day in E3514, as a trade's ticket takes one, and read the refusal by its cell; type
+the date back. B3554 and B3555 hold the same two refusals. Then change the header on one
+of the desk's own cashflow sheets and compare its mark with the day before.

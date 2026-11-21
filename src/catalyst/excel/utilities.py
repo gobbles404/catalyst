@@ -1057,7 +1057,8 @@ PAYMENT_COLUMNS = ("payment_factor", "payment_amount", "group_npv", "group_dv01"
 def cashflows_table(obj: Cashflows) -> MixedArray:
     # One row per payment booked, in the ticket's order, since #200, under the definition's field
     # names in its order: trade_id where the batch has it, trade_date, amount, currency on every
-    # row, payment_date, and counterparty and description where the batch has them, the
+    # row, payment_day, the field's name since cashflow-payment-day.md and in the place it
+    # had as payment_date, and counterparty and description where the batch has them, the
     # template's value on every row as a ticket's column is on its own, so that a payment reads
     # whole from its row; nothing of the valuation, which the results show.
     n = obj.rows
@@ -1080,7 +1081,7 @@ def cashflows_table(obj: Cashflows) -> MixedArray:
     numbers("trade_date", "datetime64[D]", obj.trade_date)
     numbers("amount", "float64", obj.amount)
     text("currency", (obj.currency,) * n)
-    numbers("payment_date", "datetime64[D]", obj.payment_date)
+    numbers("payment_day", "datetime64[D]", obj.payment_date)
     if obj.counterparty is not None:
         text("counterparty", obj.counterparty)
     if obj.description is not None:
