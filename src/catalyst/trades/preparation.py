@@ -22,7 +22,13 @@ from catalyst.index_definitions.index_conventions import IndexConventions
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market.market_history import MarketHistory
 from catalyst.trades.display_axes import EarlyRisk, PeriodAxis, early_risk, period_axis
-from catalyst.trades.encoding import Encoded, EncodedLeg, PaymentAxes, group_words
+from catalyst.trades.encoding import (
+    Encoded,
+    EncodedLeg,
+    PaymentAxes,
+    group_words,
+    position_counts,
+)
 from catalyst.trades.terms import Route, price_words
 
 PREPARED_SLOTS = "prepared_slots"  # slots placed on the calendar and told live from fixed
@@ -132,11 +138,13 @@ class PreparedTrades:
 
     Per payment group, aligned with the encoding's groups, a contract paying on two days being
     two of them: is_settled[g], whether every slot of the group on every leg has fixed and it
-    pays on or before the valuation date, so its amount is modeled as cash; the set amounts stay
-    each leg's, since two-index-one-price.md, never summed apart from the payment or the total
-    they enter. Then the totals: offset_unsettled, the fixed legs of the groups not yet settled
-    in all, and set_unsettled, each leg's set amounts of those groups in all, one per leg in
-    leg order, which the tick sums with the legs' live amounts for the mark under one
+    pays on or before the valuation date, so its amount is modeled as cash; under a physical
+    settlement, which pays on no day, since expired-physical-cash.md whether the group's contract
+    has expired, the batch holding no position on it, its fixed legs alone its cash; the set
+    amounts stay each leg's, since two-index-one-price.md, never summed apart from the payment
+    or the total they enter. Then the totals: offset_unsettled, the fixed legs of the groups not
+    yet settled in all, and set_unsettled, each leg's set amounts of those groups in all, one
+    per leg in leg order, which the tick sums with the legs' live amounts for the mark under one
     compensation; and cash, the whole amounts of the settled groups, fixed leg and set amounts
     together, moved out of the mark on the day they pay and never discounted. And since #176,
     for a bilateral financial batch,
@@ -321,16 +329,29 @@ def _the_totals(
     Neumaier's compensation, so that a small leg's dollar survives a strike that cancelled the
     large leg's; every sum finite since #190, the arithmetic running with numpy's flags down,
     else refused for the batch by its total, the cash first, a pair's set amounts by the leg's
-    index."""
+    index. A physical batch's settled groups are its closed contracts past their expiry, since
+    expired-physical-cash.md, and their cash is their fixed legs alone, no set amount added and
+    no compensated sum made: the quantity the final price would multiply is zero."""
+    physical = encoded.payment_date is None
     with np.errstate(over="ignore", invalid="ignore"):
-        settled_amounts = compensated([encoded.offset_of_group, *[leg.set_amount for leg in legs]])
+        if physical:
+            settled_amounts = encoded.offset_of_group
+        else:
+            settled_amounts = compensated(
+                [encoded.offset_of_group, *[leg.set_amount for leg in legs]]
+            )
         cash = float(settled_amounts[is_settled].sum())
         offset_unsettled = float(encoded.offset_of_group[unsettled].sum())
         set_unsettled = tuple([float(leg.set_amount[unsettled].sum()) for leg in legs])
     if not np.isfinite(cash):
+        summed = (
+            "closed contracts' fixed legs"
+            if physical
+            else "settled groups' offsets and set amounts"
+        )
         raise ValueError(
             f"the batch has {cash!r} of cash in all, expected a finite amount of {currency}; the "
-            "settled groups' offsets and set amounts sum past the largest number"
+            f"{summed} sum past the largest number"
         )
     if not np.isfinite(offset_unsettled):
         side = price_words(encoded.terms.instrument)[1]  # a float_float's is its spread leg
@@ -352,6 +373,26 @@ def _the_totals(
                 "largest number"
             )
     return cash, offset_unsettled, set_unsettled
+
+
+def _open_past_expiry(encoded: Encoded, g: int, expiry: np.datetime64, as_of: np.datetime64) -> str:
+    """The words for a physical contract past its expiry with a position left, since
+    expired-physical-cash.md: the contract, its expiry and the valuation date, the first quantity
+    unit whose count is not zero with that count, signed, and the first trade entered in that
+    unit on the contract. The counts are made again here, on the failing path alone, the
+    encoding having kept the flag and nothing else."""
+    terms = encoded.terms
+    leg = encoded.legs[0]
+    left = position_counts(terms, encoded.group_of_component, encoded.offset_of_group.size)[0][g]
+    unit = int((left != 0).argmax())
+    entered = leg.leg.specification[terms.occurrence]
+    k = int(((encoded.group_of_component == g) & (entered == unit)).argmax())
+    code = leg.leg.schedule.codes[int(leg.group_contract[g])]
+    return (
+        f"{code} expired {expiry}, before valuation date {as_of}, with {float(left[unit])!r} of "
+        f"{leg.leg.index.specifications.names[unit]!r} open, {terms.named(k)} among them; a "
+        "physical position open past its expiry is a delivery, which is not modeled"
+    )
 
 
 def prepared_trades(
@@ -378,9 +419,13 @@ def prepared_trades(
     month a month like any other. A slot has fixed when the calendar marks its day fixed, which
     is the day after it at the earliest, an observation staying live on its own day as the
     calendar's rule says. A physical fixed_float whose contract has expired, its expiry day marked
-    fixed, is refused, naming the trade, the contract, its expiry and the valuation date:
-    delivery is not modeled, and nothing is omitted, zeroed, kept in mark or moved to cash in its
-    place; the contract's expiry decides, not an earlier observation's fixing. A fixed slot takes
+    fixed, is settled where the batch holds no position on it, since expired-physical-cash.md:
+    the encoding's flag, the whole counts of each quantity unit on the contract adding to exactly
+    zero, and the group's fixed legs alone are its cash, the final price multiplying a quantity
+    of zero and entering nothing. Where a count is left it is refused, naming the contract, its
+    expiry and the valuation date, the count, its unit and a trade holding it: delivery is not
+    modeled, and nothing is omitted, zeroed, kept in mark or moved to cash in its place; the
+    contract's expiry decides, not an earlier observation's fixing. A fixed slot takes
     its settle off the history, the settle on its day, which the history holds for every fixed
     and priced day, and every slot's day is priced, since the encoding refused a closed one
     against the same holiday calendar the history's calendar was built from. A group is settled
@@ -429,21 +474,17 @@ def prepared_trades(
     fixed = [history.calendar.is_fixed[rows] for rows, history in zip(placed, matched, strict=True)]
     if encoded.payment_date is None:
         # A physical batch is a futures batch on one leg: the kernel refuses a physical IFERC one
-        # and a physical pair.
+        # and a physical pair. Since expired-physical-cash.md a contract past its expiry is
+        # settled where the batch holds no position on it and refused where it holds one.
         leg = legs[0]
-        codes = leg.leg.schedule.codes
+        closed = cast(NDArray[np.bool_], encoded.closed)  # physical: a flag per group
         expiries = cast(FuturesSchedule, leg.leg.schedule).future_expiry[leg.group_contract]
         expired = first_calendar.is_fixed[(expiries - first_calendar.dates[0]).astype(np.intp)]
-        if expired.any():
-            g = int(expired.argmax())
-            k = int((encoded.group_of_component == g).argmax())  # its first component
-            raise ValueError(
-                f"{terms.named(k)} on {codes[int(leg.group_contract[g])]} expired "
-                f"{expiries[g]}, "
-                f"before valuation date {as_of}; "
-                "a physical fixed_float after its expiry is not supported"
-            )
-        is_settled = np.zeros(groups, dtype=np.bool_)
+        delivered = expired & ~closed
+        if delivered.any():
+            g = int(delivered.argmax())
+            raise ValueError(_open_past_expiry(encoded, g, expiries[g], as_of))
+        is_settled = expired
     else:
         unfixed = np.bincount(legs[0].slot_group, weights=~fixed[0], minlength=groups)
         for leg, is_fixed in zip(legs[1:], fixed[1:], strict=True):

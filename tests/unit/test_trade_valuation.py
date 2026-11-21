@@ -1257,8 +1257,9 @@ def test_zero_bypasses_neither_coverage_expiry_nor_identity_on_the_sheet(
     )
     expired = a_history(ng["index"], "2026-10-29", "2026-11-26", ["2026-11-26", "2026-12-25"], {})
     assert ENTRY["_PrepareTrades"](trades, expired) == (
-        "#ERROR _PrepareTrades: ValueError: trade 1001 at row 1 on Z26 expired 2026-11-25, "
-        "before valuation date 2026-11-26; a physical fixed_float after its expiry is not supported"
+        "#ERROR _PrepareTrades: ValueError: Z26 expired 2026-11-25, before valuation date "
+        "2026-11-26, with 2.0 of 'NYMEX NG' open, trade 1001 at row 1 among them; a physical "
+        "position open past its expiry is a delivery, which is not modeled"
     )
     # An all-zero batch is held to the identity rules as any batch is: a history over another
     # index of the same facts and name, and a market over another history of the same index.
@@ -1268,6 +1269,10 @@ def test_zero_bypasses_neither_coverage_expiry_nor_identity_on_the_sheet(
         rows([*ENTRY_ROWS[0][:3], 0.0, 3.0], ENTRY_ROWS[1]),
         ng["template"],
     )
+    # Since expired-physical-cash.md a contract of zero rows alone holds no position, so past
+    # its expiry it is settled where a held one is a delivery: Z26's slot fixed and settled.
+    settled = spilled(ENTRY["util_ReadHandle"](ENTRY["_PrepareTrades"](nothing, expired)))
+    assert [line[3:5] for line in settled[2:]] == [[True, True], [False, False]]
     twin, _ = an_index("Henry Hub NYMEX", NG_CONTRACTS, NG_HOLIDAYS, [("NYMEX NG", 10_000.0)])
     other = a_history(twin, "2026-10-29", "2026-11-24", NG_HOLIDAYS, {})
     assert ENTRY["_PrepareTrades"](nothing, other) == (
@@ -1372,8 +1377,9 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
     )
     expired = a_history(ng["index"], "2026-10-29", "2026-11-26", ["2026-11-26", "2026-12-25"], {})
     assert prepare(ng["trades"], expired) == (
-        "#ERROR _PrepareTrades: ValueError: trade 1001 at row 1 on Z26 expired 2026-11-25, "
-        "before valuation date 2026-11-26; a physical fixed_float after its expiry is not supported"
+        "#ERROR _PrepareTrades: ValueError: Z26 expired 2026-11-25, before valuation date "
+        "2026-11-26, with 16.0 of 'NYMEX NG' open, trade 1001 at row 1 among them; a physical "
+        "position open past its expiry is a delivery, which is not modeled"
     )
     bilateral = templated(
         [

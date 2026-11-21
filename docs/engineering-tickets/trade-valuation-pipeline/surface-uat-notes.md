@@ -993,3 +993,29 @@ and MMBTU and nothing it shows moved. Then clear a unit cell of a template and r
 field named as missing; book a C5 leg in cents a gallon against WTI at a spread price of
 -9.10 and read zero at 145 and 70.00; and book one of the desk's cracks from the record
 and compare the mark with the record's NPV.
+
+## 37. A closed physical contract past its expiry, as cash
+
+Agreed 20 November 2026 and built in #258, issue #256:
+[expired-physical-cash.md](expired-physical-cash.md). A physical `fixed_float` whose
+contract has expired no longer fails its batch when the position is closed: the buy and the
+sell stay as booked and their locked-in profit or loss moves from `cleared_mark` to
+`cleared_cash` the day after the expiry. Closed means the quantities of each `quantity_unit`
+on the contract add to exactly zero, counted as whole numbers. An expired contract with a
+count left still fails, naming the contract, the count and its unit. A physical batch names
+one clearing house. The brokerage and the clearing stay as booked, so mark plus cash less
+the reserves reads the same before and after the expiry.
+
+UAT: rows 3435 to 3505 of the kept workbook, on an index made there, PHYS, whose LOT of
+10,000 MMBTU charges 10.00 of brokerage and 4.00 of clearing. H3454 is one lot of Z26
+bought at 3.00 and sold at 3.10 before its expiry on 18 November, under one clearing house
+and a broker. B3470 reads the mark on the expiry day, 1,000, and C3475 the cash the day
+after, 1,000, with nothing left in the mark. Rows 3480 and 3484 read the same fees on both
+days, 20 and 8, and B3487 and C3487 the same 972. The risk from B3490 holds no lot, and
+row 3499 shows the slot fixed and its contract settled. Type 9 over the expiry's settle in
+C3447 and see the cash stand. Type -2 over the sell's quantity in E3465 and read the
+refusal in H3457, by the contract and the count; type -1 back and the cash returns. B3502
+to B3505 are the refusals of the buy alone, of a lot against 10,000 of the one-MMBTU unit
+and of a second clearing house on a physical ticket. Then book a closed position of the
+desk's own past its expiry and compare the cash with the record's realized amount, and
+mark plus cash less the reserves with the day before.

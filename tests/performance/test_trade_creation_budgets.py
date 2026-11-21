@@ -357,6 +357,9 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_keys": 1,  # the keys present exactly on the bilateral route, since slice 3
         "_the_selections": 1,  # each occurrence's unit, method, basis and frequency in range
         "_the_method": 1,
+        # expired-physical-cash.md: the one house a physical batch names; a financial batch's
+        # settlement looked at and nothing more
+        "_the_clearing_house": 1,
         "_the_occurrences": 1,
         "_the_brokered": 1,  # which rows name a broker, since #188
         "_the_components": 1,

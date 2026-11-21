@@ -2463,6 +2463,37 @@ $formulas = [ordered]@{
     "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ27)" = "#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     "=_CreateTrades(VSTACK(YJ7,WJ5),YL4:YP4,YL5:YP5,YJ19)" = "#ERROR _CreateTrades: ValueError: index 2 'A' measures ENERGY, expected VOLUME as index 1 'RB'; a spread across two measures needs a density or a heat content, which the unit tables do not carry"
     '=_CreateTradeTemplate("fixed_float",HSTACK("route","spread_price_currency_unit"),HSTACK("bilateral","USD"))' = "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    # A closed physical contract past its expiry, expired-physical-cash.md: one LOT of Z26 bought
+    # at 3.00 and sold at 3.10 through ION under one clearing house, in ZJ19. On the expiry day,
+    # 18 November, the 1,000 is the mark, ZJ21; the day after it is cash, ZJ23, whatever the
+    # expiry settled at, 9.00 here, the slot fixed and its contract settled, no lot at risk, and
+    # 20 of brokerage and 8 of clearing on both days. The buy alone, ZJ24, is a delivery, and a
+    # second clearing house on a physical ticket is refused when the batch is made.
+    '=MID(ZJ19,FIND(":",ZJ19)+1,12)' = "trades:PHYS:"
+    "=INDEX(_ReportValues(ZJ21),1,1)" = "cleared_mark"
+    "=INDEX(_ReportValues(ZJ21),3,1)" = "1000"
+    "=INDEX(_ReportValues(ZJ21),3,2)" = "0"
+    "=INDEX(_ReportValues(ZJ23),1,2)" = "cleared_cash"
+    "=INDEX(_ReportValues(ZJ23),3,1)" = "0"
+    "=INDEX(_ReportValues(ZJ23),3,2)" = "1000"
+    "=INDEX(_ReportReserves(ZJ21),3,1)" = "20"
+    "=INDEX(_ReportReserves(ZJ21),3,2)" = "8"
+    "=INDEX(_ReportReserves(ZJ23),3,1)" = "20"
+    "=INDEX(_ReportReserves(ZJ23),3,2)" = "8"
+    "=INDEX(_ReportValues(ZJ21),3,1)+INDEX(_ReportValues(ZJ21),3,2)-INDEX(_ReportReserves(ZJ21),3,1)-INDEX(_ReportReserves(ZJ21),3,2)" = "972"
+    "=INDEX(_ReportValues(ZJ23),3,1)+INDEX(_ReportValues(ZJ23),3,2)-INDEX(_ReportReserves(ZJ23),3,1)-INDEX(_ReportReserves(ZJ23),3,2)" = "972"
+    '=INDEX(_ReportRisk(ZJ21,"nominal_delta","day"),4,2)' = "0"
+    '=INDEX(_ReportRisk(ZJ23,"nominal_delta","day"),4,2)' = "0"
+    '=INDEX(_ReportRisk(ZJ23,"nominal_delta","month"),4,2)' = "0"
+    "=ROWS(util_ReadHandle(ZJ22))"       = "3"
+    "=INDEX(util_ReadHandle(ZJ20),3,4)"  = "FALSE"
+    "=INDEX(util_ReadHandle(ZJ20),3,5)"  = "FALSE"
+    "=INDEX(util_ReadHandle(ZJ22),3,1)"  = "Z26"
+    "=INDEX(util_ReadHandle(ZJ22),3,4)"  = "TRUE"
+    "=INDEX(util_ReadHandle(ZJ22),3,5)"  = "TRUE"
+    "=INDEX(util_ReadHandle(ZJ22),3,7)"  = "0"
+    "=_PrepareTrades(ZJ24,ZJ13)" = "#ERROR _PrepareTrades: ValueError: Z26 expired 2026-11-18, before valuation date 2026-11-19, with 1.0 of 'LOT' open, trade 1001 at row 1 among them; a physical position open past its expiry is a delivery, which is not modeled"
+    "=_CreateTrades(ZJ5,ZL4:ZQ4,ZL5:ZQ6,ZJ25)" = "#ERROR _CreateTrades: ValueError: clearing_house of trade 1002 at row 2 is 'ICE Clear Europe', expected 'CME Clearing' as at row 1; a physical batch clears through one clearing house"
     # A request for quote, rfq-quoting.md, on the quoting block's strip in UX5 and its market VA7,
     # January at 30 and February at 60: F27 at 100,000 and G27 at 300,000 in XA1:XB2, the
     # bilateral +1bd template VF3 paying 1 February at 0.99 and 1 March at 0.98 in XD1, the
@@ -4102,6 +4133,56 @@ $cells = [ordered]@{
     "YJ25" = '=_CreateTradeTemplate("float_float",YM1:YY1,YM2:YY2)'
     "YJ26" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK("EUR",YM2:YY2))'
     "YJ27" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK("USD","MMBTU",YN2:YY2))'
+    # expired-physical-cash.md: a closed physical contract past its expiry. A futures index over
+    # X26, Z26 and F27 in ZA1:ZB3, Z26 expiring 18 November 2026, Christmas closed, quoted in USD
+    # per MMBTU with a LOT of 10,000 MMBTU charging 10 and 4 a lot and a one-MMBTU unit, in ZJ5;
+    # valued on the expiry day in ZJ6 and the day after in ZJ7, with the 17th's settle behind
+    # the first and the expiry's 9.00 behind the second, their histories in ZJ12 and ZJ13 and
+    # their markets in ZJ16 and ZJ17. A cleared physical template under one clearing house and
+    # ION in ZL1:ZT2 and ZJ18; one LOT of Z26 bought at 3.00 and sold at 3.10 in ZL4:ZP6, booked
+    # in ZJ19, prepared and valued on the expiry day in ZJ20 and ZJ21 and the day after in ZJ22
+    # and ZJ23; the buy alone in ZJ24; and a template naming no house in ZJ25, for a ticket
+    # naming two in ZQ4:ZQ6.
+    "ZA1" = "X26"; "ZA2" = "Z26"; "ZA3" = "F27"
+    "ZB1" = "16-Nov-2026"; "ZB2" = "18-Nov-2026"; "ZB3" = "29-Dec-2026"
+    "ZC1" = "25-Dec-2026"
+    "ZD1" = "name"; "ZE1" = "lot_size"; "ZF1" = "lot_unit"; "ZG1" = "brokerage_rate_per_lot"; "ZH1" = "clearing_rate_per_lot"
+    "ZD2" = "LOT"; "ZE2" = "10000"; "ZF2" = "MMBTU"; "ZG2" = "10"; "ZH2" = "4"
+    "ZD3" = "MMBTU"; "ZE3" = "1"; "ZF3" = "MMBTU"; "ZG3" = "0"; "ZH3" = "0"
+    "ZA5" = "18-Nov-2026"; "ZA6" = "19-Nov-2026"
+    "ZA8" = "18-Nov-2026"; "ZA9" = "17-Nov-2026"
+    "ZB8" = "9"; "ZB9" = "3.05"
+    "ZA11" = "3.2"; "ZA12" = "3.5"
+    "ZJ1" = "=_CreateFuturesSchedule(ZA1:ZA3,ZB1:ZB3)"
+    "ZJ2" = "=_CreateHolidayCalendar(ZC1)"
+    "ZJ3" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "ZJ4" = "=_CreateContractSpecifications(ZD1:ZH1,ZD2:ZH3)"
+    "ZJ5" = '=_CreateIndex("PHYS","Gas with a contract to close",ZJ1,ZJ3,ZJ4,ZJ2,"LOT")'
+    "ZJ6" = "=_CreateValuationDate(ZA5,0.5)"
+    "ZJ7" = "=_CreateValuationDate(ZA6,0.5)"
+    "ZJ8" = "=_CreateCalendar(ZJ6,ZJ5)"
+    "ZJ9" = "=_CreateCalendar(ZJ7,ZJ5)"
+    "ZJ10" = "=_CreateFuturesFixings(ZA9,ZB9,ZJ5)"
+    "ZJ11" = "=_CreateFuturesFixings(ZA8:ZA9,ZB8:ZB9,ZJ5)"
+    "ZJ12" = "=_CreateMarketHistory(ZJ8,ZJ10)"
+    "ZJ13" = "=_CreateMarketHistory(ZJ9,ZJ11)"
+    "ZJ14" = '=_CreatePriceVector("PHYS",ZA11:ZA12)'
+    "ZJ15" = '=_CreatePriceVector("PHYS",ZA12)'
+    "ZJ16" = "=_CreateMarket(ZJ12,ZJ14)"
+    "ZJ17" = "=_CreateMarket(ZJ13,ZJ15)"
+    "ZL1" = "quantity_unit"; "ZM1" = "quantity_per"; "ZN1" = "settlement_frequency"; "ZO1" = "nearby"; "ZP1" = "schedule_method"; "ZQ1" = "route"; "ZR1" = "settlement_method"; "ZS1" = "broker"; "ZT1" = "clearing_house"
+    "ZL2" = "LOT"; "ZM2" = "month"; "ZN2" = "monthly"; "ZO2" = "1"; "ZP2" = "lastday"; "ZQ2" = "cleared"; "ZR2" = "physical"; "ZS2" = "ION"; "ZT2" = "CME Clearing"
+    "ZJ18" = '=_CreateTradeTemplate("fixed_float",ZL1:ZT1,ZL2:ZT2)'
+    "ZL4" = "trade_id"; "ZM4" = "trade_date"; "ZN4" = "contract_code"; "ZO4" = "quantity"; "ZP4" = "fixed_price"; "ZQ4" = "clearing_house"
+    "ZL5" = "1001"; "ZM5" = "6-Oct-2026"; "ZN5" = "Z26"; "ZO5" = "1"; "ZP5" = "3"; "ZQ5" = "CME Clearing"
+    "ZL6" = "1002"; "ZM6" = "6-Oct-2026"; "ZN6" = "Z26"; "ZO6" = "-1"; "ZP6" = "3.1"; "ZQ6" = "ICE Clear Europe"
+    "ZJ19" = "=_CreateTrades(ZJ5,ZL4:ZP4,ZL5:ZP6,ZJ18)"
+    "ZJ20" = "=_PrepareTrades(ZJ19,ZJ12)"
+    "ZJ21" = "=_EvaluateTrades(ZJ20,ZJ16)"
+    "ZJ22" = "=_PrepareTrades(ZJ19,ZJ13)"
+    "ZJ23" = "=_EvaluateTrades(ZJ22,ZJ17)"
+    "ZJ24" = "=_CreateTrades(ZJ5,ZL4:ZP4,ZL5:ZP5,ZJ18)"
+    "ZJ25" = '=_CreateTradeTemplate("fixed_float",ZL1:ZS1,ZL2:ZS2)'
     # The request for quote, rfq-quoting.md and dated-quotes.md, on the quoting block's strip as a
     # ticket's rows: the two months, their quantities and the request's payment days in XA1:XC2, 8
     # February and 1 March, and in XA4:XC5 paying 1 March and 8 March, under the headers XE1:XG1;
