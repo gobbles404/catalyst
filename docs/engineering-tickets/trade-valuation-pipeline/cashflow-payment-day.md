@@ -1,6 +1,6 @@
 # A cashflow is booked under payment_day
 
-**Status:** Built in #NNN, from main after #260, agreed with the owner on 20 November 2026
+**Status:** Built in #264, from main after #260, agreed with the owner on 20 November 2026
 for [issue #261](https://github.com/gobbles404/catalyst/issues/261), this page in its first
 commit. The `cashflow` instrument's booking field is renamed from `payment_date` to
 `payment_day`, the header a `fixed_float` and a `float_float` already book under. A name
