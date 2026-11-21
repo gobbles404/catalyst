@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 from test_aggregate_risk import same_view
 from test_bilateral_kernel import curve_of, curve_set
-from test_create_trades import a_template, a_ticket
+from test_create_trades import a_template, a_ticket, seam_key, the_calendars
 from test_trades import dates, day, quoted, waha_history
 from test_two_index import (
     AS_OF,
@@ -98,6 +98,7 @@ def booked(
         a_template(template, FLOAT_FLOAT),
         UNITS,
         WorkCounter(),
+        the_calendars(),
     )
 
 
@@ -151,7 +152,9 @@ def alone(ix: Index, quantity: float, fixed_price: float) -> Trades:
         "quantity": [quantity],
         "fixed_price": [fixed_price],
     }
-    return trades((ix,), a_ticket(rows), a_template(ONE_INDEX), UNITS, WorkCounter())
+    return trades(
+        (ix,), a_ticket(rows), a_template(ONE_INDEX), UNITS, WorkCounter(), the_calendars()
+    )
 
 
 def number(value: object) -> float:
@@ -715,7 +718,7 @@ def test_the_pairs_rules_stand_in_their_words() -> None:
         "index 2 is another index named 'NTO', the name of index 1, expected one index for one name"
     )
     physical = {
-        k: v for k, v in BILATERAL.items() if k not in ("payment_day", "payment_holiday_calendar")
+        k: v for k, v in BILATERAL.items() if k not in ("payment_day", "payment_calendar_key")
     } | {"settlement_method": "physical"}
     assert refused(physical, indexes=(A, B)) == (
         "settlement_method is 'physical', expected 'financial' with two indexes; a two-index "
@@ -748,7 +751,14 @@ def test_a_fixed_float_pair_on_the_same_indexes_is_as_it_was() -> None:
     # second leg received, its handle joined by a plus.
     rows: dict[str, list[object]] = {k: v for k, v in TICKET.items() if k != "spread_price"}
     rows["fixed_price"] = [-0.75]
-    pair = trades((NTO, PAN), a_ticket(rows), a_template(PAIR_BILATERAL), UNITS, WorkCounter())
+    pair = trades(
+        (NTO, PAN),
+        a_ticket(rows),
+        a_template(PAIR_BILATERAL),
+        UNITS,
+        WorkCounter(),
+        the_calendars(),
+    )
     assert pair.resolved.descriptor == "NTO+PAN"
     assert [leg.subtracted for leg in pair.resolved.legs] == [False, False]
     results = valued(pair)
@@ -762,7 +772,7 @@ FIELDS = (
     "trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, "
     "settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, "
     "quantity_unit, quantity_per, {price}, second_schedule_method, payment_day, "
-    "payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "payment_calendar_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
 )
 SPREAD_FIELDS = FIELDS.format(
     price="spread_price, spread_price_currency_unit, spread_price_quantity_unit"
@@ -781,7 +791,7 @@ TEMPLATE_FIELDS = (
     "counterparty",
     "discount_curve_key",
     "payment_day",
-    "payment_holiday_calendar",
+    "payment_calendar_key",
 )
 
 
@@ -808,7 +818,7 @@ def sheet() -> dict[str, Any]:
             "ACME Trading",
             "SOFR",
             serial(PAY),
-            cells["holidays"],
+            seam_key(cells["holidays"]),
         ),
     )
     cells["headers"] = across("trade_id", "trade_date", "contract_code", "quantity", "spread_price")
@@ -895,7 +905,7 @@ def test_the_sheet_refuses_what_a_spread_does_not_book(sheet: dict[str, Any]) ->
     )
     # No quote prices a spread: its template is refused as a cashflow's is.
     assert bridge.entry("_CreateQuoteTemplate")(
-        "float_float", across("route"), across("bilateral")
+        "float_float", across("route"), across("bilateral"), bridge.MISSING
     ) == (
         "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'float_float', expected one a "
         "quote prices: 'fixed_float'"

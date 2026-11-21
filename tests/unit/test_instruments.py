@@ -70,7 +70,7 @@ def test_the_catalog_holds_the_fixed_float_with_its_twenty_three_fields_in_order
         "fixed_price",
         "second_schedule_method",
         "payment_day",
-        "payment_holiday_calendar",
+        "payment_calendar_key",
         "marketing_reserve",
         "cva_reserve",
         "settlement_frequency",
@@ -109,8 +109,16 @@ def test_the_catalog_holds_the_fixed_float_with_its_twenty_three_fields_in_order
     assert second.required_when == "two indexes" and not second.required
     assert not second.quote_allowed
     assert "second_fixed_price" not in by_name
-    assert by_name["payment_holiday_calendar"].required_when == "settlement_method = financial"
-    assert by_name["payment_holiday_calendar"].type is FieldType.HOLIDAY_CALENDAR
+    assert by_name["payment_calendar_key"].required_when == "settlement_method = financial"
+    # A key, text, since payment-calendar-keys.md: no field of any instrument takes a handle.
+    assert by_name["payment_calendar_key"].type is FieldType.TEXT
+    assert {field.type for each in CATALOG for field in each.fields} <= {
+        FieldType.TEXT,
+        FieldType.NUMBER,
+        FieldType.DATE,
+        FieldType.CODE,
+        FieldType.DATE_OR_TEXT,
+    }
     assert by_name["payment_day"].type is FieldType.DATE_OR_TEXT  # a date or a rule
     assert {field.name for field in FIXED_FLOAT.fields if field.type is FieldType.CODE} == {
         "schedule_method",
@@ -200,7 +208,7 @@ def test_the_quote_metadata_says_what_a_quote_template_may_hold_and_a_quote_requ
         "discount_curve_key",
         "quantity_per",
         "payment_day",
-        "payment_holiday_calendar",
+        "payment_calendar_key",
         "settlement_frequency",
         "nearby",
     ]
@@ -214,9 +222,7 @@ def test_the_quote_metadata_says_what_a_quote_template_may_hold_and_a_quote_requ
     ]
     assert by_name["discount_curve_key"].quote_required_when == "route = bilateral"
     assert by_name["payment_day"].quote_required_when == "settlement_method = financial"
-    assert by_name["payment_holiday_calendar"].quote_required_when == (
-        "settlement_method = financial"
-    )
+    assert by_name["payment_calendar_key"].quote_required_when == ("settlement_method = financial")
     assert all(
         field.quote_required_when == NONE
         for field in FIXED_FLOAT.fields

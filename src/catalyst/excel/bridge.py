@@ -1046,36 +1046,6 @@ def _field_texts(body: _FieldBody, j: int, rows: NDArray[np.bool_] | None) -> tu
     return tuple(body.texts[places])
 
 
-def _field_handles(
-    kind: type[object],
-    expected: str,
-    body: _FieldBody,
-    j: int,
-    rows: NDArray[np.bool_] | None,
-) -> tuple[object, ...]:
-    """A column of handles resolved to the objects they stand for, one per row checked, in row
-    order: each cell nonempty text, else named as a text column names a cell that is not, then
-    its text through the handle rule, which names the cell as the argument a scalar handle
-    names: a creator's failure relayed, text naming no live object, or a handle of another
-    kind. The first bad cell down the column is the one named, whichever way it is bad; each
-    cell's text is found at its own place, and each is its own lookup."""
-    cells = body.cells
-    not_text = cells.kinds[:, j] != TEXT_CODE
-    if body.empty is not None:
-        not_text |= body.empty[:, j]
-    if rows is not None:
-        not_text &= rows
-    held: list[object] = []
-    for r in range(cells.kinds.shape[0]):
-        if rows is not None and not rows[r]:
-            continue
-        if not_text[r]:
-            raise _field_bad(body, j, not_text, expected)
-        text = cells.texts[int(body.places[r, j])]
-        held.append(_resolve((kind,), expected, f"{body.argument} cell ({r + 1}, {j + 1})", text))
-    return tuple(held)
-
-
 def _field_dates_or_texts(body: _FieldBody, j: int, rows: NDArray[np.bool_] | None) -> DatesOrTexts:
     """A column whose cells hold a date or a text, since payment-day-date-or-rule.md, told apart
     by type and nothing else: a number that is a whole serial inside the calendar is a date, a
@@ -1111,10 +1081,6 @@ _FIELD_COLUMNS: Final[
     FieldType.CODE: ("text", _field_texts),
     FieldType.NUMBER: ("number", _field_numbers),
     FieldType.DATE: ("date", _field_dates),
-    FieldType.HOLIDAY_CALENDAR: (
-        "holiday calendar handle",
-        partial(_field_handles, HolidayCalendar, "holiday calendar handle"),
-    ),
     FieldType.DATE_OR_TEXT: ("date or text", _field_dates_or_texts),
 }
 

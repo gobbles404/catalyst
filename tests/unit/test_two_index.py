@@ -19,7 +19,7 @@ import pytest
 from numpy.typing import NDArray
 from test_aggregate_risk import column, same_view
 from test_bilateral_kernel import curve_of, curve_set
-from test_create_trades import a_template, a_ticket
+from test_create_trades import a_template, a_ticket, key_of, seam_key, the_calendars, with_calendars
 from test_trades import dates, day, history_on, numbers, quoted, waha_history
 from test_utilities import rows
 
@@ -148,7 +148,7 @@ SHARED: dict[str, object] = {
     "schedule_method": "lastday",
     "second_schedule_method": "lastday",
     "settlement_method": "financial",
-    "payment_holiday_calendar": PAYS,
+    "payment_calendar_key": key_of(PAYS),
 }
 BILATERAL: dict[str, object] = {
     **SHARED,
@@ -177,7 +177,9 @@ def booked(
     ticket: Mapping[str, list[object]] = TICKET,
     indexes: Sequence[Index] = (A, B),
 ) -> Trades:
-    return trades(indexes, a_ticket(ticket), a_template(template), UNITS, WorkCounter())
+    return trades(
+        indexes, a_ticket(ticket), a_template(template), UNITS, WorkCounter(), the_calendars()
+    )
 
 
 def refused(
@@ -718,7 +720,7 @@ def test_the_pair_is_two_distinct_indexes_of_one_quoting_on_a_financial_settleme
         "settled in DOLLAR as index 1 'A'; two legs' prices add in one unit"
     )
     physical = {
-        k: v for k, v in CLEARED.items() if k not in ("payment_day", "payment_holiday_calendar")
+        k: v for k, v in CLEARED.items() if k not in ("payment_day", "payment_calendar_key")
     } | {"settlement_method": "physical"}
     assert refused(physical) == (
         "settlement_method is 'physical', expected 'financial' with two indexes; a two-index "
@@ -814,7 +816,7 @@ def test_the_histories_and_the_markets_are_one_per_leg_of_the_pair() -> None:
 
 def test_the_pairs_counts_are_each_legs_observations_and_slots_and_the_trades_groups() -> None:
     counter = WorkCounter()
-    trades((A, B), a_ticket(TICKET), a_template(BILATERAL), UNITS, counter)
+    trades((A, B), a_ticket(TICKET), a_template(BILATERAL), UNITS, counter, the_calendars())
     counts = counter.freeze()
     assert counts["resolved_occurrences"] == 1 and counts["resolved_components"] == 1
     assert counts["schedule_codes_read"] == 11  # A's six and B's five
@@ -1168,6 +1170,9 @@ SEAM = {
         "util_ReadHandle",
     )
 }
+# A batch or a quote template made on the sheet names the tests' collection of payment
+# calendars, payment-calendar-keys.md.
+SEAM["_CreateTrades"] = with_calendars(SEAM["_CreateTrades"])
 PID = os.getpid()
 
 
@@ -1283,7 +1288,7 @@ def the_sheet() -> dict[str, Any]:
             "counterparty",
             "discount_curve_key",
             "payment_day",
-            "payment_holiday_calendar",
+            "payment_calendar_key",
         ),
         across(
             "NYMEX NG",
@@ -1297,7 +1302,7 @@ def the_sheet() -> dict[str, Any]:
             "ACME Trading",
             "SOFR",
             serial(PAY),
-            holidays,
+            seam_key(holidays),
         ),
     )
     return {
@@ -1414,7 +1419,7 @@ def test_the_sheet_prepares_and_values_a_pair_from_ranges_in_either_order(
                 "counterparty",
                 "discount_curve_key",
                 "payment_day",
-                "payment_holiday_calendar",
+                "payment_calendar_key",
             ),
             across(
                 "NYMEX NG",
@@ -1427,7 +1432,7 @@ def test_the_sheet_prepares_and_values_a_pair_from_ranges_in_either_order(
                 "ACME Trading",
                 "SOFR",
                 serial(PAY),
-                SEAM["_CreateHolidayCalendar"](serial("2027-01-01"), bridge.MISSING),
+                seam_key(SEAM["_CreateHolidayCalendar"](serial("2027-01-01"), bridge.MISSING)),
             ),
         ),
     )
@@ -1510,7 +1515,7 @@ FIELDS = (
     "trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, "
     "settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, "
     "quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, "
-    "payment_holiday_calendar, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "payment_calendar_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
 )
 
 

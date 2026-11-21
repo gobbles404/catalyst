@@ -11,6 +11,7 @@ from typing import Any, cast
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from test_create_trades import seam_key, with_calendars
 
 from catalyst.calendar.calendar import calendar
 from catalyst.excel import bridge
@@ -51,6 +52,10 @@ from catalyst.trades.terms import (
 )
 
 ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
+# A batch or a quote template made on the sheet names the tests' collection of payment
+# calendars, payment-calendar-keys.md.
+ENTRY["_CreateTrades"] = with_calendars(ENTRY["_CreateTrades"])
+ENTRY["_CreateQuoteTemplate"] = with_calendars(ENTRY["_CreateQuoteTemplate"])
 FIRST = np.datetime64("1899-12-30", "D")
 
 
@@ -683,7 +688,7 @@ def test_the_sheet_refuses_an_open_contract_and_a_second_clearing_house(
         **houses,
         "settlement_method": "financial",
         "payment_day": "+2bd",
-        "payment_holiday_calendar": sheet["holidays"],
+        "payment_calendar_key": seam_key(sheet["holidays"]),
     }
     template = ENTRY["_CreateTradeTemplate"](
         "fixed_float", row(*financial), row(*financial.values())

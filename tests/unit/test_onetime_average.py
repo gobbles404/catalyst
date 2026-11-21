@@ -8,7 +8,16 @@ from typing import Any
 
 import numpy as np
 import pytest
-from test_create_trades import a_template, a_ticket, an_index, components_of, created, refused
+from test_create_trades import (
+    a_template,
+    a_ticket,
+    an_index,
+    components_of,
+    created,
+    key_of,
+    refused,
+    the_calendars,
+)
 from test_quote import Settle, priced
 from test_trade_valuation import ENTRY, row, rows, serial, spilled, templated, valued
 from test_trade_valuation import a_history as seam_history
@@ -57,7 +66,7 @@ TMA_TEMPLATE: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "CME Clearing",
     "payment_day": day("2026-06-29"),
-    "payment_holiday_calendar": CL.holiday_calendar,
+    "payment_calendar_key": key_of(CL.holiday_calendar),
 }
 TMA_TICKET: dict[str, list[object]] = {
     "trade_id": [1],
@@ -426,7 +435,7 @@ STRIP_TEMPLATE: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "CME Clearing",
     "payment_day": day("2027-04-07"),
-    "payment_holiday_calendar": NG.holiday_calendar,
+    "payment_calendar_key": key_of(NG.holiday_calendar),
 }
 STRIP_FINALS = {day("2026-12-29"): 3.0, day("2027-01-27"): 5.0, day("2027-02-24"): 4.0}
 
@@ -535,7 +544,7 @@ def test_the_window_crosses_the_seam_and_reads_back_its_dates_as_the_booked_peri
         "settlement_method": "financial",
         "clearing_house": "CME Clearing",
         "payment_day": serial("2026-06-29"),
-        "payment_holiday_calendar": calendar,
+        "payment_calendar_key": calendar,
     }
     headers = row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price")
     booking = [1.0, serial("2026-05-15"), serial("2026-05-26"), serial("2026-06-25")]
@@ -598,6 +607,8 @@ def test_the_library_builds_the_window_from_the_same_ticket_and_template_as_the_
     # The resolution's own entry: the ticket and the template typed as the seam hands them over
     # give the terms the kernel tests supply, the one component's period the window.
     counter = WorkCounter()
-    batch = trades((CL,), a_ticket(TMA_TICKET), a_template(TMA_TEMPLATE), UNITS, counter)
+    batch = trades(
+        (CL,), a_ticket(TMA_TICKET), a_template(TMA_TEMPLATE), UNITS, counter, the_calendars()
+    )
     assert labels(batch) == [WINDOW] and batch.encoded.group_head.tolist() == [0]
     assert counter.freeze()["encoded_groups"] == 1

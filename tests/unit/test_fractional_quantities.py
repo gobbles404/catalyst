@@ -23,6 +23,7 @@ from test_create_trades import (
     a_template,
     an_index,
     created,
+    key_of,
     refused,
 )
 from test_float_float import BILATERAL as SPREAD
@@ -86,7 +87,7 @@ SWAP: dict[str, object] = {
     "counterparty": "ACME Trading",
     "discount_curve_key": "SOFR",
     "payment_day": day(PAY),
-    "payment_holiday_calendar": OIL.holiday_calendar,
+    "payment_calendar_key": key_of(OIL.holiday_calendar),
 }
 CLEARED: dict[str, object] = {
     **{k: v for k, v in SWAP.items() if k not in ("counterparty", "discount_curve_key")},

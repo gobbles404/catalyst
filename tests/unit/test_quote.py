@@ -12,6 +12,7 @@ from types import MappingProxyType
 import numpy as np
 import pytest
 from test_bilateral_kernel import CLOSE, curve_of, curve_set
+from test_create_trades import bound_calendar, key_of, seam_key, with_calendars
 from test_market import a_gas_daily_history
 from test_trade_valuation import a_history as seam_history
 from test_trade_valuation import a_market as seam_market
@@ -40,7 +41,7 @@ from catalyst.globals.payments import factors_on
 from catalyst.globals.unit_conversions import UNITS
 from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
-from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index, index
 from catalyst.index_definitions.index_conventions import index_conventions
@@ -81,6 +82,9 @@ ENTRY = {
         "_CollectDiscountCurves",
     )
 }
+# A batch or a quote template made on the sheet names the tests' collection of payment
+# calendars, payment-calendar-keys.md.
+ENTRY["_CreateQuoteTemplate"] = with_calendars(ENTRY["_CreateQuoteTemplate"])
 
 # The ticket's strip: a futures index quoted in dollars a barrel, Z26 bounding the calendar, F27
 # and G27 month-matching, the market closed on weekends and New Year's Day, so that January's last
@@ -96,7 +100,7 @@ STRIP = an_index(
     ("VOLUME", "BBL"),
     ("BBL", 1.0, "BBL"),
 )
-WEEKENDS_ONLY = holiday_calendar(dates("2030-01-01"))
+WEEKENDS_ONLY = holiday_calendar(dates("2030-01-01"), "WEEKENDS_ONLY")
 # The ordinary named curve: 1 on the valuation day, 0.99 on 1 February and 0.98 on 1 March, the
 # two payment days of +1bd; a second with visibly different factors; a flat one.
 SOFR = curve_of((DEC_31, 1.0), ("2027-02-01", 0.99), ("2027-03-01", 0.98))
@@ -108,7 +112,9 @@ CALDAY_CLEARED, CALDAY_BILATERAL = 2610 / 59, 2567.1 / 58.13
 
 
 def a_template(**values: object) -> QuoteTemplate:
-    return QuoteTemplate(FIXED_FLOAT, tuple(values), MappingProxyType(dict(values)))
+    return QuoteTemplate(
+        FIXED_FLOAT, tuple(values), MappingProxyType(dict(values)), bound_calendar(values)
+    )
 
 
 def financial(
@@ -116,7 +122,7 @@ def financial(
     method: str = "asian",
     per: str = "month",
     lag: str = "+1bd",
-    payment_calendar: object = WEEKENDS_ONLY,
+    payment_calendar: HolidayCalendar = WEEKENDS_ONLY,
     key: str | None = None,
     day: str | None = None,
 ) -> QuoteTemplate:
@@ -131,7 +137,7 @@ def financial(
         "payment_day": DayOrRule(None, lag)
         if day is None
         else DayOrRule(np.datetime64(day, "D"), None),
-        "payment_holiday_calendar": payment_calendar,
+        "payment_calendar_key": key_of(payment_calendar),
     }
     if key is not None:
         values["discount_curve_key"] = key
@@ -143,7 +149,7 @@ def bilateral(
     method: str = "asian",
     per: str = "month",
     lag: str = "+1bd",
-    payment_calendar: object = WEEKENDS_ONLY,
+    payment_calendar: HolidayCalendar = WEEKENDS_ONLY,
     day: str | None = None,
 ) -> QuoteTemplate:
     return financial("bilateral", method, per, lag, payment_calendar, key, day)
@@ -677,7 +683,7 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             nearby=1.0,
             payment_day=DayOrRule(None, "+1bd"),
         ),
-        f"payment_holiday_calendar is missing, {in_template} when settlement_method = financial",
+        f"payment_calendar_key is missing, {in_template} when settlement_method = financial",
     )
     refused(
         m,
@@ -704,9 +710,9 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             quantity_per="month",
             settlement_frequency="monthly",
             nearby=1.0,
-            payment_holiday_calendar=WEEKENDS_ONLY,
+            payment_calendar_key=key_of(WEEKENDS_ONLY),
         ),
-        "payment_holiday_calendar is a holiday calendar, expected none in the quote template "
+        "payment_calendar_key is 'WEEKENDS_ONLY', expected none in the quote template "
         "unless settlement_method = financial",
     )
     # The collection: required with a bilateral quote, refused with a cleared one.
@@ -1058,14 +1064,16 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
     )
     history = seam_history(ix, "2026-12-16", DEC_31, ["2027-01-01"], {})
     market = seam_market(history, "SEAM", 30.0, 60.0)
-    weekends = ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING)
+    weekends = seam_key(
+        ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING)
+    )
     fields = row(
         "route",
         "settlement_method",
         "schedule_method",
         "quantity_per",
         "payment_day",
-        "payment_holiday_calendar",
+        "payment_calendar_key",
         "discount_curve_key",
         "settlement_frequency",
         "nearby",
@@ -1083,7 +1091,7 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
             "schedule_method",
             "quantity_per",
             "payment_day",
-            "payment_holiday_calendar",
+            "payment_calendar_key",
             "settlement_frequency",
             "nearby",
         ),

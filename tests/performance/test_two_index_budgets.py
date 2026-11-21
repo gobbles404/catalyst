@@ -26,6 +26,7 @@ from catalyst.index_definitions.holiday_calendar import holiday_calendar
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index, index
 from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.payment_calendars import collect_payment_calendars
 from catalyst.instrumentation.work_counts import WorkCounter, WorkCounts
 from catalyst.instruments.definitions import FIXED_FLOAT, FieldType, Instrument
 from catalyst.instruments.fields import DatesOrTexts, FieldValues
@@ -99,6 +100,9 @@ def iferc_index() -> Index:
 A = futures_index()
 B = iferc_index()
 SOFR = discount_curve("SOFR", dates(AS_OF, PAY), numbers(1.0, 0.95))
+# The payment calendar, weekends alone, under its name, and the collection a batch selects
+# it from by key, payment-calendar-keys.md: made once, outside every measured call.
+CALENDARS = collect_payment_calendars((holiday_calendar(dates(), "PAYS"),), WorkCounter())
 TEMPLATE: dict[str, object] = {
     "quantity_unit": "MMBTU",
     "quantity_per": "month",
@@ -111,7 +115,7 @@ TEMPLATE: dict[str, object] = {
     "counterparty": "ACME Trading",
     "discount_curve_key": "SOFR",
     "payment_day": np.datetime64(PAY, "D"),
-    "payment_holiday_calendar": holiday_calendar(dates()),
+    "payment_calendar_key": "PAYS",
 }
 TICKET: dict[str, list[object]] = {
     "trade_id": [1],
@@ -131,8 +135,6 @@ def typed(definition: Instrument, name: str, values: list[object]) -> object:
             return np.array(values, dtype="datetime64[D]")
         case FieldType.TEXT | FieldType.CODE:
             return tuple(str(value) for value in values)
-        case FieldType.HOLIDAY_CALENDAR:
-            return tuple(values)
         case FieldType.DATE_OR_TEXT:
             return DatesOrTexts(
                 np.array([not isinstance(value, str) for value in values]),
@@ -160,14 +162,14 @@ def rows_of(n: int) -> dict[str, list[object]]:
 
 def pair(n: int, counter: WorkCounter) -> Trades:
     template = trade_template(a_ticket({k: [v] for k, v in TEMPLATE.items()}))
-    return trades((A, B), a_ticket(rows_of(n)), template, UNITS, counter)
+    return trades((A, B), a_ticket(rows_of(n)), template, UNITS, counter, CALENDARS)
 
 
 def single(n: int, counter: WorkCounter) -> Trades:
     template = trade_template(
         a_ticket({k: [v] for k, v in TEMPLATE.items() if k != "second_schedule_method"})
     )
-    return trades((A,), a_ticket(rows_of(n)), template, UNITS, counter)
+    return trades((A,), a_ticket(rows_of(n)), template, UNITS, counter, CALENDARS)
 
 
 def history_a() -> MarketHistory:

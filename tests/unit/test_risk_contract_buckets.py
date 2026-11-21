@@ -7,6 +7,7 @@ nothing to any exchange's holidays."""
 from typing import cast
 
 import pytest
+from test_create_trades import seam_keyed
 from test_trade_valuation import (
     ENTRY,
     a_history,
@@ -34,7 +35,7 @@ FIELDS = (
     "settlement_method",
     "clearing_house",
     "payment_day",
-    "payment_holiday_calendar",
+    "payment_calendar_key",
     "settlement_frequency",
     "nearby",
 )
@@ -89,7 +90,9 @@ def a_template(
         values.insert(4, counterparty)
         fields.insert(5, "discount_curve_key")  # and names its curve, since slice 3
         values.insert(5, "SOFR")
-    return str(ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*values)))
+    return str(
+        ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*seam_keyed(fields, values)))
+    )
 
 
 def booked(

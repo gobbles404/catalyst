@@ -10,7 +10,7 @@ from typing import cast
 import numpy as np
 import pytest
 from test_bilateral_kernel import curve_of, curve_set
-from test_create_trades import a_template, a_ticket
+from test_create_trades import a_template, a_ticket, key_of, the_calendars
 from test_quote import priced
 from test_trades import an_index, quoted
 from test_two_index import cell, grid
@@ -45,7 +45,7 @@ CLEARED: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "CME Clearing",
     "payment_day": "+2bd",
-    "payment_holiday_calendar": PAYS,
+    "payment_calendar_key": key_of(PAYS),
 }
 BILATERAL: dict[str, object] = {
     **{field: value for field, value in CLEARED.items() if field != "clearing_house"},
@@ -81,7 +81,9 @@ def settle(day: np.datetime64) -> float:
 def booked(
     template: Mapping[str, object] = CLEARED, ticket: Mapping[str, list[object]] = ROW
 ) -> Trades:
-    return trades((HG,), a_ticket(ticket), a_template(template), UNITS, WorkCounter())
+    return trades(
+        (HG,), a_ticket(ticket), a_template(template), UNITS, WorkCounter(), the_calendars()
+    )
 
 
 def valued(

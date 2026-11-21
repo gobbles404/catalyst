@@ -32,7 +32,6 @@ class FieldType(Enum):
     NUMBER = "number"
     DATE = "date"
     CODE = "code"  # text from a fixed list, the list in the options
-    HOLIDAY_CALENDAR = "holiday calendar handle"
     # A date or a text, told apart by type once at the seam and never by reading, since
     # payment-day-date-or-rule.md: the payment day, a day as entered or the rule that finds it.
     DATE_OR_TEXT = "date or text"
@@ -176,7 +175,7 @@ FIXED_FLOAT = Instrument(
             FieldType.CODE,
             "physical, financial",
             "Selects behavior, validation and payment terms, not a label: a financial batch "
-            "requires payment_day and payment_holiday_calendar and pays on its payment day, the "
+            "requires payment_day and payment_calendar_key and pays on its payment day, the "
             "row's date or the day its rule finds; a physical one pays on no day, takes lastday "
             "rows alone, is refused past its expiry and refused on the bilateral route; the "
             "delivery itself is outside the model",
@@ -307,14 +306,18 @@ FIXED_FLOAT = Instrument(
             quote_required_when="settlement_method = financial",
         ),
         Field(
-            "payment_holiday_calendar",
-            "Calendar supplying holidays for payment-day counting",
+            "payment_calendar_key",
+            "The name of the calendar a payment rule's business days are counted on",
             False,
             "settlement_method = financial",
-            FieldType.HOLIDAY_CALENDAR,
-            "a _CreateHolidayCalendar handle",
-            "Monday to Friday less its holidays, counted by a rule's business days; separate from "
-            "the pricing calendar; read for nothing by a row paying on a date",
+            FieldType.TEXT,
+            "a calendar's name, or several joined by +, such as NYFED+LON",
+            "Exact and case-sensitive: one name selects that calendar of the collection given "
+            "when the batch or the quote template is made, several joined by + the calendar "
+            "closed on every day any of them is closed, in any order; Monday to Friday less its "
+            "holidays, separate from the pricing calendar; rows may name different calendars; "
+            "a name the collection lacks fails, on a row paying on a date too, which reads the "
+            "calendar for nothing",
             quote_allowed=True,
             quote_required_when="settlement_method = financial",
         ),
@@ -433,7 +436,7 @@ FLOAT_FLOAT = Instrument(
             NONE,
             FieldType.CODE,
             "financial",
-            "financial exactly: the batch requires payment_day and payment_holiday_calendar and "
+            "financial exactly: the batch requires payment_day and payment_calendar_key and "
             "each month pays one net amount on its payment day, the row's date or the day its "
             "rule finds; physical is refused by name",
         ),
@@ -528,7 +531,7 @@ FLOAT_FLOAT = Instrument(
             "index's kind, lastday alone on an IFERC index",
         ),
         _as_booked("payment_day"),
-        _as_booked("payment_holiday_calendar"),
+        _as_booked("payment_calendar_key"),
         _as_booked("marketing_reserve"),
         _as_booked("cva_reserve"),
         Field(

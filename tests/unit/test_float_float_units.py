@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 from test_bilateral_kernel import curve_of, curve_set
-from test_create_trades import a_template, a_ticket
+from test_create_trades import a_template, a_ticket, seam_key, the_calendars
 from test_float_float import BILATERAL as GAS_SPREAD
 from test_float_float import FIELDS, NTO, PAN, TEMPLATE_FIELDS
 from test_float_float import TICKET as GAS_TICKET
@@ -138,6 +138,7 @@ def booked(
         a_template(template, FLOAT_FLOAT),
         UNITS,
         WorkCounter(),
+        the_calendars(),
     )
 
 
@@ -492,7 +493,12 @@ def test_the_crack_nets_with_a_position_on_crude_and_each_index_keeps_its_own_lo
         "fixed_price": [69.00],
     }
     bought = trades(
-        (WTI,), a_ticket(rows), a_template({**alone, "quantity_unit": "BBL"}), UNITS, WorkCounter()
+        (WTI,),
+        a_ticket(rows),
+        a_template({**alone, "quantity_unit": "BBL"}),
+        UNITS,
+        WorkCounter(),
+        the_calendars(),
     )
     position = trade_results(
         prepared_trades(bought.encoded, (hist_wti,), WorkCounter()),
@@ -785,7 +791,7 @@ def sheet() -> dict[str, Any]:
         "ACME Trading",
         "SOFR",
         serial(PAY),
-        holidays,
+        seam_key(holidays),
     ]
     cells["template"] = SEAM["_CreateTradeTemplate"](
         "float_float", across(*TEMPLATE_FIELDS), across(*cells["values"])

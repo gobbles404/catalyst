@@ -2,7 +2,7 @@
 
 Built in #183 as the ticket [combine-holiday-calendars.md](../../engineering-tickets/trade-valuation-pipeline/combine-holiday-calendars.md), UAT item 16.
 
-One holiday calendar closed on every day any of the given calendars is closed. Two desks' calendars, a clearing house's and a bank's, combined this way give the days a payment can move on when it must be open on all of them: a holiday in any of the calendars is a holiday in the result, and a weekday none of them lists stays open. The result is an ordinary [holiday calendar](holiday-calendar.md), reached by handle, for a template's `payment_holiday_calendar`, for [util_ShiftDate](../utilities/shift-date.md) or for another combination.
+One holiday calendar closed on every day any of the given calendars is closed. Two desks' calendars, a clearing house's and a bank's, combined this way give the days a payment can move on when it must be open on all of them: a holiday in any of the calendars is a holiday in the result, and a weekday none of them lists stays open. The result is an ordinary [holiday calendar](holiday-calendar.md), reached by handle, for an index, for [util_ShiftDate](../utilities/shift-date.md) or for another combination. A payment calendar of several centres needs no cell of this function since [payment-calendar-keys.md](../../engineering-tickets/trade-valuation-pipeline/payment-calendar-keys.md): a key of several names, `NYFED+LON`, makes the same union when a batch or a quote template is made, [collect-payment-calendars.md](collect-payment-calendars.md#binding-a-key), and a combination, having no name, is no member of a collection.
 
 ## Worksheet contract
 
@@ -50,7 +50,7 @@ Quoted from the declaration in `src/catalyst/excel/index_definitions.py`, which 
 
 | Item | Text |
 |---|---|
-| Function | Combines holiday calendars into one closed on every day any of them is closed, the days in order, once each, and shows its handle, an ordinary calendar for payment_holiday_calendar, util_ShiftDate or another combination. |
+| Function | Combines holiday calendars into one closed on every day any of them is closed, the days in order, once each, and shows its handle, an ordinary calendar for an index, util_ShiftDate or another combination. |
 | `calendar_handles` | The calendars to combine: a cell, a row or a column of cells showing _CreateHolidayCalendar's or this function's results, such as B2:B3, every one read and a repeat read again. |
 
 ## The library checks

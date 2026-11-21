@@ -11,7 +11,17 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 from test_bilateral_kernel import CLOSE, curve_of, curve_set
-from test_create_trades import WAHA, WAHA_PAYS, WAHA_TEMPLATE, WAHA_TICKET, created, dates, refused
+from test_create_trades import (
+    WAHA,
+    WAHA_PAYS,
+    WAHA_TEMPLATE,
+    WAHA_TICKET,
+    created,
+    dates,
+    key_of,
+    refused,
+    seam_key,
+)
 from test_create_trades import an_index as kernel_index
 from test_field_values import ENTRY as PROBES
 from test_field_values import bound
@@ -95,7 +105,7 @@ CONTRACTS = (
 )
 FAR = ("2030-01-01",)  # a calendar closed on weekends alone within these years
 SYN = kernel_index("SYN", CONTRACTS, FAR, (("MMBTU", 1.0, "MMBTU"),))
-WEEKENDS = holiday_calendar(dates(*FAR))
+WEEKENDS = holiday_calendar(dates(*FAR), "FAR_WEEKENDS")
 BILATERAL: dict[str, object] = {
     "quantity_unit": "MMBTU",
     "quantity_per": "month",
@@ -106,7 +116,7 @@ BILATERAL: dict[str, object] = {
     "settlement_method": "financial",
     "counterparty": "ACME Trading",
     "discount_curve_key": "SOFR",
-    "payment_holiday_calendar": WEEKENDS,
+    "payment_calendar_key": key_of(WEEKENDS),
 }
 CLEARED: dict[str, object] = {
     **{k: v for k, v in BILATERAL.items() if k not in ("counterparty", "discount_curve_key")},
@@ -214,7 +224,7 @@ def test_a_date_is_exact_and_a_physical_row_holds_none() -> None:
     assert batch.resolved.payment is not None
     np.testing.assert_array_equal(batch.resolved.payment.date, [saturday, saturday])
     physical = {
-        **{k: v for k, v in CLEARED.items() if k != "payment_holiday_calendar"},
+        **{k: v for k, v in CLEARED.items() if k != "payment_calendar_key"},
         "settlement_method": "physical",
     }
     assert refused(SYN, two_rows(FEB_25, FEB_25), physical) == (
@@ -330,11 +340,11 @@ def syn() -> dict[str, Any]:
     the bilateral and the cleared templates, and the ticket's two rows as a batch: 10,000 MMBtu of
     F27 at 2.65 each, one paying +2bd and one on 25 February 2027."""
     index, calendar = seam_index("SYN", list(CONTRACTS), SEAM_HOLIDAYS, [("MMBTU", 1.0)])
-    fields = {**BILATERAL, "payment_holiday_calendar": calendar}
+    fields = {**BILATERAL, "payment_calendar_key": seam_key(calendar)}
     bilateral_template = ENTRY["_CreateTradeTemplate"](
         "fixed_float", row(*fields), row(*fields.values())
     )
-    cleared_fields = {**CLEARED, "payment_holiday_calendar": calendar}
+    cleared_fields = {**CLEARED, "payment_calendar_key": seam_key(calendar)}
     cleared_template = ENTRY["_CreateTradeTemplate"](
         "fixed_float", row(*cleared_fields), row(*cleared_fields.values())
     )
@@ -458,8 +468,8 @@ def test_a_cleared_strip_on_one_date_keeps_its_months_and_pays_them_together(
 
 def test_a_template_reads_back_its_day_or_its_rule(syn: dict[str, Any]) -> None:
     names = row(*BILATERAL, "payment_day")
-    values = [v for k, v in BILATERAL.items() if k != "payment_holiday_calendar"]
-    values.append(syn["calendar"])
+    values = [v for k, v in BILATERAL.items() if k != "payment_calendar_key"]
+    values.append(seam_key(syn["calendar"]))
     dated = ENTRY["_CreateTradeTemplate"]("fixed_float", names, row(*values, serial("2027-02-25")))
     table = spilled(ENTRY["util_ReadHandle"](dated))
     at = table[0].index("payment_day")
@@ -550,7 +560,7 @@ def test_a_quote_template_takes_the_date_through_the_seam(syn: dict[str, Any]) -
         "settlement_frequency": "monthly",
         "nearby": 1.0,
         "payment_day": serial("2027-03-15"),
-        "payment_holiday_calendar": syn["calendar"],
+        "payment_calendar_key": seam_key(syn["calendar"]),
     }
     template = ENTRY["_CreateQuoteTemplate"]("fixed_float", row(*fields), row(*fields.values()))
     history = a_history(syn["index"], "2026-10-29", "2026-12-15", SEAM_HOLIDAYS, {})

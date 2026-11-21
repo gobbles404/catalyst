@@ -13,6 +13,7 @@ from collections.abc import Callable, Mapping
 import pytest
 from test_seam_allocation import SLACK, least_peak
 from test_two_index_budgets import (
+    CALENDARS,
     ROWS,
     SOFR,
     TEMPLATE,
@@ -72,7 +73,7 @@ def spread(n: int, counter: WorkCounter) -> Trades:
     """n rows of A less B, each its own occurrence of G27."""
     template = trade_template(a_ticket({k: [v] for k, v in SPREAD_TEMPLATE.items()}))
     ticket = a_ticket({name: list(values) * n for name, values in SPREAD_TICKET.items()})
-    return trades((A, B), ticket, template, UNITS, counter)
+    return trades((A, B), ticket, template, UNITS, counter, CALENDARS)
 
 
 @pytest.mark.parametrize("n", ROWS)

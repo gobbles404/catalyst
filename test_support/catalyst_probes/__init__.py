@@ -35,7 +35,6 @@ from catalyst.excel.bridge import (
     TextRow,
     register,
 )
-from catalyst.index_definitions.kind import named
 from catalyst.instruments.definitions import FieldType
 from catalyst.instruments.fields import FieldValues
 
@@ -186,7 +185,7 @@ def _echoed(values: FieldValues) -> MixedArray:
 
 
 def _typed(values: FieldValues, name: str) -> list[object]:
-    """A bound column's values as cells: a number, a date's serial, text, or a kind's words."""
+    """A bound column's values as cells: a number, a date's serial or text."""
     match values.field(name).type:
         case FieldType.NUMBER:
             return values.numbers(name).tolist()
@@ -194,8 +193,6 @@ def _typed(values: FieldValues, name: str) -> list[object]:
             return (values.dates(name) - EXCEL_EPOCH).astype(np.int64).tolist()
         case FieldType.TEXT | FieldType.CODE:
             return list(values.texts(name))
-        case FieldType.HOLIDAY_CALENDAR:
-            return [named(obj) for obj in values.objects(name)]
         case FieldType.DATE_OR_TEXT:  # a date's serial or the text, payment-day-date-or-rule.md
             entered = values.dates_or_texts(name)
             serials = iter((entered.dates - EXCEL_EPOCH).astype(np.int64).tolist())

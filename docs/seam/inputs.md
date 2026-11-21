@@ -237,11 +237,10 @@ through `catalyst.instruments.fields.selected`. Any subset of the instrument's f
 order; the headers match the field names exactly, case and all, decision 29 standing for the
 tables declared beside a function, so that `Quantity` is unknown where `quantity` is a field
 and `quantity ` is another header, and the message lists the instrument's fields. Each column
-is checked against its field's type with the table rules, text for a code, and a field that
-holds a handle, `holiday calendar handle`, is a column of handle texts resolved one cell at a
-time through decision 35's rule, in row order, each cell's text found at its own place in the
-body and each cell named as a scalar handle argument is named, the first bad cell down the
-column whichever way it is bad; and a field of a date or a text, `date or text`, since
+is checked against its field's type with the table rules, text for a code; no field holds a
+handle since [payment-calendar-keys.md](../engineering-tickets/trade-valuation-pipeline/payment-calendar-keys.md),
+which made the one that did, the payment calendar, a key of text, and removed the column of
+handle texts the field path resolved cell by cell; and a field of a date or a text, `date or text`, since
 [payment-day-date-or-rule.md](../engineering-tickets/trade-valuation-pipeline/payment-day-date-or-rule.md),
 is a column told apart cell by cell by type, a whole-day serial inside the calendar a date and a
 nonempty text a text, any other cell refused as the first bad one down the column, `expected

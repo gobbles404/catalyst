@@ -234,7 +234,9 @@ def the_terms(
             if entered.rule is not None:
                 rule_text = entered.rule
                 rule = payment_rule_of("payment_day", rule_text)
-        payment_calendar = cast(HolidayCalendar, values["payment_holiday_calendar"])
+        # Bound when the template was made, payment-calendar-keys.md; the conditions above
+        # held the key present, and a template holding one holds its calendar.
+        payment_calendar = template.payment_calendar
     key = _text(values, "discount_curve_key") if route is Route.BILATERAL else None
     return Terms(
         route,

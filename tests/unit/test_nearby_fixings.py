@@ -9,7 +9,7 @@ width."""
 
 import numpy as np
 import pytest
-from test_create_trades import an_index, created
+from test_create_trades import an_index, created, key_of
 from test_quote import a_template as a_quote_template
 from test_trades import day, quoted
 from test_utilities import rows
@@ -163,7 +163,7 @@ def test_a_first_nearby_average_reads_the_prompts_column_whatever_the_width(near
         "settlement_method": "financial",
         "clearing_house": "CME Clearing",
         "payment_day": day("2026-06-18"),
-        "payment_holiday_calendar": ROLL.holiday_calendar,
+        "payment_calendar_key": key_of(ROLL.holiday_calendar),
     }
     ticket: dict[str, list[object]] = {
         "trade_id": [1],
@@ -191,7 +191,7 @@ def test_a_first_nearby_average_reads_the_prompts_column_whatever_the_width(near
         settlement_frequency="onetime",
         nearby=1.0,
         payment_day=DayOrRule(day("2026-06-18"), None),
-        payment_holiday_calendar=ROLL.holiday_calendar,
+        payment_calendar_key=key_of(ROLL.holiday_calendar),
     )
     price = quote_by_dates(
         market, day("2026-06-15"), day("2026-06-16"), quote, "flat", None, WorkCounter()

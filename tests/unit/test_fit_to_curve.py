@@ -15,6 +15,7 @@ from collections.abc import Callable
 import numpy as np
 import pytest
 from test_bilateral_kernel import CLOSE, curve_of, curve_set
+from test_create_trades import seam_key, with_calendars
 from test_quote import (
     DEC_31,
     MONTH_CLEARED,
@@ -81,6 +82,9 @@ ENTRY = {
         "_CollectDiscountCurves",
     )
 }
+# A batch or a quote template made on the sheet names the tests' collection of payment
+# calendars, payment-calendar-keys.md.
+ENTRY["_CreateQuoteTemplate"] = with_calendars(ENTRY["_CreateQuoteTemplate"])
 
 # The issue's worked example: three months at 4.50, 4.30 and 3.00, quantities 3,100,000, 280,000
 # and 310,000, payment factors 0.99, 0.95 and 0.90. January, February and March 2027 on the
@@ -107,7 +111,7 @@ FIELDS = (
     "schedule_method",
     "quantity_per",
     "payment_day",
-    "payment_holiday_calendar",
+    "payment_calendar_key",
     "settlement_frequency",
     "nearby",
 )
@@ -461,7 +465,9 @@ def test_the_three_worksheet_functions_take_the_pricing_through_the_seam() -> No
     )
     history = seam_history(ix, "2026-12-16", DEC_31, ["2027-01-01"], {})
     market = seam_market(history, "SEAM", *PRICES)
-    weekends = ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING)
+    weekends = seam_key(
+        ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING)
+    )
     otc_template = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         row("discount_curve_key", *FIELDS),

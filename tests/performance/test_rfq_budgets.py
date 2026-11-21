@@ -306,7 +306,7 @@ def on_the_sheet() -> tuple[object, object, object, object, object]:
     )
     history = PATH["_CreateMarketHistory"](PATH["_CreateCalendar"](date, ix), fixings)
     market = PATH["_CreateMarket"](history, PATH["_CreatePriceVector"]("SEAM", column(1.0, 1.2)))
-    weekends = PATH["_CreateHolidayCalendar"](column(serial("2030-01-01")), bridge.MISSING)
+    weekends = PATH["_CreateHolidayCalendar"](column(serial("2030-01-01")), "PAYS")
     template = PATH["_CreateQuoteTemplate"](
         "fixed_float",
         row(
@@ -315,12 +315,13 @@ def on_the_sheet() -> tuple[object, object, object, object, object]:
             "schedule_method",
             "quantity_per",
             "payment_day",
-            "payment_holiday_calendar",
+            "payment_calendar_key",
             "discount_curve_key",
             "settlement_frequency",
             "nearby",
         ),
-        row("bilateral", "financial", "asian", "month", "+5bd", weekends, "SOFR", "monthly", 1.0),
+        row("bilateral", "financial", "asian", "month", "+5bd", "PAYS", "SOFR", "monthly", 1.0),
+        PATH["_CollectPaymentCalendars"](weekends),
     )
     curve = PATH["_CreateDiscountCurve"](
         "SOFR",
@@ -444,6 +445,7 @@ ONETIME = QuoteTemplate(
     MappingProxyType(
         {**BILATERAL.values, "quantity_per": "period", "settlement_frequency": "onetime"}
     ),
+    BILATERAL.payment_calendar,
 )
 WINDOWS = a_ticket(
     12,

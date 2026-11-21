@@ -13,7 +13,7 @@ from collections.abc import Mapping
 import numpy as np
 import pytest
 from test_bilateral_kernel import CLOSE, curve_of, curve_set
-from test_create_trades import an_index, created
+from test_create_trades import an_index, created, key_of, seam_key, with_calendars
 from test_onetime_average import (
     CL,
     CL_CONTRACTS,
@@ -48,6 +48,9 @@ ENTRY = {
     name: bridge.entry(name)
     for name in ("_QuoteByDates", "_Quote", "_CreateQuoteTemplate", "_CreateHolidayCalendar")
 }
+# A batch or a quote template made on the sheet names the tests' collection of payment
+# calendars, payment-calendar-keys.md.
+ENTRY["_CreateQuoteTemplate"] = with_calendars(ENTRY["_CreateQuoteTemplate"])
 
 # The trade month, 26 May to 25 June 2026, valued 20 May with N26 at 70 and Q26 at 72 before any
 # day fixes: 22 pricing days, four of May and eighteen of June, N26's nineteen through its expiry
@@ -85,7 +88,7 @@ def terms(
     }
     if settlement == "financial":
         values["payment_day"] = payment
-        values["payment_holiday_calendar"] = CL.holiday_calendar
+        values["payment_calendar_key"] = key_of(CL.holiday_calendar)
     if route == "bilateral":
         values["discount_curve_key"] = "SOFR"
     return a_template(**values)
@@ -392,19 +395,19 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "schedule_method",
         "quantity_per",
         "payment_day",
-        "payment_holiday_calendar",
+        "payment_calendar_key",
         "settlement_frequency",
         "nearby",
     )
     onetime = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         fields,
-        row("cleared", "financial", "asian", "period", "+2bd", holidays, "onetime", 1.0),
+        row("cleared", "financial", "asian", "period", "+2bd", seam_key(holidays), "onetime", 1.0),
     )
     monthly = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         fields,
-        row("cleared", "financial", "asian", "month", "+2bd", holidays, "monthly", 1.0),
+        row("cleared", "financial", "asian", "month", "+2bd", seam_key(holidays), "monthly", 1.0),
     )
     start, end = serial("2026-05-26"), serial("2026-06-25")
     assert ENTRY["_QuoteByDates"](
