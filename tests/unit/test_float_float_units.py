@@ -730,7 +730,7 @@ def sheet() -> dict[str, Any]:
     headers = across(
         "name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"
     )
-    holidays = SEAM["_CreateHolidayCalendar"](serial("2027-01-01"))
+    holidays = SEAM["_CreateHolidayCalendar"](serial("2027-01-01"), bridge.MISSING)
     date = SEAM["_CreateValuationDate"](serial(AS_OF), 0.5)
     cells: dict[str, Any] = {"holidays": holidays}
     for key, name, unit, lot, settles, quotes in (

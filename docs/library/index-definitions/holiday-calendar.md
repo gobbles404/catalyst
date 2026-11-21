@@ -1,13 +1,15 @@
 # _CreateHolidayCalendar
 
-Built in #67. Since #183 several calendars combine into one closed on every day any of them is closed, [combine-holiday-calendars.md](combine-holiday-calendars.md); this page is the creator alone, which keeps the list as given.
+Built in #67. Since #183 several calendars combine into one closed on every day any of them is closed, [combine-holiday-calendars.md](combine-holiday-calendars.md); this page is the creator alone, which keeps the list as given. Since [payment-calendar-keys.md](../../engineering-tickets/trade-valuation-pipeline/payment-calendar-keys.md) a calendar may be made under a name, the word a payment calendar key selects it by, and named calendars are gathered by [_CollectPaymentCalendars](collect-payment-calendars.md).
 
 The days one market is closed, listed one by one as the desk keeps them, kept as given and reached by handle. It is a static calendar: the list is the calendar, and no day is generated from a rule. Its readers reach it through the [index](index.md), which holds it beside a futures schedule since #107, requires it there and refuses it beside an IFERC or a Gas Daily one. The [futures fixings](../market-data/futures-fixings.md), its first reader since #79 and through the index since #108, are refused on a listed day, or without a fixing on a business day, through numpy's business-day functions over this list, as [time.md](../time.md) decided; the [calendar](../calendar/calendar.md) of #82 reads it the same way, flagging whether the market is open on each of its days. A reader that counts the business days between two dates is not specified. The code is `src/catalyst/index_definitions/holiday_calendar.py`, the record and its builder, and `src/catalyst/excel/index_definitions.py`, the worksheet function.
 
 ## Worksheet contract
 
 ```python
-def _CreateHolidayCalendar(holiday: DateColumn) -> Handle[HolidayCalendar]: ...
+def _CreateHolidayCalendar(
+    holiday: DateColumn, name: str | None = None
+) -> Handle[HolidayCalendar]: ...
 ```
 
 | | A | B |
@@ -25,6 +27,7 @@ def _CreateHolidayCalendar(holiday: DateColumn) -> Handle[HolidayCalendar]: ...
 | 11 | 25-Dec-2026 | |
 | 12 | `=_CreateHolidayCalendar(A2:A11)` | shows `30512:holiday_calendar:6` |
 | 13 | `=_CreateHolidayCalendar(A2)` | shows `30512:holiday_calendar:7`, a market closed on one day |
+| 14 | `=_CreateHolidayCalendar(A2:A11,"NYFED")` | shows `30512:holiday_calendar:NYFED:8`, the same days under a name |
 
 One column of dates, selected without the header row: row 1 is for the person reading the sheet, and the function never sees it. It is the second function to take a column of one kind without headers, after `_CreateFuturesSchedule` ([inputs.md](../../seam/inputs.md) decision 38), and the cost that page states, two columns selected one row out of step, does not arise with one. A single cell is a column of one, so a market closed on one day needs no range. The seam checks the column alone, dates one column wide, no blank cells, and hands over an array of days; nothing here restates that. The result is a handle: text in the cell that stands for the calendar the seam keeps, declared `Handle[HolidayCalendar]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the calendar.
 
@@ -34,12 +37,25 @@ Quoted from the declaration in `src/catalyst/excel/index_definitions.py`, which 
 
 | Item | Text |
 |---|---|
-| Function | Creates a holiday calendar from the days one market is closed and shows its handle, the text other formulas take as the calendar. |
+| Function | Creates a holiday calendar from the days one market is closed, under a name where a payment calendar key will select it, and shows its handle, the text other formulas take as the calendar. |
 | `holiday` | The column of dates the market is closed, such as A2:A11, one holiday per row. |
+| `[name]` | The calendar's name, text such as NYFED, exact and case-sensitive with no whitespace around it and no plus sign: what a payment calendar key selects. Leave it out for a calendar no key selects. |
+
+## The name
+
+Optional, the second argument. Left out, the calendar is as it always was: an index's pricing calendar and a date utility's calendar need no name, and every formula written before the name existed reads the same. Given, it is kept as typed and shows in two places: in the handle, `30512:holiday_calendar:NYFED:8` where a calendar without one shows `30512:holiday_calendar:7`, and beside each day of the readback, a second column `name`, as a curve's readback repeats its name.
+
+| Rule on a name | Refused as |
+|---|---|
+| Not whitespace alone | `name is ' ', expected a name, not whitespace alone` |
+| No whitespace around it | `name is ' NYFED', expected a name with no whitespace around it` |
+| No plus sign, which joins names in a key | `name is 'NYFED+LON', expected a name without '+', which joins names in a key` |
+
+The first two are the curve name's rule, [discount-curve.md](../globals/discount-curve.md), since a key matches a name exactly, case and all. A blank cell, a number or empty text for the name is the seam's to refuse, `name is number 7.0, expected text`. A combination, [combine-holiday-calendars.md](combine-holiday-calendars.md), has no name whatever its sources are called.
 
 ## The library checks
 
-None. The seam never compares two arguments and the calendar has one, so there is no rule of alignment as the schedule has, and a calendar is the days the desk listed. The dates are kept as given, in the order given: a day listed twice is listed twice, a day out of order stays where it was, and a Saturday listed is kept. What a calendar must look like for a reader to use it, whether days repeat, whether they increase, whether a weekend day belongs, is that reader's rule; its two readers, the futures fixings and the calendar, read the list as numpy does, a day listed twice counting once and a weekend day listed adding nothing, so neither needs one. A one-row calendar is a calendar. A failed call publishes nothing, and a column the seam rejects never reaches the function.
+None on the days. The seam never compares two arguments and the calendar's name stands alone, so there is no rule of alignment as the schedule has, and a calendar is the days the desk listed. The dates are kept as given, in the order given: a day listed twice is listed twice, a day out of order stays where it was, and a Saturday listed is kept. What a calendar must look like for a reader to use it, whether days repeat, whether they increase, whether a weekend day belongs, is that reader's rule; its two readers, the futures fixings and the calendar, read the list as numpy does, a day listed twice counting once and a weekend day listed adding nothing, so neither needs one. A one-row calendar is a calendar. A failed call publishes nothing, and a column the seam rejects never reaches the function.
 
 ## Tests
 
@@ -60,4 +76,4 @@ The examples and properties below are `tests/unit/test_holiday_calendar.py`; the
 
 ## Not here
 
-Whether a day is a business day: the futures fixings' rule since #79 and the calendar's priced flag since #82, numpy's business-day functions over this list as [time.md](../time.md) decided. The business days between two dates, and where a date that falls on a holiday rolls to: a later consumer's job, with whatever it needs a calendar to hold true. Weekends: the calendar holds the days the desk listed and knows nothing of Saturdays and Sundays; the futures fixings and the calendar treat them as closed, Monday to Friday being the week, and another reader may rule otherwise. Holidays from a rule, the third Monday of January say: the list is the calendar. Which market the calendar belongs to, its name, its exchange, its time zone. A market with no holidays: a range has at least one cell and a blank fails, so the smallest calendar holds one day, and an empty calendar waits for a need. A reader of its own: [util_ReadHandle](../utilities/read-handle.md) spills any calendar. Market data, pricing.
+Whether a day is a business day: the futures fixings' rule since #79 and the calendar's priced flag since #82, numpy's business-day functions over this list as [time.md](../time.md) decided. The business days between two dates, and where a date that falls on a holiday rolls to: a later consumer's job, with whatever it needs a calendar to hold true. Weekends: the calendar holds the days the desk listed and knows nothing of Saturdays and Sundays; the futures fixings and the calendar treat them as closed, Monday to Friday being the week, and another reader may rule otherwise. Holidays from a rule, the third Monday of January say: the list is the calendar. Which market the calendar belongs to, its exchange, its time zone: a name is the word a key selects by and says nothing of a market. A market with no holidays: a range has at least one cell and a blank fails, so the smallest calendar holds one day, and an empty calendar waits for a need. A reader of its own: [util_ReadHandle](../utilities/read-handle.md) spills any calendar. Market data, pricing.

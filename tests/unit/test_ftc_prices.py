@@ -372,7 +372,7 @@ def test_the_worksheet_function_spills_the_check_over_the_months_through_the_sea
     )
     history = seam_history(ix, "2026-12-16", DEC_31, ["2027-01-01"], {})
     market = seam_market(history, "SEAM", *PRICES)
-    weekends = ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]))
+    weekends = ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING)
     template = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         row(*FIELDS),

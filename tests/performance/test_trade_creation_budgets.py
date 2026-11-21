@@ -686,7 +686,9 @@ def sheet() -> dict[str, object]:
         Cells.from_rows([[serial(day)] for day in EXPIRIES]),
         bridge.MISSING,
     )
-    holidays = PATH["_CreateHolidayCalendar"](Cells.from_rows([[serial(day)] for day in HOLIDAYS]))
+    holidays = PATH["_CreateHolidayCalendar"](
+        Cells.from_rows([[serial(day)] for day in HOLIDAYS]), bridge.MISSING
+    )
     conventions = PATH["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specifications = PATH["_CreateContractSpecifications"](
         Cells.from_rows(
@@ -794,7 +796,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
 def test_the_template_creator_reads_each_value_once_and_publishes_once(
     call_profile: CallProfile, sheet: dict[str, object]
 ) -> None:
-    holidays = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46352.0]]))
+    holidays = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46352.0]]), bridge.MISSING)
     headers = Cells.from_rows([list(TEMPLATE_FIELDS)])
     values = Cells.from_rows(
         [

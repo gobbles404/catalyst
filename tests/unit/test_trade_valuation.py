@@ -99,7 +99,9 @@ def an_index(
         column([serial(expiry) for _, expiry in contracts]),
         bridge.MISSING,
     )
-    calendar = ENTRY["_CreateHolidayCalendar"](column([serial(day) for day in holidays]))
+    calendar = ENTRY["_CreateHolidayCalendar"](
+        column([serial(day) for day in holidays]), bridge.MISSING
+    )
     conventions = ENTRY["_CreateIndexConventions"](
         quoted_in, measure[1], "DOLLAR", measure[0], measure[1]
     )
@@ -601,7 +603,9 @@ def test_a_lag_past_the_sheets_calendar_fails_the_template_or_the_batch_in_the_l
         "quantity_unit": "TOY",
         "settlement_method": "financial",
         "clearing_house": "TEST_CLEARER",
-        "payment_holiday_calendar": ENTRY["_CreateHolidayCalendar"](column([serial("2026-01-01")])),
+        "payment_holiday_calendar": ENTRY["_CreateHolidayCalendar"](
+            column([serial("2026-01-01")]), bridge.MISSING
+        ),
     }
     beyond = {**fields, "payment_day": "+99999999999999999999bd"}
     assert templated([*beyond], [*beyond.values()]) == (
@@ -706,7 +710,9 @@ def phh() -> dict[str, Any]:
         [("NYMEX NG", 10_000.0), ("ICE PHH", 2_500.0)],
         reporting_lot="ICE PHH",
     )
-    clearing = ENTRY["_CreateHolidayCalendar"](column([serial("2027-05-31"), serial("2027-08-30")]))
+    clearing = ENTRY["_CreateHolidayCalendar"](
+        column([serial("2027-05-31"), serial("2027-08-30")]), bridge.MISSING
+    )
     template = pen_template("ICE PHH", str(clearing))
     headers = row(*NG_HEADERS)
     long = [1.0, serial("2027-06-01"), "N27", 2.0, 3.0]
@@ -890,7 +896,9 @@ def strip() -> dict[str, Any]:
         [("NYMEX NG", 10_000.0), ("ICE PHH", 2_500.0)],
         reporting_lot="ICE PHH",
     )
-    clearing = ENTRY["_CreateHolidayCalendar"](column([serial("2027-05-31"), serial("2027-08-30")]))
+    clearing = ENTRY["_CreateHolidayCalendar"](
+        column([serial("2027-05-31"), serial("2027-08-30")]), bridge.MISSING
+    )
     template = pen_template("ICE PHH", str(clearing))
     return {
         "index": index,
@@ -1022,7 +1030,9 @@ def test_the_wti_pen_values_its_thousand_barrel_lots_in_dollars_a_barrel() -> No
         [("NYMEX CL", 1_000.0), ("ICE WTI T", 1_000.0)],
         ("VOLUME", "BBL"),
     )
-    clearing = ENTRY["_CreateHolidayCalendar"](column([serial("2026-12-25"), serial("2026-12-28")]))
+    clearing = ENTRY["_CreateHolidayCalendar"](
+        column([serial("2026-12-25"), serial("2026-12-28")]), bridge.MISSING
+    )
     template = pen_template("ICE WTI T", str(clearing))
     trades = ENTRY["_CreateTrades"](
         index, row(*NG_HEADERS), rows([1.0, serial("2026-12-01"), "F27", 3.0, 60.0]), template
@@ -1435,7 +1445,9 @@ L3D_STRIP: list[object] = [19.0, serial("2026-11-20"), "Z26-F27", 3.0, 70.0]
 
 def l3d_template(payment_holidays: list[str], settlement: str = "financial") -> str:
     fields = PEN_FIELDS if settlement == "financial" else PEN_FIELDS[:6]
-    calendar = ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in payment_holidays]))
+    calendar = ENTRY["_CreateHolidayCalendar"](
+        column([serial(d) for d in payment_holidays]), bridge.MISSING
+    )
     values: list[object] = [
         "UNIT",
         "month",
@@ -1664,7 +1676,9 @@ def asian_template(
     payment_holidays: list[str], settlement: str = "financial", basis: str = "month"
 ) -> str:
     fields = PEN_FIELDS if settlement == "financial" else PEN_FIELDS[:6]
-    calendar = ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in payment_holidays]))
+    calendar = ENTRY["_CreateHolidayCalendar"](
+        column([serial(d) for d in payment_holidays]), bridge.MISSING
+    )
     values: list[object] = [
         "GAL",
         basis,
@@ -2216,7 +2230,7 @@ def pays() -> dict[str, Any]:
         PAYS_HOLIDAYS,
         [("UNIT", 1.0)],
     )
-    calendar = ENTRY["_CreateHolidayCalendar"](column([serial("2026-01-01")]))
+    calendar = ENTRY["_CreateHolidayCalendar"](column([serial("2026-01-01")]), bridge.MISSING)
     template = templated(
         [*PAYS_FIELDS],
         ["UNIT", "month", "last3day", "cleared", "financial", "Prototype Clearing", calendar],
@@ -2435,7 +2449,9 @@ def mixed() -> dict[str, Any]:
         column([serial(d) for d in ("2026-11-30", "2026-12-31", "2027-01-29", "2027-02-26")]),
         bridge.MISSING,
     )
-    holidays = ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in MIXED_HOLIDAYS]))
+    holidays = ENTRY["_CreateHolidayCalendar"](
+        column([serial(d) for d in MIXED_HOLIDAYS]), bridge.MISSING
+    )
     conventions = ENTRY["_CreateIndexConventions"]("DOLLAR", "GAL", "DOLLAR", "VOLUME", "GAL")
     specifications = ENTRY["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
@@ -2452,7 +2468,7 @@ def mixed() -> dict[str, Any]:
             "GAL",
         )
     )
-    payments = ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]))
+    payments = ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]), bridge.MISSING)
     template = templated(
         [*MIXED_FIELDS], ["cleared", "financial", serial("2026-11-30"), 10.0, "+1bd", payments]
     )
@@ -2588,7 +2604,7 @@ def test_the_mixed_batch_equals_its_singletons_on_the_sheet_and_a_uniform_field_
             serial("2026-11-30"),
             10.0,
             "+1bd",
-            ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")])),
+            ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]), bridge.MISSING),
             "lastday",
         ],
     )
@@ -2674,7 +2690,9 @@ def ete_index(
         column([serial(expiry) for _, expiry in ETE_CONTRACTS]),
         bridge.MISSING,
     )
-    calendar = ENTRY["_CreateHolidayCalendar"](column([serial(day) for day in ETE_HOLIDAYS]))
+    calendar = ENTRY["_CreateHolidayCalendar"](
+        column([serial(day) for day in ETE_HOLIDAYS]), bridge.MISSING
+    )
     conventions = ENTRY["_CreateIndexConventions"](quote[0], quote[1], settled, "VOLUME", "GAL")
     specifications = ENTRY["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
@@ -2701,7 +2719,7 @@ def ete_template(basis: str | None = "month", broker: str | None = None) -> str:
     """A financial template paying one business day after the last observation on a calendar
     closed on New Year's Day, the basis in it unless None leaves it to the ticket, and since #188
     naming the broker given, the fee examples' ION, so that they still charge brokerage."""
-    payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")])))
+    payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]), bridge.MISSING))
     fields = ["quantity_per", *ETE_FIELDS, "payment_holiday_calendar"]
     values: list[object] = [basis, "cleared", "financial", "ETE Clearing", "+1bd", payments]
     if broker is not None:
@@ -3115,7 +3133,9 @@ WTI_ROW: list[object] = [
 def wti_template(lag: str = "+2bd", method: str | None = "asian", unit: str = "BBL") -> str:
     """The asian template in barrels, or the unit given, cleared and financial, paying that lag
     on the WTI-like calendar; with no method, a template that leaves the method to the rows."""
-    calendar = ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in WTI_HOLIDAYS]))
+    calendar = ENTRY["_CreateHolidayCalendar"](
+        column([serial(d) for d in WTI_HOLIDAYS]), bridge.MISSING
+    )
     fields = [f for f in PEN_FIELDS if method is not None or f != "schedule_method"]
     values: list[object] = [unit, "month", method, "cleared", "financial", "Prototype Clearing"]
     values = [v for v in values if v is not None] + [lag, calendar]
@@ -3539,7 +3559,7 @@ def an_iferc_history(index: str, as_of: str, indices: dict[str, float]) -> str:
 @pytest.fixture(scope="module")
 def waha() -> dict[str, Any]:
     index = an_iferc_index("WAHA", WAHA_MONTHS, [("LOT", 2_500.0), ("MMBTU", 1.0)])
-    pays = ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]))
+    pays = ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]), bridge.MISSING)
     fields = {
         "quantity_unit": "LOT",
         "quantity_per": "month",
@@ -4269,7 +4289,7 @@ BILATERAL_REFUSAL = (
 
 
 def a_template_of(fields: tuple[str, ...], values: tuple[object, ...]) -> str:
-    payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")])))
+    payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]), bridge.MISSING))
     return str(templated([*fields, "payment_holiday_calendar"], [*values, payments]))
 
 
@@ -4651,7 +4671,7 @@ def unit() -> dict[str, Any]:
         [("UNIT", 1.0)],
         ("VOLUME", "BBL"),
     )
-    payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")])))
+    payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING))
     template = templated(
         [*UNIT_FIELDS],
         [
@@ -5183,7 +5203,9 @@ def test_bilateral_batches_reconcile_both_deltas_on_every_axis(
     # year and the sum of the contract column read back once per contract; the group NPVs sum to
     # the mark, the group DV01s to the DV01, each NPV its amount times its factor; and the two
     # deltas differ, every factor below one.
-    wti_calendar = str(ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in WTI_HOLIDAYS])))
+    wti_calendar = str(
+        ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in WTI_HOLIDAYS]), bridge.MISSING)
+    )
     if which == "rolling asian over a year end":
         template = bilateral_template(
             (*PEN_FIELDS[:5], "counterparty", *PEN_FIELDS[6:]),
@@ -5220,7 +5242,9 @@ def test_bilateral_batches_reconcile_both_deltas_on_every_axis(
                 "bilateral",
                 "financial",
                 "ACME Trading",
-                str(ENTRY["_CreateHolidayCalendar"](column([serial("2026-01-01")]))),
+                str(
+                    ENTRY["_CreateHolidayCalendar"](column([serial("2026-01-01")]), bridge.MISSING)
+                ),
             ),
         )
         trades = ENTRY["_CreateTrades"](
@@ -5312,7 +5336,9 @@ def test_a_half_year_values_as_its_six_months_do() -> None:
         "settlement_method": "financial",
         "clearing_house": "TEST_CLEARER",
         "payment_day": "+2bd",
-        "payment_holiday_calendar": ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")])),
+        "payment_holiday_calendar": ENTRY["_CreateHolidayCalendar"](
+            column([serial("2030-01-01")]), bridge.MISSING
+        ),
     }
     template = templated([*fields], [*fields.values()])
     history = a_history(index, "2026-11-26", "2026-12-15", [], {})

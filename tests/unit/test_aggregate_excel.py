@@ -98,7 +98,7 @@ def sheet() -> dict[str, Any]:
     moves."""
     hng = one_unit_index("HNG", "2027-01-04")
     wti = one_unit_index("WTI", "2027-01-05")
-    payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")])))
+    payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING))
     bilateral = str(
         templated(
             [*UNIT_FIELDS],
@@ -851,7 +851,9 @@ def cent_settled_index(name: str, expiry: str) -> str:
         column([serial("2026-12-31"), serial(expiry), serial("2029-01-05")]),
         bridge.MISSING,
     )
-    calendar = ENTRY["_CreateHolidayCalendar"](column([serial(day) for day in UNIT_HOLIDAYS]))
+    calendar = ENTRY["_CreateHolidayCalendar"](
+        column([serial(day) for day in UNIT_HOLIDAYS]), bridge.MISSING
+    )
     conventions = ENTRY["_CreateIndexConventions"]("DOLLAR", "BBL", "CENT", "VOLUME", "BBL")
     specifications = ENTRY["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),

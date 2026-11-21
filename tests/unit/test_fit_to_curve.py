@@ -461,7 +461,7 @@ def test_the_three_worksheet_functions_take_the_pricing_through_the_seam() -> No
     )
     history = seam_history(ix, "2026-12-16", DEC_31, ["2027-01-01"], {})
     market = seam_market(history, "SEAM", *PRICES)
-    weekends = ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]))
+    weekends = ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING)
     otc_template = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         row("discount_curve_key", *FIELDS),

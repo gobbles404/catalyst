@@ -361,7 +361,7 @@ def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
     astype: dict[str, int],
     steps: int,
 ) -> None:
-    calendar = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46307.0]]))
+    calendar = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46307.0]]), bridge.MISSING)
     third = calendar if with_calendar else bridge.MISSING
     PATH["util_ShiftDate"](date, offset, third)
     assert call_profile(lambda: PATH["util_ShiftDate"](date, offset, third)) == {
@@ -1010,11 +1010,11 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     holidays = holiday_column(100)
-    PATH["_CreateHolidayCalendar"](holidays)
-    assert call_profile(lambda: PATH["_CreateHolidayCalendar"](holidays)) == {
+    PATH["_CreateHolidayCalendar"](holidays, bridge.MISSING)
+    assert call_profile(lambda: PATH["_CreateHolidayCalendar"](holidays, bridge.MISSING)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 1,
+        "_validate": 2,  # the column, and the name, left out here, payment-calendar-keys.md
         "_date_column": 1,
         "_one_column": 1,
         "_shape": 1,
@@ -1025,7 +1025,7 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
         "holiday_calendar": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateHolidayCalendar"](holidays)) == {
+    assert numpy_calls(lambda: PATH["_CreateHolidayCalendar"](holidays, bridge.MISSING)) == {
         "ndarray.any": 1,  # one look, for the calendar
         "ndarray.astype": 2,  # the column on its way to days
         "numpy.array": 1,  # the one copy the calendar keeps
@@ -1260,7 +1260,7 @@ def index_parts() -> tuple[object, object, object, object]:
         PATH["_CreateFuturesSchedule"](codes, futures, MISSING),
         PATH["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU"),
         PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(12)),
-        PATH["_CreateHolidayCalendar"](holiday_column(100)),
+        PATH["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING),
     )
 
 
@@ -1431,7 +1431,7 @@ def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out
     codes, futures, _, _ = schedule_columns(2)
     index = an_index(
         PATH["_CreateFuturesSchedule"](codes, futures, MISSING),
-        PATH["_CreateHolidayCalendar"](holiday_column(100)),
+        PATH["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING),
     )
     days, settles = fixings_columns(260, 100)
     PATH["_CreateFuturesFixings"](days, settles, index)
@@ -1470,7 +1470,7 @@ def calendar_sources(contracts: int) -> tuple[object, object]:
     many monthly contracts a month apart with a calendar of a hundred holidays a week apart."""
     codes, futures, _, _ = schedule_columns(contracts)
     schedule = PATH["_CreateFuturesSchedule"](codes, futures, MISSING)
-    holidays = PATH["_CreateHolidayCalendar"](holiday_column(100))
+    holidays = PATH["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING)
     return PATH["_CreateValuationDate"](46276.0, 0.5), an_index(schedule, holidays)
 
 
@@ -1879,7 +1879,7 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     futures = Cells.from_rows([[46161.0 + days_apart * i] for i in range(contracts)])
     valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
     schedule = PATH["_CreateFuturesSchedule"](codes, futures, MISSING)
-    index = an_index(schedule, PATH["_CreateHolidayCalendar"](holiday_column(100)))
+    index = an_index(schedule, PATH["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING))
     made = PATH["_CreateCalendar"](valuation, index)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
@@ -2327,7 +2327,7 @@ def test_rows_of_fields_bind_with_one_look_per_column_and_nothing_per_row(
 def test_a_row_of_fields_with_a_handle_cell_resolves_it_once(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    calendar = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46023.0]]))
+    calendar = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46023.0]]), bridge.MISSING)
     headers = Cells.from_rows(
         [["quantity_unit", "payment_holiday_calendar", "trade_date", "quantity"]]
     )
@@ -2379,7 +2379,7 @@ def test_a_combination_resolves_each_calendar_once_and_unites_them_once(
     call_profile: CallProfile, numpy_calls: CallProfile, n: int
 ) -> None:
     handles = Cells.from_rows(
-        [[PATH["_CreateHolidayCalendar"](holiday_column(100))] for _ in range(n)]
+        [[PATH["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING)] for _ in range(n)]
     )
     PATH["_CombineHolidayCalendars"](handles)
     assert call_profile(lambda: PATH["_CombineHolidayCalendars"](handles)) == {
@@ -2420,7 +2420,7 @@ def cl_months() -> object:
             Cells.from_rows([[46468.0], [46497.0], [46527.0]]),
             MISSING,
         ),
-        PATH["_CreateHolidayCalendar"](holiday_column(1)),
+        PATH["_CreateHolidayCalendar"](holiday_column(1), bridge.MISSING),
     )
 
 

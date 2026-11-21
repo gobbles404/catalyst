@@ -69,7 +69,7 @@ THE_CALENDAR = object()  # in a case's arguments: the calendar's handle, made be
 
 @functools.cache
 def the_calendar() -> str:
-    text = bridge.call("_CreateHolidayCalendar", [HOLIDAYS])
+    text = bridge.call("_CreateHolidayCalendar", [HOLIDAYS, bridge.MISSING])
     assert isinstance(text, str) and CALENDAR.fullmatch(text), text
     return text
 

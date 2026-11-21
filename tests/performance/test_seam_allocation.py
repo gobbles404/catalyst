@@ -306,7 +306,10 @@ def holiday_column(days: int) -> Cells:
 def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
     days = 100
     holidays = holiday_column(days)
-    assert least_peak(lambda: ENTRY["_CreateHolidayCalendar"](holidays)) <= 17 * days + 2 * SLACK
+    assert (
+        least_peak(lambda: ENTRY["_CreateHolidayCalendar"](holidays, bridge.MISSING))
+        <= 17 * days + 2 * SLACK
+    )
 
 
 def iferc_columns(contracts: int) -> tuple[Cells, Cells]:
@@ -406,7 +409,7 @@ def test_an_index_keeps_one_small_record_and_its_reader_stays_small() -> None:
     specifications = ENTRY["_CreateContractSpecifications"](
         SPECIFICATION_HEADERS, specification_body(12)
     )
-    holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
+    holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING)
     assert (
         least_peak(
             lambda: ENTRY["_CreateIndex"](
@@ -470,7 +473,7 @@ def test_futures_fixings_keep_a_copy_of_each_column() -> None:
     codes, futures, _, _ = schedule_columns(2)
     index = an_index(
         ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING),
-        ENTRY["_CreateHolidayCalendar"](holiday_column(100)),
+        ENTRY["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING),
     )
     days, settles = fixings_columns(rows, 100)
     assert (
@@ -484,7 +487,7 @@ def calendar_sources(contracts: int) -> tuple[object, object]:
     many monthly contracts a month apart with a calendar of a hundred holidays a week apart."""
     codes, futures, _, _ = schedule_columns(contracts)
     schedule = ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING)
-    holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
+    holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING)
     return ENTRY["_CreateValuationDate"](46276.0, 0.5), an_index(schedule, holidays)
 
 
@@ -813,7 +816,7 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     futures = Cells.from_rows([[46161.0 + days_apart * i] for i in range(contracts)])
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     schedule = ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING)
-    index = an_index(schedule, ENTRY["_CreateHolidayCalendar"](holiday_column(100)))
+    index = an_index(schedule, ENTRY["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING))
     made = ENTRY["_CreateCalendar"](valuation, index)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
@@ -1019,7 +1022,7 @@ def test_futures_fixings_keep_their_two_columns_and_release_frees_them() -> None
     codes, futures, _, _ = schedule_columns(2)
     index = an_index(
         ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING),
-        ENTRY["_CreateHolidayCalendar"](holiday_column(100)),
+        ENTRY["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING),
     )
     days, settles = fixings_columns(rows, 100)
     kept = retained_numpy_bytes(lambda: ENTRY["_CreateFuturesFixings"](days, settles, index))
@@ -1030,7 +1033,7 @@ def test_futures_fixings_keep_their_two_columns_and_release_frees_them() -> None
 def test_a_holiday_calendar_keeps_its_one_column_and_release_frees_it() -> None:
     dates = 100
     holidays = holiday_column(dates)
-    kept = retained_numpy_bytes(lambda: ENTRY["_CreateHolidayCalendar"](holidays))
+    kept = retained_numpy_bytes(lambda: ENTRY["_CreateHolidayCalendar"](holidays, bridge.MISSING))
     assert kept == (dates * DAY_BYTES, 0)
 
 
@@ -1087,7 +1090,7 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
         least_peak(lambda: ENTRY["CountFieldRows"]("fixed_float", headers, body))
         <= 60 * rows + 2 * SLACK
     )
-    calendar = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46023.0]]))
+    calendar = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46023.0]]), bridge.MISSING)
     one = Cells.from_rows([["quantity_unit", "payment_holiday_calendar", "trade_date", "quantity"]])
     row = Cells.from_rows([["lots", calendar, 46164.0, 10.0]])
     live = bridge.live_handles()
@@ -1136,7 +1139,9 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         Cells.from_rows([[float((day - first).astype(np.int64))] for day in expiries]),
         MISSING,
     )
-    holidays = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[day] for day in closed]))
+    holidays = ENTRY["_CreateHolidayCalendar"](
+        Cells.from_rows([[day] for day in closed]), bridge.MISSING
+    )
     conventions = ENTRY["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specifications = ENTRY["_CreateContractSpecifications"](
         Cells.from_rows(
@@ -1239,7 +1244,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
 def test_a_combination_keeps_its_distinct_days_and_release_frees_them() -> None:
     dates = 100
     sources = Cells.from_rows(
-        [[ENTRY["_CreateHolidayCalendar"](holiday_column(dates))] for _ in range(2)]
+        [[ENTRY["_CreateHolidayCalendar"](holiday_column(dates), bridge.MISSING)] for _ in range(2)]
     )
     kept = retained_numpy_bytes(lambda: ENTRY["_CombineHolidayCalendars"](sources))
     assert kept == (dates * DAY_BYTES, 0)
@@ -1261,7 +1266,7 @@ def test_an_interpolation_costs_its_months_and_publishes_nothing(contracts: int)
     serials = [[float(day + 25569)] for day in days.tolist()]
     index = an_index(
         ENTRY["_CreateFuturesSchedule"](Cells.from_rows(codes), Cells.from_rows(serials), MISSING),
-        ENTRY["_CreateHolidayCalendar"](holiday_column(1)),
+        ENTRY["_CreateHolidayCalendar"](holiday_column(1), bridge.MISSING),
     )
     anchors = Cells.from_rows([codes[0], codes[-1]])
     prices = Cells.from_rows([[60.0], [72.0]])

@@ -547,7 +547,7 @@ PAIR: list[list[object]] = [
 @pytest.fixture(scope="module")
 def sheet() -> dict[str, Any]:
     """The page's index and template through the seam, and a history valued on a day."""
-    holidays = ENTRY["_CreateHolidayCalendar"](column([serial(CLOSED_DAY)]))
+    holidays = ENTRY["_CreateHolidayCalendar"](column([serial(CLOSED_DAY)]), bridge.MISSING)
     schedule = ENTRY["_CreateFuturesSchedule"](
         rows(*[[code] for code, _ in CONTRACTS]),
         column([serial(expiry) for _, expiry in CONTRACTS]),

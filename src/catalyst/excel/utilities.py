@@ -44,6 +44,7 @@ from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import IndexConventions
 from catalyst.index_definitions.kind import named
+from catalyst.index_definitions.payment_calendars import PaymentCalendars
 from catalyst.index_definitions.periods import end_date, start_date
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FieldType, Instrument
@@ -331,7 +332,26 @@ def price_vector_table(obj: PriceVector) -> MixedArray:
 
 @shown.register
 def holiday_calendar_table(obj: HolidayCalendar) -> MixedArray:
-    return MixedArray.table([("holiday",), ("datetime64[D]",)], obj.holiday)
+    # The days; and beside each, since payment-calendar-keys.md, the calendar's name where it
+    # was made with one, as a curve's readback repeats its name.
+    if obj.name is None:
+        return MixedArray.table([("holiday",), ("datetime64[D]",)], obj.holiday)
+    return MixedArray.table(
+        [("holiday", "name"), ("datetime64[D]", "str")],
+        obj.holiday,
+        (obj.name,) * obj.holiday.size,
+    )
+
+
+@shown.register
+def payment_calendars_table(obj: PaymentCalendars) -> MixedArray:
+    # One row per calendar in the order given, payment-calendar-keys.md: its name and how many
+    # days it lists; the days themselves are each calendar's own handle's to spill.
+    return MixedArray.table(
+        [("name", "holidays"), ("str", "int64")],
+        obj.names,
+        np.array([calendar.holiday.size for calendar in obj.calendars], dtype=np.int64),
+    )
 
 
 @shown.register

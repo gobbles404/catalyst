@@ -596,6 +596,30 @@ $formulas = [ordered]@{
     "=_CombineHolidayCalendars(TA1:TA2)"     = "#ERROR _CombineHolidayCalendars: calendar_handles cell (1, 1) is number 46309.0, expected holiday calendar handle"
     '=_CombineHolidayCalendars("x")'         = "#ERROR _CombineHolidayCalendars: calendar_handles is text 'x' naming no live object, expected holiday calendar handle"
     "=_CombineHolidayCalendars()"            = "#ERROR _CombineHolidayCalendars: calendar_handles is missing, expected holiday calendar handles in a cell, a row or a column"
+    # Named holiday calendars and their collection, payment-calendar-keys.md: PAY_A in TC20,
+    # closed on 26 November 2026, PAY_B in TC21, closed on the 27th and the 30th, a calendar with
+    # no name in TC22 and the collection of the two named in TD20. A name shows in the handle
+    # and beside each day of the readback; the collection reads back each name and its count
+    # of days; a member with no name, a name twice and a name no key could select are refused
+    # in the library's words, a number for a name and no handles in the seam's.
+    '=MID(TC20,FIND(":",TC20)+1,23)'         = "holiday_calendar:PAY_A:"
+    "=COLUMNS(util_ReadHandle(TC20))"        = "2"
+    "=INDEX(util_ReadHandle(TC20),1,2)"      = "name"
+    "=INDEX(util_ReadHandle(TC21),4,2)"      = "PAY_B"
+    "=INDEX(util_ReadHandle(TC21),4,1)"      = "46356"
+    "=COLUMNS(util_ReadHandle(TC22))"        = "1"
+    '=ISNUMBER(VALUE(MID(TC22,FIND(":",TC22,FIND(":",TC22)+1)+1,9)))' = "TRUE"
+    '=MID(TD20,FIND(":",TD20)+1,18)'         = "payment_calendars:"
+    "=ROWS(util_ReadHandle(TD20))"           = "4"
+    '=INDEX(util_ReadHandle(TD20),1,1)&" "&INDEX(util_ReadHandle(TD20),1,2)' = "name holidays"
+    '=INDEX(util_ReadHandle(TD20),3,1)&" "&INDEX(util_ReadHandle(TD20),3,2)' = "PAY_A 1"
+    '=INDEX(util_ReadHandle(TD20),4,1)&" "&INDEX(util_ReadHandle(TD20),4,2)' = "PAY_B 2"
+    "=_CollectPaymentCalendars(TC20:TC22)"   = "#ERROR _CollectPaymentCalendars: ValueError: calendar_handles cell 3 is a calendar with no name, expected one made with a name, the word a payment calendar key selects it by"
+    "=_CollectPaymentCalendars(HSTACK(TC20,TC20))" = "#ERROR _CollectPaymentCalendars: ValueError: calendar_handles cell 1 and cell 2 are both named 'PAY_A', expected each name once"
+    "=_CollectPaymentCalendars()"            = "#ERROR _CollectPaymentCalendars: calendar_handles is missing, expected holiday calendar handles in a cell, a row or a column"
+    '=_CreateHolidayCalendar(TA20,"PAY_A+PAY_B")' = "#ERROR _CreateHolidayCalendar: ValueError: name is 'PAY_A+PAY_B', expected a name without '+', which joins names in a key"
+    '=_CreateHolidayCalendar(TA20," PAY_A")'  = "#ERROR _CreateHolidayCalendar: ValueError: name is ' PAY_A', expected a name with no whitespace around it"
+    '=_CreateHolidayCalendar(TA20,7)'         = "#ERROR _CreateHolidayCalendar: name is number 7.0, expected text"
     # The balance of a period, date-helper-inputs.md: one BAL prefix in either case on any label and
     # the valuation-date handle beside it, from QH1:QH12, the balance running from the later of the
     # handle's day and the label's first day to the label's last: the ticket's table on October 2026
@@ -4037,6 +4061,12 @@ $cells = [ordered]@{
     "TE2" = "=_CombineHolidayCalendars(TC1:TD1)"
     "TE3" = "=_CombineHolidayCalendars(TC1)"
     "TF1" = "=TE1"; "TF2" = "=TC3"
+    # payment-calendar-keys.md: two named calendars, one with no name, and the collection.
+    "TA20" = "26-Nov-2026"; "TB20" = "27-Nov-2026"; "TB21" = "30-Nov-2026"
+    "TC20" = '=_CreateHolidayCalendar(TA20,"PAY_A")'
+    "TC21" = '=_CreateHolidayCalendar(TB20:TB21,"PAY_B")'
+    "TC22" = "=_CreateHolidayCalendar(TA20)"
+    "TD20" = "=_CollectPaymentCalendars(TC20:TC21)"
     "TE4" = "=_CombineHolidayCalendars(TF1:TF2)"
     "TG1" = "U26"; "TH1" = "27-Aug-2026"
     "TG2" = "V26"; "TH2" = "28-Sep-2026"

@@ -38,7 +38,7 @@ def a_schedule(codes: tuple[str, ...], expiries: tuple[float, ...]) -> str:
 
 
 def a_holiday_calendar(*serials: float) -> str:
-    text = bridge.call("_CreateHolidayCalendar", [column(*serials)])
+    text = bridge.call("_CreateHolidayCalendar", [column(*serials), bridge.MISSING])
     assert isinstance(text, str) and text.startswith(f"{PID}:holiday_calendar:"), text
     return text
 

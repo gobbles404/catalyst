@@ -56,7 +56,7 @@ TEMPLATE_FIELDS: dict[str, object] = {
 def test_the_quote_template_creator_reads_each_value_once_and_publishes_once(
     call_profile: CallProfile,
 ) -> None:
-    holidays = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46352.0]]))
+    holidays = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46352.0]]), bridge.MISSING)
     headers = Cells.from_rows([list(TEMPLATE_FIELDS)])
     values = Cells.from_rows(
         [
