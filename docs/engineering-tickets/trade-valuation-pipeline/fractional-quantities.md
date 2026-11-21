@@ -1,6 +1,6 @@
 # A financially settled trade takes a fractional quantity
 
-**Status:** Built in #NNN, agreed with the owner on 21 November 2026 for
+**Status:** Built in #267, agreed with the owner on 21 November 2026 for
 [issue #262](https://github.com/gobbles404/catalyst/issues/262), this page in its first commit;
 one pull request on `feat/fractional-quantities`, stacked on `refactor/dollar-unit`, the branch of
 [currency-and-currency-unit.md](currency-and-currency-unit.md), #266. It follows

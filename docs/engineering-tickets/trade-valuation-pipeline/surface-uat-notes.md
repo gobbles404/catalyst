@@ -1136,7 +1136,7 @@ mark with the day before.
 
 ## 43. A financially settled trade takes a fractional quantity
 
-Agreed 21 November 2026 and built in #NNN, issue #262:
+Agreed 21 November 2026 and built in #267, issue #262:
 [fractional-quantities.md](fractional-quantities.md). A `quantity` on a financially
 settled row of a `fixed_float` or a `float_float` is any finite number, so a swap of a
 lot and a half is booked as 1.5 and read back as 1.5. Nothing is rounded. A physically
