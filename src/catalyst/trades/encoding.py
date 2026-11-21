@@ -257,7 +257,7 @@ class Encoded:
     count of the first leg's specification times the specification's rate per lot, summed, since
     #188 the brokered rows' components charged brokerage and every component clearing on a
     cleared route and none on a bilateral one, since #175 the marketing reserve the rows booked,
-    summed once per row, and their currency, the Reserves record, static for the batch and
+    summed once per row, their currency and its unit, the Reserves record, static for the batch and
     entering no number here; _ReportReserves spills the totals and the results readback shows
     them once.
 
@@ -609,9 +609,8 @@ def _the_amounts(
     conventions = leg.index.conventions
     selection = leg.specification[terms.occurrence]  # each component's specification row
     selected = np.unique(selection)  # the distinct selections of the batch
-    currency = conventions.currency_unit
     quote_unit = conventions.quote_quantity_unit
-    per_price = f"{currency} per {conventions.quote_currency_unit}/{quote_unit}"
+    per_price = f"{conventions.currency_unit} per {conventions.quote_currency_unit}/{quote_unit}"
     to_quote_unit = _the_sizes(leg, selected, quote_unit, units)
     with np.errstate(over="ignore", invalid="ignore"):
         to_currency = units.factor(
@@ -747,7 +746,7 @@ def _the_price_leg(terms: ResolvedTrades, coefficient: NDArray[np.float64]) -> N
     float-float-units.md from the spread price's own coefficient, named so in a refusal; each
     finite or the first that is not refused by its trade and its operation, the arithmetic
     running with numpy's flags down."""
-    currency = terms.legs[0].index.conventions.currency_unit
+    currency_unit = terms.legs[0].index.conventions.currency_unit
     with np.errstate(over="ignore", invalid="ignore"):
         offset = -coefficient * terms.price
     outrun = ~np.isfinite(offset)
@@ -756,8 +755,8 @@ def _the_price_leg(terms: ResolvedTrades, coefficient: NDArray[np.float64]) -> N
         field, side = price_words(terms.instrument)
         raise ValueError(
             f"{terms.named(k)} has {float(offset[k])!r} of {side}, expected a finite amount "
-            f"of {currency}; its coefficient times its {field.replace('_', ' ')} outruns the "
-            "largest number"
+            f"of {currency_unit}; its coefficient times its {field.replace('_', ' ')} outruns "
+            "the largest number"
         )
     return offset
 

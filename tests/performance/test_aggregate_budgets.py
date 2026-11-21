@@ -336,7 +336,7 @@ def test_a_view_copies_through_saved_places_and_discovers_nothing(
             assert call_profile(lambda r=risk, b=bucket: aggregate_view(agg, r, b)) == {
                 "aggregate_view": 1,
                 "delta_labels": index_groups,  # the headings, spelled once in risk_report.py
-                "dv01_label": rate_groups + len(agg.currencies),
+                "dv01_label": rate_groups + len(agg.currency_units),
                 "cross_gamma_label": cross_groups,
                 "_axes_of": 1,
                 "_refuse_early": 1,
@@ -363,7 +363,7 @@ def test_a_view_copies_through_saved_places_and_discovers_nothing(
         assert call_profile(lambda b=bucket: aggregate_view(agg, Risk.ALL, b)) == {
             "aggregate_view": 1,
             "delta_labels": index_groups,
-            "dv01_label": rate_groups + len(agg.currencies),
+            "dv01_label": rate_groups + len(agg.currency_units),
             "cross_gamma_label": cross_groups,
             "_axes_of": 1,
             "_refuse_early": 1,

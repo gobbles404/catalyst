@@ -970,6 +970,7 @@ def test_the_pair_collects_with_a_single_index_source_and_a_cashflow() -> None:
                 CASHFLOW,
             ),
             a_template({"currency": "USD", "discount_curve_key": "SOFR"}, CASHFLOW),
+            UNITS,
             WorkCounter(),
         ),
         valuation_date(day(AS_OF), 0.5),
@@ -1096,12 +1097,14 @@ def test_the_prepared_and_valued_pair_read_back_one_row_per_slot_naming_its_leg(
     assert cell(table, 0, "floating_contribution") == pytest.approx(35_000.0, **CLOSE)
     assert cell(table, 1, "floating_contribution") == pytest.approx(-4_000.0, **CLOSE)
     headings = table[0]
-    assert headings[-4:] == [
+    assert headings[-5:] == [
         "observation_coefficient",
         "observation_price",
         "price_unit",
         "floating_contribution",
+        "currency_unit",  # the batch's, once, since currency-and-currency-unit.md
     ]
+    assert [cell(table, r, "currency_unit") for r in range(2)] == ["USD", "-"]
     assert headings.index("brokerage_reserve") == headings.index("group_dv01") + 1
     # A cleared pair: the group facts are none, a dash on every row.
     cleared = grid(valued(booked(CLEARED), curve=None))

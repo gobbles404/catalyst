@@ -612,11 +612,11 @@ def test_the_sheet_reads_the_closed_contract_as_cash_with_its_fees_and_no_risk(
     ):
         results = evaluated(sheet, trades, as_of, *quotes)
         assert spilled(ENTRY["_ReportValues"](results)) == [
-            ["cleared_mark", "cleared_cash", "currency", "as_of"],
-            ["float64", "float64", "str", "datetime64[D]"],
-            [mark, cash, "USD", serial(as_of)],
+            ["cleared_mark", "cleared_cash", "currency", "as_of", "currency_unit"],
+            ["float64", "float64", "str", "datetime64[D]", "str"],
+            [mark, cash, "USD", serial(as_of), "USD"],
         ]
-        assert spilled(ENTRY["_ReportReserves"](results))[2] == [20.0, 8.0, 0.0, 0.0, "USD"]
+        assert spilled(ENTRY["_ReportReserves"](results))[2] == [20.0, 8.0, 0.0, 0.0, "USD", "USD"]
         for bucket in ("day", "month", "year"):
             total = spilled(ENTRY["_ReportRisk"](results, "nominal_delta", bucket))[3]
             assert total == ["Total", 0.0]
