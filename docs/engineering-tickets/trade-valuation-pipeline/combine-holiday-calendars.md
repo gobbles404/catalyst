@@ -2,7 +2,7 @@
 
 [Pipeline overview](README.md) · [UAT item 16](surface-uat-notes.md#16-combine-payment-holiday-calendars)
 
-**Status:** The function was removed by [holiday-keys.md](holiday-keys.md), #NNN: a calendar closed when any of several is closed is now a key of their names joined by `+`, and this page keeps the words of its day.
+**Status:** The function was removed by [holiday-keys.md](holiday-keys.md), #270: a calendar closed when any of several is closed is now a key of their names joined by `+`, and this page keeps the words of its day.
 Built in #183 on `claude/combine-holiday-calendars`, stacked on PR #182 at `9c00a9f`,
 12 October 2026, the page as the ticket; the [As built](#as-built-183) section at the end says what
 was built and what was not. One focused PR on the current prototype, reusing its existing

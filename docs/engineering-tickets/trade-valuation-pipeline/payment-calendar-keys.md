@@ -9,7 +9,7 @@ field, on `feat/payment-calendar-keys`, stacked on the first. It follows
 curve by name, and [combine-holiday-calendars.md](combine-holiday-calendars.md), #183.
 [holiday-calendar.md](../../library/index-definitions/holiday-calendar.md) and
 [collect-holiday-calendars.md](../../library/index-definitions/collect-holiday-calendars.md) own
-the name, the collection and the key. Since [holiday-keys.md](holiday-keys.md), #NNN, the field
+the name, the collection and the key. Since [holiday-keys.md](holiday-keys.md), #270, the field
 reads `payment_holiday_key`, the collection is `_CollectHolidayCalendars`, a calendar's name
 comes first and is required, and `_CombineHolidayCalendars` is gone; this page keeps the words
 of its day.

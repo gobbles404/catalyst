@@ -1,6 +1,6 @@
 # Every holiday calendar is named and chosen by key
 
-**Status:** Built in #NNN, agreed with the owner on 21 November 2026 from their acceptance
+**Status:** Built in #270, agreed with the owner on 21 November 2026 from their acceptance
 testing of #268 and #269, one pull request on `feat/holiday-keys`, stacked on
 `feat/payment-calendar-keys`, the branch of [payment-calendar-keys.md](payment-calendar-keys.md),
 #269. [holiday-calendar.md](../../library/index-definitions/holiday-calendar.md) and
