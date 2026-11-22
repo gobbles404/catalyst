@@ -28,12 +28,12 @@ from test_two_index import PID, A, B, across, down, grid, serial, the_sheet, und
 from catalyst.excel import bridge
 from catalyst.globals.unit_conversions import UNITS
 from catalyst.index_definitions.holiday_calendar import combine_holiday_calendars, holiday_calendar
-from catalyst.index_definitions.index import Index
-from catalyst.index_definitions.payment_calendars import (
-    PaymentCalendars,
+from catalyst.index_definitions.holiday_calendars import (
+    HolidayCalendars,
     calendar_key,
-    collect_payment_calendars,
+    collect_holiday_calendars,
 )
+from catalyst.index_definitions.index import Index
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT, FLOAT_FLOAT, Instrument
 from catalyst.quoting.quote import quote, quote_by_dates
@@ -48,10 +48,10 @@ from catalyst.trades.resolution import Trades, trades
 #   both, closed 26, 27 and 30:            Tuesday 1, Wednesday 2     -> 2 December
 #   PAY_D, closed Friday 27:               Thursday 26, Monday 30     -> 30 November, as PAY_A
 
-PAY_A = holiday_calendar(dates("2026-11-26"), "PAY_A")
-PAY_B = holiday_calendar(dates("2026-11-27", "2026-11-30"), "PAY_B")
-PAY_D = holiday_calendar(dates("2026-11-27"), "PAY_D")
-CALENDARS = collect_payment_calendars((PAY_A, PAY_B, PAY_D), WorkCounter())
+PAY_A = holiday_calendar("PAY_A", dates("2026-11-26"))
+PAY_B = holiday_calendar("PAY_B", dates("2026-11-27", "2026-11-30"))
+PAY_D = holiday_calendar("PAY_D", dates("2026-11-27"))
+CALENDARS = collect_holiday_calendars((PAY_A, PAY_B, PAY_D), WorkCounter())
 TEMPLATE: dict[str, object] = {
     "quantity_unit": "TOY",
     "quantity_per": "month",
@@ -76,14 +76,14 @@ def rows_of(*keys: str | None, code: str = "Z26") -> dict[str, list[object]]:
         "fixed_price": [3.0] * n,
     }
     if keys[0] is not None:
-        ticket["payment_calendar_key"] = list(keys)
+        ticket["payment_holiday_key"] = list(keys)
     return ticket
 
 
 def booked(
     ticket: Mapping[str, list[object]],
     template: Mapping[str, object] = TEMPLATE,
-    calendars: PaymentCalendars | None = CALENDARS,
+    calendars: HolidayCalendars | None = CALENDARS,
     counter: WorkCounter | None = None,
     indexes: tuple[Index, ...] = (TOY,),
     definition: Instrument = FIXED_FLOAT,
@@ -101,7 +101,7 @@ def booked(
 def refused(
     ticket: Mapping[str, list[object]],
     template: Mapping[str, object] = TEMPLATE,
-    calendars: PaymentCalendars | None = CALENDARS,
+    calendars: HolidayCalendars | None = CALENDARS,
 ) -> str:
     with pytest.raises(ValueError) as refusal:
         booked(ticket, template, calendars)
@@ -116,8 +116,8 @@ def paid(batch: Trades) -> list[str]:
 def keys_read_back(batch: Trades) -> list[str]:
     """The last column of the trades readback, each row's key as entered."""
     table = grid(batch)
-    assert table[0][-1] == "payment_calendar_key" and table[1][-1] == "str"
-    return [str(key) for key in under(table, "payment_calendar_key")]
+    assert table[0][-1] == "payment_holiday_key" and table[1][-1] == "str"
+    return [str(key) for key in under(table, "payment_holiday_key")]
 
 
 def test_the_tickets_four_keys_pay_on_the_days_worked_by_hand() -> None:
@@ -130,16 +130,16 @@ def test_the_tickets_four_keys_pay_on_the_days_worked_by_hand() -> None:
     one, other, both, again = payment.calendar
     # One name is the collection's calendar itself; two are one combination, whichever order.
     assert one is PAY_A and other is PAY_B and both is again
-    assert both.name is None
+    assert both.name == "PAY_A+PAY_B"
     np.testing.assert_array_equal(
         both.holiday, combine_holiday_calendars((PAY_A, PAY_B), WorkCounter()).holiday
     )
-    assert batch.resolved.payment_calendar_key == keys
+    assert batch.resolved.payment_holiday_key == keys
     assert keys_read_back(batch) == list(keys)  # as entered, the order of the names kept
     counts = counter.freeze().as_dict()
     # Four distinct key texts bound; one combination of two calendars, their three listed days
     # read and kept; one rule read and applied once on each of the three calendars.
-    assert counts["payment_keys_bound"] == 4
+    assert counts["holiday_keys_bound"] == 4
     assert (counts["calendars_combined"], counts["holidays_read"], counts["holidays_kept"]) == (
         2,
         3,
@@ -152,21 +152,21 @@ def test_a_key_from_the_template_pays_as_the_same_key_on_every_row() -> None:
     counter = WorkCounter()
     from_template = booked(
         rows_of(None, None, None),
-        {**TEMPLATE, "payment_calendar_key": "PAY_A+PAY_B"},
+        {**TEMPLATE, "payment_holiday_key": "PAY_A+PAY_B"},
         counter=counter,
     )
     from_rows = booked(rows_of("PAY_A+PAY_B", "PAY_A+PAY_B", "PAY_A+PAY_B"))
     assert paid(from_template) == paid(from_rows) == ["2026-12-02"] * 3
     assert keys_read_back(from_template) == ["PAY_A+PAY_B"] * 3
     counts = counter.freeze().as_dict()
-    assert counts["payment_keys_bound"] == 1 and counts["calendars_combined"] == 2
+    assert counts["holiday_keys_bound"] == 1 and counts["calendars_combined"] == 2
     # A thousand rows of one key bind once and combine once: nothing per row.
     many = WorkCounter()
     booked(rows_of(*["PAY_B+PAY_A"] * 1_000), counter=many)
-    assert many.freeze().as_dict()["payment_keys_bound"] == 1
+    assert many.freeze().as_dict()["holiday_keys_bound"] == 1
     assert many.freeze().as_dict()["calendars_combined"] == 2
     # The collection's order changes nothing, nor a member no key names.
-    reordered = collect_payment_calendars((PAY_D, PAY_B, PAY_A), WorkCounter())
+    reordered = collect_holiday_calendars((PAY_D, PAY_B, PAY_A), WorkCounter())
     assert paid(booked(rows_of("PAY_A", "PAY_B", "PAY_A+PAY_B"), calendars=reordered)) == [
         "2026-11-30",
         "2026-12-01",
@@ -187,11 +187,11 @@ def test_a_stated_date_is_paid_as_entered_and_still_needs_a_key_the_collection_h
         "2026-11-26"
     ]
     assert refused(rows_of("PAY_A", "PAY_C"), dated) == (
-        "payment_calendar_key row 2 is 'PAY_C', expected names of the collection's calendars, "
+        "payment_holiday_key row 2 is 'PAY_C', expected names of the collection's calendars, "
         "'PAY_A', 'PAY_B' and 'PAY_D'; it holds no 'PAY_C'"
     )
     assert refused(rows_of(None), dated) == (
-        "payment_calendar_key is missing, expected it when settlement_method = financial"
+        "payment_holiday_key is missing, expected it when settlement_method = financial"
     )
 
 
@@ -200,27 +200,27 @@ def test_a_name_the_collection_lacks_is_refused_by_the_first_row_that_holds_it()
         "expected names of the collection's calendars, 'PAY_A', 'PAY_B' and 'PAY_D'; it holds no"
     )
     assert refused(rows_of("PAY_A", "PAY_C", "PAY_C")) == (
-        f"payment_calendar_key row 2 is 'PAY_C', {lacking} 'PAY_C'"
+        f"payment_holiday_key row 2 is 'PAY_C', {lacking} 'PAY_C'"
     )
     assert refused(rows_of("PAY_A", "PAY_B+PAY_C")) == (
-        f"payment_calendar_key row 2 is 'PAY_B+PAY_C', {lacking} 'PAY_C'"
+        f"payment_holiday_key row 2 is 'PAY_B+PAY_C', {lacking} 'PAY_C'"
     )
     # Exactly, case and all: no folding, no trimming, no nearest name.
-    assert refused(rows_of("pay_a")) == f"payment_calendar_key row 1 is 'pay_a', {lacking} 'pay_a'"
+    assert refused(rows_of("pay_a")) == f"payment_holiday_key row 1 is 'pay_a', {lacking} 'pay_a'"
     # From the template the field alone is named.
-    assert refused(rows_of(None), {**TEMPLATE, "payment_calendar_key": "PAY_C"}) == (
-        f"payment_calendar_key is 'PAY_C', {lacking} 'PAY_C'"
+    assert refused(rows_of(None), {**TEMPLATE, "payment_holiday_key": "PAY_C"}) == (
+        f"payment_holiday_key is 'PAY_C', {lacking} 'PAY_C'"
     )
     # No fallback to the one calendar of a collection of one.
-    alone = collect_payment_calendars((PAY_A,), WorkCounter())
+    alone = collect_holiday_calendars((PAY_A,), WorkCounter())
     assert refused(rows_of("PAY_B"), calendars=alone) == (
-        "payment_calendar_key row 1 is 'PAY_B', expected names of the collection's calendars, "
+        "payment_holiday_key row 1 is 'PAY_B', expected names of the collection's calendars, "
         "'PAY_A'; it holds no 'PAY_B'"
     )
     # A collection of no calendars, which the library can make and the sheet cannot, says so.
-    nothing = collect_payment_calendars((), WorkCounter())
+    nothing = collect_holiday_calendars((), WorkCounter())
     assert refused(rows_of("PAY_A"), calendars=nothing) == (
-        "payment_calendar_key row 1 is 'PAY_A', expected names of the collection's calendars, "
+        "payment_holiday_key row 1 is 'PAY_A', expected names of the collection's calendars, "
         "none; it holds no 'PAY_A'"
     )
 
@@ -241,16 +241,14 @@ def test_a_key_that_is_no_name_or_names_joined_by_a_plus_sign_is_refused(
     key: str, reason: str
 ) -> None:
     form = "expected a calendar's name, or several joined by '+'"
-    assert (
-        refused(rows_of("PAY_A", key)) == f"payment_calendar_key row 2 is {key!r}, {form}{reason}"
-    )
+    assert refused(rows_of("PAY_A", key)) == f"payment_holiday_key row 2 is {key!r}, {form}{reason}"
     with pytest.raises(ValueError) as refusal:
-        calendar_key("payment_calendar_key", key)
-    assert str(refusal.value) == f"payment_calendar_key is {key!r}, {form}{reason}"
+        calendar_key("payment_holiday_key", key)
+    assert str(refusal.value) == f"payment_holiday_key is {key!r}, {form}{reason}"
     # A template reads the same form when it is made, before any collection is known.
     with pytest.raises(ValueError) as at_template:
-        a_template({**TEMPLATE, "payment_calendar_key": key})
-    assert str(at_template.value) == f"payment_calendar_key is {key!r}, {form}{reason}"
+        a_template({**TEMPLATE, "payment_holiday_key": key})
+    assert str(at_template.value) == f"payment_holiday_key is {key!r}, {form}{reason}"
 
 
 def test_the_names_of_a_key_are_a_set_read_once() -> None:
@@ -261,13 +259,12 @@ def test_the_names_of_a_key_are_a_set_read_once() -> None:
 
 def test_a_financial_batch_needs_a_collection_and_a_physical_one_needs_neither() -> None:
     assert refused(rows_of("PAY_A"), calendars=None) == (
-        "payment_calendars is missing, expected a _CollectPaymentCalendars collection, which a "
-        "financially settled batch selects its payment calendar from"
+        "holiday_calendars is missing, expected a _CollectHolidayCalendars collection, which a "
+        "financially settled batch selects a calendar from"
     )
     # No field from both, even to the same value.
-    assert refused(rows_of("PAY_A"), {**TEMPLATE, "payment_calendar_key": "PAY_A"}) == (
-        "payment_calendar_key is supplied by the template and by the ticket, expected by one of "
-        "them"
+    assert refused(rows_of("PAY_A"), {**TEMPLATE, "payment_holiday_key": "PAY_A"}) == (
+        "payment_holiday_key is supplied by the template and by the ticket, expected by one of them"
     )
     physical = {
         **{k: v for k, v in TEMPLATE.items() if k != "payment_day"},
@@ -275,9 +272,9 @@ def test_a_financial_batch_needs_a_collection_and_a_physical_one_needs_neither()
     }
     for calendars in (None, CALENDARS):  # with a collection or without, nothing reads it
         assert booked(rows_of(None), physical, calendars).resolved.payment is None
-        assert booked(rows_of(None), physical, calendars).resolved.payment_calendar_key is None
+        assert booked(rows_of(None), physical, calendars).resolved.payment_holiday_key is None
     assert refused(rows_of("PAY_A"), physical) == (
-        "payment_calendar_key is 'PAY_A', expected none unless settlement_method = financial"
+        "payment_holiday_key is 'PAY_A', expected none unless settlement_method = financial"
     )
 
 
@@ -299,20 +296,20 @@ def test_a_key_is_no_payment_group_and_a_strip_pays_each_month_on_its_rows_calen
 # The pair and the spread of F27 pay +2bd from the later observation, Monday 4 January 2027:
 # Wednesday the 6th on a calendar open all week, Thursday the 7th where Tuesday the 5th is closed.
 
-WEEK = holiday_calendar(dates("2030-01-01"), "WEEK")
-JAN_5 = holiday_calendar(dates("2027-01-05"), "JAN_5")
-TWO_LEGS = collect_payment_calendars((WEEK, JAN_5), WorkCounter())
+WEEK = holiday_calendar("WEEK", dates("2030-01-01"))
+JAN_5 = holiday_calendar("JAN_5", dates("2027-01-05"))
+TWO_LEGS = collect_holiday_calendars((WEEK, JAN_5), WorkCounter())
 
 
 @pytest.mark.parametrize(("key", "pays"), [("WEEK", "2027-01-06"), ("WEEK+JAN_5", "2027-01-07")])
 def test_a_pair_and_a_spread_pay_on_the_calendar_their_key_selects(key: str, pays: str) -> None:
     pair = booked(
-        PAIR_F27, {**PAIR_LIFECYCLE, "payment_calendar_key": key}, TWO_LEGS, indexes=(A, B)
+        PAIR_F27, {**PAIR_LIFECYCLE, "payment_holiday_key": key}, TWO_LEGS, indexes=(A, B)
     )
     assert paid(pair) == [pays]
     spread = booked(
         SPREAD_F27,
-        {**SPREAD_LIFECYCLE, "payment_calendar_key": key},
+        {**SPREAD_LIFECYCLE, "payment_holiday_key": key},
         TWO_LEGS,
         indexes=(NTO, PAN),
         definition=FLOAT_FLOAT,
@@ -327,11 +324,11 @@ def test_a_pair_and_a_spread_pay_on_the_calendar_their_key_selects(key: str, pay
 # calendar open all week that is 5 February and 5 March, where the curve stands at 0.99 and 0.97;
 # on FIFTHS, closed on those two days, Monday 8 February and Monday 8 March, at 0.98 and 0.96.
 
-FIFTHS = holiday_calendar(dates("2027-02-05", "2027-03-05"), "FIFTHS")
-QUOTED = collect_payment_calendars((WEEK, FIFTHS), WorkCounter())
+FIFTHS = holiday_calendar("FIFTHS", dates("2027-02-05", "2027-03-05"))
+QUOTED = collect_holiday_calendars((WEEK, FIFTHS), WorkCounter())
 
 
-def quote_terms(key: str | None, calendars: PaymentCalendars | None = QUOTED) -> QuoteTemplate:
+def quote_terms(key: str | None, calendars: HolidayCalendars | None = QUOTED) -> QuoteTemplate:
     values: dict[str, object] = {
         "route": "bilateral",
         "settlement_method": "financial",
@@ -343,7 +340,7 @@ def quote_terms(key: str | None, calendars: PaymentCalendars | None = QUOTED) ->
         "discount_curve_key": "SOFR",
     }
     if key is not None:
-        values["payment_calendar_key"] = key
+        values["payment_holiday_key"] = key
     return quote_template(
         a_ticket({name: [value] for name, value in values.items()}), calendars, WorkCounter()
     )
@@ -352,12 +349,13 @@ def quote_terms(key: str | None, calendars: PaymentCalendars | None = QUOTED) ->
 def test_a_quote_template_binds_its_key_once_and_every_quote_under_it_uses_the_calendar() -> None:
     week, fifths, both = quote_terms("WEEK"), quote_terms("FIFTHS"), quote_terms("FIFTHS+WEEK")
     assert week.payment_calendar is WEEK and fifths.payment_calendar is FIFTHS
-    assert both.payment_calendar is not None and both.payment_calendar.name is None
+    assert both.payment_calendar is not None
+    assert both.payment_calendar.name == "FIFTHS+WEEK"
     assert quote_terms(None).payment_calendar is None and quote_terms(None, None).values
     counter = WorkCounter()
-    quote_template(a_ticket({"payment_calendar_key": ["FIFTHS+WEEK"]}), QUOTED, counter)
+    quote_template(a_ticket({"payment_holiday_key": ["FIFTHS+WEEK"]}), QUOTED, counter)
     assert counter.freeze().as_dict() == {
-        "payment_keys_bound": 1,
+        "holiday_keys_bound": 1,
         "calendars_combined": 2,
         "holidays_read": 3,
         "holidays_kept": 3,
@@ -388,14 +386,14 @@ def test_a_quote_template_refuses_a_key_it_cannot_bind() -> None:
     with pytest.raises(ValueError) as lacking:
         quote_terms("WEEK+TOK")
     assert str(lacking.value) == (
-        "payment_calendar_key is 'WEEK+TOK', expected names of the collection's calendars, "
+        "payment_holiday_key is 'WEEK+TOK', expected names of the collection's calendars, "
         "'WEEK' and 'FIFTHS'; it holds no 'TOK'"
     )
     with pytest.raises(ValueError) as none:
         quote_terms("WEEK", None)
     assert str(none.value) == (
-        "payment_calendars is missing, expected a _CollectPaymentCalendars collection, which "
-        "payment_calendar_key selects its payment calendar from"
+        "holiday_calendars is missing, expected a _CollectHolidayCalendars collection, which "
+        "payment_holiday_key selects a calendar from"
     )
 
 
@@ -409,9 +407,9 @@ def sheet() -> dict[str, Any]:
     it, their collection, and a cleared financial template paying +2bd with no key of its own."""
     cells = the_sheet()
     create = bridge.entry("_CreateHolidayCalendar")
-    cells["open"] = create(serial("2030-01-01"), "OPEN")
-    cells["jan_28"] = create(serial("2027-01-28"), "JAN_28")
-    cells["calendars"] = bridge.entry("_CollectPaymentCalendars")(
+    cells["open"] = create("OPEN", serial("2030-01-01"))
+    cells["jan_28"] = create("JAN_28", serial("2027-01-28"))
+    cells["calendars"] = bridge.entry("_CollectHolidayCalendars")(
         down(cells["open"], cells["jan_28"])
     )
     fields: dict[str, object] = {
@@ -429,7 +427,7 @@ def sheet() -> dict[str, Any]:
         "fixed_float", across(*fields), across(*fields.values())
     )
     cells["key_headers"] = across(
-        "trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "payment_calendar_key"
+        "trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "payment_holiday_key"
     )
     return cells
 
@@ -467,8 +465,8 @@ def test_the_sheet_books_each_row_on_the_calendar_its_key_selects(sheet: dict[st
         serial("2027-02-01"),
         serial("2027-02-01"),
     ]
-    assert table[0][-1] == "payment_calendar_key" and table[1][-1] == "str"
-    assert under(table, "payment_calendar_key") == ["OPEN", "JAN_28", "JAN_28+OPEN"]
+    assert table[0][-1] == "payment_holiday_key" and table[1][-1] == "str"
+    assert under(table, "payment_holiday_key") == ["OPEN", "JAN_28", "JAN_28+OPEN"]
 
 
 def test_the_sheet_refuses_a_key_in_the_librarys_words_and_a_collection_in_the_seams(
@@ -482,16 +480,16 @@ def test_the_sheet_refuses_a_key_in_the_librarys_words_and_a_collection_in_the_s
 
     made = (sheet["a"], sheet["key_headers"])
     assert create(*made, one("TOK"), sheet["keyless"], sheet["calendars"]) == (
-        library + "payment_calendar_key row 1 is 'TOK', expected names of the collection's "
+        library + "payment_holiday_key row 1 is 'TOK', expected names of the collection's "
         "calendars, 'OPEN' and 'JAN_28'; it holds no 'TOK'"
     )
     assert create(*made, one("OPEN+"), sheet["keyless"], sheet["calendars"]) == (
-        library + "payment_calendar_key row 1 is 'OPEN+', expected a calendar's name, or several "
+        library + "payment_holiday_key row 1 is 'OPEN+', expected a calendar's name, or several "
         "joined by '+'; a name is missing"
     )
     assert create(*made, one("OPEN"), sheet["keyless"], bridge.MISSING) == (
-        library + "payment_calendars is missing, expected a _CollectPaymentCalendars collection, "
-        "which a financially settled batch selects its payment calendar from"
+        library + "holiday_calendars is missing, expected a _CollectHolidayCalendars collection, "
+        "which a financially settled batch selects a calendar from"
     )
     # A blank key and a number where the key goes are the seam's to refuse, by the cell.
     assert create(*made, one(None), sheet["keyless"], sheet["calendars"]) == (
@@ -502,23 +500,23 @@ def test_the_sheet_refuses_a_key_in_the_librarys_words_and_a_collection_in_the_s
     )
     # A calendar where the collection goes, and a collection that failed, by the argument.
     assert create(*made, one("OPEN"), sheet["keyless"], sheet["open"]) == (
-        f"#ERROR _CreateTrades: payment_calendars is holiday calendar handle {sheet['open']!r}, "
-        "expected payment calendars handle"
+        f"#ERROR _CreateTrades: holiday_calendars is holiday calendar handle {sheet['open']!r}, "
+        "expected holiday calendars handle"
     )
-    failed = bridge.entry("_CollectPaymentCalendars")(down(sheet["open"], sheet["open"]))
+    failed = bridge.entry("_CollectHolidayCalendars")(down(sheet["open"], sheet["open"]))
     assert create(*made, one("OPEN"), sheet["keyless"], failed) == (
-        "#ERROR _CreateTrades: payment_calendars is the creator's failure, expected payment "
+        "#ERROR _CreateTrades: holiday_calendars is the creator's failure, expected holiday "
         f"calendars handle: {failed}"
     )
     # The same collection serves a quote template, which binds its key when it is made.
     quoted = bridge.entry("_CreateQuoteTemplate")(
-        "fixed_float", across("payment_calendar_key"), across("JAN_28+OPEN"), sheet["calendars"]
+        "fixed_float", across("payment_holiday_key"), across("JAN_28+OPEN"), sheet["calendars"]
     )
     assert re.fullmatch(rf"{PID}:quote_template:\d+", str(quoted))
     assert spilled(quoted)[2] == ["fixed_float", "JAN_28+OPEN"]
     assert bridge.entry("_CreateQuoteTemplate")(
-        "fixed_float", across("payment_calendar_key"), across("TOK"), sheet["calendars"]
+        "fixed_float", across("payment_holiday_key"), across("TOK"), sheet["calendars"]
     ) == (
-        "#ERROR _CreateQuoteTemplate: ValueError: payment_calendar_key is 'TOK', expected names "
+        "#ERROR _CreateQuoteTemplate: ValueError: payment_holiday_key is 'TOK', expected names "
         "of the collection's calendars, 'OPEN' and 'JAN_28'; it holds no 'TOK'"
     )

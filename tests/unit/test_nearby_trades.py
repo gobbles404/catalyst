@@ -45,7 +45,7 @@ WINDOW: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "CME Clearing",
     "payment_day": day("2026-06-18"),
-    "payment_calendar_key": key_of(ROLL.holiday_calendar),
+    "payment_holiday_key": key_of(ROLL.holiday_calendar),
 }
 JUNE_12, JUNE_16, JUNE_19 = "2026-06-12", "2026-06-16", "2026-06-19"
 
@@ -238,7 +238,7 @@ def test_listed_contracts_are_counted_and_not_calendar_months() -> None:
         (("BBL", 1.0, "BBL"),),
         ("VOLUME", "BBL"),
     )
-    terms = {**WINDOW, "payment_calendar_key": key_of(gaps.holiday_calendar), "nearby": 2.0}
+    terms = {**WINDOW, "payment_holiday_key": key_of(gaps.holiday_calendar), "nearby": 2.0}
     batch, _ = created(gaps, rows_over(None), terms)
     codes = gaps.schedule.codes
     assert [codes[int(r)] for r in batch.encoded.legs[0].slot_reference] == ["U26", "Z26"]
@@ -265,7 +265,7 @@ def test_a_second_nearby_window_nets_against_futures_on_the_contracts_it_reads()
         "settlement_method": "financial",
         "clearing_house": "CME Clearing",
         "payment_day": "+2bd",
-        "payment_calendar_key": key_of(ROLL.holiday_calendar),
+        "payment_holiday_key": key_of(ROLL.holiday_calendar),
     }
     sold: dict[str, list[object]] = {
         "trade_id": [10, 11],
@@ -294,7 +294,7 @@ def test_the_trades_readback_ends_with_each_rows_nearby_and_then_its_calendar_ke
     assert texts[width - 3 : width] == [
         "settlement_frequency",
         "nearby",
-        "payment_calendar_key",
+        "payment_holiday_key",
     ]
     assert texts[2 * width - 2 : 2 * width] == ["int64", "str"]  # their types beneath
     assert table.numeric_slots[2:, -2].tolist() == [1.0, 2.0]
@@ -384,7 +384,7 @@ def test_a_later_nearby_is_refused_by_name_where_it_is_not_priced() -> None:
         **monthly,
         "settlement_method": "financial",
         "payment_day": "+2bd",
-        "payment_calendar_key": key_of(ROLL.holiday_calendar),
+        "payment_holiday_key": key_of(ROLL.holiday_calendar),
     }
     # An expiry-based method takes its own contract's days: the first such row is named, an
     # asian row beside it standing.
@@ -439,7 +439,7 @@ def test_a_quote_template_is_required_to_hold_the_field() -> None:
         "quantity_per": "period",
         "settlement_frequency": "onetime",
         "payment_day": DayOrRule(day("2026-06-18"), None),
-        "payment_calendar_key": key_of(ROLL.holiday_calendar),
+        "payment_holiday_key": key_of(ROLL.holiday_calendar),
     }
     start, end = day("2026-06-15"), day("2026-06-16")
     with pytest.raises(ValueError) as refusal:

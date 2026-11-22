@@ -17,8 +17,8 @@ def _CreateFuturesFixings(
 | | A | B | C | D |
 |---|---|---|---|---|
 | 1 | date | settle | holiday | |
-| 2 | 6-May-2026 | 95.08 | 25-May-2026 | `=_CreateHolidayCalendar(C2)` shows `30512:holiday_calendar:9` |
-| 3 | 5-May-2026 | 102.27 | | `=_CreateIndex("WTI NYMEX", "West Texas Intermediate crude oil - NYMEX", B10, B11, B12, D2)` shows `30512:index:WTI NYMEX:10`, B10 to B12 holding the schedule, the conventions and the specifications |
+| 2 | 6-May-2026 | 95.08 | 25-May-2026 | `=_CreateHolidayCalendar("NYMEX", C2)` shows `30512:holiday_calendar:NYMEX:9` |
+| 3 | 5-May-2026 | 102.27 | | `=_CreateIndex("WTI NYMEX", "West Texas Intermediate crude oil - NYMEX", B10, B11, B12, "NYMEX", , B13)` shows `30512:index:WTI NYMEX:10`, B10 to B12 holding the schedule, the conventions and the specifications and B13 `=_CollectHolidayCalendars(D2)`, the collection the key `NYMEX` selects from |
 | 4 | 4-May-2026 | 106.42 | | |
 | 5 | 1-May-2026 | 101.94 | | |
 | 6 | `=_CreateFuturesFixings(A2:A5, B2:B5, D3)` | shows `30512:futures_fixings:WTI NYMEX:13` | | |

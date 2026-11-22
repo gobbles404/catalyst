@@ -19,6 +19,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from numpy.typing import NDArray
 from test_create_trades import key_of, the_calendars
 from test_trades import (
@@ -40,8 +41,7 @@ from catalyst.globals.discount_curve_set import DiscountCurveSet, collect_discou
 from catalyst.globals.unit_conversions import UNITS
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
-from catalyst.index_definitions.holiday_calendar import holiday_calendar
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT
@@ -83,13 +83,13 @@ UNIT = an_index(
     ("VOLUME", "BBL"),
     ("UNIT", 1.0, "BBL"),
 )
-PAY_DAYS = holiday_calendar(dates("2030-01-01"))
+PAY_DAYS = closed_on(dates("2030-01-01"))
 AS_OF = "2027-01-04"
 A_YEAR, TWO_YEARS = "2028-01-04", "2029-01-03"  # 365 and 730 days after the valuation day
 # The review's index: the same contracts and calendars, trades entered in barrels, a bare unit of
 # one, and a reporting lot of three barrels, so that a lot is a third of an exposure and the
 # discounted sensitivity is the lots multiplied back by three.
-TRIO = index(
+TRIO = index_on(
     "TRIO",
     "TRIO index",
     futures_schedule(("Z26", "F27", "F29"), dates("2026-12-31", "2027-01-04", "2029-01-05"), None),
@@ -102,7 +102,7 @@ TRIO = index(
         numbers(0.0, 0.0),
         UNITS,
     ),
-    holiday_calendar(dates("2027-12-27")),
+    closed_on(dates("2027-12-27")),
     "TRIO",
     UNITS,
 )
@@ -514,7 +514,7 @@ def test_the_two_trades_made_through_the_creators_value_the_same() -> None:
         "settlement_method": "financial",
         "counterparty": "ACME Trading",
         "discount_curve_key": "SOFR",
-        "payment_calendar_key": key_of(PAY_DAYS),
+        "payment_holiday_key": key_of(PAY_DAYS),
     }
     template = trade_template(
         FieldValues(FIXED_FLOAT, 1, tuple(fields), {k: (v,) for k, v in fields.items()})

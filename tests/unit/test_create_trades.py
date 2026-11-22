@@ -13,6 +13,7 @@ from typing import Any, cast
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name, closed_on, index_on
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
@@ -25,17 +26,16 @@ from catalyst.index_definitions.futures_schedule import futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
 from catalyst.index_definitions.holiday_calendar import (
     HolidayCalendar,
-    combine_holiday_calendars,
     holiday_calendar,
 )
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
-from catalyst.index_definitions.index import Index, index
-from catalyst.index_definitions.index_conventions import index_conventions
-from catalyst.index_definitions.payment_calendars import (
-    PaymentCalendars,
-    collect_payment_calendars,
-    payment_calendar,
+from catalyst.index_definitions.holiday_calendars import (
+    HolidayCalendars,
+    calendar_of,
+    collect_holiday_calendars,
 )
+from catalyst.index_definitions.iferc_schedule import iferc_schedule
+from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT, NONE, FieldType, Instrument
 from catalyst.instruments.fields import DatesOrTexts, FieldValues
@@ -64,42 +64,30 @@ def day(text: str) -> np.datetime64:
 # Since payment-calendar-keys.md a row names its payment calendar by key and the batch is given
 # a collection to select from. A test still says which calendar a row pays on: it writes
 # key_of(calendar) where the key goes, and the helpers that make a batch pass the_calendars(),
-# the collection of every calendar keyed so far. A calendar made with a name is collected as it
-# is, under that name; one made without is collected as the same days under a name made for it
-# once, CAL1, CAL2, in the order met.
-_KEYED: dict[int, tuple[HolidayCalendar, str]] = {}  # by the calendar's identity, the calendar kept
+# the collection of every calendar keyed so far, each under the name it was made with; a test
+# calendar made for its days alone, closed_on, has a name of its own, CAL1, CAL2.
 _COLLECTED: dict[str, HolidayCalendar] = {}
 
 
 def key_of(calendar: HolidayCalendar | None) -> str:
-    """The key that selects the calendar from the_calendars(); an index's calendar, which an
-    index may lack, is taken as present."""
+    """The key that selects the calendar from the_calendars(), its name; an index's calendar,
+    which an index may lack, is taken as present."""
     assert calendar is not None
-    held = _KEYED.get(id(calendar))
-    if held is None:
-        named = calendar
-        if calendar.name is None:
-            named = holiday_calendar(calendar.holiday, f"CAL{len(_KEYED) + 1}")
-        name = cast(str, named.name)
-        assert _COLLECTED.setdefault(name, named) is named, f"two test calendars are named {name}"
-        held = _KEYED[id(calendar)] = (calendar, name)
-    return held[1]
+    held = _COLLECTED.setdefault(calendar.name, calendar)
+    assert held is calendar, f"two test calendars are named {calendar.name}"
+    return calendar.name
 
 
-def the_calendars() -> PaymentCalendars:
+def the_calendars() -> HolidayCalendars:
     """The collection of every calendar a test has keyed so far, in the order keyed."""
-    return collect_payment_calendars(tuple(_COLLECTED.values()), WorkCounter())
+    return collect_holiday_calendars(tuple(_COLLECTED.values()), WorkCounter())
 
 
 def bound_calendar(values: Mapping[str, object]) -> HolidayCalendar | None:
     """The calendar a quote template's key selects from the_calendars(), bound by the library's
     own step as quote_template binds it, for a test that makes a QuoteTemplate itself."""
-    key = values.get("payment_calendar_key")
-    if key is None:
-        return None
-    return payment_calendar(
-        the_calendars(), {}, WorkCounter(), "payment_calendar_key", cast(str, key)
-    )
+    key = cast(str | None, values.get("payment_holiday_key"))
+    return calendar_of("payment_holiday_key", key, the_calendars(), WorkCounter())
 
 
 # The same two through the seam, for a test that works in handles: seam_key(handle) is the key
@@ -109,11 +97,11 @@ def KeyOfCalendar(calendar: Handle[HolidayCalendar]) -> str:
     return key_of(calendar)
 
 
-def TheCalendars() -> Handle[PaymentCalendars]:
+def TheCalendars() -> Handle[HolidayCalendars]:
     return the_calendars()
 
 
-def CountCalendars(calendars: Handle[PaymentCalendars]) -> float:
+def CountCalendars(calendars: Handle[HolidayCalendars]) -> float:
     return float(len(calendars.calendars))
 
 
@@ -123,8 +111,12 @@ register(CountCalendars, hidden=True)
 _PUBLISHED: list[tuple[int, object]] = []  # the collection's last handle, and its size then
 
 
-def seam_key(calendar: object) -> str:
-    return cast(str, bridge.call("KeyOfCalendar", [calendar]))
+def seam_key(calendar: object) -> Any:
+    """The key of the calendar a handle stands for; a calendar left out is a key left out, as
+    a formula that names no calendar names no key."""
+    if calendar is bridge.MISSING:
+        return calendar
+    return bridge.call("KeyOfCalendar", [calendar])
 
 
 def seam_calendars() -> object:
@@ -141,13 +133,13 @@ def seam_calendars() -> object:
 
 
 def seam_keyed(fields: Sequence[object], values: Sequence[object]) -> list[object]:
-    """A template's values with a calendar's handle under payment_calendar_key given as
+    """A template's values with a calendar's handle under payment_holiday_key given as
     its key, for a seam test whose values still hold the calendar's handle there; a
     value that is no live calendar handle, a key already or a cell a test made wrong on
     purpose, is left as written."""
     keyed = list(values)
     for i, name in enumerate(fields):
-        if name == "payment_calendar_key" and isinstance(keyed[i], str):
+        if name == "payment_holiday_key" and isinstance(keyed[i], str):
             key = seam_key(keyed[i])
             if not key.startswith("#ERROR"):
                 keyed[i] = key
@@ -181,7 +173,7 @@ def an_index(
     codes = tuple(code for code, _ in contracts)
     schedule = futures_schedule(codes, dates(*(expiry for _, expiry in contracts)), None)
     names = tuple(name for name, _, _ in lots)
-    return index(
+    return index_on(
         name,
         f"{name} index",
         schedule,
@@ -194,7 +186,7 @@ def an_index(
             np.zeros(len(lots)),
             UNITS,
         ),
-        holiday_calendar(dates(*holidays)),
+        closed_on(dates(*holidays)),
         names[0] if reporting_lot == "" else reporting_lot,
         UNITS,
     )
@@ -208,7 +200,7 @@ TOY = an_index(
     (("TOY", 10_000.0, "MMBTU"),),
 )
 # The toy's payment calendar: Monday to Friday less 26 November, 25 December and New Year's Day.
-PAYMENT_CALENDAR = holiday_calendar(dates("2026-11-26", "2026-12-25", "2027-01-01"), "TOY_PAYS")
+PAYMENT_CALENDAR = holiday_calendar("TOY_PAYS", dates("2026-11-26", "2026-12-25", "2027-01-01"))
 
 NG_TEMPLATE: dict[str, object] = {
     "quantity_unit": "NYMEX NG",
@@ -226,7 +218,7 @@ TOY_TEMPLATE: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "TEST_CLEARER",
     "payment_day": "+2bd",
-    "payment_calendar_key": key_of(PAYMENT_CALENDAR),
+    "payment_holiday_key": key_of(PAYMENT_CALENDAR),
 }
 NG_TICKET: dict[str, list[object]] = {
     "trade_id": [1001, 1002, 1003, 1004, 1001],
@@ -499,7 +491,7 @@ def one_payment_day(expiry: str, holidays: tuple[str, ...], lag: str) -> np.date
         {
             **TOY_TEMPLATE,
             "payment_day": lag,
-            "payment_calendar_key": key_of(holiday_calendar(dates(*holidays))),
+            "payment_holiday_key": key_of(closed_on(dates(*holidays))),
         },
     )
     assert batch.resolved.payment is not None
@@ -536,7 +528,7 @@ def payment_refusal(lag: str, in_ticket: bool = False) -> str:
     template = {
         **TOY_TEMPLATE,
         "payment_day": lag,
-        "payment_calendar_key": key_of(holiday_calendar(dates())),
+        "payment_holiday_key": key_of(closed_on(dates())),
     }
     if in_ticket:
         return refused(
@@ -594,12 +586,12 @@ def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
     # two business days after F27 does. Row a, Z26 at +1bd on the first, pays 27 November;
     # row b, F27 at +3bd on the second, pays 4 January. Either calendar applied to both rows
     # would move one of them, row a to the 26th or row b to New Year's Day.
-    after_z26 = holiday_calendar(dates("2026-11-26"), "AFTER_Z26")
-    before_new_year = holiday_calendar(dates("2026-12-31"), "BEFORE_NEW_YEAR")
+    after_z26 = holiday_calendar("AFTER_Z26", dates("2026-11-26"))
+    before_new_year = holiday_calendar("BEFORE_NEW_YEAR", dates("2026-12-31"))
     template = {
         name: value
         for name, value in TOY_TEMPLATE.items()
-        if name not in ("payment_day", "payment_calendar_key")
+        if name not in ("payment_day", "payment_holiday_key")
     }
     batch, _ = created(
         TOY,
@@ -610,7 +602,7 @@ def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
             "quantity": [1, 1],
             "fixed_price": [3.0, 3.0],
             "payment_day": ["+1bd", "+3bd"],
-            "payment_calendar_key": [key_of(after_z26), key_of(before_new_year)],
+            "payment_holiday_key": [key_of(after_z26), key_of(before_new_year)],
         },
         template,
     )
@@ -628,7 +620,7 @@ def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
 # on the NG index, M27 the month Memorial Day closes the last business day before the contract
 # month, and ICE WTI T F27 on a CL index in barrels.
 
-CLEARING = holiday_calendar(dates("2026-12-25", "2026-12-28", "2027-01-01", "2027-05-31"))
+CLEARING = closed_on(dates("2026-12-25", "2026-12-28", "2027-01-01", "2027-05-31"))
 PEN_TEMPLATE: dict[str, object] = {
     **NG_TEMPLATE,
     "quantity_unit": "ICE PHH",
@@ -636,7 +628,7 @@ PEN_TEMPLATE: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "ICE Clear Europe",
     "payment_day": "+1bd",
-    "payment_calendar_key": key_of(CLEARING),
+    "payment_holiday_key": key_of(CLEARING),
 }
 NG_2026 = an_index(
     contracts=(("X26", "2026-10-28"), ("Z26", "2026-11-25"), ("F27", "2026-12-29")),
@@ -699,24 +691,24 @@ def test_each_calendar_serves_its_own_operation() -> None:
         holidays=("2027-06-25",),
         lots=(("ICE PHH", 2_500.0, "MMBTU"),),
     )
-    open_calendar = holiday_calendar(dates())
+    open_calendar = closed_on(dates())
     assert pen_days(
-        friday_closed, ["N27"], {**PEN_TEMPLATE, "payment_calendar_key": key_of(open_calendar)}
+        friday_closed, ["N27"], {**PEN_TEMPLATE, "payment_holiday_key": key_of(open_calendar)}
     ) == (["2027-06-24"], ["2027-06-25"])
     # A Monday closed on the payment calendar alone: the pen day is the Friday as before, and
     # +1bd pays Tuesday.
-    monday_closed = holiday_calendar(dates("2027-06-28"))
+    monday_closed = closed_on(dates("2027-06-28"))
     assert pen_days(
-        NG_2027, ["N27"], {**PEN_TEMPLATE, "payment_calendar_key": key_of(monday_closed)}
+        NG_2027, ["N27"], {**PEN_TEMPLATE, "payment_holiday_key": key_of(monday_closed)}
     ) == (["2027-06-25"], ["2027-06-29"])
     # The pen day itself closed on the payment calendar: rolled back to Thursday first, then one
     # business day on, Monday, the first clearing day after the pen day and not the Tuesday a
     # second roll would give.
-    friday_closed_for_payment = holiday_calendar(dates("2027-06-25"))
+    friday_closed_for_payment = closed_on(dates("2027-06-25"))
     assert pen_days(
         NG_2027,
         ["N27"],
-        {**PEN_TEMPLATE, "payment_calendar_key": key_of(friday_closed_for_payment)},
+        {**PEN_TEMPLATE, "payment_holiday_key": key_of(friday_closed_for_payment)},
     ) == (["2027-06-25"], ["2027-06-28"])
 
 
@@ -763,7 +755,7 @@ SYN = an_index(
     holidays=("2026-12-04",),
     lots=(("UNIT", 1.0, "MMBTU"),),
 )
-WEEKDAYS = holiday_calendar(dates("2026-01-01"))
+WEEKDAYS = closed_on(dates("2026-01-01"))
 L3D_TEMPLATE: dict[str, object] = {
     **NG_TEMPLATE,
     "quantity_unit": "UNIT",
@@ -771,7 +763,7 @@ L3D_TEMPLATE: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "Prototype Clearing",
     "payment_day": "+2bd",
-    "payment_calendar_key": key_of(WEEKDAYS),
+    "payment_holiday_key": key_of(WEEKDAYS),
 }
 L3D_TICKET: dict[str, list[object]] = {
     "trade_id": [1, 2],
@@ -811,7 +803,7 @@ def test_last3day_observes_the_expiry_and_the_two_days_before_and_pays_after_the
 def test_a_payment_calendar_closed_on_the_eighth_moves_the_payment_and_not_the_days() -> None:
     closed_eighth = {
         **L3D_TEMPLATE,
-        "payment_calendar_key": key_of(holiday_calendar(dates("2026-12-08"))),
+        "payment_holiday_key": key_of(closed_on(dates("2026-12-08"))),
     }
     components, days, weights, pays = l3d_days(template=closed_eighth)
     assert (components, days, weights) == l3d_days()[:3]
@@ -876,7 +868,7 @@ def test_a_physical_last3day_future_is_refused_when_the_batch_is_made() -> None:
     physical = {
         name: value
         for name, value in L3D_TEMPLATE.items()
-        if name not in ("payment_day", "payment_calendar_key")
+        if name not in ("payment_day", "payment_holiday_key")
     }
     assert refused(SYN, L3D_TICKET, {**physical, "settlement_method": "physical"}) == (
         "settlement_method is 'physical', expected 'financial' with the last3day method of "
@@ -900,7 +892,7 @@ ETHANE = an_index(
     (("GAL", 1.0, "GAL"),),
     ("VOLUME", "GAL"),
 )
-PAY_JAN_1 = holiday_calendar(dates("2027-01-01"))
+PAY_JAN_1 = closed_on(dates("2027-01-01"))
 ASIAN_TEMPLATE: dict[str, object] = {
     **NG_TEMPLATE,
     "quantity_unit": "GAL",
@@ -908,7 +900,7 @@ ASIAN_TEMPLATE: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "Prototype Clearing",
     "payment_day": "+2bd",
-    "payment_calendar_key": key_of(PAY_JAN_1),
+    "payment_holiday_key": key_of(PAY_JAN_1),
 }
 ASIAN_TICKET: dict[str, list[object]] = {
     "trade_id": [1, 2],
@@ -960,7 +952,7 @@ def test_asian_observes_the_months_pricing_days_and_pays_after_the_last() -> Non
 def test_a_payment_calendar_closed_on_the_fourth_moves_the_payment_and_not_the_days() -> None:
     closed_fourth = {
         **ASIAN_TEMPLATE,
-        "payment_calendar_key": key_of(holiday_calendar(dates("2027-01-01", "2027-01-04"))),
+        "payment_holiday_key": key_of(closed_on(dates("2027-01-01", "2027-01-04"))),
     }
     components, days, weights, pays = asian_days(template=closed_fourth)
     assert (components, days, weights) == asian_days()[:3]
@@ -1035,7 +1027,7 @@ def test_a_physical_asian_future_is_refused_when_the_batch_is_made() -> None:
     physical = {
         name: value
         for name, value in ASIAN_TEMPLATE.items()
-        if name not in ("payment_day", "payment_calendar_key")
+        if name not in ("payment_day", "payment_holiday_key")
     }
     assert refused(ETHANE, ASIAN_TICKET, {**physical, "settlement_method": "physical"}) == (
         "settlement_method is 'physical', expected 'financial' with the asian method of trade 1 "
@@ -1146,7 +1138,7 @@ def test_the_pricing_and_payment_calendars_move_no_covered_day() -> None:
         ticket,
         {
             **template,
-            "payment_calendar_key": key_of(holiday_calendar(dates("2027-01-01", "2027-01-05"))),
+            "payment_holiday_key": key_of(closed_on(dates("2027-01-01", "2027-01-05"))),
         },
     )
     assert open_market.resolved.payment is not None and paid_later.resolved.payment is not None
@@ -1750,9 +1742,8 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
         ),
         (
             NG_TICKET,
-            {**NG_TEMPLATE, "payment_calendar_key": key_of(PAYMENT_CALENDAR)},
-            "payment_calendar_key is 'TOY_PAYS', expected none unless "
-            "settlement_method = financial",
+            {**NG_TEMPLATE, "payment_holiday_key": key_of(PAYMENT_CALENDAR)},
+            "payment_holiday_key is 'TOY_PAYS', expected none unless settlement_method = financial",
         ),
         (
             NG_TICKET,
@@ -1762,7 +1753,7 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
         (
             NG_TICKET,
             {**NG_TEMPLATE, "settlement_method": "financial", "payment_day": "+1bd"},
-            "payment_calendar_key is missing, expected it when settlement_method = financial",
+            "payment_holiday_key is missing, expected it when settlement_method = financial",
         ),
         (  # since #175: a bilateral batch names its counterparty
             NG_TICKET,
@@ -1889,13 +1880,13 @@ def test_two_lags_for_one_contract_make_two_payment_groups_by_their_days() -> No
     # +1bd on a calendar closed on the 26th and the 27th reaches 30 November, as +2bd on the
     # toy's calendar does: one group of Z26, the grouping by the day and not by the lag or the
     # calendar that made it.
-    friday_closed = holiday_calendar(dates("2026-11-26", "2026-11-27"))
+    friday_closed = closed_on(dates("2026-11-26", "2026-11-27"))
     one, _ = created(
         TOY,
         {
             **NG_TICKET,
             "payment_day": ["+1bd", "+2bd", "+2bd", "+2bd", "+1bd"],
-            "payment_calendar_key": [
+            "payment_holiday_key": [
                 key_of(friday_closed),
                 key_of(PAYMENT_CALENDAR),
                 key_of(PAYMENT_CALENDAR),
@@ -1903,7 +1894,7 @@ def test_two_lags_for_one_contract_make_two_payment_groups_by_their_days() -> No
                 key_of(friday_closed),
             ],
         },
-        {k: v for k, v in template.items() if k != "payment_calendar_key"},
+        {k: v for k, v in template.items() if k != "payment_holiday_key"},
     )
     np.testing.assert_array_equal(one.encoded.legs[0].group_contract, [1, 2])
     np.testing.assert_array_equal(one.encoded.payment_date, dates("2026-11-30", "2026-12-31"))
@@ -2007,7 +1998,7 @@ def test_the_batch_fields_are_read_in_the_pages_order_the_unit_first() -> None:
 
 
 def test_the_index_must_be_a_futures_index_with_one_contract_per_month() -> None:
-    daily = index(
+    daily = index_on(
         "daily",
         "Sample Gas Daily index",
         gas_daily_schedule(("c0",), dates("2026-01-01"), dates("2026-01-31")),
@@ -2154,7 +2145,7 @@ def sheet() -> dict[str, Any]:
     schedule = ENTRY["_CreateFuturesSchedule"](
         cells(["X26"], ["Z26"], ["F27"]), cells([46323.0], [46351.0], [46385.0]), bridge.MISSING
     )
-    holidays = ENTRY["_CreateHolidayCalendar"](cells([46352.0], [46381.0]), bridge.MISSING)
+    holidays = ENTRY["_CreateHolidayCalendar"](a_name(), cells([46352.0], [46381.0]))
     conventions = ENTRY["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specs = ENTRY["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
@@ -2166,8 +2157,9 @@ def sheet() -> dict[str, Any]:
         schedule,
         conventions,
         specs,
-        holidays,
+        seam_key(holidays),
         "NYMEX NG",
+        seam_calendars(),
     )
     template = ENTRY["_CreateTradeTemplate"](
         "fixed_float", row(*NG_TEMPLATE), row(*NG_TEMPLATE.values())
@@ -2400,7 +2392,7 @@ def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any
         row(*TOY_TEMPLATE),
         row(
             *[
-                seam_key(sheet["holidays"]) if name == "payment_calendar_key" else value
+                seam_key(sheet["holidays"]) if name == "payment_holiday_key" else value
                 for name, value in {**TOY_TEMPLATE, "quantity_unit": "NYMEX NG"}.items()
             ]
         ),
@@ -2437,7 +2429,7 @@ def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any
         "offset",
         "settlement_frequency",
         "nearby",
-        "payment_calendar_key",  # last, as entered, since payment-calendar-keys.md
+        "payment_holiday_key",  # last, as entered, since payment-calendar-keys.md
     ]
     assert [line[-1] for line in table[2:]] == [seam_key(sheet["holidays"])] * 2
     assert [line[0] for line in table[2:]] == [1.0, 1.0]
@@ -2655,7 +2647,7 @@ MIXED_TEMPLATE: dict[str, object] = {
     "trade_date": day("2026-11-30"),
     "fixed_price": 10.0,
     "payment_day": "+1bd",
-    "payment_calendar_key": key_of(holiday_calendar(dates("2027-01-01"))),
+    "payment_holiday_key": key_of(closed_on(dates("2027-01-01"))),
     "settlement_frequency": "monthly",
     "nearby": 1.0,
 }
@@ -2701,7 +2693,7 @@ def test_a_mixed_ticket_resolves_each_row_to_its_own_choices_and_encodes_to_the_
         "encoded_observations": 27,
         "encoded_slots": 23,
         "payment_rules_read": 1,
-        "payment_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
+        "holiday_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
         "payment_shifts": 1,
         "reserved_fee_components": 4,
         "resolved_components": 4,
@@ -2859,7 +2851,7 @@ WTI = an_index(
 WTI_TEMPLATE: dict[str, object] = {
     **ASIAN_TEMPLATE,
     "quantity_unit": "BBL",
-    "payment_calendar_key": key_of(holiday_calendar(dates(*WTI_HOLIDAYS))),
+    "payment_holiday_key": key_of(closed_on(dates(*WTI_HOLIDAYS))),
 }
 WTI_TICKET: dict[str, list[object]] = {
     "trade_id": [23],
@@ -3008,7 +3000,7 @@ def test_the_asian_and_pen_share_one_december_axis_of_22_days_one_month_and_one_
 # lastday, LOT a month at +2bd from publication, iferc-publication-payment-anchor.md; WAH001, 1 LOT
 # of Z26 at -0.50 booked 30 November.
 
-WAHA = index(
+WAHA = index_on(
     "WAHA",
     "Waha basis - ICE",
     iferc_schedule(("X26", "Z26", "F27"), dates("2026-11-02", "2026-12-01", "2027-01-04")),
@@ -3025,7 +3017,7 @@ WAHA = index(
     "LOT",
     UNITS,
 )
-WAHA_PAYS = holiday_calendar(dates("2027-01-01"), "WAHA_PAYS")
+WAHA_PAYS = holiday_calendar("WAHA_PAYS", dates("2027-01-01"))
 WAHA_TEMPLATE: dict[str, object] = {
     "quantity_unit": "LOT",
     "quantity_per": "month",
@@ -3036,7 +3028,7 @@ WAHA_TEMPLATE: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "ICE Clear Europe",
     "payment_day": "+2bd",
-    "payment_calendar_key": key_of(WAHA_PAYS),
+    "payment_holiday_key": key_of(WAHA_PAYS),
 }
 WAHA_TICKET: dict[str, list[object]] = {
     "trade_id": [1001],
@@ -3085,7 +3077,7 @@ def test_an_iferc_basis_future_observes_publication_day_and_pays_from_it() -> No
         "encoded_observations": 1,
         "encoded_slots": 1,
         "payment_rules_read": 1,
-        "payment_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
+        "holiday_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
         "payment_shifts": 1,
         "reserved_fee_components": 1,
         "resolved_components": 1,
@@ -3121,7 +3113,7 @@ def test_iferc_payment_counts_from_publication_on_the_payment_calendar() -> None
         WAHA_TICKET,
         {
             **WAHA_TEMPLATE,
-            "payment_calendar_key": key_of(holiday_calendar(dates("2026-12-02", "2027-01-01"))),
+            "payment_holiday_key": key_of(closed_on(dates("2026-12-02", "2027-01-01"))),
         },
     )
     assert closed.resolved.payment is not None
@@ -3154,7 +3146,7 @@ def test_an_iferc_batch_is_financial_lastday_whole_months_on_a_reporting_index_o
     physical = {
         key: value
         for key, value in WAHA_TEMPLATE.items()
-        if key not in ("payment_day", "payment_calendar_key")
+        if key not in ("payment_day", "payment_holiday_key")
     }
     assert refused(WAHA, WAHA_TICKET, {**physical, "settlement_method": "physical"}) == (
         "settlement_method is 'physical', expected 'financial' on an IFERC index; an IFERC basis "
@@ -3191,7 +3183,7 @@ def test_an_iferc_batch_is_financial_lastday_whole_months_on_a_reporting_index_o
         "contract_code row 1 is 'G27', expected months the index's schedule has a contract for; "
         "it has none for 2027-02"
     )
-    bare = index(
+    bare = index_on(
         "bare",
         "An index made without a reporting lot",
         WAHA.schedule,
@@ -3322,7 +3314,7 @@ CHAIN = an_index(
     holidays=(),
     lots=(("TOY", 10_000.0, "MMBTU"),),
 )
-WEEKDAYS_ONLY = holiday_calendar(dates())
+WEEKDAYS_ONLY = closed_on(dates())
 
 
 def chained(
@@ -3339,15 +3331,15 @@ def chained(
         "quantity": [1] * len(rows),
         "fixed_price": [3.0] * len(rows),
     }
-    template: dict[str, object] = {**TOY_TEMPLATE, "payment_calendar_key": key_of(WEEKDAYS_ONLY)}
+    template: dict[str, object] = {**TOY_TEMPLATE, "payment_holiday_key": key_of(WEEKDAYS_ONLY)}
     if template_rule is None:
         del template["payment_day"]
         ticket["payment_day"] = [rule for _, rule in rows]
     else:
         template["payment_day"] = template_rule
     if calendars is not None:
-        del template["payment_calendar_key"]
-        ticket["payment_calendar_key"] = [key_of(calendar) for calendar in calendars]
+        del template["payment_holiday_key"]
+        ticket["payment_holiday_key"] = [key_of(calendar) for calendar in calendars]
     return created(CHAIN, ticket, template)
 
 
@@ -3388,7 +3380,7 @@ def test_rules_and_calendars_vary_by_row_and_a_strip_applies_its_rule_per_compon
     # Row a's calendar closes the Monday, so its +1bd pays the Tuesday; rows b and c pay the
     # Monday by +3cd and by +1bd on the open calendar, one group; three groups of rule and
     # calendar, three instructions applied.
-    closed_monday = holiday_calendar(dates("2026-10-12"))
+    closed_monday = closed_on(dates("2026-10-12"))
     batch, counter = chained(
         [("V26", "+1bd"), ("V26", "+3cd"), ("V26", "+1bd")],
         calendars=(closed_monday, WEEKDAYS_ONLY, WEEKDAYS_ONLY),
@@ -3437,7 +3429,7 @@ def test_a_rule_that_leaves_the_sheet_names_the_first_offending_row_in_ticket_or
     # rule of its own. The groups are made rule by rule, so row 3's is made before row 2's, and
     # the refusal still names row 2, the first offending row of the ticket.
     cal_x, cal_y, cal_z = (
-        holiday_calendar(dates(closed)) for closed in ("2026-10-12", "2026-10-13", "2026-10-14")
+        closed_on(dates(closed)) for closed in ("2026-10-12", "2026-10-13", "2026-10-14")
     )
     with pytest.raises(ValueError) as strayed:
         chained(
@@ -3485,7 +3477,7 @@ def test_an_iferc_chain_counts_from_publication_and_may_not_pay_on_that_day() ->
 
 # A second Waha-like index whose December months publish on 4 December 2026 and 1 December 2025,
 # for the examples of a publication day closed on the payment calendar and of a year earlier.
-LATE = index(
+LATE = index_on(
     "LATE",
     "Waha basis - ICE, published on the fourth",
     iferc_schedule(("Z25", "Z26"), dates("2025-12-01", "2026-12-04")),
@@ -3518,7 +3510,7 @@ def test_the_tickets_date_examples_pin_on_both_routes() -> None:
     closed, _ = created(
         WAHA,
         WAHA_TICKET,
-        {**WAHA_TEMPLATE, "payment_calendar_key": key_of(holiday_calendar(dates("2026-12-02")))},
+        {**WAHA_TEMPLATE, "payment_holiday_key": key_of(closed_on(dates("2026-12-02")))},
     )
     np.testing.assert_array_equal(paid_on(closed), dates("2026-12-04"))
     on_a_closed_day, _ = created(
@@ -3527,7 +3519,7 @@ def test_the_tickets_date_examples_pin_on_both_routes() -> None:
         {
             **WAHA_TEMPLATE,
             "payment_day": "+1bd",
-            "payment_calendar_key": key_of(holiday_calendar(dates("2026-12-04"))),
+            "payment_holiday_key": key_of(closed_on(dates("2026-12-04"))),
         },
     )
     np.testing.assert_array_equal(paid_on(on_a_closed_day), dates("2026-12-07"))
@@ -3569,7 +3561,7 @@ HALF = an_index(
 HALF_TEMPLATE: dict[str, object] = {
     **TOY_TEMPLATE,
     "quantity_unit": "LOT",
-    "payment_calendar_key": key_of(holiday_calendar(dates())),
+    "payment_holiday_key": key_of(closed_on(dates())),
 }
 
 
@@ -3652,7 +3644,7 @@ def test_a_half_year_per_calendar_day_covers_its_days_and_a_missing_month_is_ref
         "it has none for 2028-08"
     )
     assert refused(
-        TOY, half_rows("1H27"), {**TOY_TEMPLATE, "payment_calendar_key": key_of(PAYMENT_CALENDAR)}
+        TOY, half_rows("1H27"), {**TOY_TEMPLATE, "payment_holiday_key": key_of(PAYMENT_CALENDAR)}
     ) == (
         "contract_code row 1 is '1H27', expected months the index's schedule has a contract for; "
         "it has none for 2027-03"
@@ -3693,11 +3685,11 @@ ANCHORED = an_index(
     holidays=(),
     lots=(("LOT", 1.0, "MMBTU"),),
 )
-CALENDAR_A = holiday_calendar(dates("2026-10-14", "2026-10-12", "2026-10-14"))
-CALENDAR_B = holiday_calendar(dates("2026-10-13", "2026-10-14"))
+CALENDAR_A = closed_on(dates("2026-10-14", "2026-10-12", "2026-10-14"))
+CALENDAR_B = closed_on(dates("2026-10-13", "2026-10-14"))
 
 
-def anchored_payment(calendar: HolidayCalendar, lag: str = "+1bd") -> str:
+def anchored_payment(key: str, lag: str = "+1bd") -> str:
     batch, _ = created(
         ANCHORED,
         {
@@ -3711,7 +3703,7 @@ def anchored_payment(calendar: HolidayCalendar, lag: str = "+1bd") -> str:
             **TOY_TEMPLATE,
             "quantity_unit": "LOT",
             "payment_day": lag,
-            "payment_calendar_key": key_of(calendar),
+            "payment_holiday_key": key,
         },
     )
     assert batch.resolved.payment is not None
@@ -3719,16 +3711,15 @@ def anchored_payment(calendar: HolidayCalendar, lag: str = "+1bd") -> str:
     return str(batch.resolved.payment.date[0])
 
 
-def test_a_payment_steps_over_every_combined_calendars_holidays() -> None:
-    # From the Friday anchor, the weekend and the three listed weekdays are closed on the combined
-    # calendar, so +1bd pays Thursday 15 October, as a calendar listing the union pays; on A alone
-    # the Tuesday, on B alone the Monday, and on no holidays at all the Monday.
-    combined = combine_holiday_calendars((CALENDAR_A, CALENDAR_B), WorkCounter())
-    assert anchored_payment(combined) == "2026-10-15"
-    assert anchored_payment(holiday_calendar(dates("2026-10-12", "2026-10-13", "2026-10-14"))) == (
-        "2026-10-15"
-    )
-    assert anchored_payment(combined, "+2bd") == "2026-10-16"
-    assert anchored_payment(CALENDAR_A) == "2026-10-13"
-    assert anchored_payment(CALENDAR_B) == "2026-10-12"
-    assert anchored_payment(holiday_calendar(dates())) == "2026-10-12"
+def test_a_payment_steps_over_every_holiday_of_a_key_of_two_calendars() -> None:
+    # From the Friday anchor, the weekend and the three listed weekdays are closed on the two
+    # calendars together, so +1bd pays Thursday 15 October, as a calendar listing the union
+    # pays; on A alone the Tuesday, on B alone the Monday, and on no holidays at all the Monday.
+    a, b = key_of(CALENDAR_A), key_of(CALENDAR_B)
+    assert anchored_payment(f"{a}+{b}") == anchored_payment(f"{b}+{a}") == "2026-10-15"
+    listed = closed_on(dates("2026-10-12", "2026-10-13", "2026-10-14"))
+    assert anchored_payment(key_of(listed)) == "2026-10-15"
+    assert anchored_payment(f"{a}+{b}", "+2bd") == "2026-10-16"
+    assert anchored_payment(a) == "2026-10-13"
+    assert anchored_payment(b) == "2026-10-12"
+    assert anchored_payment(key_of(closed_on(dates()))) == "2026-10-12"

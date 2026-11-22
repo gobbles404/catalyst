@@ -35,7 +35,7 @@ FIELDS = (
     "settlement_method",
     "clearing_house",
     "payment_day",
-    "payment_calendar_key",
+    "payment_holiday_key",
     "settlement_frequency",
     "nearby",
 )

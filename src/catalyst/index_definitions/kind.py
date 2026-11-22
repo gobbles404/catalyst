@@ -36,20 +36,21 @@ def named(obj: object) -> str:
 
 def with_holiday_calendar(holiday_calendar: HolidayCalendar | None) -> HolidayCalendar:
     """A futures index's holiday calendar, required: its market closes on days its schedule does
-    not say, so a calendar left out is refused rather than guessed. Read through an index, it
-    is the calendar the index was made with, never missing, and this is the one way to say so."""
+    not say, so an index made with no key to select one is refused rather than guessed. Read
+    through an index, it is the calendar the index was made with, never missing, and this is
+    the one way to say so."""
     if holiday_calendar is None:
         raise ValueError(
-            "holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
+            "holiday_key is missing, expected a holiday calendar's key with a futures schedule"
         )
     return holiday_calendar
 
 
-def without_holiday_calendar(holiday_calendar: HolidayCalendar | None, kind: Kind) -> None:
+def without_holiday_key(holiday_key: str | None, kind: Kind) -> None:
     """An IFERC or a Gas Daily index takes no holiday calendar, since every period of theirs
-    prices; one given is refused, since nothing reads it: fail loudly rather than ignore."""
-    if holiday_calendar is not None:
+    prices; a key given is refused before it is looked up, since nothing would read its
+    calendar: fail loudly rather than ignore."""
+    if holiday_key is not None:
         raise ValueError(
-            "holiday_calendar is a holiday calendar, "
-            f"expected none with {described(kind, 'schedule')}"
+            f"holiday_key is {holiday_key!r}, expected none with {described(kind, 'schedule')}"
         )

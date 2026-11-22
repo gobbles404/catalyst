@@ -7,9 +7,11 @@ from typing import cast
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name
 from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
+from test_create_trades import seam_calendars, seam_key
 from test_utilities import read, rows
 
 from catalyst.excel import bridge
@@ -34,7 +36,7 @@ HANDLE = re.compile(r"[0-9]+:futures_schedule:([0-9]+)")
 # The first three days of the calendar page's sample as the sheet sends them: serials for
 # 1 January, 19 January and 16 February 2026.
 HOLIDAYS = Cells.from_rows([[46023.0], [46041.0], [46069.0]])
-CALENDAR = re.compile(r"[0-9]+:holiday_calendar:([0-9]+)")
+CALENDAR = re.compile(r"[0-9]+:holiday_calendar:CAL[0-9]+:([0-9]+)")
 
 # The conventions page's sample as the sheet sends it: five texts, an index quoted in dollars per
 # barrel, settled in dollars, its quantity a volume stated in barrels.
@@ -209,7 +211,7 @@ def ReadHolidayCalendar(calendar: Handle[HolidayCalendar]) -> str:
 
 
 def a_calendar(column: object) -> str:
-    text = bridge.call("_CreateHolidayCalendar", [column, bridge.MISSING])
+    text = bridge.call("_CreateHolidayCalendar", [a_name(), column])
     assert isinstance(text, str) and CALENDAR.fullmatch(text), text
     return text
 
@@ -257,7 +259,7 @@ def test_a_single_cell_is_a_calendar_of_one_day() -> None:
     ],
 )
 def test_a_calendar_that_cannot_be_made_says_why(column: object, text: str) -> None:
-    assert bridge.call("_CreateHolidayCalendar", [column, bridge.MISSING]) == text
+    assert bridge.call("_CreateHolidayCalendar", [a_name(), column]) == text
 
 
 # A rejected column stops the call before the function runs, so nothing is published and the
@@ -265,7 +267,7 @@ def test_a_calendar_that_cannot_be_made_says_why(column: object, text: str) -> N
 def test_a_rejected_column_publishes_no_object_and_no_handle() -> None:
     before = number(a_calendar(HOLIDAYS), CALENDAR)
     assert bridge.call(
-        "_CreateHolidayCalendar", [Cells.from_rows([[46023.0], [None]]), bridge.MISSING]
+        "_CreateHolidayCalendar", [a_name(), Cells.from_rows([[46023.0], [None]])]
     ) == ("#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date")
     assert number(a_calendar(HOLIDAYS), CALENDAR) == before + 1
 
@@ -278,124 +280,10 @@ def test_a_handle_of_another_kind_is_not_a_calendar() -> None:
     )
 
 
-# --- _CombineHolidayCalendars, combine-holiday-calendars.md -----------------------------------
-
-
-# The ticket's synthetic calendars as the sheet sends them: A lists 14, 12 and 14 October 2026, B
-# the 13th and the 14th; their combination is the 12th, the 13th and the 14th, once each, in order.
+# The union's two calendars as the sheet sends them: A lists 14, 12 and 14 October 2026, B the
+# 13th and the 14th.
 CALENDAR_A = Cells.from_rows([[46309.0], [46307.0], [46309.0]])
 CALENDAR_B = Cells.from_rows([[46308.0], [46309.0]])
-COMBINED_DAYS = "2026-10-12 2026-10-13 2026-10-14"
-
-
-def a_combination(handles: object) -> str:
-    text = bridge.call("_CombineHolidayCalendars", [handles])
-    assert isinstance(text, str) and CALENDAR.fullmatch(text), text
-    return text
-
-
-def test_a_column_of_calendars_combines_into_their_distinct_days_in_order() -> None:
-    a, b = a_calendar(CALENDAR_A), a_calendar(CALENDAR_B)
-    column = a_combination(Cells.from_rows([[a], [b]]))
-    assert bridge.call("ReadHolidayCalendar", [column]) == COMBINED_DAYS
-    # A row and a column give the same calendar; the order of the inputs changes nothing.
-    assert bridge.call("ReadHolidayCalendar", [a_combination(Cells.from_rows([[b, a]]))]) == (
-        COMBINED_DAYS
-    )
-    # One cell is one calendar combined: its own distinct days, in order, the repeat dropped.
-    assert bridge.call("ReadHolidayCalendar", [a_combination(a)]) == "2026-10-12 2026-10-14"
-    # A repeat among the inputs is read again and changes nothing of the days.
-    assert bridge.call(
-        "ReadHolidayCalendar", [a_combination(Cells.from_rows([[a], [b], [a]]))]
-    ) == (COMBINED_DAYS)
-    # A combination is an ordinary calendar, so it combines again.
-    saturday = a_calendar(46305.0)
-    nested = a_combination(Cells.from_rows([[column], [saturday]]))
-    assert bridge.call("ReadHolidayCalendar", [nested]) == "2026-10-10 " + COMBINED_DAYS
-    # The sources stand as they were listed.
-    assert bridge.call("ReadHolidayCalendar", [a]) == "2026-10-14 2026-10-12 2026-10-14"
-    assert bridge.call("ReadHolidayCalendar", [b]) == "2026-10-13 2026-10-14"
-
-
-def test_a_combination_reads_back_as_a_calendar_of_its_days_once_each() -> None:
-    a, b = a_calendar(CALENDAR_A), a_calendar(CALENDAR_B)
-    table = rows(read(a_combination(Cells.from_rows([[a], [b]]))))
-    assert table == [["holiday"], ["datetime64[D]"], [46307.0], [46308.0], [46309.0]]
-    assert rows(read(a_combination(b))) == [["holiday"], ["datetime64[D]"], [46308.0], [46309.0]]
-
-
-def test_a_combination_refuses_its_cells_in_the_seams_words_and_publishes_nothing() -> None:
-    a, b = a_calendar(CALENDAR_A), a_calendar(CALENDAR_B)
-    other = a_schedule(CODES, FUTURES, MISSING)
-    failed = str(
-        bridge.call(
-            "_CreateHolidayCalendar", [Cells.from_rows([[46023.0], [None]]), bridge.MISSING]
-        )
-    )
-    assert failed == "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
-    before = number(a_calendar(HOLIDAYS), CALENDAR)
-    combine = bridge.call
-    for handles, text in (
-        (
-            Cells.from_rows([[a, b], [b, a]]),
-            "calendar_handles is 2x2 array, expected one cell, one row or one column of holiday "
-            "calendar handles",
-        ),
-        (
-            Cells.from_rows([[a], [None]]),
-            "calendar_handles cell (2, 1) is blank, expected holiday calendar handle",
-        ),
-        (
-            Cells.from_rows([[a, 46307.0]]),
-            "calendar_handles cell (1, 2) is number 46307.0, expected holiday calendar handle",
-        ),
-        (
-            Cells.from_rows([[a], [""]]),
-            "calendar_handles cell (2, 1) is empty text, expected holiday calendar handle",
-        ),
-        (
-            Cells.from_rows([[a], ["x"]]),
-            "calendar_handles cell (2, 1) is text 'x' naming no live object, expected holiday "
-            "calendar handle",
-        ),
-        (
-            Cells.from_rows([[a], [other]]),
-            f"calendar_handles cell (2, 1) is futures schedule handle {other!r}, expected holiday "
-            "calendar handle",
-        ),
-        (
-            Cells.from_rows([[a], [failed]]),
-            "calendar_handles cell (2, 1) is the creator's failure, expected holiday calendar "
-            "handle: " + failed,
-        ),
-        (
-            MISSING,
-            "calendar_handles is missing, expected holiday calendar handles in a cell, a row or a "
-            "column",
-        ),
-        (
-            None,
-            "calendar_handles is blank, expected holiday calendar handles in a cell, a row or a "
-            "column",
-        ),
-        (
-            other,
-            f"calendar_handles is futures schedule handle {other!r}, expected holiday calendar "
-            "handle",
-        ),
-    ):
-        assert (
-            combine("_CombineHolidayCalendars", [handles])
-            == "#ERROR _CombineHolidayCalendars: " + text
-        )
-    # A consumer of a failed combination shows the creator's text once, through the relay rule.
-    broken = combine("_CombineHolidayCalendars", [Cells.from_rows([[a], [failed]])])
-    assert bridge.call("ReadHolidayCalendar", [broken]) == (
-        f"#ERROR ReadHolidayCalendar: calendar is the creator's failure, expected holiday calendar "
-        f"handle: {failed}"
-    )
-    # Nothing was published by any refusal: the next calendar takes the next number.
-    assert number(a_calendar(HOLIDAYS), CALENDAR) == before + 1
 
 
 # The IFERC schedule page's sample as the sheet sends it: three codes as text and two columns of
@@ -1086,7 +974,10 @@ def the_parts() -> tuple[str, str, str, str]:
 
 
 def an_index(*args: object) -> str:
-    text = bridge.call("_CreateIndex", list(args))
+    """The index of seven arguments as these tests state them, the sixth a calendar's handle or
+    MISSING: the handle's key in its place and the tests' collection last, as a formula names
+    the calendar by key and the collection's cell since holiday-keys.md."""
+    text = bridge.call("_CreateIndex", [*args[:5], seam_key(args[5]), args[6], seam_calendars()])
     assert isinstance(text, str) and INDEX.fullmatch(text), text
     return text
 
@@ -1199,10 +1090,11 @@ def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None
             specifications,
             MISSING,
             MISSING,
+            MISSING,
         ],
     ) == (
-        "#ERROR _CreateIndex: ValueError: holiday_calendar is missing, "
-        "expected holiday calendar handle with a futures schedule"
+        "#ERROR _CreateIndex: ValueError: holiday_key is missing, "
+        "expected a holiday calendar's key with a futures schedule"
     )
     gas_daily = a_gas_daily_schedule(
         INDEX_GAS_DAILY_CODES, INDEX_GAS_DAILY_FIRST, INDEX_GAS_DAILY_LAST
@@ -1215,11 +1107,12 @@ def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None
             gas_daily,
             conventions,
             specifications,
-            holidays,
+            seam_key(holidays),
             MISSING,
+            seam_calendars(),
         ],
     ) == (
-        "#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, "
+        f"#ERROR _CreateIndex: ValueError: holiday_key is {seam_key(holidays)!r}, "
         "expected none with a Gas Daily schedule"
     )
     iferc = an_iferc_schedule(INDEX_IFERC_CODES, INDEX_IFERC_PUBLISHED)
@@ -1231,11 +1124,12 @@ def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None
             iferc,
             conventions,
             specifications,
-            holidays,
+            seam_key(holidays),
             MISSING,
+            seam_calendars(),
         ],
     ) == (
-        "#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, "
+        f"#ERROR _CreateIndex: ValueError: holiday_key is {seam_key(holidays)!r}, "
         "expected none with an IFERC schedule"
     )
     for wrong, what in (
@@ -1251,8 +1145,9 @@ def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None
                 wrong,
                 conventions,
                 specifications,
-                holidays,
+                seam_key(holidays),
                 MISSING,
+                seam_calendars(),
             ],
         ) == (
             f"#ERROR _CreateIndex: ValueError: schedule is {what}, "
@@ -1275,6 +1170,7 @@ def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None
             made,
             conventions,
             specifications,
+            MISSING,
             MISSING,
             MISSING,
         ],
@@ -1389,7 +1285,7 @@ THE_CONVENTIONS, THE_SPECIFICATIONS = object(), object()
         ),
         (
             ["Henry Hub NYMEX", THE_SCHEDULE, THE_CONVENTIONS, THE_SPECIFICATIONS, None, MISSING],
-            "#ERROR _CreateIndex: holiday_calendar is blank, expected holiday calendar handle",
+            "#ERROR _CreateIndex: holiday_key is blank, expected text",
         ),
         (
             [
@@ -1400,8 +1296,7 @@ THE_CONVENTIONS, THE_SPECIFICATIONS = object(), object()
                 46167.0,
                 MISSING,
             ],
-            "#ERROR _CreateIndex: holiday_calendar is number 46167.0, "
-            "expected holiday calendar handle",
+            "#ERROR _CreateIndex: holiday_key is number 46167.0, expected text",
         ),
     ],
     ids=[
@@ -1419,15 +1314,15 @@ THE_CONVENTIONS, THE_SPECIFICATIONS = object(), object()
         "a blank where the conventions should be",
         "the specifications left out",
         "text naming no live specifications",
-        "a blank where the holiday calendar should be",
-        "a number where the holiday calendar should be",
+        "a blank where the holiday key should be",
+        "a number where the holiday key should be",
     ],
 )
 def test_an_index_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
     schedule, holidays, conventions, specifications = the_parts()
     stand_ins = {
         id(THE_SCHEDULE): schedule,
-        id(THE_HOLIDAYS): holidays,
+        id(THE_HOLIDAYS): seam_key(holidays),  # the calendar's key, since holiday-keys.md
         id(THE_CONVENTIONS): conventions,
         id(THE_SPECIFICATIONS): specifications,
     }
@@ -1435,6 +1330,7 @@ def test_an_index_that_cannot_be_made_says_why(args: list[object], text: str) ->
     given.insert(
         1, "Henry Hub natural gas - NYMEX"
     )  # the display name, since #169, never at fault here
+    given.append(seam_calendars())  # the collection the key selects from, never at fault here
     assert bridge.call("_CreateIndex", given) == text
 
 
@@ -1448,8 +1344,9 @@ def test_a_handle_of_another_kind_in_a_typed_slot_of_the_index_is_refused_by_nam
             schedule,
             holidays,
             specifications,
-            holidays,
+            seam_key(holidays),
             MISSING,
+            seam_calendars(),
         ],
     ) == (
         f"#ERROR _CreateIndex: index_conventions is holiday calendar handle {holidays!r}, "
@@ -1463,8 +1360,9 @@ def test_a_handle_of_another_kind_in_a_typed_slot_of_the_index_is_refused_by_nam
             schedule,
             conventions,
             conventions,
-            holidays,
+            seam_key(holidays),
             MISSING,
+            seam_calendars(),
         ],
     ) == (
         f"#ERROR _CreateIndex: contract_specifications is index conventions handle "
@@ -1487,13 +1385,79 @@ def test_a_handle_of_another_kind_in_a_typed_slot_of_the_index_is_refused_by_nam
             schedule,
             conventions,
             specifications,
-            made,
+            seam_key(holidays),
             MISSING,
+            made,
         ],
     ) == (
-        f"#ERROR _CreateIndex: holiday_calendar is index handle {made!r}, "
-        "expected holiday calendar handle"
+        f"#ERROR _CreateIndex: holiday_calendars is index handle {made!r}, "
+        "expected holiday calendars handle"
     )
+    # A single calendar's handle is no collection, however alike the two kinds read.
+    assert bridge.call(
+        "_CreateIndex",
+        [
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            schedule,
+            conventions,
+            specifications,
+            seam_key(holidays),
+            MISSING,
+            holidays,
+        ],
+    ) == (
+        f"#ERROR _CreateIndex: holiday_calendars is holiday calendar handle {holidays!r}, "
+        "expected holiday calendars handle"
+    )
+
+
+def test_the_holiday_key_selects_from_the_collection_and_is_refused_in_the_librarys_words() -> None:
+    # holiday-keys.md: the key is text, one name of the collection or several joined by a plus
+    # sign; the collection is the last argument, required with a key and read for nothing
+    # without one.
+    schedule, _, conventions, specifications = the_parts()
+    nymex = bridge.call("_CreateHolidayCalendar", ["IDX_NYMEX", CALENDAR_A])
+    ice = bridge.call("_CreateHolidayCalendar", ["IDX_ICE", CALENDAR_B])
+    both = bridge.call("_CollectHolidayCalendars", [Cells.from_rows([[nymex, ice]])])
+
+    def made(key: object, collection: object, on: object = schedule) -> object:
+        return bridge.call(
+            "_CreateIndex",
+            ["HH", "Henry Hub", on, conventions, specifications, key, MISSING, collection],
+        )
+
+    for key in ("IDX_NYMEX", "IDX_ICE", "IDX_NYMEX+IDX_ICE", "IDX_ICE+IDX_NYMEX"):
+        text = made(key, both)
+        assert isinstance(text, str) and INDEX.fullmatch(text), text
+        assert rows(read(text))[2][5] == 1.0  # has_holiday_calendar
+    assert made("IDX_NYMEX", MISSING) == (
+        "#ERROR _CreateIndex: ValueError: holiday_calendars is missing, expected a "
+        "_CollectHolidayCalendars collection, which holiday_key selects a calendar from"
+    )
+    assert made("IDX_CME", both) == (
+        "#ERROR _CreateIndex: ValueError: holiday_key is 'IDX_CME', expected names of the "
+        "collection's calendars, 'IDX_NYMEX' and 'IDX_ICE'; it holds no 'IDX_CME'"
+    )
+    assert made("IDX_NYMEX + IDX_ICE", both) == (
+        "#ERROR _CreateIndex: ValueError: holiday_key is 'IDX_NYMEX + IDX_ICE', expected a "
+        "calendar's name, or several joined by '+', each with no whitespace around it"
+    )
+    # A calendar's handle typed where the key goes is text, read as a name the collection lacks.
+    assert made(nymex, both) == (
+        f"#ERROR _CreateIndex: ValueError: holiday_key is {nymex!r}, expected names of the "
+        f"collection's calendars, 'IDX_NYMEX' and 'IDX_ICE'; it holds no {nymex!r}"
+    )
+    # An IFERC index refuses a key before anything is looked up, and reads a collection given
+    # with no key for nothing.
+    iferc = an_iferc_schedule(INDEX_IFERC_CODES, INDEX_IFERC_PUBLISHED)
+    assert made("IDX_NOWHERE", MISSING, iferc) == (
+        "#ERROR _CreateIndex: ValueError: holiday_key is 'IDX_NOWHERE', expected none with an "
+        "IFERC schedule"
+    )
+    monthly = made(MISSING, both, iferc)
+    assert isinstance(monthly, str) and INDEX.fullmatch(monthly), monthly
+    assert rows(read(monthly))[2][5] == 0.0
 
 
 # The index's own rule for the lot units reaches the sheet in the library's words: the volume
@@ -1510,8 +1474,9 @@ def test_lot_units_of_another_measure_are_refused_by_the_index_in_the_librarys_w
             schedule,
             volume,
             gas,
-            holidays,
+            seam_key(holidays),
             MISSING,
+            seam_calendars(),
         ],
     ) == (
         "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', "
@@ -1565,11 +1530,10 @@ def test_a_failed_index_publishes_no_object_and_reading_one_publishes_nothing() 
             specifications,
             MISSING,
             MISSING,
+            MISSING,
         ],
     )
-    assert cast(str, refused).startswith(
-        "#ERROR _CreateIndex: ValueError: holiday_calendar is missing"
-    )
+    assert cast(str, refused).startswith("#ERROR _CreateIndex: ValueError: holiday_key is missing")
     made = an_index(
         "Henry Hub NYMEX",
         "Henry Hub natural gas - NYMEX",
@@ -1654,7 +1618,16 @@ def test_a_name_too_long_for_a_cell_fails_before_the_index_is_stored(name: str, 
     total = len(f"{PID}:index:") + units + len(":") + len(str(count))
     assert bridge.call(
         "_CreateIndex",
-        [name, f"{name} index", schedule, conventions, specifications, holidays, MISSING],
+        [
+            name,
+            f"{name} index",
+            schedule,
+            conventions,
+            specifications,
+            seam_key(holidays),
+            MISSING,
+            seam_calendars(),
+        ],
     ) == (f"#ERROR _CreateIndex: returned handle of {total} characters, expected at most 32767")
     made = an_index(
         "Henry Hub NYMEX",
@@ -1713,8 +1686,9 @@ def test_the_reporting_lot_is_named_resolved_and_read_back_or_left_unset() -> No
             schedule,
             conventions,
             specifications,
-            holidays,
+            seam_key(holidays),
             "LOT",
+            seam_calendars(),
         ],
     ) == (
         "#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the "
@@ -1729,8 +1703,9 @@ def test_the_reporting_lot_is_named_resolved_and_read_back_or_left_unset() -> No
                 schedule,
                 conventions,
                 specifications,
-                holidays,
+                seam_key(holidays),
                 None,
+                seam_calendars(),
             ],
         )
         == "#ERROR _CreateIndex: reporting_lot is blank, expected text"
@@ -1744,8 +1719,9 @@ def test_the_reporting_lot_is_named_resolved_and_read_back_or_left_unset() -> No
                 schedule,
                 conventions,
                 specifications,
-                holidays,
+                seam_key(holidays),
                 1.0,
+                seam_calendars(),
             ],
         )
         == "#ERROR _CreateIndex: reporting_lot is number 1.0, expected text"
@@ -1795,7 +1771,17 @@ def test_a_display_name_that_is_not_text_is_refused_in_the_seams_words(
     schedule, holidays, conventions, specifications = the_parts()
     assert (
         bridge.call(
-            "_CreateIndex", ["WTI", value, schedule, conventions, specifications, holidays, MISSING]
+            "_CreateIndex",
+            [
+                "WTI",
+                value,
+                schedule,
+                conventions,
+                specifications,
+                seam_key(holidays),
+                MISSING,
+                seam_calendars(),
+            ],
         )
         == f"#ERROR _CreateIndex: display_name is {words}, expected text"
     )

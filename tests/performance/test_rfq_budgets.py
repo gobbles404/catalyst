@@ -12,6 +12,7 @@ from types import MappingProxyType
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name, key_in
 from test_quote_budgets import BILATERAL, CAL, CLEARED, MARKET, RATES
 from test_seam_allocation import SLACK, least_peak
 
@@ -289,14 +290,21 @@ def on_the_sheet() -> tuple[object, object, object, object, object]:
         column(serial("2026-12-15"), serial("2027-01-29"), serial("2027-02-26")),
         bridge.MISSING,
     )
-    holidays = PATH["_CreateHolidayCalendar"](column(serial("2027-01-01")), bridge.MISSING)
+    holidays = PATH["_CreateHolidayCalendar"](a_name(), column(serial("2027-01-01")))
     conventions = PATH["_CreateIndexConventions"]("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL")
     specifications = PATH["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
         row("BBL", 1.0, "BBL", 0.0, 0.0),
     )
     ix = PATH["_CreateIndex"](
-        "SEAM", "SEAM index", schedule, conventions, specifications, holidays, "BBL"
+        "SEAM",
+        "SEAM index",
+        schedule,
+        conventions,
+        specifications,
+        key_in(holidays),
+        "BBL",
+        PATH["_CollectHolidayCalendars"](holidays),
     )
     date = PATH["_CreateValuationDate"](serial("2026-12-31"), 0.5)
     days = np.arange(np.datetime64("2026-12-16", "D"), np.datetime64("2026-12-31", "D"))
@@ -306,7 +314,7 @@ def on_the_sheet() -> tuple[object, object, object, object, object]:
     )
     history = PATH["_CreateMarketHistory"](PATH["_CreateCalendar"](date, ix), fixings)
     market = PATH["_CreateMarket"](history, PATH["_CreatePriceVector"]("SEAM", column(1.0, 1.2)))
-    weekends = PATH["_CreateHolidayCalendar"](column(serial("2030-01-01")), "PAYS")
+    weekends = PATH["_CreateHolidayCalendar"]("PAYS", column(serial("2030-01-01")))
     template = PATH["_CreateQuoteTemplate"](
         "fixed_float",
         row(
@@ -315,13 +323,13 @@ def on_the_sheet() -> tuple[object, object, object, object, object]:
             "schedule_method",
             "quantity_per",
             "payment_day",
-            "payment_calendar_key",
+            "payment_holiday_key",
             "discount_curve_key",
             "settlement_frequency",
             "nearby",
         ),
         row("bilateral", "financial", "asian", "month", "+5bd", "PAYS", "SOFR", "monthly", 1.0),
-        PATH["_CollectPaymentCalendars"](weekends),
+        PATH["_CollectHolidayCalendars"](weekends),
     )
     curve = PATH["_CreateDiscountCurve"](
         "SOFR",

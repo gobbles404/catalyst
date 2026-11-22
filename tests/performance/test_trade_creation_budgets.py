@@ -11,6 +11,7 @@ from collections.abc import Callable
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on, key_in
 from numpy.typing import NDArray
 
 from catalyst.excel import bridge
@@ -19,10 +20,9 @@ from catalyst.globals.unit_conversions import UNITS
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
 from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.index_definitions.holiday_calendars import collect_holiday_calendars
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
-from catalyst.index_definitions.index import index
 from catalyst.index_definitions.index_conventions import index_conventions
-from catalyst.index_definitions.payment_calendars import collect_payment_calendars
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT
 from catalyst.instruments.fields import DatesOrTexts, FieldValues
@@ -79,7 +79,7 @@ HOLIDAYS = np.array(["2026-12-25", "2027-01-01", "2027-12-24"], dtype="datetime6
 EXPIRIES = np.busday_offset(
     MONTHS.astype("datetime64[D]") + np.timedelta64(24, "D"), 0, roll="backward", holidays=HOLIDAYS
 )
-GAS = index(
+GAS = index_on(
     "gas",
     "Sample gas index",
     futures_schedule(CODES, EXPIRIES, None),
@@ -87,14 +87,14 @@ GAS = index(
     contract_specifications(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
-    holiday_calendar(HOLIDAYS),
+    closed_on(HOLIDAYS),
     "lot",
     UNITS,
 )
 # The payment calendar under its name, and the collection of it a batch selects from by key,
 # payment-calendar-keys.md: made once here, outside every profiled call.
-PAYMENT_CALENDAR = holiday_calendar(HOLIDAYS, "PAYS")
-CALENDARS = collect_payment_calendars((PAYMENT_CALENDAR,), WorkCounter())
+PAYMENT_CALENDAR = holiday_calendar("PAYS", HOLIDAYS)
+CALENDARS = collect_holiday_calendars((PAYMENT_CALENDAR,), WorkCounter())
 # The asian method's index: the same months, each contract expiring on its month's last business
 # day, so that every pricing day of a month prices its own contract.
 MONTH_ENDS = np.busday_offset(
@@ -103,7 +103,7 @@ MONTH_ENDS = np.busday_offset(
     roll="backward",
     holidays=HOLIDAYS,
 )
-ASIAN_GAS = index(
+ASIAN_GAS = index_on(
     "gas",
     "Sample gas index",
     futures_schedule(CODES, MONTH_ENDS, None),
@@ -111,7 +111,7 @@ ASIAN_GAS = index(
     contract_specifications(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
-    holiday_calendar(HOLIDAYS),
+    closed_on(HOLIDAYS),
     "lot",
     UNITS,
 )
@@ -125,7 +125,7 @@ TEMPLATE_FIELDS: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "TEST_CLEARER",
     "payment_day": "+2bd",
-    "payment_calendar_key": "PAYS",
+    "payment_holiday_key": "PAYS",
 }
 
 
@@ -235,7 +235,7 @@ def test_creation_reports_its_rows_its_components_and_every_schedule_code(
         "encoded_groups": contracts,  # one payment day per contract: one group each
         "encoded_observations": rows,
         "encoded_slots": contracts,
-        "payment_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
+        "holiday_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
         "payment_shifts": 1,
         "reserved_fee_components": rows,  # clearing alone: cleared and unbrokered, since #188
@@ -340,7 +340,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         # payment-calendar-keys.md: the batch's one key bound once to its calendar, the
         # collection searched for the one name; nothing per row
         "_the_calendars": 1,
-        "payment_calendar": 1,
+        "keyed_calendar": 1,
         "calendar_key": 1,
         "calendar_named": 1,
         "FieldValues.has": 16,
@@ -551,7 +551,7 @@ def test_the_penultimate_method_adds_one_look_at_the_expiries_and_nothing_per_ro
         terms.payment.date, np.busday_offset(observations.date, 2, holidays=HOLIDAYS)
     )
     assert counter.freeze().as_dict() == {
-        "payment_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
+        "holiday_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
         "payment_shifts": 1,
         "resolved_components": rows,
@@ -598,7 +598,7 @@ def test_the_last3day_method_gives_three_days_per_component_and_one_payment_afte
         terms.payment.date, np.busday_offset(expiries, 2, holidays=HOLIDAYS)
     )
     assert counter.freeze().as_dict() == {
-        "payment_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
+        "holiday_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
         "payment_shifts": 1,
         "resolved_components": rows,
@@ -656,7 +656,7 @@ def test_the_asian_method_gives_a_month_of_days_per_component_and_one_payment_af
         np.busday_offset(MONTH_ENDS[terms.legs[0].contract], 2, holidays=HOLIDAYS),
     )
     assert counter.freeze().as_dict() == {
-        "payment_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
+        "holiday_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
         "payment_shifts": 1,
         "resolved_components": rows,
@@ -704,7 +704,7 @@ def sheet() -> dict[str, object]:
         bridge.MISSING,
     )
     holidays = PATH["_CreateHolidayCalendar"](
-        Cells.from_rows([[serial(day)] for day in HOLIDAYS]), "PAYS"
+        "PAYS", Cells.from_rows([[serial(day)] for day in HOLIDAYS])
     )
     conventions = PATH["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specifications = PATH["_CreateContractSpecifications"](
@@ -715,9 +715,16 @@ def sheet() -> dict[str, object]:
     )
     values = list(TEMPLATE_FIELDS.values())  # the key as text, the calendar collected below
     return {
-        "calendars": PATH["_CollectPaymentCalendars"](holidays),
+        "calendars": PATH["_CollectHolidayCalendars"](holidays),
         "index": PATH["_CreateIndex"](
-            "gas", "Sample gas index", schedule, conventions, specifications, holidays, "lot"
+            "gas",
+            "Sample gas index",
+            schedule,
+            conventions,
+            specifications,
+            key_in(holidays),
+            "lot",
+            PATH["_CollectHolidayCalendars"](holidays),
         ),
         "template": PATH["_CreateTradeTemplate"](
             "fixed_float", Cells.from_rows([list(TEMPLATE_FIELDS)]), Cells.from_rows([values])
@@ -1143,7 +1150,7 @@ def test_a_onetime_window_is_one_component_across_its_month_end_and_nothing_runs
 # hold every method once per contract; two thousand over twenty-four hold each many times.
 MIXED_SIZES = [(8, 2), (2_000, 24)]
 MIXED_IDS = ["eight rows", "two thousand rows"]
-MIXED_GAS = index(
+MIXED_GAS = index_on(
     "gas",
     "Sample gas index",
     futures_schedule(CODES, MONTH_ENDS, None),
@@ -1156,7 +1163,7 @@ MIXED_GAS = index(
         np.array([0.0, 0.0]),
         UNITS,
     ),
-    holiday_calendar(HOLIDAYS),
+    closed_on(HOLIDAYS),
     "lot",
     UNITS,
 )
@@ -1221,7 +1228,7 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
     counter = WorkCounter()
     terms, (observations,), _ = resolved((MIXED_GAS,), ticket, template, counter, CALENDARS)
     assert counter.freeze().as_dict() == {
-        "payment_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
+        "holiday_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
         "payment_shifts": 1,
         "resolved_components": rows,
@@ -1292,7 +1299,7 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
 IFERC_PUBLICATION = np.busday_offset(
     MONTHS.astype("datetime64[D]"), 0, roll="forward", holidays=HOLIDAYS
 )
-BASIS = index(
+BASIS = index_on(
     "basis",
     "Sample basis index",
     iferc_schedule(CODES, IFERC_PUBLICATION),
@@ -1350,7 +1357,7 @@ def test_an_iferc_ticket_resolves_like_a_futures_one_without_the_days(
         np.busday_offset(IFERC_PUBLICATION[terms.legs[0].contract], 2, holidays=HOLIDAYS),
     )
     assert counter.freeze().as_dict() == {
-        "payment_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
+        "holiday_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
         "payment_shifts": 1,
         "resolved_components": rows,
@@ -1416,7 +1423,7 @@ def test_a_marketing_and_a_cva_column_each_sum_once_per_row_and_the_counter_says
         "encoded_groups": contracts,
         "encoded_observations": rows,
         "encoded_slots": contracts,
-        "payment_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
+        "holiday_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
         "payment_shifts": 1,
         "reserved_fee_components": rows,  # clearing alone: cleared and unbrokered, since #188

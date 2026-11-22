@@ -10,8 +10,9 @@ from typing import Any, cast
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name, closed_on, index_on
 from numpy.typing import NDArray
-from test_create_trades import seam_key, with_calendars
+from test_create_trades import seam_calendars, seam_key, with_calendars
 
 from catalyst.calendar.calendar import calendar
 from catalyst.excel import bridge
@@ -21,8 +22,7 @@ from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_codes import schedule_months
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
-from catalyst.index_definitions.holiday_calendar import holiday_calendar
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT
@@ -87,7 +87,7 @@ def an_index() -> Index:
     schedule = futures_schedule(
         tuple(code for code, _ in CONTRACTS), dates(*(expiry for _, expiry in CONTRACTS)), None
     )
-    return index(
+    return index_on(
         "GAS",
         "GAS index",
         schedule,
@@ -100,7 +100,7 @@ def an_index() -> Index:
             numbers(4.0, 0.0),
             UNITS,
         ),
-        holiday_calendar(dates()),
+        closed_on(dates()),
         "LOT",
         UNITS,
     )
@@ -152,7 +152,7 @@ def terms_of(
         if pays is None
         else PaymentTerms(
             DatesOrTexts.of_dates(dates(*[pays] * count)),
-            (holiday_calendar(dates()),) * count,
+            (closed_on(dates()),) * count,
             dates(*[pays] * count),
         ),
         counterparty=None if cleared else ("ACME",) * count,
@@ -552,7 +552,7 @@ PAIR: list[list[object]] = [
 @pytest.fixture(scope="module")
 def sheet() -> dict[str, Any]:
     """The page's index and template through the seam, and a history valued on a day."""
-    holidays = ENTRY["_CreateHolidayCalendar"](column([serial(CLOSED_DAY)]), bridge.MISSING)
+    holidays = ENTRY["_CreateHolidayCalendar"](a_name(), column([serial(CLOSED_DAY)]))
     schedule = ENTRY["_CreateFuturesSchedule"](
         rows(*[[code] for code, _ in CONTRACTS]),
         column([serial(expiry) for _, expiry in CONTRACTS]),
@@ -567,8 +567,9 @@ def sheet() -> dict[str, Any]:
             row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
             rows(["LOT", 10_000.0, "MMBTU", 10.0, 4.0], ["MMBTU", 1.0, "MMBTU", 0.0, 0.0]),
         ),
-        holidays,
+        seam_key(holidays),
         "LOT",
+        seam_calendars(),
     )
 
     def history(as_of: str, settle: float = 3.0) -> str:
@@ -688,7 +689,7 @@ def test_the_sheet_refuses_an_open_contract_and_a_second_clearing_house(
         **houses,
         "settlement_method": "financial",
         "payment_day": "+2bd",
-        "payment_calendar_key": seam_key(sheet["holidays"]),
+        "payment_holiday_key": seam_key(sheet["holidays"]),
     }
     template = ENTRY["_CreateTradeTemplate"](
         "fixed_float", row(*financial), row(*financial.values())

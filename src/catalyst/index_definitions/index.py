@@ -1,27 +1,30 @@
 """The index behind one reference price: its name, its schedule, the conventions its price is
 quoted in, the contract specifications it trades as, for a futures index the holiday calendar of
-its market, four objects the sheet already holds and a name, bound once, and, where the desk
-named one, the specification a batch's delta is reported in lots of, resolved once here.
+its market, chosen by key from a collection, objects the sheet already holds and a name, bound
+once, and, where the desk named one, the specification a batch's delta is reported in lots of,
+resolved once here.
 docs/library/index-definitions/index.md is the page."""
 
 import math
 from dataclasses import dataclass
 from functools import singledispatch
-from typing import cast
+from typing import assert_never, cast
 
 from catalyst.globals.unit_conversions import UnitConversions
 from catalyst.index_definitions.contract_specifications import ContractSpecifications
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.holiday_calendars import HolidayCalendars, calendar_of
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index_conventions import CURRENCY, IndexConventions, a_unit_of
 from catalyst.index_definitions.kind import (
     Kind,
     named,
     with_holiday_calendar,
-    without_holiday_calendar,
+    without_holiday_key,
 )
+from catalyst.instrumentation.work_counts import WorkCounter
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,20 +77,26 @@ def index(
     schedule: object,
     conventions: IndexConventions,
     specifications: ContractSpecifications,
-    holiday_calendar: HolidayCalendar | None,
+    holiday_key: str | None,
     reporting_lot: str | None,
     units: UnitConversions,
+    holiday_calendars: HolidayCalendars | None,
+    counter: WorkCounter,
 ) -> Index:
     """The one way to make an Index: the schedule's kind chooses which index is made, the
-    holiday calendar is checked against it, the specifications' lot units against the
-    conventions' quantity type, the reporting lot, where one is named, against the specifications
-    and the tables, and the record is returned once all four hold, nothing else.
+    holiday key is checked against it and bound to its calendar, the specifications' lot units
+    are checked against the conventions' quantity type, the reporting lot, where one is named,
+    against the specifications and the tables, and the record is returned once all four hold,
+    nothing else.
 
     The kind is read off the object the seam hands over, the one way the library tells kinds
     apart, as the market history reads its fixings'; an object of no schedule kind is refused
-    here in the library's words, since the seam names no kind for it. A futures index brings
-    its holiday calendar, and the other two leave it out, the calendar's rules of #104 in the
-    calendar's words. Then each lot unit of the specifications is a unit of the conventions'
+    here in the library's words, since the seam names no kind for it. A futures index names
+    its holiday calendar by key, one name of the collection or several joined by a plus sign,
+    bound here once by the step every reader of a key shares, calendar_of, and held by
+    reference, so nothing later looks a name up; the other two leave the key out, and one
+    given is refused before it is looked up. Then each lot unit of the specifications is a
+    unit of the conventions'
     quantity type, read from the tables passed in: a barrel row and a gallon row both stand
     under a volume index, and an MMBTU row does not, the one fact that lives across two of the
     definitions and so is checked where they meet. Then the reporting lot, when one is named: the
@@ -103,10 +112,13 @@ def index(
     handle and the price vector's match take the name alone. Whether the four objects are one
     index's is otherwise the desk's
     to keep right, since nothing in any of them says which index it belongs to. Nothing is copied
-    and nothing is built but the small record; the one pass is over the specifications' lot
-    units, one lookup per row, and nothing of the schedule is looked at.
+    and nothing is built but the small record, and the union a key of several names makes; the
+    one pass is over the specifications' lot units, one lookup per row, and nothing of the
+    schedule is looked at. Work: `holiday_keys_bound`, one for a futures index, and a union's
+    own counts.
     """
-    kind, calendar = _of(schedule, holiday_calendar)
+    kind = _of(schedule)
+    calendar = _the_calendar(kind, holiday_key, holiday_calendars, counter)
     measure = units.categories[conventions.quantity_type].sizes
     for row, unit in enumerate(specifications.lot_units, start=1):
         if unit not in measure:
@@ -157,32 +169,43 @@ def _the_reporting_lot(
 
 
 @singledispatch
-def _of(
-    schedule: object, holiday_calendar: HolidayCalendar | None
-) -> tuple[Kind, HolidayCalendar | None]:
+def _of(schedule: object) -> Kind:
     raise ValueError(
         f"schedule is {named(schedule)}, expected a futures, IFERC or Gas Daily schedule"
     )
 
 
 @_of.register
-def futures_index(
-    schedule: FuturesSchedule, holiday_calendar: HolidayCalendar | None
-) -> tuple[Kind, HolidayCalendar | None]:
-    return Kind.FUTURES, with_holiday_calendar(holiday_calendar)
+def futures_index(schedule: FuturesSchedule) -> Kind:
+    return Kind.FUTURES
 
 
 @_of.register
-def iferc_index(
-    schedule: IfercSchedule, holiday_calendar: HolidayCalendar | None
-) -> tuple[Kind, HolidayCalendar | None]:
-    without_holiday_calendar(holiday_calendar, Kind.IFERC)
-    return Kind.IFERC, None
+def iferc_index(schedule: IfercSchedule) -> Kind:
+    return Kind.IFERC
 
 
 @_of.register
-def gas_daily_index(
-    schedule: GasDailySchedule, holiday_calendar: HolidayCalendar | None
-) -> tuple[Kind, HolidayCalendar | None]:
-    without_holiday_calendar(holiday_calendar, Kind.GAS_DAILY)
-    return Kind.GAS_DAILY, None
+def gas_daily_index(schedule: GasDailySchedule) -> Kind:
+    return Kind.GAS_DAILY
+
+
+def _the_calendar(
+    kind: Kind,
+    holiday_key: str | None,
+    holiday_calendars: HolidayCalendars | None,
+    counter: WorkCounter,
+) -> HolidayCalendar | None:
+    """The holiday calendar the kind takes, holiday-keys.md: a futures index's, the one its key
+    selects from the collection, the key required; none for the other two, a key given refused
+    before anything is looked up."""
+    match kind:
+        case Kind.FUTURES:
+            return with_holiday_calendar(
+                calendar_of("holiday_key", holiday_key, holiday_calendars, counter)
+            )
+        case Kind.IFERC | Kind.GAS_DAILY:
+            without_holiday_key(holiday_key, kind)
+            return None
+        case _:
+            assert_never(kind)

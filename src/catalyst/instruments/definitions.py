@@ -175,7 +175,7 @@ FIXED_FLOAT = Instrument(
             FieldType.CODE,
             "physical, financial",
             "Selects behavior, validation and payment terms, not a label: a financial batch "
-            "requires payment_day and payment_calendar_key and pays on its payment day, the "
+            "requires payment_day and payment_holiday_key and pays on its payment day, the "
             "row's date or the day its rule finds; a physical one pays on no day, takes lastday "
             "rows alone, is refused past its expiry and refused on the bilateral route; the "
             "delivery itself is outside the model",
@@ -306,7 +306,7 @@ FIXED_FLOAT = Instrument(
             quote_required_when="settlement_method = financial",
         ),
         Field(
-            "payment_calendar_key",
+            "payment_holiday_key",
             "The name of the calendar a payment rule's business days are counted on",
             False,
             "settlement_method = financial",
@@ -436,7 +436,7 @@ FLOAT_FLOAT = Instrument(
             NONE,
             FieldType.CODE,
             "financial",
-            "financial exactly: the batch requires payment_day and payment_calendar_key and "
+            "financial exactly: the batch requires payment_day and payment_holiday_key and "
             "each month pays one net amount on its payment day, the row's date or the day its "
             "rule finds; physical is refused by name",
         ),
@@ -531,7 +531,7 @@ FLOAT_FLOAT = Instrument(
             "index's kind, lastday alone on an IFERC index",
         ),
         _as_booked("payment_day"),
-        _as_booked("payment_calendar_key"),
+        _as_booked("payment_holiday_key"),
         _as_booked("marketing_reserve"),
         _as_booked("cva_reserve"),
         Field(

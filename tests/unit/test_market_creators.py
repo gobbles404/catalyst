@@ -10,6 +10,8 @@ from typing import cast
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name
+from test_create_trades import seam_calendars, seam_key
 from test_utilities import read, rows
 
 from catalyst.excel import bridge
@@ -45,7 +47,7 @@ def a_schedule(codes: tuple[str, ...], expiries: tuple[float, ...]) -> str:
 
 
 def a_holiday_calendar(*serials: float) -> str:
-    text = bridge.call("_CreateHolidayCalendar", [column(*serials), bridge.MISSING])
+    text = bridge.call("_CreateHolidayCalendar", [a_name(), column(*serials)])
     assert isinstance(text, str) and text.startswith(f"{PID}:holiday_calendar:"), text
     return text
 
@@ -81,7 +83,16 @@ def an_index(schedule: object, holidays: object = MISSING, name: str = "WTI NYME
     )
     text = bridge.call(
         "_CreateIndex",
-        [name, f"{name} index", schedule, conventions, specifications, holidays, MISSING],
+        [
+            name,
+            f"{name} index",
+            schedule,
+            conventions,
+            specifications,
+            seam_key(holidays),
+            MISSING,
+            seam_calendars(),
+        ],
     )
     assert isinstance(text, str) and text.startswith(f"{PID}:index:"), text
     return text

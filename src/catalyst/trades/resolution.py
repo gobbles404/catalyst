@@ -31,14 +31,14 @@ from catalyst.index_definitions.contract_codes import month_label, schedule_mont
 from catalyst.index_definitions.date_offsets import shift_days
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.holiday_calendars import (
+    KEYS_BOUND,
+    HolidayCalendars,
+    keyed_calendar,
+    no_collection,
+)
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
-from catalyst.index_definitions.payment_calendars import (
-    KEYS_BOUND,
-    PaymentCalendars,
-    no_collection,
-    payment_calendar,
-)
 from catalyst.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT, FLOAT_FLOAT, FieldType
@@ -107,7 +107,7 @@ CONDITIONS: Final[dict[str, tuple[str, Route | Settlement]]] = {
     "counterparty": ("route", Route.BILATERAL),  # since #175
     "discount_curve_key": ("route", Route.BILATERAL),  # named-curves-slice-3.md
     "payment_day": ("settlement_method", Settlement.FINANCIAL),  # payment-day-date-or-rule.md
-    "payment_calendar_key": ("settlement_method", Settlement.FINANCIAL),  # payment-calendar-keys.md
+    "payment_holiday_key": ("settlement_method", Settlement.FINANCIAL),  # payment-calendar-keys.md
 }
 
 
@@ -136,7 +136,7 @@ def trades(
     template: TradeTemplate,
     units: UnitConversions,
     counter: WorkCounter,
-    calendars: PaymentCalendars | None = None,
+    calendars: HolidayCalendars | None = None,
 ) -> Trades:
     """The one way to make Trades: resolution, which makes each leg's schedule methods'
     observations on the way to the payment days, one index or since two-index-fixed-float.md
@@ -151,7 +151,7 @@ def resolved(
     ticket: FieldValues,
     template: TradeTemplate,
     counter: WorkCounter,
-    calendars: PaymentCalendars | None = None,
+    calendars: HolidayCalendars | None = None,
 ) -> tuple[ResolvedTrades, tuple[Observations, ...], tuple[NDArray[np.bool_], tuple[str, ...]]]:
     """The resolution child: the terms of a batch from a template and a ticket, checked in this
     order, the first failure being the message, and then the kernel's own rules; with them the
@@ -386,7 +386,7 @@ def resolved(
         marketing_reserve=fields.amounts("marketing_reserve", marketing_reserves),
         cva_reserve=fields.amounts("cva_reserve", finite_amounts),  # signed, cva-reserve.md
         discount_curve_key=fields.keys("discount_curve_key"),
-        payment_calendar_key=fields.labels("payment_calendar_key"),  # bound above, kept to show
+        payment_holiday_key=fields.labels("payment_holiday_key"),  # bound above, kept to show
         schedule_month=months,
         second_leg=second_leg,
         price_unit=price_unit,
@@ -984,7 +984,7 @@ def _the_payments(
     occurrence: NDArray[np.intp],
     trade_ids: NDArray[np.int64] | None,
     counter: WorkCounter,
-    collection: PaymentCalendars | None,
+    collection: HolidayCalendars | None,
 ) -> PaymentTerms | None:
     """The payment terms over the legs' anchors: one anchor for every index since
     iferc-publication-payment-anchor.md, each component's last observation day, the expiry under
@@ -1046,7 +1046,7 @@ def _the_payment_terms(
     occurrence: NDArray[np.intp],
     trade_ids: NDArray[np.int64] | None,
     counter: WorkCounter,
-    collection: PaymentCalendars | None,
+    collection: HolidayCalendars | None,
 ) -> PaymentTerms | None:
     """For a financial settlement, the payment terms: what each occurrence entered for its
     payment_day, a date or a rule text, with its payment calendar, retained, and each component's
@@ -1119,21 +1119,21 @@ def _the_payment_terms(
 
 
 def _the_calendars(
-    fields: _Fields, collection: PaymentCalendars | None, counter: WorkCounter
+    fields: _Fields, collection: HolidayCalendars | None, counter: WorkCounter
 ) -> tuple[HolidayCalendar, ...]:
-    """Each occurrence's payment calendar, the one its payment_calendar_key selects from the
+    """Each occurrence's payment calendar, the one its payment_holiday_key selects from the
     collection, payment-calendar-keys.md: each distinct key text bound once, in the order its
     first row comes, so a refusal names the first row that holds it, by the step a quote
-    template shares, payment_calendar; keys that name one set of calendars share one calendar,
+    template shares, keyed_calendar; keys that name one set of calendars share one calendar,
     and rows that share a calendar are counted together as rows sharing a handle were. Every
     row's key is bound, a row paying on a date included, which reads its calendar for nothing:
     the owner's rule of 21 November 2026. A financial batch with no collection is refused by
-    the argument. Work: `payment_keys_bound`, the distinct keys; a combination's own counts."""
+    the argument. Work: `holiday_keys_bound`, the distinct keys; a combination's own counts."""
     if collection is None:
         raise no_collection("a financially settled batch")
     combined: dict[tuple[str, ...], HolidayCalendar] = {}
     bound, by_key = _each_distinct(
-        fields, "payment_calendar_key", partial(payment_calendar, collection, combined, counter)
+        fields, "payment_holiday_key", partial(keyed_calendar, collection, combined, counter)
     )
     counter.hit(KEYS_BOUND, len(bound))
     return tuple([bound[int(k)] for k in by_key])

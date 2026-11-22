@@ -11,6 +11,8 @@ import re
 from typing import Any, cast
 
 import pytest
+from holiday_fixtures import a_name
+from test_create_trades import seam_calendars, seam_key
 from test_trade_valuation import (
     A_YEAR_OUT,
     CLEARED_DV01,
@@ -98,7 +100,7 @@ def sheet() -> dict[str, Any]:
     moves."""
     hng = one_unit_index("HNG", "2027-01-04")
     wti = one_unit_index("WTI", "2027-01-05")
-    payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING))
+    payments = str(ENTRY["_CreateHolidayCalendar"](a_name(), column([serial("2030-01-01")])))
     bilateral = str(
         templated(
             [*UNIT_FIELDS],
@@ -852,7 +854,7 @@ def cent_settled_index(name: str, expiry: str) -> str:
         bridge.MISSING,
     )
     calendar = ENTRY["_CreateHolidayCalendar"](
-        column([serial(day) for day in UNIT_HOLIDAYS]), bridge.MISSING
+        a_name(), column([serial(day) for day in UNIT_HOLIDAYS])
     )
     conventions = ENTRY["_CreateIndexConventions"]("DOLLAR", "BBL", "CENT", "VOLUME", "BBL")
     specifications = ENTRY["_CreateContractSpecifications"](
@@ -861,7 +863,14 @@ def cent_settled_index(name: str, expiry: str) -> str:
     )
     return str(
         ENTRY["_CreateIndex"](
-            name, f"{name} index", schedule, conventions, specifications, calendar, "LOT"
+            name,
+            f"{name} index",
+            schedule,
+            conventions,
+            specifications,
+            seam_key(calendar),
+            "LOT",
+            seam_calendars(),
         )
     )
 

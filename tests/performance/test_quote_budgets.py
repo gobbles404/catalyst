@@ -12,6 +12,7 @@ from types import MappingProxyType
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from test_seam_allocation import SLACK, least_peak
 
 from catalyst.calendar.calendar import calendar
@@ -24,7 +25,6 @@ from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
 from catalyst.index_definitions.holiday_calendar import holiday_calendar
-from catalyst.index_definitions.index import index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT
@@ -48,7 +48,7 @@ TEMPLATE_FIELDS: dict[str, object] = {
     "settlement_frequency": "monthly",
     "nearby": 1.0,
     "payment_day": "+5bd",
-    "payment_calendar_key": "PAYS",
+    "payment_holiday_key": "PAYS",
     "discount_curve_key": "SOFR",
 }
 
@@ -58,8 +58,8 @@ def test_the_quote_template_creator_reads_each_value_once_and_publishes_once(
 ) -> None:
     # The calendar under its name and the collection of it, made before the profiled call:
     # the template's row holds the key, text, and the creator binds it once.
-    holidays = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46352.0]]), "PAYS")
-    calendars = PATH["_CollectPaymentCalendars"](holidays)
+    holidays = PATH["_CreateHolidayCalendar"]("PAYS", Cells.from_rows([[46352.0]]))
+    calendars = PATH["_CollectHolidayCalendars"](holidays)
     headers = Cells.from_rows([list(TEMPLATE_FIELDS)])
     values = Cells.from_rows([list(TEMPLATE_FIELDS.values())])
 
@@ -105,7 +105,8 @@ def test_the_quote_template_creator_reads_each_value_once_and_publishes_once(
         # field's reader and again by the step that binds it, the collection searched for the
         # one name, and the binding counted.
         "calendar_key": 2,
-        "payment_calendar": 1,
+        "calendar_of": 1,
+        "keyed_calendar": 1,
         "calendar_named": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 1,
@@ -134,7 +135,7 @@ MONTH_ENDS = (
     np.arange("2027-02", "2028-02", dtype="datetime64[M]").astype("datetime64[D]")
     - np.timedelta64(1, "D")
 ).astype("datetime64[D]")
-CAL = index(
+CAL = index_on(
     "CAL",
     "CAL index",
     futures_schedule(
@@ -144,11 +145,11 @@ CAL = index(
     ),
     index_conventions("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL", UNITS),
     contract_specifications(("BBL",), np.array([1.0]), ("BBL",), np.zeros(1), np.zeros(1), UNITS),
-    holiday_calendar(np.array([], dtype="datetime64[D]")),
+    closed_on(np.array([], dtype="datetime64[D]")),
     "BBL",
     UNITS,
 )
-WEEKENDS_ONLY = holiday_calendar(np.array(["2030-01-01"], dtype="datetime64[D]"), "PAYS")
+WEEKENDS_ONLY = holiday_calendar("PAYS", np.array(["2030-01-01"], dtype="datetime64[D]"))
 SOFR = discount_curve(
     "SOFR",
     np.array(["2027-06-16", "2027-07-01", "2028-01-03"], dtype="datetime64[D]"),
@@ -166,7 +167,7 @@ def a_template(route: str) -> QuoteTemplate:
         "settlement_frequency": "monthly",
         "nearby": 1.0,
         "payment_day": DayOrRule(None, "+1bd"),  # the rule as the template holds it
-        "payment_calendar_key": "PAYS",  # the key, and below the calendar it was bound to
+        "payment_holiday_key": "PAYS",  # the key, and below the calendar it was bound to
     }
     if route == "bilateral":
         values["discount_curve_key"] = "SOFR"

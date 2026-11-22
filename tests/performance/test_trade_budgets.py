@@ -13,6 +13,7 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from numpy.typing import NDArray
 from test_seam_allocation import KEYWORD_CALL, SLACK, least_peak
 
@@ -23,9 +24,8 @@ from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_codes import schedule_months
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
-from catalyst.index_definitions.holiday_calendar import holiday_calendar
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT
@@ -94,8 +94,8 @@ PAYS: NDArray[np.datetime64] = np.array(
     (MONTHS + np.timedelta64(1, "M")).astype("datetime64[D]") - np.timedelta64(1, "D"),
     dtype="datetime64[D]",
 )
-PAYMENT_CALENDAR = holiday_calendar(HOLIDAYS)
-GAS = index(
+PAYMENT_CALENDAR = closed_on(HOLIDAYS)
+GAS = index_on(
     "gas",
     "Sample gas index",
     futures_schedule(CODES, EXPIRIES, None),
@@ -103,7 +103,7 @@ GAS = index(
     contract_specifications(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
-    holiday_calendar(HOLIDAYS),
+    closed_on(HOLIDAYS),
     "lot",
     UNITS,
 )
@@ -474,7 +474,7 @@ MONTH_ENDS = np.busday_offset(
     holidays=HOLIDAYS,
 )
 ASIAN_PAYS = np.busday_offset(MONTH_ENDS, 2, holidays=HOLIDAYS)
-ASIAN_GAS = index(
+ASIAN_GAS = index_on(
     "gas",
     "Sample gas index",
     futures_schedule(CODES, MONTH_ENDS, None),
@@ -482,7 +482,7 @@ ASIAN_GAS = index(
     contract_specifications(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
-    holiday_calendar(HOLIDAYS),
+    closed_on(HOLIDAYS),
     "lot",
     UNITS,
 )
@@ -1044,7 +1044,7 @@ def test_a_two_day_daily_batch_prepares_and_ticks_by_its_doubled_slots() -> None
 # over twenty-four hold each many times.
 MIXED_SIZES = [(8, 2), (2_000, 24)]
 MIXED_IDS = ["eight trades", "two thousand trades"]
-MIXED_GAS = index(
+MIXED_GAS = index_on(
     "gas",
     "Sample gas index",
     futures_schedule(CODES, MONTH_ENDS, None),
@@ -1057,7 +1057,7 @@ MIXED_GAS = index(
         np.array([0.0, 0.0]),
         UNITS,
     ),
-    holiday_calendar(HOLIDAYS),
+    closed_on(HOLIDAYS),
     "lot",
     UNITS,
 )
@@ -1248,7 +1248,7 @@ ROLLING_EXPIRIES = np.busday_offset(
     roll="backward",
     holidays=HOLIDAYS,
 )
-ROLLING_GAS = index(
+ROLLING_GAS = index_on(
     "rolling",
     "Sample gas index with rolling contracts",
     futures_schedule(ROLLING_CODES, ROLLING_EXPIRIES, None),
@@ -1256,7 +1256,7 @@ ROLLING_GAS = index(
     contract_specifications(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
-    holiday_calendar(HOLIDAYS),
+    closed_on(HOLIDAYS),
     "lot",
     UNITS,
 )
@@ -1378,7 +1378,7 @@ IFERC_PUBLICATION = np.busday_offset(
     MONTHS.astype("datetime64[D]"), 0, roll="forward", holidays=HOLIDAYS
 )
 IFERC_PAYS = np.busday_offset(IFERC_PUBLICATION, 2, roll="backward", holidays=HOLIDAYS)
-BASIS = index(
+BASIS = index_on(
     "basis",
     "Sample basis index",
     iferc_schedule(CODES, IFERC_PUBLICATION),

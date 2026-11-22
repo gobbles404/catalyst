@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name, key_and_collection
 
 from catalyst.excel import bridge
 from catalyst.excel.bridge import MISSING, Cells
@@ -319,8 +320,10 @@ def test_a_periods_day_is_text_in_one_reading_and_a_date_out(
 
 
 # A date shifted by an offset: the date checked as a number and as a date and the offset as text,
-# the calendar handle resolved once where one is given, the library's one reading of the offset
-# into its instructions and one application of them as arrays, since #181, one numpy offset per
+# and since holiday-keys.md the key as text and the collection's handle resolved once where a key
+# is given, the key read and bound to the collection's calendar by the step every reader of a key
+# shares, one name found and nothing made; the library's one reading of the offset into its
+# instructions and one application of them as arrays, since #181, one numpy offset per
 # business-day instruction, dispatched in C and unseen, or two conversions per month end, one look
 # per instruction at the sheet's calendar, and the seam's way out for a date. The same calls and
 # the same numpy for one day and for two million, for a week and for the sheet's calendar end to
@@ -361,27 +364,35 @@ def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
     astype: dict[str, int],
     steps: int,
 ) -> None:
-    calendar = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46307.0]]), bridge.MISSING)
-    third = calendar if with_calendar else bridge.MISSING
-    PATH["util_ShiftDate"](date, offset, third)
-    assert call_profile(lambda: PATH["util_ShiftDate"](date, offset, third)) == {
+    calendar = PATH["_CreateHolidayCalendar"]("SHIFT", Cells.from_rows([[46307.0]]))
+    key = "SHIFT" if with_calendar else bridge.MISSING
+    held = PATH["_CollectHolidayCalendars"](calendar) if with_calendar else bridge.MISSING
+    PATH["util_ShiftDate"](date, offset, key, held)
+    assert call_profile(lambda: PATH["util_ShiftDate"](date, offset, key, held)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 3,  # the date, the offset and the calendar, given or left out
+        "_validate": 4,  # the date, the offset, the key and the collection, given or left out
         "_number": 1,
         "_date": 1,
-        "_text": 2 if with_calendar else 1,  # the offset, and the handle's text
+        "_text": 3 if with_calendar else 1,  # the offset; the key, and the handle's text
         **({"_resolve": 1} if with_calendar else {}),
         "util_ShiftDate": 1,
+        "WorkCounter.__init__": 1,
         "shift_date": 1,
         "read_offset": 1,  # the offset into its instructions, once
+        "calendar_of": 1,  # the key's one binding, nothing for no key
+        **(
+            {"keyed_calendar": 1, "calendar_key": 1, "calendar_named": 1, "WorkCounter.hit": 1}
+            if with_calendar
+            else {}
+        ),
         "shift_days": 1,  # the instructions applied to the one day, as an array
         **library,
         "_date_out": 1,
         "_unit": 1,
         "_serials": 1,
     }
-    assert numpy_calls(lambda: PATH["util_ShiftDate"](date, offset, third)) == {
+    assert numpy_calls(lambda: PATH["util_ShiftDate"](date, offset, key, held)) == {
         **astype,  # the month to its first day, twice, for a month end
         "numpy.array": 2,  # the one-day array in, and the way out's one-day array
         "numpy.asarray": 1,  # the stray days' NaT fill, read for its type
@@ -390,6 +401,66 @@ def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
         "ndarray.any": 2
         + steps,  # one look per instruction at the sheet's calendar, two the way out's
         "ufunc.reduce": 2 + steps,
+    }
+
+
+# A key of several names, the union a `_CombineHolidayCalendars` cell made once before
+# holiday-keys.md and a shift now makes on each call: two and twenty-four calendars of a hundred
+# days each. The key is one text and the collection one handle whatever the names, so the seam's
+# calls do not grow; the library finds each name once, so its lookups grow with the names and
+# nothing else does; then the one union and its one copy, and nothing is published. The numpy
+# is the same at two names and at twenty-four beyond the shift's own: concatenate runs in C
+# unseen by the ledger, unique is the flatten, the sort and the hash it is built of over two
+# asanyarray views, then the union's copy and its freeze.
+@pytest.mark.parametrize("n", [2, 24], ids=["two calendars", "twenty-four calendars"])
+def test_a_key_of_several_names_finds_each_once_and_unites_them_once_on_every_shift(
+    call_profile: CallProfile, numpy_calls: CallProfile, n: int
+) -> None:
+    names = [f"UNION{i}" for i in range(n)]
+    held = PATH["_CollectHolidayCalendars"](
+        Cells.from_rows(
+            [[PATH["_CreateHolidayCalendar"](name, holiday_column(100))] for name in names]
+        )
+    )
+    key = "+".join(names)
+    PATH["util_ShiftDate"](46304.0, "+1bd", key, held)
+    assert call_profile(lambda: PATH["util_ShiftDate"](46304.0, "+1bd", key, held)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 4,
+        "_number": 1,
+        "_date": 1,
+        "_text": 3,
+        "_resolve": 1,
+        "util_ShiftDate": 1,
+        "WorkCounter.__init__": 1,
+        "shift_date": 1,
+        "read_offset": 1,
+        "calendar_of": 1,
+        "keyed_calendar": 1,
+        "calendar_key": 1,
+        "calendar_named": n,  # each name found once
+        "combine_holiday_calendars": 1,
+        "_owning": 1,
+        "WorkCounter.hit": 4,  # the union's three counts and the key's one
+        "shift_days": 1,
+        "_business_days_on": 1,
+        "_date_out": 1,
+        "_unit": 1,
+        "_serials": 1,
+    }
+    assert numpy_calls(lambda: PATH["util_ShiftDate"](46304.0, "+1bd", key, held)) == {
+        "ndarray.flatten": 1,
+        "ndarray.sort": 1,
+        "numpy._unique_hash": 1,
+        "numpy.asanyarray": 2,
+        "ndarray.setflags": 1,  # the union, frozen
+        "numpy.array": 3,  # the union's one copy, beside the shift's two
+        "numpy.asarray": 1,
+        "numpy.empty": 2,
+        "numpy.datetime_data": 1,
+        "ndarray.any": 3,
+        "ufunc.reduce": 3,
     }
 
 
@@ -1010,11 +1081,12 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     holidays = holiday_column(100)
-    PATH["_CreateHolidayCalendar"](holidays, bridge.MISSING)
-    assert call_profile(lambda: PATH["_CreateHolidayCalendar"](holidays, bridge.MISSING)) == {
+    PATH["_CreateHolidayCalendar"]("NYMEX", holidays)
+    assert call_profile(lambda: PATH["_CreateHolidayCalendar"]("NYMEX", holidays)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 2,  # the column, and the name, left out here, payment-calendar-keys.md
+        "_validate": 2,  # the name and the column
+        "_text": 1,  # the name's text rule
         "_date_column": 1,
         "_one_column": 1,
         "_shape": 1,
@@ -1023,9 +1095,12 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
         "_as_days": 1,
         "_CreateHolidayCalendar": 1,
         "holiday_calendar": 1,
+        "calendar_name": 1,  # the name's rule, the curve name's and no plus sign
+        "curve_name": 1,
+        "_owning": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateHolidayCalendar"](holidays, bridge.MISSING)) == {
+    assert numpy_calls(lambda: PATH["_CreateHolidayCalendar"]("NYMEX", holidays)) == {
         "ndarray.any": 1,  # one look, for the calendar
         "ndarray.astype": 2,  # the column on its way to days
         "numpy.array": 1,  # the one copy the calendar keeps
@@ -1166,14 +1241,16 @@ def specification_body(contracts: int) -> Cells:
 def an_index(schedule: object, holidays: object = MISSING) -> object:
     """The index handle of that schedule handle and holiday calendar handle, with the conventions
     of gas and one lot, since nothing measured here reads either."""
+    key, calendars = key_and_collection(holidays)
     return PATH["_CreateIndex"](
         "sample",
         "Sample futures index",
         schedule,
         PATH["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU"),
         PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(1)),
-        holidays,
+        key,
         MISSING,
+        calendars,
     )
 
 
@@ -1260,7 +1337,7 @@ def index_parts() -> tuple[object, object, object, object]:
         PATH["_CreateFuturesSchedule"](codes, futures, MISSING),
         PATH["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU"),
         PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(12)),
-        PATH["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING),
+        PATH["_CreateHolidayCalendar"](a_name(), holiday_column(100)),
     )
 
 
@@ -1275,14 +1352,16 @@ def test_an_index_is_two_texts_and_four_handles_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     schedule, conventions, specifications, holidays = index_parts()
+    key, calendars = key_and_collection(holidays)
     PATH["_CreateIndex"](
         "Henry Hub NYMEX",
         "Henry Hub natural gas - NYMEX",
         schedule,
         conventions,
         specifications,
-        holidays,
+        key,
         MISSING,
+        calendars,
     )
     assert call_profile(
         lambda: PATH["_CreateIndex"](
@@ -1291,18 +1370,26 @@ def test_an_index_is_two_texts_and_four_handles_in_and_one_publication_out(
             schedule,
             conventions,
             specifications,
-            holidays,
+            key,
             MISSING,
+            calendars,
         )
     ) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 7,  # the seven declared, the reporting lot left out among them
-        "_text": 6,  # the name's and the display name's rules, and each handle's text rule
-        "_resolve": 4,  # each handle's one lookup
+        "_validate": 8,  # the eight declared, the reporting lot left out among them
+        "_text": 7,  # the two names' and the key's rules, and each handle's text rule
+        "_resolve": 4,  # each handle's one lookup, the collection's in the calendar's place
         "_CreateIndex": 1,
+        "WorkCounter.__init__": 1,
         "index": 1,
         "futures_index": 1,
+        "_the_calendar": 1,
+        "calendar_of": 1,  # the key bound once, by the step every reader of a key shares
+        "keyed_calendar": 1,
+        "calendar_key": 1,
+        "calendar_named": 1,
+        "WorkCounter.hit": 1,
         "with_holiday_calendar": 1,
         "_publish": 1,
     }
@@ -1314,8 +1401,9 @@ def test_an_index_is_two_texts_and_four_handles_in_and_one_publication_out(
                 schedule,
                 conventions,
                 specifications,
-                holidays,
+                key,
                 MISSING,
+                calendars,
             )
         )
         == {}
@@ -1329,6 +1417,7 @@ def test_an_index_is_two_texts_and_four_handles_in_and_one_publication_out(
         specifications,
         MISSING,
         MISSING,
+        MISSING,
     )
     assert call_profile(
         lambda: PATH["_CreateIndex"](
@@ -1339,17 +1428,20 @@ def test_an_index_is_two_texts_and_four_handles_in_and_one_publication_out(
             specifications,
             MISSING,
             MISSING,
+            MISSING,
         )
     ) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 7,
+        "_validate": 8,
         "_text": 5,
         "_resolve": 3,
         "_CreateIndex": 1,
         "index": 1,
+        "WorkCounter.__init__": 1,
         "iferc_index": 1,
-        "without_holiday_calendar": 1,
+        "_the_calendar": 1,
+        "without_holiday_key": 1,
         "_publish": 1,
     }
 
@@ -1366,8 +1458,9 @@ def test_reading_an_index_back_costs_one_row(
         schedule,
         conventions,
         specifications,
-        holidays,
+        key_and_collection(holidays)[0],
         MISSING,
+        key_and_collection(holidays)[1],
     )
     PATH["util_ReadHandle"](made)
     assert call_profile(lambda: PATH["util_ReadHandle"](made)) == {
@@ -1431,7 +1524,7 @@ def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out
     codes, futures, _, _ = schedule_columns(2)
     index = an_index(
         PATH["_CreateFuturesSchedule"](codes, futures, MISSING),
-        PATH["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING),
+        PATH["_CreateHolidayCalendar"](a_name(), holiday_column(100)),
     )
     days, settles = fixings_columns(260, 100)
     PATH["_CreateFuturesFixings"](days, settles, index)
@@ -1470,7 +1563,7 @@ def calendar_sources(contracts: int) -> tuple[object, object]:
     many monthly contracts a month apart with a calendar of a hundred holidays a week apart."""
     codes, futures, _, _ = schedule_columns(contracts)
     schedule = PATH["_CreateFuturesSchedule"](codes, futures, MISSING)
-    holidays = PATH["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING)
+    holidays = PATH["_CreateHolidayCalendar"](a_name(), holiday_column(100))
     return PATH["_CreateValuationDate"](46276.0, 0.5), an_index(schedule, holidays)
 
 
@@ -1879,7 +1972,7 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     futures = Cells.from_rows([[46161.0 + days_apart * i] for i in range(contracts)])
     valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
     schedule = PATH["_CreateFuturesSchedule"](codes, futures, MISSING)
-    index = an_index(schedule, PATH["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING))
+    index = an_index(schedule, PATH["_CreateHolidayCalendar"](a_name(), holiday_column(100)))
     made = PATH["_CreateCalendar"](valuation, index)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
@@ -2324,49 +2417,6 @@ def test_rows_of_fields_bind_with_one_look_per_column_and_nothing_per_row(
     }
 
 
-# --- the combination of calendars, combine-holiday-calendars.md: n handles in, one publication out
-
-
-# Two and twenty-four calendars of a hundred days each: the vector's shape checked once, the cells
-# decoded in one pass and each resolved once, so the seam's entries grow with the handles and
-# nothing else does; the library's one union and the builder's one copy; one publication. The
-# numpy is the same at two handles and at twenty-four: concatenate runs in C unseen by the ledger,
-# unique is the flatten, the sort and the hash it is built of over two asanyarray views, then the
-# builder's copy and its freeze.
-@pytest.mark.parametrize("n", [2, 24], ids=["two calendars", "twenty-four calendars"])
-def test_a_combination_resolves_each_calendar_once_and_unites_them_once(
-    call_profile: CallProfile, numpy_calls: CallProfile, n: int
-) -> None:
-    handles = Cells.from_rows(
-        [[PATH["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING)] for _ in range(n)]
-    )
-    PATH["_CombineHolidayCalendars"](handles)
-    assert call_profile(lambda: PATH["_CombineHolidayCalendars"](handles)) == {
-        "Registered.run": 1,
-        "_arguments": 1,
-        "_validate": 1,
-        "_resolve_each": 1,
-        "_values": 1,
-        "_decoded": n,
-        "_text": n,
-        "_resolve": n,
-        "_CombineHolidayCalendars": 1,
-        "combine_holiday_calendars": 1,
-        "holiday_calendar": 1,
-        "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 3,
-        "_publish": 1,
-    }
-    assert numpy_calls(lambda: PATH["_CombineHolidayCalendars"](handles)) == {
-        "ndarray.flatten": 1,
-        "ndarray.sort": 1,
-        "numpy._unique_hash": 1,
-        "numpy.asanyarray": 2,
-        "numpy.array": 1,  # the one copy the calendar keeps
-        "ndarray.setflags": 1,  # frozen
-    }
-
-
 # --- contract prices interpolated between anchors, interpolate-contract-prices.md --------------
 
 
@@ -2379,7 +2429,7 @@ def cl_months() -> object:
             Cells.from_rows([[46468.0], [46497.0], [46527.0]]),
             MISSING,
         ),
-        PATH["_CreateHolidayCalendar"](holiday_column(1), bridge.MISSING),
+        PATH["_CreateHolidayCalendar"](a_name(), holiday_column(1)),
     )
 
 

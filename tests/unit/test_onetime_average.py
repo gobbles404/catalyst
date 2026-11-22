@@ -66,7 +66,7 @@ TMA_TEMPLATE: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "CME Clearing",
     "payment_day": day("2026-06-29"),
-    "payment_calendar_key": key_of(CL.holiday_calendar),
+    "payment_holiday_key": key_of(CL.holiday_calendar),
 }
 TMA_TICKET: dict[str, list[object]] = {
     "trade_id": [1],
@@ -435,7 +435,7 @@ STRIP_TEMPLATE: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "CME Clearing",
     "payment_day": day("2027-04-07"),
-    "payment_calendar_key": key_of(NG.holiday_calendar),
+    "payment_holiday_key": key_of(NG.holiday_calendar),
 }
 STRIP_FINALS = {day("2026-12-29"): 3.0, day("2027-01-27"): 5.0, day("2027-02-24"): 4.0}
 
@@ -544,7 +544,7 @@ def test_the_window_crosses_the_seam_and_reads_back_its_dates_as_the_booked_peri
         "settlement_method": "financial",
         "clearing_house": "CME Clearing",
         "payment_day": serial("2026-06-29"),
-        "payment_calendar_key": calendar,
+        "payment_holiday_key": calendar,
     }
     headers = row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price")
     booking = [1.0, serial("2026-05-15"), serial("2026-05-26"), serial("2026-06-25")]

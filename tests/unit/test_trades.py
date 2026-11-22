@@ -13,6 +13,7 @@ from typing import Any, NamedTuple, cast
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
@@ -24,9 +25,9 @@ from catalyst.index_definitions.contract_codes import schedule_months
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
-from catalyst.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.kind import Kind
 from catalyst.instrumentation.work_counts import WorkCounter
@@ -155,7 +156,7 @@ def an_index(
     codes = tuple(code for code, _ in contracts)
     schedule = futures_schedule(codes, dates(*(expiry for _, expiry in contracts)), None)
     spec_name, lot_size, lot_unit = lot
-    return index(
+    return index_on(
         name,
         f"{name} index",
         schedule,
@@ -163,7 +164,7 @@ def an_index(
         contract_specifications(
             (spec_name,), numbers(lot_size), (lot_unit,), numbers(0.0), numbers(0.0), UNITS
         ),
-        holiday_calendar(dates(*holidays)),
+        closed_on(dates(*holidays)),
         spec_name if reporting_lot == "" else reporting_lot,
         UNITS,
     )
@@ -190,7 +191,7 @@ FIXED_PRICE = numbers(3.100, 3.150, 3.400, 3.350, 3.100)
 # F27, computed once on the page and supplied here as resolved dates beside the lag and the
 # calendar that gave them.
 TOY_PAYS = dates("2026-11-30", "2026-11-30", "2026-12-31", "2026-12-31", "2026-11-30")
-PAYMENT_CALENDAR = holiday_calendar(dates("2026-11-26", "2026-12-25", "2027-01-01"))
+PAYMENT_CALENDAR = closed_on(dates("2026-11-26", "2026-12-25", "2027-01-01"))
 
 
 def paying(pays: NDArray[np.datetime64], occurrences: int, lag: int = 2) -> PaymentTerms:
@@ -325,7 +326,7 @@ def test_the_terms_own_frozen_copies_of_their_columns() -> None:
     assert terms.broker is None
 
 
-GAS_DAILY = index(
+GAS_DAILY = index_on(
     "daily",
     "Sample Gas Daily index",
     gas_daily_schedule(("c0",), dates("2026-01-01"), dates("2026-01-31")),
@@ -656,7 +657,7 @@ def test_one_lot_quoted_in_cents_values_in_dollars_through_live_fixed_and_paid(
 # 3.65. The mark is 3,500 dollars, 350,000 cents, and a dollar's move is 100 cents per MMBTU of
 # exposure: the coefficient is the quote quantity times 100, the delta 6,000,000, -3,000,000 and
 # -1,000,000 cents per dollar per MMBTU, and the unit names both currencies.
-CENT_SETTLED = index(
+CENT_SETTLED = index_on(
     "cents settled",
     "Gas settled in cents",
     futures_schedule(
@@ -668,7 +669,7 @@ CENT_SETTLED = index(
     contract_specifications(
         ("NG",), numbers(10_000.0), ("MMBTU",), numbers(0.0), numbers(0.0), UNITS
     ),
-    holiday_calendar(dates("2026-11-26", "2026-12-25", "2027-01-01")),
+    closed_on(dates("2026-11-26", "2026-12-25", "2027-01-01")),
     "NG",
     UNITS,
 )
@@ -714,7 +715,7 @@ def test_a_price_in_dollars_settles_in_cents_with_the_unit_naming_both() -> None
 # Fees are reserves, outside value: the index's brokerage and clearing rates per lot change no
 # offset, no mark and no delta, the owner's decision the valuation pages record.
 def test_fees_per_lot_are_reserves_and_move_no_value() -> None:
-    with_fees = index(
+    with_fees = index_on(
         "Henry Hub NYMEX",
         "Henry Hub natural gas - NYMEX",
         NG.schedule,
@@ -1115,7 +1116,7 @@ PHH = an_index(
     ("2027-05-31", "2027-07-05"),
     lot=("ICE PHH", 2_500.0, "MMBTU"),
 )
-CLEARING_CALENDAR = holiday_calendar(dates("2027-05-31", "2027-08-30"))
+CLEARING_CALENDAR = closed_on(dates("2027-05-31", "2027-08-30"))
 
 
 def pen_terms(
@@ -2208,7 +2209,7 @@ SYN = an_index(
     ("2026-12-04",),
     lot=("UNIT", 1.0, "MMBTU"),
 )
-WEEKDAYS = holiday_calendar(dates("2026-01-01"))  # a payment calendar closing no day of the example
+WEEKDAYS = closed_on(dates("2026-01-01"))  # a payment calendar closing no day of the example
 SYN_SETTLES = {
     "2026-12-01": 70.0,
     "2026-12-02": 71.0,
@@ -2519,7 +2520,7 @@ ETHANE = an_index(
     ("VOLUME", "GAL"),
     ("GAL", 1.0, "GAL"),
 )
-PAY_JAN_1 = holiday_calendar(dates("2027-01-01"))
+PAY_JAN_1 = closed_on(dates("2027-01-01"))
 
 
 def pricing_days(first: str, after: str) -> list[str]:
@@ -3453,7 +3454,7 @@ def test_matching_payment_days_compress_into_one_group_whatever_made_them() -> N
         pytest.approx(150),
         0.0,
     )
-    closed = holiday_calendar(dates("2026-12-07", "2026-12-08"))
+    closed = closed_on(dates("2026-12-07", "2026-12-08"))
     coalesced = group_terms(
         lags=(1, 3), pays=("2026-12-09", "2026-12-09"), calendars=(closed, WEEKDAYS)
     )
@@ -3603,7 +3604,7 @@ def test_partial_asian_periods_on_one_contract_settle_independently() -> None:
 # 31st B fixed and paid, -62 of cash, 275 and 85 for the rest; on 1 January everything fixed, 190
 # unpaid; on 4 January 128 of cash and nothing in mark. The payment days and the anchors they count
 # from are the fixture's own arithmetic, never the kernel's.
-MIXED = index(
+MIXED = index_on(
     "MIXED",
     "Synthetic volume index for the mixed-fields example",
     futures_schedule(
@@ -3620,7 +3621,7 @@ MIXED = index(
         numbers(0.0, 0.0),
         UNITS,
     ),
-    holiday_calendar(dates("2026-12-25")),
+    closed_on(dates("2026-12-25")),
     "GAL",
     UNITS,
 )
@@ -3693,7 +3694,7 @@ def mixed_terms(
     )
     n = len(entries)
     lag_days = np.array([1] * n if lags is None else lags, dtype=np.int64)
-    pay_calendar = holiday_calendar(dates(*pay_closed))
+    pay_calendar = closed_on(dates(*pay_closed))
     payment = (
         None
         if settlement is Settlement.PHYSICAL
@@ -3942,7 +3943,7 @@ def test_equivalent_quantities_compress_alike_whatever_unit_states_them() -> Non
             pytest.approx(cash),
             pytest.approx(delta),
         )
-    cents = index(
+    cents = index_on(
         "cents lots",
         "Gas quoted in cents with lot specifications",
         CENTS.schedule,
@@ -4135,7 +4136,7 @@ def test_the_mixed_batchs_refusals_keep_their_meaning() -> None:
 # The review's extreme input: a BTU as the reporting lot on the cent-quoted index, a coefficient
 # of 1e-8 dollars a cent an MMBTU a lot, so that quantities hundreds of orders of magnitude above
 # any book count their lots past the largest number while every monetary number stays finite.
-TINY_LOT = index(
+TINY_LOT = index_on(
     "tiny lot",
     "Gas with a one BTU lot",
     CENTS.schedule,
@@ -4534,7 +4535,7 @@ WTI_CONTRACTS = (
 
 def wti_like(name: str, contracts: tuple[tuple[str, str], ...]) -> Index:
     """An index of those contracts with the WTI-like conventions, the barrel and the lot."""
-    return index(
+    return index_on(
         name,
         f"{name} index",
         futures_schedule(
@@ -4549,14 +4550,14 @@ def wti_like(name: str, contracts: tuple[tuple[str, str], ...]) -> Index:
             numbers(0.0, 0.0),
             UNITS,
         ),
-        holiday_calendar(dates(*WTI_HOLIDAYS)),
+        closed_on(dates(*WTI_HOLIDAYS)),
         "LOT",
         UNITS,
     )
 
 
 WTI = wti_like("WTI", WTI_CONTRACTS)
-WTI_PAYS = holiday_calendar(dates(*WTI_HOLIDAYS))
+WTI_PAYS = closed_on(dates(*WTI_HOLIDAYS))
 # The ticket's six observation days, the 19th, 20th, 26th and 27th weekends and the 25th a
 # holiday, with their fixings as they arrive; 60 on every other fixed day and 78 on the 29th, a
 # day outside the window whose fixing must change nothing of this trade.
@@ -5384,7 +5385,7 @@ def test_a_days_lots_past_the_largest_number_are_refused_by_their_day() -> None:
 WAHA_SCHEDULE = iferc_schedule(
     ("X26", "Z26", "F27"), dates("2026-11-02", "2026-12-01", "2027-01-04")
 )
-WAHA = index(
+WAHA = index_on(
     "WAHA",
     "Waha basis - ICE",
     WAHA_SCHEDULE,
@@ -5401,7 +5402,7 @@ WAHA = index(
     "LOT",
     UNITS,
 )
-WAHA_PAYS = holiday_calendar(dates("2027-01-01"))
+WAHA_PAYS = closed_on(dates("2027-01-01"))
 WAHA_MONTHS = schedule_months(WAHA_SCHEDULE)
 # Each month's payment day at +2bd from its publication day on that calendar, the ticket's table:
 # 4 November, 3 December and, New Year's Day closed, 6 January.
@@ -5729,7 +5730,7 @@ def test_the_first_iferc_month_is_a_month_to_trade_and_the_existing_refusals_hol
     assert str(missing.value) == (
         "fixings has no index for X26, expected an index for every fixed month in calendar"
     )
-    twin = index(
+    twin = index_on(
         "WAHA",
         "Waha basis - ICE",
         WAHA_SCHEDULE,
@@ -5865,7 +5866,7 @@ def a_fee_index(
     reporting_lot: str = "LOT",
     schedule: object = NG.schedule,
 ) -> Index:
-    return index(
+    return index_on(
         "FEES",
         "Dollars a barrel with the ticket's two specifications",
         schedule,

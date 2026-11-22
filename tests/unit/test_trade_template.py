@@ -101,7 +101,7 @@ def test_each_value_is_the_scalar_its_type_names_and_a_calendar_key_the_text_typ
         trade_date=46289.0,
         contract_code="z26",
         payment_day="+2bd",
-        payment_calendar_key="NYFED+LON",
+        payment_holiday_key="NYFED+LON",
     )
     defaults = template.defaults
     assert defaults["quantity"] == 10.0 and type(defaults["quantity"]) is float
@@ -112,10 +112,10 @@ def test_each_value_is_the_scalar_its_type_names_and_a_calendar_key_the_text_typ
     assert defaults["payment_day"] == DayOrRule(None, "+2bd")  # the rule, read for the grammar
     # Since payment-calendar-keys.md the payment calendar is a key, held as typed: the template
     # has no collection, so it reads the key's form and binds no calendar; a batch does.
-    held = defaults["payment_calendar_key"]
+    held = defaults["payment_holiday_key"]
     assert held == "NYFED+LON" and type(held) is str
-    assert a_template(payment_calendar_key="NOT_COLLECTED").defaults == {
-        "payment_calendar_key": "NOT_COLLECTED"
+    assert a_template(payment_holiday_key="NOT_COLLECTED").defaults == {
+        "payment_holiday_key": "NOT_COLLECTED"
     }
 
 
@@ -227,18 +227,18 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
         ),
         ({"fixed_price": float("inf")}, "fixed_price is inf, expected a finite price"),
         (  # since payment-calendar-keys.md: one name, or several joined by a plus sign
-            {"payment_calendar_key": "NYFED++LON"},
-            "payment_calendar_key is 'NYFED++LON', expected a calendar's name, or several joined "
+            {"payment_holiday_key": "NYFED++LON"},
+            "payment_holiday_key is 'NYFED++LON', expected a calendar's name, or several joined "
             "by '+'; a name is missing",
         ),
         (
-            {"payment_calendar_key": "NYFED + LON"},
-            "payment_calendar_key is 'NYFED + LON', expected a calendar's name, or several "
+            {"payment_holiday_key": "NYFED + LON"},
+            "payment_holiday_key is 'NYFED + LON', expected a calendar's name, or several "
             "joined by '+', each with no whitespace around it",
         ),
         (
-            {"payment_calendar_key": "LON+NYFED+LON"},
-            "payment_calendar_key is 'LON+NYFED+LON', expected a calendar's name, or several "
+            {"payment_holiday_key": "LON+NYFED+LON"},
+            "payment_holiday_key is 'LON+NYFED+LON', expected a calendar's name, or several "
             "joined by '+', each once; 'LON' is given twice",
         ),
         (
@@ -313,11 +313,11 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
 def test_the_reader_spills_the_instrument_and_each_default_under_its_field() -> None:
     handle = ENTRY["_CreateTradeTemplate"](
         "fixed_float",
-        row("quantity_unit", "quantity", "trade_date", "payment_calendar_key"),
+        row("quantity_unit", "quantity", "trade_date", "payment_holiday_key"),
         row("LOT", 10.0, 46289.0, "NYFED+LON"),
     )
     assert spilled(handle) == [
-        ["instrument", "quantity_unit", "quantity", "trade_date", "payment_calendar_key"],
+        ["instrument", "quantity_unit", "quantity", "trade_date", "payment_holiday_key"],
         ["str", "str", "float64", "datetime64[D]", "str"],
         ["fixed_float", "LOT", 10.0, 46289.0, "NYFED+LON"],  # the key as typed
     ]

@@ -3,6 +3,7 @@ schedule, and the four columns made once."""
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
@@ -13,9 +14,9 @@ from catalyst.globals.valuation_date import ValuationDate, valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
-from catalyst.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.kind import Kind
 
@@ -41,9 +42,9 @@ def codes_of(made: Calendar) -> list[str]:
 # and that day, a Monday, a holiday.
 SCHEDULE = a_schedule(("m26", "2026-05-19"), ("n26", "2026-06-22"), ("q26", "2026-07-21"))
 MAY_25 = valuation_date(day("2026-05-25"), 0.5)
-CLOSED_MAY_25 = holiday_calendar(dates("2026-05-25"))
+CLOSED_MAY_25 = closed_on(dates("2026-05-25"))
 # A calendar of one day, New Year's Day, outside every calendar built here.
-ELSEWHERE = holiday_calendar(dates("2026-01-01"))
+ELSEWHERE = closed_on(dates("2026-01-01"))
 
 CONVENTIONS = index_conventions("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL", UNITS)
 SPECIFICATIONS = contract_specifications(
@@ -56,7 +57,7 @@ def an_index(
 ) -> Index:
     """The index of that schedule and holiday calendar, with one set of conventions and
     specifications throughout, since nothing here reads either."""
-    return index(
+    return index_on(
         "sample",
         "Sample futures index",
         schedule,
@@ -293,12 +294,12 @@ def test_a_holiday_on_a_weekday_closes_it_and_one_on_a_weekend_changes_nothing()
     weekday = flags(a_calendar())
     assert weekday["2026-05-25"][0] is False
     assert weekday["2026-05-26"][0] is True
-    on_a_saturday = flags(a_calendar(holidays=holiday_calendar(dates("2026-05-23"))))
+    on_a_saturday = flags(a_calendar(holidays=closed_on(dates("2026-05-23"))))
     assert on_a_saturday == flags(a_calendar(holidays=ELSEWHERE))
 
 
 def test_consecutive_holidays_close_each_day() -> None:
-    closed = holiday_calendar(dates("2026-05-25", "2026-05-26", "2026-05-27"))
+    closed = closed_on(dates("2026-05-25", "2026-05-26", "2026-05-27"))
     shown = flags(a_calendar(holidays=closed))
     assert [shown[f"2026-05-{d}"][0] for d in (22, 25, 26, 27, 28)] == [
         True,
@@ -313,9 +314,9 @@ def test_consecutive_holidays_close_each_day() -> None:
 
 
 def test_duplicate_unordered_and_out_of_range_holidays_change_nothing() -> None:
-    plain = a_calendar(holidays=holiday_calendar(dates("2026-05-25", "2026-06-19")))
+    plain = a_calendar(holidays=closed_on(dates("2026-05-25", "2026-06-19")))
     messy = a_calendar(
-        holidays=holiday_calendar(
+        holidays=closed_on(
             dates(
                 "2026-06-19",
                 "2026-05-25",
@@ -335,7 +336,7 @@ def test_duplicate_unordered_and_out_of_range_holidays_change_nothing() -> None:
 
 def test_a_holiday_on_an_expiry_changes_the_business_day_flag_alone() -> None:
     plain = a_calendar(holidays=ELSEWHERE)
-    closed = a_calendar(holidays=holiday_calendar(dates("2026-06-22")))
+    closed = a_calendar(holidays=closed_on(dates("2026-06-22")))
     assert np.array_equal(plain.dates, closed.dates)
     assert np.array_equal(plain.contract, closed.contract)
     assert np.array_equal(plain.is_fixed, closed.is_fixed)
@@ -446,7 +447,7 @@ def test_every_day_between_the_first_expiry_and_the_last_is_one_row_with_one_pro
         data.draw(st.lists(st.integers(-10, 2500), max_size=30)), dtype="timedelta64[D]"
     )
     as_of = expiries[0] + np.timedelta64(data.draw(st.integers(-10, 2500)), "D")
-    made = calendar(valuation_date(as_of, 0.5), an_index(schedule, holiday_calendar(listed)))
+    made = calendar(valuation_date(as_of, 0.5), an_index(schedule, closed_on(listed)))
     span = int((expiries[-1] - expiries[0]).astype(np.int64))
     assert made.dates.size == span
     assert np.all(np.diff(made.dates) == np.timedelta64(1, "D"))
@@ -487,7 +488,7 @@ def test_the_calendar_keeps_its_sources_by_reference_and_its_columns_read_only()
 
 
 def test_making_a_calendar_changes_no_source_and_a_second_calendar_leaves_the_first() -> None:
-    holidays = holiday_calendar(dates("2026-06-19", "2026-05-25", "2026-05-25"))
+    holidays = closed_on(dates("2026-06-19", "2026-05-25", "2026-05-25"))
     listed_before = holidays.holiday.copy()
     first = a_calendar(holidays=holidays)
     assert np.array_equal(holidays.holiday, listed_before)

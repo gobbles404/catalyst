@@ -3,7 +3,7 @@ the one before; `+7cd`, a week of calendar days on; `+0em`, the last day of the 
 `+1em` the next month's; and since #181 a chain of them, `+3em+25cd-1bd+1bd`, each instruction
 applied to the result of the one before, left to right. One date and one offset in, one date out,
 no object and no handle; the business days are Monday to Friday less the holidays of a calendar
-the desk may give, and nothing else of the library is read. The same reading and the same
+the desk may choose by key, and nothing else of the library is read. The same reading and the same
 arithmetic serve a trade's payment rule, over every component's anchor at once.
 docs/library/utilities/shift-date.md is the page."""
 
@@ -16,7 +16,9 @@ import numpy as np
 from numpy.typing import NDArray
 
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.holiday_calendars import HolidayCalendars, calendar_of
 from catalyst.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
+from catalyst.instrumentation.work_counts import WorkCounter
 
 # The form an offset takes, in the words a message offers.
 FORMS: Final = (
@@ -159,14 +161,24 @@ def shift_days(
     return Shifted(current, strayed_at, strayed_to)
 
 
-def shift_date(date: np.datetime64, offset: str, holidays: HolidayCalendar | None) -> np.datetime64:
-    """The date the offset names from the one given: the offset read whole, `read_offset`, and
-    its instructions applied to the one day, `shift_days`, in their order. The day each
-    instruction makes is held to the sheet's calendar, 1 March 1900 to 31 December 9999, and
-    the first that leaves it is refused naming the date, the offset and the day, with the
-    instruction when the offset has more than one, whatever a later instruction would have made
-    of it."""
+def shift_date(
+    date: np.datetime64,
+    offset: str,
+    holiday_key: str | None,
+    holiday_calendars: HolidayCalendars | None,
+    counter: WorkCounter,
+) -> np.datetime64:
+    """The date the offset names from the one given: the offset read whole, `read_offset`; then
+    the calendar its business days skip, the one the holiday key selects from the collection,
+    bound by the step every reader of a key shares, calendar_of, or none for no key, Monday to
+    Friday with no holidays; and the instructions applied to the one day, `shift_days`, in
+    their order. The day each instruction makes is held to the sheet's calendar, 1 March 1900
+    to 31 December 9999, and the first that leaves it is refused naming the date, the offset
+    and the day, with the instruction when the offset has more than one, whatever a later
+    instruction would have made of it. Work: `holiday_keys_bound`, one for a key, and a
+    union's own counts for a key of several names, on every call."""
     steps = read_offset("offset", offset)
+    holidays = calendar_of("holiday_key", holiday_key, holiday_calendars, counter)
     shifted = shift_days(np.array([date], dtype="datetime64[D]"), steps, holidays)
     k = int(shifted.strayed_at[0])
     if k >= 0:
