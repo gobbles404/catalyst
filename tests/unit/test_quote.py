@@ -799,13 +799,31 @@ def test_the_period_and_the_market_refuse_what_they_cannot_price() -> None:
         match=r"^index is .*, expected a futures, IFERC or published index for a fixed_float$",
     ):
         quote_on(quoted(a_gas_daily_history("2026-10-15"), 2.9), "V26", financial())
-    # A published index books and values trades and is not quoted yet.
-    with pytest.raises(ValueError) as unbuilt:
-        quote_on(quoted(a_published_history("2026-09-16"), 3.5, 3.65), "U26", financial())
-    assert str(unbuilt.value) == (
-        "index is a published index, expected a futures or an IFERC index for a quote; a quote "
-        "on a published index is not built"
+    # A published index takes the asian method alone, in a quote as in a batch.
+    refused(
+        quoted(a_published_history("2026-09-16"), 3.5, 3.65),
+        "U26",
+        financial(method="lastday"),
+        "schedule_method is 'lastday', expected 'asian' on a published index; a published month "
+        "is the average of its prints",
     )
+
+
+# A quote on a published index, issue #271's worked example on Wednesday 16 September 2026:
+# September's four weekly prints an equal share each, two fixed at 3.00 and 3.20 and two at the
+# month's quote of 3.50. The whole month quotes at their average, 3.30; the balance of the month
+# holds the two prints still to come and quotes at 3.50; and October, wholly to come, at its
+# own quote.
+def test_a_quote_on_a_published_index_averages_the_prints_its_period_covers() -> None:
+    market = quoted(a_published_history("2026-09-16"), 3.5, 3.65)
+    assert quote_on(market, "U26", financial()) == pytest.approx(3.30, **CLOSE)
+    assert quote_on(market, "BALU26", financial()) == pytest.approx(3.50, **CLOSE)
+    assert quote_on(market, "V26", financial()) == pytest.approx(3.65, **CLOSE)
+    # On Tuesday the 15th Monday's print has fixed, at a stand-in until it is released: the
+    # whole month quotes through the stand-in, and the balance holds the same two prints.
+    stood_in = quoted(a_published_history("2026-09-15", 3.50), 3.5, 3.65)
+    assert quote_on(stood_in, "U26", financial()) == pytest.approx(3.375, **CLOSE)
+    assert quote_on(stood_in, "BALU26", financial()) == pytest.approx(3.50, **CLOSE)
 
 
 def test_prices_may_be_zero_or_negative_and_the_quote_keeps_the_indexs_units() -> None:

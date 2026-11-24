@@ -3363,8 +3363,26 @@ namespace Catalyst.Host.Tests
             Assert.Equal(20000.0, (double)((object[,])Seam.Call("_ReportRisk", stoodIn, "nominal_delta", "year"))[3, 1], 6);
             var lastday = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("gal", "month", "lastday", "cleared", "financial", "TEST_CLEARER", "+5bd", payments, "monthly", 1.0));
             Assert.Equal("#ERROR _CreateTrades: ValueError: schedule_method of trade 1001 at row 1 is 'lastday', expected 'asian' on a published index; a published month is the average of its prints", Trades(index, headers, new object[,] { { 1001.0, 46254.0, "U26", 40000.0, 3.10 } }, lastday));
+            // A part of a month is a window of dates, holding the prints dated in it: the balance
+            // of September from the 16th is the prints dated the 21st and the 28th, 20,000 gallons
+            // on each, worth 40,000 times 3.50 less 3.10; a window holding no print is refused.
             var dated = Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price");
-            Assert.Equal("#ERROR _CreateTrades: ValueError: U26 of trade 1001 at row 1 is covered from 2026-09-16 to 2026-09-30, part of its month, expected the whole month under asian; a published month averages every print that counts toward it, and a part of a month is not built", Trades(index, dated, new object[,] { { 1001.0, 46254.0, 46281.0, 46295.0, 40000.0, 3.10 } }, template));
+            var balance = (string)Trades(index, dated, new object[,] { { 1001.0, 46254.0, 46281.0, 46295.0, 40000.0, 3.10 } }, template);
+            var balanced = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", balance, wednesday), (string)Seam.Call("_CreateMarket", wednesday, quotes), ExcelMissing.Value);
+            Assert.Equal(16000.0, (double)((object[,])Seam.Call("_ReportValues", balanced))[2, 0], 6);
+            var balancedByDay = (object[,])Seam.Call("_ReportRisk", balanced, "nominal_delta", "day");
+            Assert.Equal(6, balancedByDay.GetLength(0));
+            Assert.Equal(46286.0, balancedByDay[4, 0]);
+            Assert.Equal(20000.0, (double)balancedByDay[4, 1], 6);
+            Assert.Equal("#ERROR _CreateTrades: ValueError: U26 of trade 1001 at row 1 has no print from 2026-09-01 to 2026-09-06, expected a print dated in the days it covers; a published index prices on its prints alone", Trades(index, dated, new object[,] { { 1001.0, 46254.0, 46266.0, 46271.0, 40000.0, 3.10 } }, template));
+            // Quotes on the same market: the whole month at the average of its four prints, 3.30,
+            // and the balance of the month at 3.50, by its label and by two dates.
+            var quoteFields = Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_holiday_key", "settlement_frequency", "nearby");
+            var quoteTemplate = (string)Template("_CreateQuoteTemplate", "fixed_float", quoteFields, Row("cleared", "financial", "asian", "month", "+5bd", payments, "monthly", 1.0));
+            var market16 = (string)Seam.Call("_CreateMarket", wednesday, quotes);
+            Assert.Equal(3.30, (double)Seam.Call("_Quote", market16, "U26", quoteTemplate, "flat", ExcelMissing.Value), 9);
+            Assert.Equal(3.50, (double)Seam.Call("_Quote", market16, "BALU26", quoteTemplate, "flat", ExcelMissing.Value), 9);
+            Assert.Equal(3.50, (double)Seam.Call("_QuoteByDates", market16, 46281.0, 46295.0, quoteTemplate, "ftc", ExcelMissing.Value), 9);
         }
 
         // The mixed road out: a rectangle of three kinds comes back one tagged value per cell.

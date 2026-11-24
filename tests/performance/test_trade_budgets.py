@@ -1672,7 +1672,7 @@ def test_a_published_batch_observes_each_months_prints_and_runs_the_kernel_on_th
         "observed": 1,
         "trade_schedule_of": 1,
         "supported_on_published": 1,  # the methods' fact the observations read on this kind
-        "_whole_months": 1,
+        "_the_prints": 1,  # each component's run of prints, a month's by code or a window's by date
         "observations": 1,
     }
     prints = contracts > PRINT_MONTH  # the prints of the months the batch holds

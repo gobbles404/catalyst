@@ -1833,6 +1833,20 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(AAP27),3,1)"   = "11000"
     '=INDEX(_ReportRisk(AAP27,"nominal_delta","year"),4,2)' = "30000"
     "=_CreateTrades(AAP3,IS1:IW1,AAR5:AAV5,AAP29,ZU1)" = "#ERROR _CreateTrades: ValueError: schedule_method of trade 1001 at row 1 is 'lastday', expected 'asian' on a published index; a published month is the average of its prints"
+    # A part of a month on a published index is a window of dates, holding the prints dated in
+    # it. The balance of September from the 16th, booked by two dates in AAP32 and valued on the
+    # 16th in AAP34: the prints dated the 21st and the 28th, 20,000 gallons on each, worth 16,000.
+    # A window holding no print is refused. And quotes on the market of AAP11 under the quote
+    # template of AAP39: the whole month at 3.30, the balance at 3.50 by its label and by dates.
+    "=INDEX(_ReportValues(AAP34),3,1)"   = "16000"
+    '=ROWS(_ReportRisk(AAP34,"nominal_delta","day"))' = "6"
+    '=INDEX(_ReportRisk(AAP34,"nominal_delta","day"),5,2)' = "20000"
+    '=INDEX(_ReportRisk(AAP34,"nominal_delta","day"),6,2)' = "20000"
+    "=_CreateTrades(AAP3,AAR31:AAW31,AAR36:AAW36,AAP5,ZU1)" = "#ERROR _CreateTrades: ValueError: U26 of trade 1001 at row 1 has no print from 2026-09-01 to 2026-09-06, expected a print dated in the days it covers; a published index prices on its prints alone"
+    '=_Quote(AAP11,"U26",AAP39,"flat")'    = "3.3"
+    '=_Quote(AAP11,"BALU26",AAP39,"flat")' = "3.5"
+    '=_QuoteByDates(AAP11,DATE(2026,9,16),DATE(2026,9,30),AAP39,"ftc")' = "3.5"
+    '=_Quote(AAP11,"U26",AAP41,"flat")'    = "#ERROR _Quote: ValueError: schedule_method is 'lastday', expected 'asian' on a published index; a published month is the average of its prints"
     # The Gas Daily schedule: a creator over three contract months, their codes and the first and
     # last day of gas of each, in DG to DI, and over the first row alone, read back through
     # util_ReadHandle; a first-date column one row long and a last-date column one row short, the
@@ -3843,6 +3857,20 @@ $cells = [ordered]@{
     "AAP27" = "=_EvaluateTrades(AAP26,AAP25)"
     "AAR29" = "gal"; "AAS29" = "month"; "AAT29" = "lastday"; "AAU29" = "cleared"; "AAV29" = "financial"; "AAW29" = "TEST_CLEARER"; "AAX29" = "+5bd"; "AAY29" = "NK2"; "AAZ29" = "monthly"
     "AAP29" = '=_CreateTradeTemplate("fixed_float",HSTACK(IJ1:IR1,"nearby"),HSTACK(AAR29:AAZ29,1))'
+    # A part of a month: a ticket by two dates, the balance of September from the 16th, booked
+    # under the asian template and valued on the 16th; a window of dates that holds no print; and
+    # a quote template, asian and lastday, for quotes on the market of AAP11.
+    "AAR31" = "trade_id"; "AAS31" = "trade_date"; "AAT31" = "start_date"; "AAU31" = "end_date"; "AAV31" = "quantity"; "AAW31" = "fixed_price"
+    "AAR32" = "1001"; "AAS32" = "20-Aug-2026"; "AAT32" = "16-Sep-2026"; "AAU32" = "30-Sep-2026"; "AAV32" = "40000"; "AAW32" = "3.1"
+    "AAP32" = "=_CreateTrades(AAP3,AAR31:AAW31,AAR32:AAW32,AAP5,ZU1)"
+    "AAP33" = "=_PrepareTrades(AAP32,AAP10)"
+    "AAP34" = "=_EvaluateTrades(AAP33,AAP11)"
+    "AAR36" = "1001"; "AAS36" = "20-Aug-2026"; "AAT36" = "1-Sep-2026"; "AAU36" = "6-Sep-2026"; "AAV36" = "40000"; "AAW36" = "3.1"
+    "AAR38" = "route"; "AAS38" = "settlement_method"; "AAT38" = "schedule_method"; "AAU38" = "quantity_per"; "AAV38" = "payment_day"; "AAW38" = "payment_holiday_key"; "AAX38" = "settlement_frequency"; "AAY38" = "nearby"
+    "AAR39" = "cleared"; "AAS39" = "financial"; "AAT39" = "asian"; "AAU39" = "month"; "AAV39" = "+5bd"; "AAW39" = "NK2"; "AAX39" = "monthly"; "AAY39" = "1"
+    "AAP39" = '=_CreateQuoteTemplate("fixed_float",AAR38:AAY38,AAR39:AAY39,ZU1)'
+    "AAR41" = "cleared"; "AAS41" = "financial"; "AAT41" = "lastday"; "AAU41" = "month"; "AAV41" = "+5bd"; "AAW41" = "NK2"; "AAX41" = "monthly"; "AAY41" = "1"
+    "AAP41" = '=_CreateQuoteTemplate("fixed_float",AAR38:AAY38,AAR41:AAY41,ZU1)'
     # The Gas Daily schedule: three contract months of Henry Hub Gas Daily, the first and last day
     # of gas of each, a fourth first date for a column one row long, a copy of the last-date column
     # with a blank, a code over a number, and two creator cells, over the three rows and over the

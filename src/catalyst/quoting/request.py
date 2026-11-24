@@ -383,19 +383,32 @@ def the_curve(
             assert_never(terms.route)
 
 
+def _the_published_terms(terms: Terms) -> None:
+    """The terms a published index takes, the batch's rules in a quote's words: a financial
+    settlement, nothing being delivered against a published price, and the asian method, a
+    month being the average of its prints."""
+    if terms.settlement is Settlement.PHYSICAL:
+        raise ValueError(
+            "settlement_method is 'physical', expected 'financial' on a published index; "
+            "nothing is delivered against a published price"
+        )
+    if terms.method is not ScheduleMethod.ASIAN:
+        raise ValueError(
+            f"schedule_method is {terms.method.value!r}, expected 'asian' on a published "
+            "index; a published month is the average of its prints"
+        )
+
+
 def the_method(terms: Terms, schedule: TradeSchedule) -> None:
     """The terms against the index's kind, the batch's rules: on an IFERC index a financial
     settlement and lastday, the month's index being published once; on a futures index a physical
     settlement with lastday alone, the other three methods settling on a price other than the
-    expiry's settle. A published index books and values trades and is not quoted yet, so it is
-    refused here by name, before any of its prints is read."""
+    expiry's settle; on a published index a financial settlement and asian, a month being the
+    average of its prints."""
     method = terms.method
     match schedule:
         case PublishedSchedule():
-            raise ValueError(
-                "index is a published index, expected a futures or an IFERC index for a quote; "
-                "a quote on a published index is not built"
-            )
+            _the_published_terms(terms)
         case IfercSchedule():
             if terms.settlement is Settlement.PHYSICAL:
                 raise ValueError(

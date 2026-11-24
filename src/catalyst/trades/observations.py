@@ -188,10 +188,12 @@ def observed(
                 count,
             )
         case PublishedSchedule():
-            # Every print that counts toward the component's month, an equal share each: the
-            # month's prints are the schedule's rows on its contract, one run, found by two
-            # searches of the column that says each print's month, so no date is compared and
-            # no calendar read. asian alone, and the whole month.
+            # The prints a component covers, an equal share each, asian alone and no calendar
+            # read. A whole month is the prints that count toward it, the schedule's rows on its
+            # contract, one run found by two searches of the column that says each print's
+            # month, so no date is compared. A part of a month is a window of dates: the prints
+            # dated from its first day to its last, two searches of the schedule's dates, each
+            # print pricing off the month its own row names. A window holding no print is refused.
             averaged = supported_on_published(method)
             if not averaged.all():
                 k = int((~averaged).argmax())
@@ -200,9 +202,15 @@ def observed(
                     "expected 'asian' on a published index; a published month is the average "
                     "of its prints"
                 )
-            _whole_months(schedule, contract, start, end, method, averaged, named, PUBLISHED_WHOLE)
-            first = np.searchsorted(schedule.contract, contract, side="left")
-            prints = np.searchsorted(schedule.contract, contract, side="right") - first
+            first, prints = _the_prints(schedule, contract, start, end)
+            if (prints == 0).any():
+                k = int((prints == 0).argmax())
+                label = schedule.codes[int(contract[k])] if booked is None else booked(k)
+                raise ValueError(
+                    f"{label} of {named(k)} has no print from {start[k]} to {end[k]}, expected "
+                    "a print dated in the days it covers; a published index prices on its "
+                    "prints alone"
+                )
             total = int(prints.sum())
             place = np.arange(total) - np.repeat(np.cumsum(prints) - prints, prints)
             place += np.repeat(first, prints)
@@ -313,10 +321,35 @@ FUTURES_WHOLE = (
     "the expiry-based methods take the contract's month entire, and a part of it prices under asian"
 )
 IFERC_WHOLE = "an IFERC month's index is one price for the whole month"
-PUBLISHED_WHOLE = (
-    "a published month averages every print that counts toward it, and a part of a month is "
-    "not built"
-)
+
+
+def _the_prints(
+    schedule: PublishedSchedule,
+    contract: NDArray[np.intp],
+    start: NDArray[np.datetime64],
+    end: NDArray[np.datetime64],
+) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
+    """The run of prints each component covers on a published schedule: the row of its first
+    print and how many follow, none where it covers no print. A component covering its whole
+    calendar month takes the prints that count toward its contract, by the code on their rows;
+    one covering a part of a month takes the prints dated from its first day to its last, by
+    their dates. Four searches over the components, two of each column, and one choice."""
+    month = start.astype("datetime64[M]")
+    whole = (start == month.astype("datetime64[D]")) & (
+        end == (month + np.timedelta64(1, "M")).astype("datetime64[D]") - np.timedelta64(1, "D")
+    )
+    dates = schedule.publication_date
+    first = np.where(
+        whole,
+        np.searchsorted(schedule.contract, contract, side="left"),
+        np.searchsorted(dates, start, side="left"),
+    )
+    last = np.where(
+        whole,
+        np.searchsorted(schedule.contract, contract, side="right"),
+        np.searchsorted(dates, end, side="right"),
+    )
+    return first, last - first
 
 
 def _whole_months(
