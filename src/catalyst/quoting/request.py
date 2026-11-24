@@ -445,6 +445,10 @@ def the_method(terms: Terms, schedule: TradeSchedule) -> None:
 
 # --- the period and the request -------------------------------------------------------------
 
+# A quote is by code or by dates as a whole: one flag, read for every component.
+_EVERY_COMPONENT: Final = np.ones(1, dtype=np.bool_)
+_EVERY_COMPONENT.setflags(write=False)
+
 
 def the_period(
     first_day: np.datetime64,
@@ -495,11 +499,14 @@ def the_request(
     terms: Terms,
     period: Period,
     counter: WorkCounter,
+    dated: bool,
 ) -> Request:
     """A quote's request from its resolved period, the steps a label and two dates share: the
     observations by the template's method over each component's days, a window's over the whole
-    of it, the quote named in a refusal and a component by what it is booked under, its code or
-    `the window`; each observation's pricing reference by the pipeline's rules, a component named
+    of it, `dated` saying whether the period is a window of dates, two dates or the balance of
+    a label, or the months a label names, which a published index selects its prints by, the
+    quote named in a refusal and a component by what it is booked under, its code or `the
+    window`; each observation's pricing reference by the pipeline's rules, a component named
     by its code or its two dates; each component's quantity, one or its calendar days; and a
     financial quote's payment days from the template, after each component's last observation.
     Work: the observations made, and the payments' as the_payments reports it."""
@@ -521,6 +528,7 @@ def the_request(
         period.last,
         lambda _: "the quote",
         booked=booked,
+        dated=_EVERY_COMPONENT if dated else None,
     )
     counter.hit(OBSERVATIONS_MADE, observations.component.size)
     references = observation_references(

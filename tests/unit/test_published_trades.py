@@ -398,8 +398,10 @@ def test_a_booked_balance_of_month_averages_the_prints_dated_in_its_window(
 
 
 # A print dated before the window's first day is outside it: a window from Tuesday the 15th
-# leaves out Monday the 14th's print, live or fixed. A whole month typed as two dates is the
-# month. A window across a month end is a part of each month, each paid from its own last print.
+# leaves out Monday the 14th's print, live or fixed. A whole month typed as two dates holds the
+# prints dated in it, on this schedule the month's own four; test_published_windows.py has a
+# schedule where they differ. A window across a month end is a part of each month, each paid
+# from its own last print.
 def test_a_window_holds_the_prints_dated_in_it_and_splits_at_a_month_end(
     diesel: dict[str, Any],
 ) -> None:
