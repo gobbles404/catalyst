@@ -8,8 +8,11 @@ field, on `feat/payment-calendar-keys`, stacked on the first. It follows
 [multiple-discount-curves.md](multiple-discount-curves.md), #201 to #203, which chose a discount
 curve by name, and [combine-holiday-calendars.md](combine-holiday-calendars.md), #183.
 [holiday-calendar.md](../../library/index-definitions/holiday-calendar.md) and
-[collect-payment-calendars.md](../../library/index-definitions/collect-payment-calendars.md) own
-the name, the collection and the key.
+[collect-holiday-calendars.md](../../library/index-definitions/collect-holiday-calendars.md) own
+the name, the collection and the key. Since [holiday-keys.md](holiday-keys.md), #270, the field
+reads `payment_holiday_key`, the collection is `_CollectHolidayCalendars`, a calendar's name
+comes first and is required, and `_CombineHolidayCalendars` is gone; this page keeps the words
+of its day.
 
 ## The issue
 
@@ -179,7 +182,7 @@ the names joined by `+`.
 |---|---|
 | The field | `payment_calendar_key` in `instruments/definitions.py` |
 | The key's form | `calendar_key` in `index_definitions/payment_calendars.py`, the field's reader in `trades/template.py` |
-| The binding, and its refusals | `payment_calendar` and `no_collection` in the same module, called by `_the_calendars` in `trades/resolution.py` and by `quote_template` in `quoting/template.py`; [collect-payment-calendars.md](../../library/index-definitions/collect-payment-calendars.md#binding-a-key) is the page |
+| The binding, and its refusals | `payment_calendar` and `no_collection` in the same module, called by `_the_calendars` in `trades/resolution.py` and by `quote_template` in `quoting/template.py`; [collect-holiday-calendars.md](../../library/index-definitions/collect-holiday-calendars.md#binding-a-key) is the page |
 | The key kept to show | `ResolvedTrades.payment_calendar_key` in `trades/terms.py`, read back last by `trades_table` in `excel/utilities.py` |
 
 ### Also pin

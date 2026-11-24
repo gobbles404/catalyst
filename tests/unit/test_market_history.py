@@ -4,6 +4,7 @@ is."""
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
@@ -14,9 +15,9 @@ from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
-from catalyst.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.market.market_history import MarketHistory, market_history
 from catalyst.market_data.futures_fixings import FuturesFixings, futures_fixings
@@ -42,9 +43,9 @@ def a_schedule(*contracts: tuple[str, str]) -> FuturesSchedule:
 # Wednesday 20 to Friday 22 May, and the settle fixed on each.
 SCHEDULE = a_schedule(("m26", "2026-05-19"), ("n26", "2026-06-22"), ("q26", "2026-07-21"))
 MAY_26 = valuation_date(day("2026-05-26"), 0.5)
-CLOSED_MAY_25 = holiday_calendar(dates("2026-05-25"))
+CLOSED_MAY_25 = closed_on(dates("2026-05-25"))
 # A calendar of one day, New Year's Day, outside every calendar built here.
-ELSEWHERE = holiday_calendar(dates("2026-01-01"))
+ELSEWHERE = closed_on(dates("2026-01-01"))
 
 CONVENTIONS = index_conventions("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL", UNITS)
 SPECIFICATIONS = contract_specifications(
@@ -60,7 +61,7 @@ def an_index(
     """The index of that schedule and holiday calendar, with one set of conventions and
     specifications throughout, since nothing here reads either. Each call is a new index, as
     every call of the library's builder is; a calendar and the fixings it binds must share one."""
-    return index(
+    return index_on(
         name, f"{name} index", schedule, CONVENTIONS, SPECIFICATIONS, holidays, None, UNITS
     )
 
@@ -343,7 +344,7 @@ def any_calendar(data: st.DataObject) -> Calendar:
     span = int(offsets[-1] - offsets[0])
     as_of = expiries[0] + np.timedelta64(data.draw(st.integers(-10, span + 10)), "D")
     fraction = data.draw(st.sampled_from((0.0, 0.5, 1.0)))
-    return calendar(valuation_date(as_of, fraction), an_index(schedule, holiday_calendar(listed)))
+    return calendar(valuation_date(as_of, fraction), an_index(schedule, closed_on(listed)))
 
 
 @settings(deadline=None)

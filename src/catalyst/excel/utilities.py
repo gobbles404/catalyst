@@ -40,10 +40,10 @@ from catalyst.index_definitions.date_offsets import shift_date
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
+from catalyst.index_definitions.holiday_calendars import HolidayCalendars
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import IndexConventions
-from catalyst.index_definitions.payment_calendars import PaymentCalendars
 from catalyst.index_definitions.periods import end_date, start_date
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FieldType, Instrument
@@ -331,10 +331,7 @@ def price_vector_table(obj: PriceVector) -> MixedArray:
 
 @shown.register
 def holiday_calendar_table(obj: HolidayCalendar) -> MixedArray:
-    # The days; and beside each, since payment-calendar-keys.md, the calendar's name where it
-    # was made with one, as a curve's readback repeats its name.
-    if obj.name is None:
-        return MixedArray.table([("holiday",), ("datetime64[D]",)], obj.holiday)
+    # The days; and beside each the calendar's name, as a curve's readback repeats its name.
     return MixedArray.table(
         [("holiday", "name"), ("datetime64[D]", "str")],
         obj.holiday,
@@ -343,7 +340,7 @@ def holiday_calendar_table(obj: HolidayCalendar) -> MixedArray:
 
 
 @shown.register
-def payment_calendars_table(obj: PaymentCalendars) -> MixedArray:
+def holiday_calendars_table(obj: HolidayCalendars) -> MixedArray:
     # One row per calendar in the order given, payment-calendar-keys.md: its name and how many
     # days it lists; the days themselves are each calendar's own handle's to spill.
     return MixedArray.table(
@@ -663,10 +660,10 @@ def trades_table(obj: Trades) -> MixedArray:
     # nearby after it, since nearby-selection.md, appended the same way: each row's own number,
     # the contract its days are priced by counted from the prompt.
     numbers("nearby", "int64", terms.nearby[rows])
-    # payment_calendar_key after it, since payment-calendar-keys.md, appended the same way so
+    # payment_holiday_key after it, since payment-calendar-keys.md, appended the same way so
     # that no column before it moves: each row's key as entered, where the batch settles
     # financially.
-    labels("payment_calendar_key", terms.payment_calendar_key)
+    labels("payment_holiday_key", terms.payment_holiday_key)
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
 
@@ -1393,16 +1390,22 @@ def util_ShiftDate(
         "-1bd, +7cd, +0em or +3em+25cd-1bd+1bd, applied left to right, typed or in a cell such "
         "as B2.",
     ],
-    holiday_calendar: Annotated[
-        Handle[HolidayCalendar] | None,
-        "The holiday-calendar handle whose holidays business days skip, such as C2; left out for "
+    holiday_key: Annotated[
+        str | None,
+        "The calendar whose holidays business days skip, by key: one calendar's name, such as "
+        "NYFED, or several joined by +, such as NYFED+LON, closed when any is; left out for "
         "Monday to Friday with no holidays.",
+    ] = None,
+    holiday_calendars: Annotated[
+        Handle[HolidayCalendars] | None,
+        "The collection holiday_key selects from: the cell showing _CollectHolidayCalendars's "
+        "result, such as C2. Leave it out where there is no holiday_key.",
     ] = None,
 ) -> Date:
     """Shifts a date by business days, calendar days or month ends, +1bd the next business day,
     -1bd the one before, +7cd a week on, +0em the month's last day, a chain such as
     +3em+25cd-1bd+1bd applied left to right, and shows the date."""
-    return Date(shift_date(date, offset, holiday_calendar))
+    return Date(shift_date(date, offset, holiday_key, holiday_calendars, WorkCounter()))
 
 
 @excel_function

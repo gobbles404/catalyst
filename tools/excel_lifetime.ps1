@@ -210,10 +210,11 @@ function Build-Chain($State, $Sheet, [string]$Name = "WTI NYMEX", [double]$First
     Put $State $Sheet "A9" "20-May-2026"; Put $State $Sheet "B9" "70.85"
     Put $State $Sheet "A10" "$First"; Put $State $Sheet "A11" "$Second"
     Put $State $Sheet "D1" "=_CreateFuturesSchedule(A2:A4,B2:B4)"
-    Put $State $Sheet "D2" "=_CreateHolidayCalendar(C2)"
+    Put $State $Sheet "D2" '=_CreateHolidayCalendar("NYMEX",C2)'
+    Put $State $Sheet "C4" "=_CollectHolidayCalendars(D2)"
     Put $State $Sheet "D3" '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     Put $State $Sheet "D4" "=_CreateContractSpecifications(E1:I1,E2:I3)"
-    Put $State $Sheet "D5" '=_CreateIndex(A1,"West Texas Intermediate crude oil - NYMEX",D1,D3,D4,D2,"NYMEX")'
+    Put $State $Sheet "D5" '=_CreateIndex(A1,"West Texas Intermediate crude oil - NYMEX",D1,D3,D4,"NYMEX","NYMEX",C4)'
     Put $State $Sheet "D6" "=_CreateValuationDate(A6,0.5)"
     Put $State $Sheet "D7" "=_CreateCalendar(D6,D5)"
     Put $State $Sheet "D8" "=_CreateFuturesFixings(A7:A9,B7:B9,D5)"
@@ -222,7 +223,10 @@ function Build-Chain($State, $Sheet, [string]$Name = "WTI NYMEX", [double]$First
     Put $State $Sheet "D11" "=_CreateMarket(D9,D10)"
     Put $State $Sheet "D12" "=INDEX(util_ReadHandle(D11),9,5)"
 }
-$ChainCreators = 11
+# The chain's creator cells: D1 to D11, and since holiday-keys.md the collection the index's
+# holiday key selects from, in C4.
+$ChainCells = @("C4") + @(1..11 | ForEach-Object { "D$_" })
+$ChainCreators = $ChainCells.Count
 
 function Run-Group([string]$Name, [scriptblock]$Body) {
     Write-Host "== $Name"
@@ -244,17 +248,17 @@ $core = {
     Check "the vector's cell shows its handle at once, no #N/A" ($vector.StartsWith("$(Id $state):price_vector:WTI NYMEX:")) $vector
     Check "the market reads the valuation day's quote" ((Text $state $sheet "D12") -eq "72.1") (Text $state $sheet "D12")
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
-    Check "eleven creators, eleven live publications, eleven published" ($c.Live -eq 11 -and $c.Published -eq 11) $c.Text
+    Check "twelve creators, twelve live publications, twelve published" ($c.Live -eq 12 -and $c.Published -eq 12) $c.Text
     Check "nothing released, no misses, no disposal errors" ($c.Released -eq 0 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     $id = Id $state
-    $led = @(1..$ChainCreators | Where-Object { (Text $state $sheet "D$_").StartsWith("${id}:") }).Count
+    $led = @($ChainCells | Where-Object { (Text $state $sheet $_).StartsWith("${id}:") }).Count
     Check "every handle begins with this Excel's process ID" ($led -eq $ChainCreators) "$id leads $(Text $state $sheet 'D5')"
 
     # Unchanged recalculation: every creator runs again, none publishes, the texts stay.
     Invoke-ExcelCall "full calculation" { $state.Excel.CalculateFull() }
     $c = Counts $state $sheet
-    Check "a full calculation with nothing changed publishes nothing" ($c.Published -eq 11 -and $c.Live -eq 11) $c.Text
-    Check "and reuses every creator's live call" ($c.Reused -ge 11) $c.Text
+    Check "a full calculation with nothing changed publishes nothing" ($c.Published -eq 12 -and $c.Live -eq 12) $c.Text
+    Check "and reuses every creator's live call" ($c.Reused -ge 12) $c.Text
     Check "the vector's text is unchanged" ((Text $state $sheet "D10") -eq $vector) (Text $state $sheet "D10")
 
     # A changed price: the vector and the market publish anew, the reader shows it, the two old
@@ -264,28 +268,28 @@ $core = {
     Check "a changed price gives the vector a new handle" ($changed -ne $vector -and $changed.StartsWith("$(Id $state):price_vector:WTI NYMEX:")) $changed
     Check "the market reads the new quote" ((Text $state $sheet "D12") -eq "73.5") (Text $state $sheet "D12")
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators -and $c.Released -ge 2 }
-    Check "the old vector and market are released and the store is back to eleven" ($c.Live -eq 11 -and $c.Released -eq 2 -and $c.Published -eq 13) $c.Text
+    Check "the old vector and market are released and the store is back to twelve" ($c.Live -eq 12 -and $c.Released -eq 2 -and $c.Published -eq 14) $c.Text
 
     # Duplicate creators: an identical call shares; a different one is its own; the last owner
     # releases.
     Put $state $sheet "F10" "=_CreatePriceVector(A1,A10:A11)"
     Check "an identical creator in another cell shows the same handle" ((Text $state $sheet "F10") -eq $changed) (Text $state $sheet "F10")
     $c = Counts $state $sheet
-    Check "and publishes nothing" ($c.Published -eq 13 -and $c.Live -eq 11) $c.Text
+    Check "and publishes nothing" ($c.Published -eq 14 -and $c.Live -eq 12) $c.Text
     Clear-Cell $state $sheet "F10"
     Start-Sleep -Seconds 3
     $c = Counts $state $sheet
-    Check "deleting the duplicate releases nothing while the first cell lives" ($c.Live -eq 11 -and $c.Released -eq 2) $c.Text
+    Check "deleting the duplicate releases nothing while the first cell lives" ($c.Live -eq 12 -and $c.Released -eq 2) $c.Text
     Check "and the market still reads through the first" ((Text $state $sheet "D12") -eq "73.5") (Text $state $sheet "D12")
     Put $state $sheet "A13" "80"; Put $state $sheet "A14" "81"
     Put $state $sheet "F10" "=_CreatePriceVector(A1,A13:A14)"
     $other = Text $state $sheet "F10"
     Check "a creator with other inputs is its own publication" ($other -ne $changed -and $other.StartsWith("$(Id $state):price_vector:WTI NYMEX:")) $other
     $c = Counts $state $sheet
-    Check "and published" ($c.Published -eq 14 -and $c.Live -eq 12) $c.Text
+    Check "and published" ($c.Published -eq 15 -and $c.Live -eq 13) $c.Text
     Clear-Cell $state $sheet "F10"
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
-    Check "deleting its last owner releases it" ($c.Live -eq 11 -and $c.Released -eq 3) $c.Text
+    Check "deleting its last owner releases it" ($c.Live -eq 12 -and $c.Released -eq 3) $c.Text
 
     # An invalid input and its recovery: the failure shows, owns nothing, and the chain rebuilds.
     Put $state $sheet "A10" "x"
@@ -294,19 +298,19 @@ $core = {
     $relayed = Text $state $sheet "D11"
     Check "and the market relays the creator's failure" ($relayed.StartsWith("#ERROR _CreateMarket: price_vector is the creator's failure, expected price vector handle: #ERROR _CreatePriceVector")) $relayed
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators - 2) }
-    Check "the failed chain owns nothing: two fewer live, nothing published" ($c.Live -eq 9 -and $c.Published -eq 14) $c.Text
+    Check "the failed chain owns nothing: two fewer live, nothing published" ($c.Live -eq 10 -and $c.Published -eq 15) $c.Text
     Put $state $sheet "A10" "73.5"
     Check "a valid price again rebuilds the vector" ((Text $state $sheet "D10").StartsWith("$(Id $state):price_vector:WTI NYMEX:")) (Text $state $sheet "D10")
     Check "and the market reads it" ((Text $state $sheet "D12") -eq "73.5") (Text $state $sheet "D12")
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
-    Check "the store is back to eleven, two more published" ($c.Live -eq 11 -and $c.Published -eq 16) $c.Text
+    Check "the store is back to twelve, two more published" ($c.Live -eq 12 -and $c.Published -eq 17) $c.Text
 
     # The last workbook closes: everything it owned goes, Python stays.
     Close-Book $state $book
     $scratch = New-Book $state
     $watch = Sheet $state $scratch
     $c = Settle $state $watch { param($c) $c.Live -eq 0 }
-    Check "closing the last workbook releases every publication" ($c.Live -eq 0 -and $c.Released -eq 16) $c.Text
+    Check "closing the last workbook releases every publication" ($c.Live -eq 0 -and $c.Released -eq 17) $c.Text
     Check "no release missed, no disposal error, none skipped" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
     Put $state $watch "A1" "=CatalystStatus()"
     Check "Python is still running" ((Text $state $watch "A1") -eq "ok: python started and functions registered") (Text $state $watch "A1")
@@ -320,7 +324,7 @@ $edits = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
-    Check "the chain is live" ($c.Live -eq 11) $c.Text
+    Check "the chain is live" ($c.Live -eq 12) $c.Text
 
     # Automatic calculation: cut the vector's creator to another cell, insert a row above the
     # chain's prices, copy the market's creator; after Excel's callbacks the current values hold
@@ -332,18 +336,18 @@ $edits = {
     Check "a creator cut to another cell under automatic calculation keeps a live handle" ($moved.StartsWith("$(Id $state):price_vector:WTI NYMEX:")) $moved
     Check "and its market still reads the quote" ((Text $state $sheet "D12") -eq "72.1") (Text $state $sheet "D12")
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
-    Check "with eleven live after the callbacks" ($c.Live -eq 11) $c.Text
+    Check "with twelve live after the callbacks" ($c.Live -eq 12) $c.Text
     Note "the moved creator's text $(if ($moved -eq $before) { 'stayed' } else { 'changed' })"
     Insert-Row $state $sheet "10:10"
     Start-Sleep -Seconds 3
     Check "a row inserted above shifts the chain and the reader still reads" ((Text $state $sheet "D13") -eq "72.1") (Text $state $sheet "D13")
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
-    Check "with eleven live" ($c.Live -eq 11) $c.Text
+    Check "with twelve live" ($c.Live -eq 12) $c.Text
     # The same call typed in another cell: the formula's text, since a copy would shift its references.
     Put $state $sheet "G12" (Read-Formula $state $sheet "D12")
     Check "the market's call typed in another cell shares the market" ((Text $state $sheet "G12") -eq (Text $state $sheet "D12")) (Text $state $sheet "G12")
     $c = Counts $state $sheet
-    Check "and publishes nothing" ($c.Live -eq 11) $c.Text
+    Check "and publishes nothing" ($c.Live -eq 12) $c.Text
     Clear-Cell $state $sheet "G12"
 
     # Manual calculation without a move: nothing propagates until asked, nothing is lost.
@@ -352,11 +356,11 @@ $edits = {
     Check "in manual mode a changed price does not propagate" ((Text $state $sheet "D13") -eq "72.1") (Text $state $sheet "D13")
     Start-Sleep -Seconds 3
     $c = Counts $state $sheet
-    Check "and the owned objects stay live while waiting" ($c.Live -eq 11) $c.Text
+    Check "and the owned objects stay live while waiting" ($c.Live -eq 12) $c.Text
     Invoke-ExcelCall "calculation" { $state.Excel.Calculate() }
     Check "a requested calculation propagates it" ((Text $state $sheet "D13") -eq "74") (Text $state $sheet "D13")
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
-    Check "and the old vector and market go" ($c.Live -eq 11) $c.Text
+    Check "and the old vector and market go" ($c.Live -eq 12) $c.Text
 
     # The known limitation: a creator cut in manual calculation mode. Excel may disconnect its
     # subscription and others on the sheet while the cells still show the old text; a full
@@ -375,13 +379,13 @@ $edits = {
     }
     Invoke-ExcelCall "full calculation" { $state.Excel.CalculateFull() }
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
-    Check "a full calculation rebuilds the chain" ($c.Live -eq 11 -and (Text $state $sheet "D13") -eq "74") "$($c.Text); reader $(Text $state $sheet "D13")"
+    Check "a full calculation rebuilds the chain" ($c.Live -eq 12 -and (Text $state $sheet "D13") -eq "74") "$($c.Text); reader $(Text $state $sheet "D13")"
     Put $state $sheet "A11" "75"
     Invoke-ExcelCall "calculation" { $state.Excel.Calculate() }
     Check "and a later update propagates" ((Text $state $sheet "D13") -eq "75") (Text $state $sheet "D13")
     Invoke-ExcelCall "automatic calculation" { $state.Excel.Calculation = -4105 }  # xlCalculationAutomatic
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
-    Check "with eleven live at the end" ($c.Live -eq 11 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Check "with twelve live at the end" ($c.Live -eq 12 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 }
 
 # --- books --------------------------------------------------------------------------------------
@@ -392,29 +396,29 @@ $books = {
     $wtiSheet = Sheet $state $wti
     Build-Chain $state $wtiSheet
     $c = Settle $state $wtiSheet { param($c) $c.Live -eq $ChainCreators }
-    Check "the WTI book is live" ($c.Live -eq 11) $c.Text
+    Check "the WTI book is live" ($c.Live -eq 12) $c.Text
     $hng = New-Book $state
     $hngSheet = Sheet $state $hng
     Build-Chain $state $hngSheet -Name "HNG" -First 2.95 -Second 3.1
     Check "the HNG market reads its own quote" ((Text $state $hngSheet "D12") -eq "2.95") (Text $state $hngSheet "D12")
-    # The five creators with equal inputs share: schedule, holidays, conventions, specifications,
-    # valuation date; the six over the index's name are the second book's own.
-    foreach ($address in "D1", "D2", "D3", "D4", "D6") {
+    # The six creators with equal inputs share: schedule, holidays, their collection, conventions,
+    # specifications, valuation date; the six over the index's name are the second book's own.
+    foreach ($address in "D1", "D2", "C4", "D3", "D4", "D6") {
         Check "the two books share $address" ((Text $state $wtiSheet $address) -eq (Text $state $hngSheet $address)) (Text $state $hngSheet $address)
     }
     Check "and keep their own indices" ((Text $state $wtiSheet "D5") -ne (Text $state $hngSheet "D5")) (Text $state $hngSheet "D5")
     $c = Settle $state $hngSheet { param($c) $c.Live -eq ($ChainCreators + 6) }
-    Check "seventeen live: eleven and six" ($c.Live -eq 17 -and $c.Published -eq 17) $c.Text
+    Check "eighteen live: twelve and six" ($c.Live -eq 18 -and $c.Published -eq 18) $c.Text
     Close-Book $state $wti
     $c = Settle $state $hngSheet { param($c) $c.Live -eq $ChainCreators }
-    Check "closing WTI releases its six and keeps what HNG shares" ($c.Live -eq 11 -and $c.Released -eq 6) $c.Text
+    Check "closing WTI releases its six and keeps what HNG shares" ($c.Live -eq 12 -and $c.Released -eq 6) $c.Text
     Check "and HNG still reads its quote" ((Text $state $hngSheet "D12") -eq "2.95") (Text $state $hngSheet "D12")
     $published = $c.Published
     Close-Book $state $hng
     $scratch = New-Book $state
     $watch = Sheet $state $scratch
     $c = Settle $state $watch { param($c) $c.Live -eq 0 }
-    Check "closing HNG releases the rest" ($c.Live -eq 0 -and $c.Released -eq 17) $c.Text
+    Check "closing HNG releases the rest" ($c.Live -eq 0 -and $c.Released -eq 18) $c.Text
     Check "and the count never reset" ($c.Published -eq $published) $c.Text
 
     # A saved workbook, reopened: the supported workflow is a full calculation, then another once
@@ -437,7 +441,7 @@ $books = {
     Put $state $reopenedSheet "A10" "76"
     Check "a later price propagates" ((Text $state $reopenedSheet "D12") -eq "76") (Text $state $reopenedSheet "D12")
     $c = Settle $state $reopenedSheet { param($c) $c.Live -eq $ChainCreators }
-    Check "with eleven live" ($c.Live -eq 11 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Check "with twelve live" ($c.Live -eq 12 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Close-Book $state $reopened
     Remove-Item $path -ErrorAction SilentlyContinue
 }
@@ -463,12 +467,12 @@ $processes = {
         Build-Chain $other $otherSheet -First 999 -Second 1000
         $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
         $d = Settle $other $otherSheet { param($c) $c.Live -eq $ChainCreators }
-        Check "the chain is live in both" ($c.Live -eq 11 -and $d.Live -eq 11) "$($c.Text); $($d.Text)"
+        Check "the chain is live in both" ($c.Live -eq 12 -and $d.Live -eq 12) "$($c.Text); $($d.Text)"
         $own = 0
         $shared = 0
-        foreach ($row in 1..$ChainCreators) {
-            $a = Text $state $sheet "D$row"
-            $b = Text $other $otherSheet "D$row"
+        foreach ($cell in $ChainCells) {
+            $a = Text $state $sheet $cell
+            $b = Text $other $otherSheet $cell
             if ($a.StartsWith("${mine}:") -and $b.StartsWith("${theirs}:") -and $a.Substring($mine.Length) -eq $b.Substring($theirs.Length)) { $own++ }
             if ($a -eq $b) { $shared++ }
         }
@@ -500,7 +504,7 @@ $processes = {
 
         # A workbook saved by the first Excel, opened in the second and fully calculated: every
         # handle recreated under the second's process ID, none of the saved texts surviving; the
-        # nine creators equal to the second's own chain share, the vector and the market are new.
+        # ten creators equal to the second's own chain share, the vector and the market are new.
         # The scratch valuation date goes first, so that the saved chain is all the first Excel holds.
         Clear-Cell $state $watch "A1"
         $c = Settle $state $watch { param($c) $c.Live -eq 0 }
@@ -511,7 +515,7 @@ $processes = {
         Build-Chain $state $savedSheet
         $c = Settle $state $savedSheet { param($c) $c.Live -eq $ChainCreators }
         Check "the chain to be saved is live in the first Excel, and nothing else" ($c.Live -eq $ChainCreators) $c.Text
-        $savedTexts = @(1..$ChainCreators | ForEach-Object { Text $state $savedSheet "D$_" })
+        $savedTexts = @($ChainCells | ForEach-Object { Text $state $savedSheet $_ })
         Invoke-ExcelCall "save the workbook" { $saved.SaveAs($path, 51) }  # xlOpenXMLWorkbook
         Close-Book $state $saved
         $reopened = Open-Book $other $path
@@ -520,8 +524,8 @@ $processes = {
         Invoke-ExcelCall "full calculation" { $other.Excel.CalculateFull() }
         $under = 0
         $survived = 0
-        foreach ($row in 1..$ChainCreators) {
-            $t = Text $other $reopenedSheet "D$row"
+        foreach ($cell in $ChainCells) {
+            $t = Text $other $reopenedSheet $cell
             if ($t.StartsWith("${theirs}:")) { $under++ }
             if ($savedTexts -contains $t) { $survived++ }
         }
@@ -529,7 +533,7 @@ $processes = {
         Check "and none of the texts saved by the first survived" ($survived -eq 0) "$survived survived"
         Check "and the market reads the quote" ((Text $other $reopenedSheet "D12") -eq "72.1") (Text $other $reopenedSheet "D12")
         $d = Settle $other $reopenedSheet { param($c) $c.Live -eq ($ChainCreators + 2) }
-        Check "thirteen live in the second: its eleven, and the reopened book's own vector and market" ($d.Live -eq 13 -and $d.Misses -eq 0 -and $d.DisposalErrors -eq 0) $d.Text
+        Check "fourteen live in the second: its twelve, and the reopened book's own vector and market" ($d.Live -eq 14 -and $d.Misses -eq 0 -and $d.DisposalErrors -eq 0) $d.Text
         Close-Book $other $reopened
         Remove-Item $path -ErrorAction SilentlyContinue
     }
@@ -539,15 +543,15 @@ $processes = {
 
 # --- calendars ---------------------------------------------------------------------------------
 
-# Combined holiday calendars, combine-holiday-calendars.md: the ticket's calendars A, 14 October
-# 2026 twice around the 12th, and B, the 13th and the 14th, combined in D3 and read by a shift of
-# two business days from Friday the 9th in D4 and by the readback's row count in D5. A's first day
-# moves to the 16th: A publishes anew and the combination with it, the shift steps over the new
-# holiday and the readback grows a row, the two old publications released. B's cell is cleared: the
-# combination fails at B's cell in the seam's words, the shift relays the failure, and the two live
-# publications they held go. B typed back rebuilds both. Nothing of a calendar's object changes
-# in place: every change is a new publication, and the trades group shows a template and a batch
-# following a payment calendar that changes.
+# A key of two names, holiday-keys.md: the ticket's calendars A, 14 October 2026 twice around the
+# 12th, and B, the 13th and the 14th, collected in D3 and read by a shift of two business days from
+# Friday the 9th on the key A+B in D4, and by the collection's readback's row count in D5. The union
+# the shift makes is no publication. A's first day moves to the 16th: A publishes anew and the
+# collection with it, the shift steps over the new holiday, the two old publications released. B's
+# cell is cleared: the collection fails at B's cell in the seam's words, the shift relays the
+# failure, and the two live publications they held go. B typed back rebuilds both. Nothing of a
+# calendar's object changes in place: every change is a new publication, and the trades group shows
+# a batch following a payment calendar that changes.
 
 $calendars = {
     param($state)
@@ -555,74 +559,73 @@ $calendars = {
     $sheet = Sheet $state $book
     Put $state $sheet "A2" "14-Oct-2026"; Put $state $sheet "A3" "12-Oct-2026"; Put $state $sheet "A4" "14-Oct-2026"
     Put $state $sheet "B2" "13-Oct-2026"; Put $state $sheet "B3" "14-Oct-2026"
-    Put $state $sheet "D1" "=_CreateHolidayCalendar(A2:A4)"
-    Put $state $sheet "D2" "=_CreateHolidayCalendar(B2:B3)"
-    Put $state $sheet "D3" "=_CombineHolidayCalendars(D1:D2)"
-    Put $state $sheet "D4" '=util_ShiftDate(DATE(2026,10,9),"+2bd",D3)'
+    Put $state $sheet "D1" '=_CreateHolidayCalendar("A",A2:A4)'
+    Put $state $sheet "D2" '=_CreateHolidayCalendar("B",B2:B3)'
+    Put $state $sheet "D3" "=_CollectHolidayCalendars(D1:D2)"
+    Put $state $sheet "D4" '=util_ShiftDate(DATE(2026,10,9),"+2bd","A+B",D3)'
     Put $state $sheet "D5" "=ROWS(util_ReadHandle(D3))"
     $id = Id $state
-    $combined = Text $state $sheet "D3"
-    Check "the combination's cell shows a holiday calendar handle" ($combined.StartsWith("${id}:holiday_calendar:")) $combined
+    $collected = Text $state $sheet "D3"
+    Check "the collection's cell shows a holiday calendars handle" ($collected.StartsWith("${id}:holiday_calendars:")) $collected
     Check "two business days from Friday the 9th over the three closed weekdays is Friday the 16th" ((Text $state $sheet "D4") -eq "46311") (Text $state $sheet "D4")
-    Check "the readback holds three days under two heading rows" ((Text $state $sheet "D5") -eq "5") (Text $state $sheet "D5")
+    Check "the readback holds two calendars under two heading rows" ((Text $state $sheet "D5") -eq "4") (Text $state $sheet "D5")
     $c = Settle $state $sheet { param($c) $c.Live -eq 3 }
-    Check "three creators, three live publications, three published" ($c.Live -eq 3 -and $c.Published -eq 3 -and $c.Released -eq 0) $c.Text
+    Check "three creators, three live publications, three published: the union a shift makes is none" ($c.Live -eq 3 -and $c.Published -eq 3 -and $c.Released -eq 0) $c.Text
 
-    # A's first day moves to the 16th: A and the combination publish anew, their consumers follow.
+    # A's first day moves to the 16th: A and the collection publish anew, the shift follows.
     Put $state $sheet "A2" "16-Oct-2026"
     $moved = Text $state $sheet "D3"
-    Check "a changed source gives the combination a new handle" ($moved -ne $combined -and $moved.StartsWith("${id}:holiday_calendar:")) $moved
+    Check "a changed calendar gives the collection a new handle" ($moved -ne $collected -and $moved.StartsWith("${id}:holiday_calendars:")) $moved
     Check "the shift steps over the new holiday to Monday the 19th" ((Text $state $sheet "D4") -eq "46314") (Text $state $sheet "D4")
-    Check "and the readback grows a row" ((Text $state $sheet "D5") -eq "6") (Text $state $sheet "D5")
     $c = Settle $state $sheet { param($c) $c.Live -eq 3 -and $c.Released -ge 2 }
-    Check "the old source and the old combination are released; three live, five published" ($c.Live -eq 3 -and $c.Released -eq 2 -and $c.Published -eq 5) $c.Text
+    Check "the old calendar and the old collection are released; three live, five published" ($c.Live -eq 3 -and $c.Released -eq 2 -and $c.Published -eq 5) $c.Text
 
-    # B's cell cleared: the combination fails at B's cell, the shift relays it, both own nothing.
+    # B's cell cleared: the collection fails at B's cell, the shift relays it, both own nothing.
     Clear-Cell $state $sheet "D2"
     $failed = Text $state $sheet "D3"
-    Check "a cleared source fails the combination at its cell in the seam's words" ($failed -eq "#ERROR _CombineHolidayCalendars: calendar_handles cell (2, 1) is blank, expected holiday calendar handle") $failed
+    Check "a cleared calendar fails the collection at its cell in the seam's words" ($failed -eq "#ERROR _CollectHolidayCalendars: calendar_handles cell (2, 1) is blank, expected holiday calendar handle") $failed
     $relayed = Text $state $sheet "D4"
-    Check "and the shift relays the combination's failure once" ($relayed -eq "#ERROR util_ShiftDate: holiday_calendar is the creator's failure, expected holiday calendar handle: $failed") $relayed
+    Check "and the shift relays the collection's failure once" ($relayed -eq "#ERROR util_ShiftDate: holiday_calendars is the creator's failure, expected holiday calendars handle: $failed") $relayed
     $c = Settle $state $sheet { param($c) $c.Live -eq 1 }
-    Check "B and the combination are released; one live, nothing more published" ($c.Live -eq 1 -and $c.Released -eq 4 -and $c.Published -eq 5) $c.Text
+    Check "B and the collection are released; one live, nothing more published" ($c.Live -eq 1 -and $c.Released -eq 4 -and $c.Published -eq 5) $c.Text
 
     # B typed back: both rebuild and the consumers read them again.
-    Put $state $sheet "D2" "=_CreateHolidayCalendar(B2:B3)"
+    Put $state $sheet "D2" '=_CreateHolidayCalendar("B",B2:B3)'
     $rebuilt = Text $state $sheet "D3"
-    Check "the source typed back rebuilds the combination" ($rebuilt.StartsWith("${id}:holiday_calendar:")) $rebuilt
+    Check "the calendar typed back rebuilds the collection" ($rebuilt.StartsWith("${id}:holiday_calendars:")) $rebuilt
     Check "and the shift reads it again" ((Text $state $sheet "D4") -eq "46314") (Text $state $sheet "D4")
-    Check "as the readback does" ((Text $state $sheet "D5") -eq "6") (Text $state $sheet "D5")
+    Check "as the readback does" ((Text $state $sheet "D5") -eq "4") (Text $state $sheet "D5")
     $c = Settle $state $sheet { param($c) $c.Live -eq 3 }
     Check "three live again, two more published" ($c.Live -eq 3 -and $c.Published -eq 7 -and $c.Released -eq 4) $c.Text
     Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 
-    # Named calendars and their collection, payment-calendar-keys.md: the two sources made again
+    # Calendars under other names and their collection, payment-calendar-keys.md: the two made again
     # under names in F1 and F2 and collected in F3, the readback's rows counted in F4.
-    Put $state $sheet "F1" '=_CreateHolidayCalendar(A2:A4,"PAY_A")'
-    Put $state $sheet "F2" '=_CreateHolidayCalendar(B2:B3,"PAY_B")'
-    Put $state $sheet "F3" "=_CollectPaymentCalendars(F1:F2)"
+    Put $state $sheet "F1" '=_CreateHolidayCalendar("PAY_A",A2:A4)'
+    Put $state $sheet "F2" '=_CreateHolidayCalendar("PAY_B",B2:B3)'
+    Put $state $sheet "F3" "=_CollectHolidayCalendars(F1:F2)"
     Put $state $sheet "F4" "=ROWS(util_ReadHandle(F3))"
     $named = Text $state $sheet "F1"
     Check "a named calendar's handle shows its name" ($named.StartsWith("${id}:holiday_calendar:PAY_A:")) $named
     $held = Text $state $sheet "F3"
-    Check "the collection's cell shows a payment calendars handle" ($held.StartsWith("${id}:payment_calendars:")) $held
+    Check "the second collection's cell shows a holiday calendars handle" ($held.StartsWith("${id}:holiday_calendars:")) $held
     Check "its readback holds two calendars under two heading rows" ((Text $state $sheet "F4") -eq "4") (Text $state $sheet "F4")
     $c = Settle $state $sheet { param($c) $c.Live -eq 6 }
     Check "the two named calendars and the collection are live: six live, ten published" ($c.Live -eq 6 -and $c.Published -eq 10 -and $c.Released -eq 4) $c.Text
 
     # A renamed: the calendar and the collection publish anew and the old two are released.
-    Put $state $sheet "F1" '=_CreateHolidayCalendar(A2:A4,"PAY_C")'
+    Put $state $sheet "F1" '=_CreateHolidayCalendar("PAY_C",A2:A4)'
     $renamed = Text $state $sheet "F1"
     Check "a renamed calendar is a new publication under the new name" ($renamed.StartsWith("${id}:holiday_calendar:PAY_C:")) $renamed
     $followed = Text $state $sheet "F3"
-    Check "and the collection follows with a new handle" ($followed -ne $held -and $followed.StartsWith("${id}:payment_calendars:")) $followed
+    Check "and the collection follows with a new handle" ($followed -ne $held -and $followed.StartsWith("${id}:holiday_calendars:")) $followed
     $c = Settle $state $sheet { param($c) $c.Live -eq 6 -and $c.Released -ge 6 }
     Check "the old calendar and the old collection are released; six live, twelve published" ($c.Live -eq 6 -and $c.Released -eq 6 -and $c.Published -eq 12) $c.Text
 
     # B given A's name: the collection fails in the library's words and owns nothing.
-    Put $state $sheet "F2" '=_CreateHolidayCalendar(B2:B3,"PAY_C")'
+    Put $state $sheet "F2" '=_CreateHolidayCalendar("PAY_C",B2:B3)'
     $twice = Text $state $sheet "F3"
-    Check "two calendars of one name fail the collection in the library's words" ($twice -eq "#ERROR _CollectPaymentCalendars: ValueError: calendar_handles cell 1 and cell 2 are both named 'PAY_C', expected each name once") $twice
+    Check "two calendars of one name fail the collection in the library's words" ($twice -eq "#ERROR _CollectHolidayCalendars: ValueError: calendar_handles cell 1 and cell 2 are both named 'PAY_C', expected each name once") $twice
     $c = Settle $state $sheet { param($c) $c.Live -eq 5 }
     Check "the failed collection owns nothing: five live, one more published, eight released" ($c.Live -eq 5 -and $c.Published -eq 13 -and $c.Released -eq 8) $c.Text
     Check "no release missed, no disposal error, with the named calendars" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
@@ -648,11 +651,11 @@ $bumps = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
-    Put $state $sheet "D13" '=_CreateHolidayCalendar(C13,"PAYS")'
-    Put $state $sheet "E13" "=_CollectPaymentCalendars(D13)"
+    Put $state $sheet "D13" '=_CreateHolidayCalendar("PAYS",C13)'
+    Put $state $sheet "E13" "=_CollectHolidayCalendars(D13)"
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
     Put $state $sheet "K6" "11-May-2026"; Put $state $sheet "L6" "q26"; Put $state $sheet "M6" "2"; Put $state $sheet "N6" "70"
-    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_calendar_key"; Put $state $sheet "S26" "discount_curve_key"; Put $state $sheet "T26" "settlement_frequency"
+    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_holiday_key"; Put $state $sheet "S26" "discount_curve_key"; Put $state $sheet "T26" "settlement_frequency"
     Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "PAYS"; Put $state $sheet "S27" "SOFR"; Put $state $sheet "T27" "monthly"
     Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
     Put $state $sheet "W2" "26-May-2026"; Put $state $sheet "X2" "1"
@@ -689,7 +692,7 @@ $bumps = {
     Check "an equal call shares the bump's handle" ((Text $state $sheet "H29") -eq $bump) (Text $state $sheet "H29")
     Check "half the difference of the marks on the bumps each way is the saved DV01, -0.088096" ((Text $state $sheet "H32") -eq "-0.088096" -and (Text $state $sheet "D34") -eq "-0.088096") ((Text $state $sheet "H32") + " " + (Text $state $sheet "D34"))
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 14) }
-    Check "the chain, the payment calendar and its collection, the template, the batch, the preparation, the curve, two bumps, three curve collections and three results: twenty-five live, twenty-five published, the equal call reusing" ($c.Live -eq 25 -and $c.Published -eq 25 -and $c.Released -eq 0) $c.Text
+    Check "the chain, the payment calendar and its collection, the template, the batch, the preparation, the curve, two bumps, three curve collections and three results: twenty-six live, twenty-six published, the equal call reusing" ($c.Live -eq 26 -and $c.Published -eq 26 -and $c.Released -eq 0) $c.Text
 
     # A quote tick: the vector, the market and the three results publish anew, the old five
     # released; the curve and both bumps are reused as they are.
@@ -697,21 +700,21 @@ $bumps = {
     Check "a quote tick remakes the results on the bump" ((Text $state $sheet "G30") -ne $onBump -and (Text $state $sheet "G30").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "G30")
     Check "and the mark on the bump follows the quote" ((Text $state $sheet "G31") -eq "7523.880441") (Text $state $sheet "G31")
     Check "while the curve and both bumps stand" ((Text $state $sheet "D29") -eq $curve -and (Text $state $sheet "G29") -eq $bump -and (Text $state $sheet "H30") -eq $down) ((Text $state $sheet "G29") + " " + (Text $state $sheet "H30"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 25 -and $c.Released -ge 5 }
-    Check "the old vector, market and three results are released; five more published" ($c.Live -eq 25 -and $c.Published -eq 30 -and $c.Released -eq 5) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 26 -and $c.Released -ge 5 }
+    Check "the old vector, market and three results are released; five more published" ($c.Live -eq 26 -and $c.Published -eq 31 -and $c.Released -eq 5) $c.Text
 
     # The equal call cleared, the bump stands on its own cell; then the bump changed to two basis
     # points: the bump and its results publish anew, the old two released; the curve stands.
     Clear-Cell $state $sheet "H29"
-    $c = Settle $state $sheet { param($c) $c.Live -eq 25 }
-    Check "the equal call cleared releases nothing, the bump held by its own cell" ($c.Live -eq 25 -and $c.Published -eq 30 -and $c.Released -eq 5) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 26 }
+    Check "the equal call cleared releases nothing, the bump held by its own cell" ($c.Live -eq 26 -and $c.Published -eq 31 -and $c.Released -eq 5) $c.Text
     $onBump = Text $state $sheet "G30"
     Put $state $sheet "G29" "=util_BumpDiscountCurve(D29,2)"
     Check "a changed bump gives the bump a new handle" ((Text $state $sheet "G29") -ne $bump -and (Text $state $sheet "G29").StartsWith("${id}:discount_curve:SOFR:")) (Text $state $sheet "G29")
     Check "and the factor two basis points up" ((Text $state $sheet "G32") -eq "0.989968537486") (Text $state $sheet "G32")
     Check "and its results a new one, while the curve stands" ((Text $state $sheet "G30") -ne $onBump -and (Text $state $sheet "D29") -eq $curve) (Text $state $sheet "G30")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 25 -and $c.Released -ge 8 }
-    Check "the old bump, its collection and its results are released; three more published" ($c.Live -eq 25 -and $c.Published -eq 33 -and $c.Released -eq 8) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 26 -and $c.Released -ge 8 }
+    Check "the old bump, its collection and its results are released; three more published" ($c.Live -eq 26 -and $c.Published -eq 34 -and $c.Released -eq 8) $c.Text
 
     # A changed factor: the curve, both bumps and the three results publish anew, the old six
     # released.
@@ -719,8 +722,8 @@ $bumps = {
     Put $state $sheet "X3" "0.98"
     Check "a changed factor gives the curve a new handle" ((Text $state $sheet "D29") -ne $curve -and (Text $state $sheet "D29").StartsWith("${id}:discount_curve:SOFR:")) (Text $state $sheet "D29")
     Check "and both bumps new ones" ((Text $state $sheet "G29") -ne $bump -and (Text $state $sheet "H30") -ne $down -and (Text $state $sheet "G29").StartsWith("${id}:discount_curve:SOFR:")) ((Text $state $sheet "G29") + " " + (Text $state $sheet "H30"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 25 -and $c.Released -ge 17 }
-    Check "the old curve, bumps, collections and results are released; nine more published" ($c.Live -eq 25 -and $c.Published -eq 42 -and $c.Released -eq 17) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 26 -and $c.Released -ge 17 }
+    Check "the old curve, bumps, collections and results are released; nine more published" ($c.Live -eq 26 -and $c.Published -eq 43 -and $c.Released -eq 17) $c.Text
 
     # Text where the bump should be: the bump fails in the seam's words and its results as the
     # consumer, both own nothing; repaired, both rebuild.
@@ -728,12 +731,12 @@ $bumps = {
     Put $state $sheet "G29" '=util_BumpDiscountCurve(D29,"1bp")'
     Check "a bump its creator refuses shows the refusal" ((Text $state $sheet "G29") -eq $refusedBump) (Text $state $sheet "G29")
     Check "and fails its collection and its results as the consumers, the creator's text carried once" ((Text $state $sheet "I29") -eq "#ERROR _CollectDiscountCurves: curve_handles is the creator's failure, expected discount curve handle: $refusedBump" -and (Text $state $sheet "G30") -eq "#ERROR _EvaluateTrades: discount_curve_set is the creator's failure, expected discount curve set handle: $refusedBump") ((Text $state $sheet "I29") + " | " + (Text $state $sheet "G30"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 22 }
-    Check "the bump, its collection and its results own nothing: twenty-two live, three released, nothing published" ($c.Live -eq 22 -and $c.Published -eq 42 -and $c.Released -eq 20) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 23 }
+    Check "the bump, its collection and its results own nothing: twenty-three live, three released, nothing published" ($c.Live -eq 23 -and $c.Published -eq 43 -and $c.Released -eq 20) $c.Text
     Put $state $sheet "G29" "=util_BumpDiscountCurve(D29,2)"
     Check "repaired, the bump and its results rebuild" ((Text $state $sheet "G29").StartsWith("${id}:discount_curve:SOFR:") -and (Text $state $sheet "G30").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "G30")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 25 }
-    Check "twenty-five live again, three more published" ($c.Live -eq 25 -and $c.Published -eq 45 -and $c.Released -eq 20) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 26 }
+    Check "twenty-six live again, three more published" ($c.Live -eq 26 -and $c.Published -eq 46 -and $c.Released -eq 20) $c.Text
     Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Close-Book $state $book
 }
@@ -755,12 +758,12 @@ $curves = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
-    Put $state $sheet "D13" '=_CreateHolidayCalendar(C13,"PAYS")'
-    Put $state $sheet "E13" "=_CollectPaymentCalendars(D13)"
+    Put $state $sheet "D13" '=_CreateHolidayCalendar("PAYS",C13)'
+    Put $state $sheet "E13" "=_CollectHolidayCalendars(D13)"
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"; Put $state $sheet "O4" "discount_curve_key"
     Put $state $sheet "K6" "11-May-2026"; Put $state $sheet "L6" "q26"; Put $state $sheet "M6" "2"; Put $state $sheet "N6" "70"; Put $state $sheet "O6" "SOFR"
     Put $state $sheet "K7" "11-May-2026"; Put $state $sheet "L7" "q26"; Put $state $sheet "M7" "-1"; Put $state $sheet "N7" "70"; Put $state $sheet "O7" "FFOIS"
-    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_calendar_key"; Put $state $sheet "S26" "settlement_frequency"
+    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_holiday_key"; Put $state $sheet "S26" "settlement_frequency"
     Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "PAYS"; Put $state $sheet "S27" "monthly"
     Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
     Put $state $sheet "W2" "26-May-2026"; Put $state $sheet "X2" "1"
@@ -793,7 +796,7 @@ $curves = {
     Check "each curve's DV01 in its own column, -0.088096 on SOFR and 0.043603 on FFOIS" ((Text $state $sheet "D33") -eq "-0.088096" -and (Text $state $sheet "D34") -eq "0.043603") ((Text $state $sheet "D33") + " " + (Text $state $sheet "D34"))
     Check "the second column FFOIS's by name and the second slot's curve FFOIS" ((Text $state $sheet "D35") -eq "FFOIS USD dv01 [DOLLAR per basis point]" -and (Text $state $sheet "D36") -eq "FFOIS") ((Text $state $sheet "D35") + " | " + (Text $state $sheet "D36"))
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 9) }
-    Check "the chain, the payment calendar and its collection, the template, the batch, the preparation, two curves, their collection and the results: twenty live, twenty published" ($c.Live -eq 20 -and $c.Published -eq 20 -and $c.Released -eq 0) $c.Text
+    Check "the chain, the payment calendar and its collection, the template, the batch, the preparation, two curves, their collection and the results: twenty-one live, twenty-one published" ($c.Live -eq 21 -and $c.Published -eq 21 -and $c.Released -eq 0) $c.Text
 
     # FFOIS's factor to 0.97: that curve, the collection and the results publish anew, the old
     # three released; SOFR stands with its column, FFOIS's moves to 0.043158 on 2,716.
@@ -801,8 +804,8 @@ $curves = {
     Check "a changed factor gives FFOIS a new handle while SOFR stands" ((Text $state $sheet "D30") -ne $ffois -and (Text $state $sheet "D30").StartsWith("${id}:discount_curve:FFOIS:") -and (Text $state $sheet "D29") -eq $sofr) ((Text $state $sheet "D29") + " " + (Text $state $sheet "D30"))
     Check "the collection and the results new ones" ((Text $state $sheet "E29") -ne $collection -and (Text $state $sheet "D31") -ne $results -and (Text $state $sheet "D31").StartsWith("${id}:trade_results:WTI NYMEX:")) ((Text $state $sheet "E29") + " " + (Text $state $sheet "D31"))
     Check "FFOIS's DV01 moves to 0.043158 and SOFR's stands, the mark 2,828" ((Text $state $sheet "D34") -eq "0.043158" -and (Text $state $sheet "D33") -eq "-0.088096" -and (Text $state $sheet "D32") -eq "2828") ((Text $state $sheet "D32") + " " + (Text $state $sheet "D33") + " " + (Text $state $sheet "D34"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 20 -and $c.Released -ge 3 }
-    Check "the old curve, collection and results are released; three more published" ($c.Live -eq 20 -and $c.Published -eq 23 -and $c.Released -eq 3) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 3 }
+    Check "the old curve, collection and results are released; three more published" ($c.Live -eq 21 -and $c.Published -eq 24 -and $c.Released -eq 3) $c.Text
 
     # The collection reordered, FFOIS first through F29:F30: a new collection and new results,
     # the numbers and the columns as they were, the rows' keys ordering them.
@@ -812,8 +815,8 @@ $curves = {
     Put $state $sheet "E29" "=_CollectDiscountCurves(F29:F30)"
     Check "the collection reordered is a new handle" ((Text $state $sheet "E29") -ne $collection -and (Text $state $sheet "E29").StartsWith("${id}:discount_curve_set:")) (Text $state $sheet "E29")
     Check "and the results a new one reading the same numbers in the same columns" ((Text $state $sheet "D31") -ne $results -and (Text $state $sheet "D32") -eq "2828" -and (Text $state $sheet "D33") -eq "-0.088096" -and (Text $state $sheet "D34") -eq "0.043158" -and (Text $state $sheet "D35") -eq "FFOIS USD dv01 [DOLLAR per basis point]") ((Text $state $sheet "D31") + " " + (Text $state $sheet "D34"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 20 -and $c.Released -ge 5 }
-    Check "the old collection and results are released; two more published" ($c.Live -eq 20 -and $c.Published -eq 25 -and $c.Released -eq 5) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 5 }
+    Check "the old collection and results are released; two more published" ($c.Live -eq 21 -and $c.Published -eq 26 -and $c.Released -eq 5) $c.Text
 
     # A key renamed in the ticket: the batch and the preparation publish anew and the results fail
     # in the library's words, owning nothing; repaired, all three rebuild and the renamed two are released.
@@ -823,12 +826,12 @@ $curves = {
     Check "a renamed key remakes the batch" ((Text $state $sheet "D27") -ne $trades -and (Text $state $sheet "D27").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D27")
     Check "and fails the results naming the key, the row and the collection's names" ((Text $state $sheet "D31") -eq "#ERROR _EvaluateTrades: ValueError: discount_curve_key 'SONIA' of trade at row 2 names no curve of the collection, which holds 'FFOIS' and 'SOFR'; expected a curve of that name") (Text $state $sheet "D31")
     Check "and its reports with it" ((Text $state $sheet "D32") -eq "#REF!" -or (Text $state $sheet "D32").StartsWith("#ERROR")) (Text $state $sheet "D32")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 19 }
-    Check "the failed results own nothing: nineteen live, the old batch, preparation and results released, two more published" ($c.Live -eq 19 -and $c.Published -eq 27 -and $c.Released -eq 8) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 20 }
+    Check "the failed results own nothing: twenty live, the old batch, preparation and results released, two more published" ($c.Live -eq 20 -and $c.Published -eq 28 -and $c.Released -eq 8) $c.Text
     Put $state $sheet "O7" "FFOIS"
     Check "repaired, the results rebuild" ((Text $state $sheet "D31").StartsWith("${id}:trade_results:WTI NYMEX:") -and (Text $state $sheet "D34") -eq "0.043158") ((Text $state $sheet "D31") + " " + (Text $state $sheet "D34"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 20 }
-    Check "twenty live again, three more published, the renamed batch and its preparation released" ($c.Live -eq 20 -and $c.Published -eq 30 -and $c.Released -eq 10) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 }
+    Check "twenty-one live again, three more published, the renamed batch and its preparation released" ($c.Live -eq 21 -and $c.Published -eq 31 -and $c.Released -eq 10) $c.Text
     Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Close-Book $state $book
 }
@@ -886,14 +889,14 @@ $cashflows = {
     Check "the readback holds three payment days under two heading rows" ((Text $state $sheet "D30") -eq "5") (Text $state $sheet "D30")
     Check "the batch alone collected shows a collection handle and its own DV01, 0.85" ($collection.StartsWith("${id}:aggregate_results:") -and (Text $state $sheet "D32") -eq "0.8500") ($collection + " " + (Text $state $sheet "D32"))
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 7) }
-    Check "the chain, the template, the batch, the date, the curve, its set, the results and the collection: eighteen live, eighteen published" ($c.Live -eq 18 -and $c.Published -eq 18 -and $c.Released -eq 0) $c.Text
+    Check "the chain, the template, the batch, the date, the curve, its set, the results and the collection: nineteen live, nineteen published" ($c.Live -eq 19 -and $c.Published -eq 19 -and $c.Released -eq 0) $c.Text
 
     # A commodity tick: the chain's vector and market publish anew, the old two released; the
     # cashflows are no consumer of a quote and stand.
     Put $state $sheet "A11" "73.8"
     Check "a commodity tick leaves the batch, the curve, its set, the results and the collection as they are" ((Text $state $sheet "D23") -eq $batch -and (Text $state $sheet "D25") -eq $curve -and (Text $state $sheet "D33") -eq $set -and (Text $state $sheet "D26") -eq $results -and (Text $state $sheet "D31") -eq $collection) (Text $state $sheet "D31")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 18 -and $c.Released -ge 2 }
-    Check "the old vector and market are released; two more published" ($c.Live -eq 18 -and $c.Published -eq 20 -and $c.Released -eq 2) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 19 -and $c.Released -ge 2 }
+    Check "the old vector and market are released; two more published" ($c.Live -eq 19 -and $c.Published -eq 21 -and $c.Released -eq 2) $c.Text
 
     # A changed factor: the curve, its set and the results publish anew, the old three released;
     # the batch stands and the mark follows, 600 at 0.96.
@@ -903,8 +906,8 @@ $cashflows = {
     Check "and the results a new one, 600 of mark" ((Text $state $sheet "D26") -ne $results -and (Text $state $sheet "D27") -eq "600") (Text $state $sheet "D27")
     Check "while the batch stands" ((Text $state $sheet "D23") -eq $batch) (Text $state $sheet "D23")
     Check "and the collection follows the results, a new handle with the same DV01" ((Text $state $sheet "D31") -ne $collection -and (Text $state $sheet "D31").StartsWith("${id}:aggregate_results:") -and (Text $state $sheet "D32") -eq "0.8400" -and (Text $state $sheet "D29") -eq "0.8400") ((Text $state $sheet "D31") + " " + (Text $state $sheet "D32"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 18 -and $c.Released -ge 6 }
-    Check "the old curve, its set, results and collection are released; four more published" ($c.Live -eq 18 -and $c.Published -eq 24 -and $c.Released -eq 6) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 19 -and $c.Released -ge 6 }
+    Check "the old curve, its set, results and collection are released; four more published" ($c.Live -eq 19 -and $c.Published -eq 25 -and $c.Released -eq 6) $c.Text
 
     # The day rolled onto the receivable's payment day with the curve moved to start there, the
     # three together under manual calculation: the date, the curve, its set and the results
@@ -922,8 +925,8 @@ $cashflows = {
     Check "the day rolled gives the results a new handle" ((Text $state $sheet "D26") -ne $results -and (Text $state $sheet "D26").StartsWith("${id}:cashflow_results:USD:")) (Text $state $sheet "D26")
     Check "the receivable and the rebate are cash, 10,250, and the payable -9,000 of mark" ((Text $state $sheet "D27") -eq "-9000" -and (Text $state $sheet "D28") -eq "10250") ((Text $state $sheet "D27") + " " + (Text $state $sheet "D28"))
     Check "and the DV01 the payable's alone, 0.9, in the collection too" ((Text $state $sheet "D29") -eq "0.9000" -and (Text $state $sheet "D32") -eq "0.9000") ((Text $state $sheet "D29") + " " + (Text $state $sheet "D32"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 18 -and $c.Released -ge 11 }
-    Check "the old date, curve, its set, results and collection are released; five more published" ($c.Live -eq 18 -and $c.Published -eq 29 -and $c.Released -eq 11) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 19 -and $c.Released -ge 11 }
+    Check "the old date, curve, its set, results and collection are released; five more published" ($c.Live -eq 19 -and $c.Published -eq 30 -and $c.Released -eq 11) $c.Text
 
     # The template cleared: the batch fails in the seam's words and the results as its consumer,
     # the three own nothing; typed back, all three rebuild.
@@ -932,12 +935,12 @@ $cashflows = {
     Check "the template cleared fails the batch in the seam's words" ((Text $state $sheet "D23") -eq $refused) (Text $state $sheet "D23")
     Check "and the results as its consumer" ((Text $state $sheet "D26") -eq "#ERROR _EvaluateCashflows: cashflows is the creator's failure, expected cashflows handle: $refused") (Text $state $sheet "D26")
     Check "and the collection as the results' consumer, the creator's text carried once" ((Text $state $sheet "D31") -eq "#ERROR _AggregateResults: result_handles is the creator's failure, expected trade results or cashflow results handle: $refused") (Text $state $sheet "D31")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 14 }
-    Check "the template, the batch, the results and the collection own nothing: fourteen live, four released" ($c.Live -eq 14 -and $c.Published -eq 29 -and $c.Released -eq 15) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 15 }
+    Check "the template, the batch, the results and the collection own nothing: fifteen live, four released" ($c.Live -eq 15 -and $c.Published -eq 30 -and $c.Released -eq 15) $c.Text
     Put $state $sheet "D22" '=_CreateTradeTemplate("cashflow",A14:C14,A15:C15)'
     Check "typed back, the four rebuild" ((Text $state $sheet "D26").StartsWith("${id}:cashflow_results:USD:") -and (Text $state $sheet "D28") -eq "10250" -and (Text $state $sheet "D31").StartsWith("${id}:aggregate_results:")) (Text $state $sheet "D31")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 18 }
-    Check "eighteen live again, four more published" ($c.Live -eq 18 -and $c.Published -eq 33 -and $c.Released -eq 15) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 19 }
+    Check "nineteen live again, four more published" ($c.Live -eq 19 -and $c.Published -eq 34 -and $c.Released -eq 15) $c.Text
     Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Close-Book $state $book
 }
@@ -965,12 +968,12 @@ $trades = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
-    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_day"; Put $state $sheet "R1" "payment_calendar_key"; Put $state $sheet "S1" "settlement_frequency"
+    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_day"; Put $state $sheet "R1" "payment_holiday_key"; Put $state $sheet "S1" "settlement_frequency"
     Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "month"; Put $state $sheet "M2" "lastday"; Put $state $sheet "N2" "cleared"; Put $state $sheet "O2" "financial"; Put $state $sheet "P2" "ICE Clear"; Put $state $sheet "Q2" "+1bd"; Put $state $sheet "R2" "PAYS"; Put $state $sheet "S2" "monthly"
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
     Put $state $sheet "K5" "11-May-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
-    Put $state $sheet "D13" '=_CreateHolidayCalendar(C13,"PAYS")'
-    Put $state $sheet "E13" "=_CollectPaymentCalendars(D13)"
+    Put $state $sheet "D13" '=_CreateHolidayCalendar("PAYS",C13)'
+    Put $state $sheet "E13" "=_CollectHolidayCalendars(D13)"
     Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",HSTACK(K1:S1,"nearby"),HSTACK(K2:S2,1))'
     Put $state $sheet "D15" "=_CreateTrades(D5,K4:N4,K5:N5,D14,E13)"
     Put $state $sheet "D16" "=INDEX(util_ReadHandle(D15),3,13)"
@@ -981,22 +984,22 @@ $trades = {
     Check "the batch's cell shows its handle, named for the index" ($trades.StartsWith("${id}:trades:WTI NYMEX:")) $trades
     Check "the batch pays n26 one business day after its Monday expiry" ((Text $state $sheet "D16") -eq "46196") (Text $state $sheet "D16")
     $collection = Text $state $sheet "E13"
-    Check "the payment calendar shows its name and its collection a handle of its kind" ((Text $state $sheet "D13").StartsWith("${id}:holiday_calendar:PAYS:") -and $collection.StartsWith("${id}:payment_calendars:")) ((Text $state $sheet "D13") + " " + $collection)
+    Check "the payment calendar shows its name and its collection a handle of its kind" ((Text $state $sheet "D13").StartsWith("${id}:holiday_calendar:PAYS:") -and $collection.StartsWith("${id}:holiday_calendars:")) ((Text $state $sheet "D13") + " " + $collection)
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 4) }
-    Check "fifteen creators, fifteen live publications" ($c.Live -eq 15 -and $c.Published -eq 15 -and $c.Released -eq 0) $c.Text
+    Check "sixteen creators, sixteen live publications" ($c.Live -eq 16 -and $c.Published -eq 16 -and $c.Released -eq 0) $c.Text
 
     # The holiday moves onto the payment day: the calendar publishes anew, and with it its
     # collection and the batch, which bound its key against that collection; the template, which
     # holds the key, a word, and no calendar, stands, and so does the chain, which never read
     # that calendar.
     Put $state $sheet "C13" "23-Jun-2026"
-    Check "a changed holiday calendar gives its collection a new handle" ((Text $state $sheet "E13") -ne $collection -and (Text $state $sheet "E13").StartsWith("${id}:payment_calendars:")) (Text $state $sheet "E13")
+    Check "a changed holiday calendar gives its collection a new handle" ((Text $state $sheet "E13") -ne $collection -and (Text $state $sheet "E13").StartsWith("${id}:holiday_calendars:")) (Text $state $sheet "E13")
     Check "while the template, holding the key and no calendar, stands" ((Text $state $sheet "D14") -eq $template) (Text $state $sheet "D14")
     $rebuilt = Text $state $sheet "D15"
     Check "and the batch a new one" ($rebuilt -ne $trades -and $rebuilt.StartsWith("${id}:trades:WTI NYMEX:")) $rebuilt
     Check "whose payment day steps over the new holiday" ((Text $state $sheet "D16") -eq "46197") (Text $state $sheet "D16")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 4) -and $c.Released -ge 3 }
-    Check "the old calendar, collection and batch are released; fifteen live, three more published" ($c.Live -eq 15 -and $c.Released -eq 3 -and $c.Published -eq 18) $c.Text
+    Check "the old calendar, collection and batch are released; sixteen live, three more published" ($c.Live -eq 16 -and $c.Released -eq 3 -and $c.Published -eq 19) $c.Text
     Check "the chain's index is untouched" ((Text $state $sheet "D5").StartsWith("${id}:index:WTI NYMEX:")) (Text $state $sheet "D5")
 
     # The template deleted: the batch fails as its consumer and owns nothing; typed back, both live.
@@ -1004,12 +1007,12 @@ $trades = {
     $failed = Text $state $sheet "D15"
     Check "a cleared template fails the batch in the seam's words" ($failed -eq "#ERROR _CreateTrades: template is blank, expected trade template handle") $failed
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 2) }
-    Check "the template and the batch are released, thirteen live" ($c.Live -eq 13 -and $c.Released -eq 5 -and $c.Published -eq 18) $c.Text
+    Check "the template and the batch are released, fourteen live" ($c.Live -eq 14 -and $c.Released -eq 5 -and $c.Published -eq 19) $c.Text
     Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",HSTACK(K1:S1,"nearby"),HSTACK(K2:S2,1))'
     Check "the template typed back rebuilds the batch" ((Text $state $sheet "D15").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D15")
     Check "which pays as before" ((Text $state $sheet "D16") -eq "46197") (Text $state $sheet "D16")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 4) }
-    Check "fifteen live again, two more published, no misses, no disposal errors" ($c.Live -eq 15 -and $c.Published -eq 20 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Check "sixteen live again, two more published, no misses, no disposal errors" ($c.Live -eq 16 -and $c.Published -eq 21 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 
     # The batch prepared against the chain's history and evaluated against its market: two lots
     # of n26 at 70 against a quote of 72.1 mark 4,200. A price tick remakes the vector, the market
@@ -1023,13 +1026,13 @@ $trades = {
     Check "the results' cell shows its handle, named for the index" ($results.StartsWith("${id}:trade_results:WTI NYMEX:")) $results
     Check "the values report reads the mark, 4,200" ((Text $state $sheet "D19") -eq "4200") (Text $state $sheet "D19")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) }
-    Check "seventeen live, two more published" ($c.Live -eq 17 -and $c.Published -eq 22) $c.Text
+    Check "eighteen live, two more published" ($c.Live -eq 18 -and $c.Published -eq 23) $c.Text
     Put $state $sheet "A10" "73.5"
     Check "a price tick gives the results a new handle" ((Text $state $sheet "D18") -ne $results -and (Text $state $sheet "D18").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "D18")
     Check "and the mark follows the quote, 7,000" ((Text $state $sheet "D19") -eq "7000") (Text $state $sheet "D19")
     Check "while the preparation is reused as it is" ((Text $state $sheet "D17") -eq $prepared) (Text $state $sheet "D17")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) -and $c.Released -ge 8 }
-    Check "the old vector, market and results are released; seventeen live, three more published" ($c.Live -eq 17 -and $c.Released -eq 8 -and $c.Published -eq 25 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Check "the old vector, market and results are released; eighteen live, three more published" ($c.Live -eq 18 -and $c.Released -eq 8 -and $c.Published -eq 26 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 
     # A changed fixing: the fixings, the history, the market over it, the preparation and the
     # results publish anew and the old five are released; the vector stands, and so does the
@@ -1043,7 +1046,7 @@ $trades = {
     Check "the mark is unmoved, no slot having fixed" ((Text $state $sheet "D19") -eq "7000") (Text $state $sheet "D19")
     Check "the vector stands" ((Text $state $sheet "D10") -eq $vector) (Text $state $sheet "D10")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) -and $c.Released -ge 13 }
-    Check "the old fixings, history, market, preparation and results are released; seventeen live, five more published" ($c.Live -eq 17 -and $c.Released -eq 13 -and $c.Published -eq 30 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Check "the old fixings, history, market, preparation and results are released; eighteen live, five more published" ($c.Live -eq 18 -and $c.Released -eq 13 -and $c.Published -eq 31 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 
     # A changed selection: the quantity unit names the index's other specification, a barrel of
     # 42 gallons, and the template, the batch, the preparation and the results publish anew, the
@@ -1062,11 +1065,11 @@ $trades = {
     Check "the mark follows the lot size, 7 for two barrels" ((Text $state $sheet "D19") -eq "7") (Text $state $sheet "D19")
     Check "the history stands" ((Text $state $sheet "D9") -eq $history) (Text $state $sheet "D9")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) -and $c.Released -ge 17 }
-    Check "the old template, batch, preparation and results are released; seventeen live, four more published" ($c.Live -eq 17 -and $c.Released -eq 17 -and $c.Published -eq 34 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Check "the old template, batch, preparation and results are released; eighteen live, four more published" ($c.Live -eq 18 -and $c.Released -eq 17 -and $c.Published -eq 35 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 
     # A quantity of zero, a row kept ready: the ticket's two barrels become none and the batch,
     # the preparation and the results publish anew, the old three released, the mark 0 and the
-    # delta 0; the template, the history and the market stand. Typed back to two, the mark is
+    # delta 0; the template, the history and the market stand. Typed back to three, the mark is
     # 7 and the delta 0.002 again, two barrels of the thousand-barrel reporting lot. The risk
     # report in D20 reads the delta, publishing nothing.
     Put $state $sheet "D20" '=INDEX(_ReportRisk(D18,"nominal_delta","year"),4,2)'
@@ -1084,12 +1087,12 @@ $trades = {
     Check "and the delta is 0" ((Text $state $sheet "D20") -eq "0") (Text $state $sheet "D20")
     Check "the template, the history and the market stand" ((Text $state $sheet "D14") -eq $template -and (Text $state $sheet "D9") -eq $history -and (Text $state $sheet "D11") -eq $market) (Text $state $sheet "D14")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) -and $c.Released -ge 20 }
-    Check "the old batch, preparation and results are released; seventeen live, three more published" ($c.Live -eq 17 -and $c.Released -eq 20 -and $c.Published -eq 37 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Check "the old batch, preparation and results are released; eighteen live, three more published" ($c.Live -eq 18 -and $c.Released -eq 20 -and $c.Published -eq 38 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Put $state $sheet "M5" "2"
-    Check "typed back to two barrels, the mark is 7 again" ((Text $state $sheet "D19") -eq "7") (Text $state $sheet "D19")
+    Check "typed back to three barrels, the mark is 7 again" ((Text $state $sheet "D19") -eq "7") (Text $state $sheet "D19")
     Check "and the delta 0.002 again" ((Text $state $sheet "D20") -eq "0.002") (Text $state $sheet "D20")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) -and $c.Released -ge 23 }
-    Check "and three more published and released, no misses, no disposal errors" ($c.Live -eq 17 -and $c.Released -eq 23 -and $c.Published -eq 40 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Check "and three more published and released, no misses, no disposal errors" ($c.Live -eq 18 -and $c.Released -eq 23 -and $c.Published -eq 41 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 }
 
 # --- valuation ------------------------------------------------------------------------------------
@@ -1148,12 +1151,12 @@ $valuation = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
-    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_day"; Put $state $sheet "R1" "payment_calendar_key"; Put $state $sheet "S1" "settlement_frequency"
+    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_day"; Put $state $sheet "R1" "payment_holiday_key"; Put $state $sheet "S1" "settlement_frequency"
     Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "month"; Put $state $sheet "M2" "lastday"; Put $state $sheet "N2" "cleared"; Put $state $sheet "O2" "financial"; Put $state $sheet "P2" "ICE Clear"; Put $state $sheet "Q2" "+1bd"; Put $state $sheet "R2" "PAYS"; Put $state $sheet "S2" "monthly"
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
     Put $state $sheet "K5" "11-May-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
-    Put $state $sheet "D13" '=_CreateHolidayCalendar(C13,"PAYS")'
-    Put $state $sheet "E13" "=_CollectPaymentCalendars(D13)"
+    Put $state $sheet "D13" '=_CreateHolidayCalendar("PAYS",C13)'
+    Put $state $sheet "E13" "=_CollectHolidayCalendars(D13)"
     Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",HSTACK(K1:S1,"nearby"),HSTACK(K2:S2,1))'
     Put $state $sheet "D15" "=_CreateTrades(D5,K4:N4,K5:N5,D14,E13)"
     Put $state $sheet "D17" "=_PrepareTrades(D15,D9)"
@@ -1172,7 +1175,7 @@ $valuation = {
     Check "the preparation shows n26 unsettled" ((Text $state $sheet "D22") -eq "FALSE") (Text $state $sheet "D22")
     Check "the report spilled shows its first header" ((Text $state $sheet "D23") -eq "cleared_mark") (Text $state $sheet "D23")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) }
-    Check "seventeen creators, seventeen live publications" ($c.Live -eq 17 -and $c.Published -eq 17 -and $c.Released -eq 0) $c.Text
+    Check "eighteen creators, eighteen live publications" ($c.Live -eq 18 -and $c.Published -eq 18 -and $c.Released -eq 0) $c.Text
 
     # A copy of the prices and a second vector, market, results and mark over it: equal calls, so
     # the live chain's own publications are shared and nothing is published.
@@ -1184,7 +1187,7 @@ $valuation = {
     Check "a second evaluation over equal prices shares the results' handle" ((Text $state $sheet "F12") -eq $results) (Text $state $sheet "F12")
     Check "and reads the same mark" ((Text $state $sheet "F13") -eq "4200") (Text $state $sheet "F13")
     $c = Counts $state $sheet
-    Check "sharing publishes nothing" ($c.Live -eq 17 -and $c.Published -eq 17) $c.Text
+    Check "sharing publishes nothing" ($c.Live -eq 18 -and $c.Published -eq 18) $c.Text
 
     # A tick: the live chain's vector, market and results publish anew and the mark follows; the
     # copy keeps the old three alive and reads what it read, nothing released, until it is cleared.
@@ -1195,10 +1198,10 @@ $valuation = {
     Check "the retained results keep their handle" ((Text $state $sheet "F12") -eq $results) (Text $state $sheet "F12")
     Check "and read the mark they read, 4,200" ((Text $state $sheet "F13") -eq "4200") (Text $state $sheet "F13")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 9) }
-    Check "twenty live, three more published, nothing released while the copy holds the old three" ($c.Live -eq 20 -and $c.Published -eq 20 -and $c.Released -eq 0) $c.Text
+    Check "twenty-one live, three more published, nothing released while the copy holds the old three" ($c.Live -eq 21 -and $c.Published -eq 21 -and $c.Released -eq 0) $c.Text
     Clear-Cell $state $sheet "F13"; Clear-Cell $state $sheet "F12"; Clear-Cell $state $sheet "F11"; Clear-Cell $state $sheet "F10"
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) -and $c.Released -ge 3 }
-    Check "the copy cleared, the old vector, market and results are released; seventeen live" ($c.Live -eq 17 -and $c.Released -eq 3 -and $c.Published -eq 20 -and $c.Misses -eq 0) $c.Text
+    Check "the copy cleared, the old vector, market and results are released; eighteen live" ($c.Live -eq 18 -and $c.Released -eq 3 -and $c.Published -eq 21 -and $c.Misses -eq 0) $c.Text
 
     # The valuation day moves onto n26's expiry with the fixings extended to the Friday before,
     # the two together under manual calculation: n26 is live on its own day, at the quote.
@@ -1216,7 +1219,7 @@ $valuation = {
     Check "the delta 2 still" ((Text $state $sheet "D20") -eq "2") (Text $state $sheet "D20")
     Check "and n26 unsettled" ((Text $state $sheet "D22") -eq "FALSE") (Text $state $sheet "D22")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) -and $c.Released -ge 10 }
-    Check "the old date, calendar, fixings, history, market, preparation and results are released; seventeen live, seven more published" ($c.Live -eq 17 -and $c.Released -eq 10 -and $c.Published -eq 27 -and $c.Misses -eq 0) $c.Text
+    Check "the old date, calendar, fixings, history, market, preparation and results are released; eighteen live, seven more published" ($c.Live -eq 18 -and $c.Released -eq 10 -and $c.Published -eq 28 -and $c.Misses -eq 0) $c.Text
 
     # The day moves past the expiry with the 22nd's settle: n26 has fixed at 72.5 and paid, and
     # the two-price vector is a price too many for the one contract left, so the market fails, the
@@ -1238,7 +1241,7 @@ $valuation = {
     Check "the delta read likewise" ((Text $state $sheet "D20") -eq "#REF!") (Text $state $sheet "D20")
     Check "and the cash read" ((Text $state $sheet "D21") -eq "#REF!") (Text $state $sheet "D21")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 4) -and $c.Released -ge 17 }
-    Check "the market and the results own nothing: fifteen live, five more published, seven released" ($c.Live -eq 15 -and $c.Released -eq 17 -and $c.Published -eq 32 -and $c.Misses -eq 0) $c.Text
+    Check "the market and the results own nothing: sixteen live, five more published, seven released" ($c.Live -eq 16 -and $c.Released -eq 17 -and $c.Published -eq 33 -and $c.Misses -eq 0) $c.Text
 
     # The vector trimmed to q26's price: the market and the results rebuild, n26 paid.
     Put $state $sheet "D10" "=_CreatePriceVector(A1,A11)"
@@ -1249,7 +1252,7 @@ $valuation = {
     Check "and the delta 0, nothing live" ((Text $state $sheet "D20") -eq "0") (Text $state $sheet "D20")
     Check "the report spilled shows its header again" ((Text $state $sheet "D23") -eq "cleared_mark") (Text $state $sheet "D23")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) -and $c.Released -ge 18 }
-    Check "seventeen live again, three more published, the old vector released, no misses, no disposal errors" ($c.Live -eq 17 -and $c.Released -eq 18 -and $c.Published -eq 35 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Check "eighteen live again, three more published, the old vector released, no misses, no disposal errors" ($c.Live -eq 18 -and $c.Released -eq 18 -and $c.Published -eq 36 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 
 
     # The bilateral path, bilateral-excel-integration.md: a template with a counterparty in K26:R27
@@ -1266,7 +1269,7 @@ $valuation = {
     # curve moves; a curve its creator refuses fails the results as its consumer and publishes
     # nothing until repaired; and a copy holding the results while the curve changes keeps them and
     # their curve alive and readable at the old mark, released when it is cleared.
-    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_calendar_key"; Put $state $sheet "S26" "discount_curve_key"; Put $state $sheet "T26" "settlement_frequency"
+    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_holiday_key"; Put $state $sheet "S26" "discount_curve_key"; Put $state $sheet "T26" "settlement_frequency"
     Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "PAYS"; Put $state $sheet "S27" "SOFR"; Put $state $sheet "T27" "monthly"
     Put $state $sheet "K6" "11-May-2026"; Put $state $sheet "L6" "q26"; Put $state $sheet "M6" "2"; Put $state $sheet "N6" "70"
     Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
@@ -1292,8 +1295,8 @@ $valuation = {
     Check "the nominal delta 2 and the delta 1.98" ((Text $state $sheet "D32") -eq "2" -and (Text $state $sheet "D33") -eq "1.98") ((Text $state $sheet "D32") + " " + (Text $state $sheet "D33"))
     Check "the DV01 -0.045567, thirty days of 5,544 a basis point" ((Text $state $sheet "D34") -eq "-0.045567") (Text $state $sheet "D34")
     Check "and since #197 the cross-gamma -0.0000163, thirty days of 1.98 lots a basis point" ((Text $state $sheet "D36") -eq "-0.0000163") (Text $state $sheet "D36")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 23 }
-    Check "the template, the batch, the preparation, the curve, its collection and the results published: twenty-three live" ($c.Live -eq 23 -and $c.Published -eq 41 -and $c.Released -eq 18) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 24 }
+    Check "the template, the batch, the preparation, the curve, its collection and the results published: twenty-four live" ($c.Live -eq 24 -and $c.Published -eq 42 -and $c.Released -eq 18) $c.Text
 
     # A quote tick: the vector, the market and both results publish anew, the old four released;
     # the batch, the preparation and the curve are reused as they are.
@@ -1304,8 +1307,8 @@ $valuation = {
     Check "a quote tick gives the bilateral results a new handle" ((Text $state $sheet "D30") -ne $bilateral -and (Text $state $sheet "D30").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "D30")
     Check "and the mark follows the quote, 7,524 at 0.99" ((Text $state $sheet "D31") -eq "7524") (Text $state $sheet "D31")
     Check "while the batch, the preparation and the curve are reused as they are" ((Text $state $sheet "D27") -eq $trades -and (Text $state $sheet "D28") -eq $prepared -and (Text $state $sheet "D29") -eq $curve) ((Text $state $sheet "D28") + " " + (Text $state $sheet "D29"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 23 -and $c.Released -ge 22 }
-    Check "the old vector, market and both results are released; four more published" ($c.Live -eq 23 -and $c.Published -eq 45 -and $c.Released -eq 22) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 24 -and $c.Released -ge 22 }
+    Check "the old vector, market and both results are released; four more published" ($c.Live -eq 24 -and $c.Published -eq 46 -and $c.Released -eq 22) $c.Text
 
     # Only the curve changes: the curve and the results publish anew, the old two released; the
     # market and the preparation stand.
@@ -1316,8 +1319,8 @@ $valuation = {
     Check "and the results a new one, 7,448 at 0.98" ((Text $state $sheet "D30") -ne $bilateral -and (Text $state $sheet "D31") -eq "7448") (Text $state $sheet "D31")
     Check "the cross-gamma follows the factor, -0.0000161 at 0.98" ((Text $state $sheet "D36") -eq "-0.0000161") (Text $state $sheet "D36")
     Check "the market and the preparation stand" ((Text $state $sheet "D11") -eq $market -and (Text $state $sheet "D28") -eq $prepared) ((Text $state $sheet "D11") + " " + (Text $state $sheet "D28"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 23 -and $c.Released -ge 25 }
-    Check "the old curve, its collection and the results are released; three more published" ($c.Live -eq 23 -and $c.Published -eq 48 -and $c.Released -eq 25) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 24 -and $c.Released -ge 25 }
+    Check "the old curve, its collection and the results are released; three more published" ($c.Live -eq 24 -and $c.Published -eq 49 -and $c.Released -eq 25) $c.Text
 
     # A changed fixing: the fixings, the history, the market, both preparations and both results
     # publish anew, the old seven released; the curve stands, its day still the valuation day, and
@@ -1329,8 +1332,8 @@ $valuation = {
     Check "a changed fixing gives the history a new handle" ((Text $state $sheet "D9") -ne $history -and (Text $state $sheet "D9").StartsWith("${id}:market_history:WTI NYMEX:")) (Text $state $sheet "D9")
     Check "the bilateral preparation a new one and the mark unmoved, 7,448" ((Text $state $sheet "D28") -ne $prepared -and (Text $state $sheet "D31") -eq "7448") ((Text $state $sheet "D28") + " " + (Text $state $sheet "D31"))
     Check "the curve stands, its day still the valuation day" ((Text $state $sheet "D29") -eq $curve) (Text $state $sheet "D29")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 23 -and $c.Released -ge 32 }
-    Check "the old fixings, history, market, preparations and results are released; seven more published" ($c.Live -eq 23 -and $c.Published -eq 55 -and $c.Released -eq 32) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 24 -and $c.Released -ge 32 }
+    Check "the old fixings, history, market, preparations and results are released; seven more published" ($c.Live -eq 24 -and $c.Published -eq 56 -and $c.Released -eq 32) $c.Text
 
     # The valuation day advances to the 24th with the 23rd's settle, the two together under manual
     # calculation: the curve left on the 23rd fails the bilateral results visibly, in the kernel's
@@ -1345,14 +1348,14 @@ $valuation = {
     Check "the day moved gives the bilateral preparation a new handle" ((Text $state $sheet "D28") -ne $prepared -and (Text $state $sheet "D28").StartsWith("${id}:prepared_trades:WTI NYMEX:")) (Text $state $sheet "D28")
     Check "and the curve left on the 23rd fails the results visibly" ((Text $state $sheet "D30") -eq "#ERROR _EvaluateTrades: ValueError: discount curve 'SOFR' starts on 2026-06-23, expected 2026-06-24, the valuation date; a curve is never rebased") (Text $state $sheet "D30")
     Check "the mark read through INDEX shows #REF!, no number" ((Text $state $sheet "D31") -eq "#REF!") (Text $state $sheet "D31")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 22 -and $c.Released -ge 41 }
-    Check "the failed results own nothing: twenty-two live, eight more published, nine released" ($c.Live -eq 22 -and $c.Published -eq 63 -and $c.Released -eq 41) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 23 -and $c.Released -ge 41 }
+    Check "the failed results own nothing: twenty-three live, eight more published, nine released" ($c.Live -eq 23 -and $c.Published -eq 64 -and $c.Released -eq 41) $c.Text
     Put $state $sheet "W2" "24-Jun-2026"
     Check "the curve moved onto the day rebuilds the results" ((Text $state $sheet "D30").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "D30")
     Check "at 7,448 still, the payment day's factor 0.98" ((Text $state $sheet "D31") -eq "7448") (Text $state $sheet "D31")
     Check "and the cross-gamma a day nearer, -0.0000156 at 29 days" ((Text $state $sheet "D36") -eq "-0.0000156") (Text $state $sheet "D36")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 23 -and $c.Released -ge 43 }
-    Check "the old curve and its collection released; the curve, the collection and the results published anew" ($c.Live -eq 23 -and $c.Published -eq 66 -and $c.Released -eq 43) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 24 -and $c.Released -ge 43 }
+    Check "the old curve and its collection released; the curve, the collection and the results published anew" ($c.Live -eq 24 -and $c.Published -eq 67 -and $c.Released -eq 43) $c.Text
 
     # A curve its creator refuses, a first factor that is not 1: the results fail as its consumer
     # and own nothing; repaired, both rebuild.
@@ -1360,12 +1363,12 @@ $valuation = {
     Put $state $sheet "X2" "0.98"
     Check "a curve its creator refuses shows the refusal" ((Text $state $sheet "D29") -eq $refusedCurve) (Text $state $sheet "D29")
     Check "and fails the collection and the results as its consumers, the creator's text carried once" ((Text $state $sheet "E29") -eq "#ERROR _CollectDiscountCurves: curve_handles is the creator's failure, expected discount curve handle: $refusedCurve" -and (Text $state $sheet "D30") -eq "#ERROR _EvaluateTrades: discount_curve_set is the creator's failure, expected discount curve set handle: $refusedCurve") ((Text $state $sheet "E29") + " | " + (Text $state $sheet "D30"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 20 -and $c.Released -ge 46 }
-    Check "the curve, its collection and the results own nothing: twenty live, three released, nothing published" ($c.Live -eq 20 -and $c.Published -eq 66 -and $c.Released -eq 46) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 46 }
+    Check "the curve, its collection and the results own nothing: twenty-one live, three released, nothing published" ($c.Live -eq 21 -and $c.Published -eq 67 -and $c.Released -eq 46) $c.Text
     Put $state $sheet "X2" "1"
     Check "repaired, the curve and the results rebuild, 7,448" ((Text $state $sheet "D31") -eq "7448") (Text $state $sheet "D31")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 23 }
-    Check "twenty-three live again, three more published" ($c.Live -eq 23 -and $c.Published -eq 69 -and $c.Released -eq 46) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 24 }
+    Check "twenty-four live again, three more published" ($c.Live -eq 24 -and $c.Published -eq 70 -and $c.Released -eq 46) $c.Text
 
     # A copy of the curve's table, clear of the status cell in Z1, and a second curve, results and
     # mark over it: equal calls share
@@ -1386,17 +1389,17 @@ $valuation = {
     Check "and an equal collection its handle" ((Text $state $sheet "G29") -eq (Text $state $sheet "E29")) (Text $state $sheet "G29")
     Check "and an equal evaluation the results" ((Text $state $sheet "F30") -eq $bilateral) (Text $state $sheet "F30")
     $c = Counts $state $sheet
-    Check "sharing publishes nothing" ($c.Live -eq 23 -and $c.Published -eq 69) $c.Text
+    Check "sharing publishes nothing" ($c.Live -eq 24 -and $c.Published -eq 70) $c.Text
     Put $state $sheet "X3" "0.97"
     Check "the live curve and results move, 7,372 at 0.97" ((Text $state $sheet "D30") -ne $bilateral -and (Text $state $sheet "D31") -eq "7372") (Text $state $sheet "D31")
     Check "the held results keep their handle, their curve and its collection" ((Text $state $sheet "F30") -eq $bilateral -and (Text $state $sheet "F29") -eq $curve -and (Text $state $sheet "G29") -ne (Text $state $sheet "E29")) ((Text $state $sheet "F30") + " " + (Text $state $sheet "F29"))
     Check "and read the mark they read, 7,448" ((Text $state $sheet "F31") -eq "7448") (Text $state $sheet "F31")
     Check "and the cross-gamma they read, -0.0000156, while the live results read -0.0000154 at 0.97" ((Text $state $sheet "F32") -eq "-0.0000156" -and (Text $state $sheet "D36") -eq "-0.0000154") ((Text $state $sheet "F32") + " " + (Text $state $sheet "D36"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 26 }
-    Check "twenty-six live, three more published, nothing released while the copy holds the old three" ($c.Live -eq 26 -and $c.Published -eq 72 -and $c.Released -eq 46) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 27 }
+    Check "twenty-seven live, three more published, nothing released while the copy holds the old three" ($c.Live -eq 27 -and $c.Published -eq 73 -and $c.Released -eq 46) $c.Text
     Clear-Cell $state $sheet "F32"; Clear-Cell $state $sheet "F31"; Clear-Cell $state $sheet "F30"; Clear-Cell $state $sheet "G29"; Clear-Cell $state $sheet "F29"
-    $c = Settle $state $sheet { param($c) $c.Live -eq 23 -and $c.Released -ge 49 }
-    Check "the copy cleared, the old curve, collection and results are released; twenty-three live, no misses" ($c.Live -eq 23 -and $c.Released -eq 49 -and $c.Published -eq 72 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 24 -and $c.Released -ge 49 }
+    Check "the copy cleared, the old curve, collection and results are released; twenty-four live, no misses" ($c.Live -eq 24 -and $c.Released -eq 49 -and $c.Published -eq 73 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 
     # The collection, aggregate-risk-excel-integration.md: the cleared results in D18, n26 paid and
     # nothing live, and the bilateral results in D30, two lots of q26 at 0.97, referred to in
@@ -1412,48 +1415,48 @@ $valuation = {
     Check "its nominal delta is the two results' together, 2" ((Text $state $sheet "AE5") -eq "2") (Text $state $sheet "AE5")
     Check "its delta 1.94, the bilateral lots at 0.97" ((Text $state $sheet "AE6") -eq "1.94") (Text $state $sheet "AE6")
     Check "and its DV01 the bilateral results' own" ((Text $state $sheet "AE7") -eq (Text $state $sheet "D34")) ((Text $state $sheet "AE7") + " " + (Text $state $sheet "D34"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 24 }
-    Check "the collection published: twenty-four live, one more published" ($c.Live -eq 24 -and $c.Published -eq 73 -and $c.Released -eq 49) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 25 }
+    Check "the collection published: twenty-five live, one more published" ($c.Live -eq 25 -and $c.Published -eq 74 -and $c.Released -eq 49) $c.Text
 
     # A quote tick: the vector, the market, both results and the collection publish anew, the old
     # five released; the delta reads the same, the lots and the factor unmoved.
     Put $state $sheet "A11" "73.9"
     Check "a quote tick gives the collection a new handle" ((Text $state $sheet "AE4") -ne $collection -and (Text $state $sheet "AE4").StartsWith("${id}:aggregate_results:")) (Text $state $sheet "AE4")
     Check "and its delta reads 1.94 still" ((Text $state $sheet "AE6") -eq "1.94") (Text $state $sheet "AE6")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 24 -and $c.Released -ge 54 }
-    Check "five more published, the old five released" ($c.Live -eq 24 -and $c.Published -eq 78 -and $c.Released -eq 54) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 25 -and $c.Released -ge 54 }
+    Check "five more published, the old five released" ($c.Live -eq 25 -and $c.Published -eq 79 -and $c.Released -eq 54) $c.Text
 
     # A cell naming nothing fails the collection visibly and releases it; the reads show #REF!;
     # the cell restored, the collection publishes anew.
     Put $state $sheet "AE2" "x"
     Check "a cell naming nothing fails the collection in the seam's words" ((Text $state $sheet "AE4") -eq "#ERROR _AggregateResults: result_handles cell (2, 1) is text 'x' naming no live object, expected trade results or cashflow results handle") (Text $state $sheet "AE4")
     Check "and its reads show #REF!, no number" ((Text $state $sheet "AE5") -eq "#REF!") (Text $state $sheet "AE5")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 23 }
-    Check "the failed collection owns nothing: twenty-three live, one released, nothing published" ($c.Live -eq 23 -and $c.Published -eq 78 -and $c.Released -eq 55) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 24 }
+    Check "the failed collection owns nothing: twenty-four live, one released, nothing published" ($c.Live -eq 24 -and $c.Published -eq 79 -and $c.Released -eq 55) $c.Text
     Put $state $sheet "AE2" "=D30"
     Check "the cell restored, the collection is live again" ((Text $state $sheet "AE4").StartsWith("${id}:aggregate_results:") -and (Text $state $sheet "AE5") -eq "2") ((Text $state $sheet "AE4") + " " + (Text $state $sheet "AE5"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 24 }
-    Check "one more published" ($c.Live -eq 24 -and $c.Published -eq 79 -and $c.Released -eq 55) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 25 }
+    Check "one more published" ($c.Live -eq 25 -and $c.Published -eq 80 -and $c.Released -eq 55) $c.Text
 
     # Another risk and bucket over the same collection reformat it; nothing is published.
     Put $state $sheet "AE8" '=INDEX(_ReportRisk(AE4,"all","month"),4,3)'
     Check "a reformat reads the delta by month, 1.94" ((Text $state $sheet "AE8") -eq "1.94") (Text $state $sheet "AE8")
     $c = Counts $state $sheet
-    Check "and publishes nothing" ($c.Live -eq 24 -and $c.Published -eq 79) $c.Text
+    Check "and publishes nothing" ($c.Live -eq 25 -and $c.Published -eq 80) $c.Text
 
     # A factor change: the curve, the bilateral results and the collection publish anew, the old
     # three released; the collection's delta follows the factor, 1.92 at 0.96.
     Put $state $sheet "X3" "0.96"
     Check "a factor change moves the collection's delta, 1.92 at 0.96" ((Text $state $sheet "AE6") -eq "1.92" -and (Text $state $sheet "AE8") -eq "1.92") ((Text $state $sheet "AE6") + " " + (Text $state $sheet "AE8"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 24 -and $c.Released -ge 59 }
-    Check "the old curve, its collection, the results and the collection are released; four more published" ($c.Live -eq 24 -and $c.Published -eq 83 -and $c.Released -eq 59) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 25 -and $c.Released -ge 59 }
+    Check "the old curve, its collection, the results and the collection are released; four more published" ($c.Live -eq 25 -and $c.Published -eq 84 -and $c.Released -eq 59) $c.Text
 
     # An unchanged recalculation: every creator runs again, none publishes, the collection's text stays.
     $collection = Text $state $sheet "AE4"
     Invoke-ExcelCall "full calculation" { $state.Excel.CalculateFull() }
     Check "a full recalculation keeps the collection's handle" ((Text $state $sheet "AE4") -eq $collection) (Text $state $sheet "AE4")
     $c = Counts $state $sheet
-    Check "and publishes nothing" ($c.Live -eq 24 -and $c.Published -eq 83 -and $c.Released -eq 59) $c.Text
+    Check "and publishes nothing" ($c.Live -eq 25 -and $c.Published -eq 84 -and $c.Released -eq 59) $c.Text
 
     # A copy over the two handle texts typed as values shares the live collection's publication.
     # Across a second tick the live five publish anew and the copy holds the old collection and,
@@ -1465,24 +1468,24 @@ $valuation = {
     Put $state $sheet "AG7" '=TEXT(INDEX(_ReportRisk(AG4,"dv01","day"),4,2),"0.000000")'
     Check "a collection over the same texts shares the handle" ((Text $state $sheet "AG4") -eq $collection) (Text $state $sheet "AG4")
     $c = Counts $state $sheet
-    Check "sharing publishes nothing" ($c.Live -eq 24 -and $c.Published -eq 83) $c.Text
+    Check "sharing publishes nothing" ($c.Live -eq 25 -and $c.Published -eq 84) $c.Text
     Put $state $sheet "A11" "74"
     Check "a second tick moves the live collection" ((Text $state $sheet "AE4") -ne $collection -and (Text $state $sheet "AE7") -ne $oldDv01) ((Text $state $sheet "AE4") + " " + (Text $state $sheet "AE7"))
     Check "the held collection keeps its handle and reads the old DV01" ((Text $state $sheet "AG4") -eq $collection -and (Text $state $sheet "AG7") -eq $oldDv01) ((Text $state $sheet "AG4") + " " + (Text $state $sheet "AG7"))
     Put $state $sheet "AG8" "=util_ReadHandle(AG1)"
     Check "while the text it was made from names nothing" ((Text $state $sheet "AG8") -eq "#ERROR util_ReadHandle: handle is text '$(Text $state $sheet "AG1")' naming no live object, expected a handle") (Text $state $sheet "AG8")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 25 -and $c.Released -ge 63 }
-    Check "twenty-five live, five more published, four released while the copy holds the old collection" ($c.Live -eq 25 -and $c.Published -eq 88 -and $c.Released -eq 63) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 26 -and $c.Released -ge 63 }
+    Check "twenty-six live, five more published, four released while the copy holds the old collection" ($c.Live -eq 26 -and $c.Published -eq 89 -and $c.Released -eq 63) $c.Text
     Clear-Cell $state $sheet "AG8"; Clear-Cell $state $sheet "AG7"; Clear-Cell $state $sheet "AG4"
-    $c = Settle $state $sheet { param($c) $c.Live -eq 24 -and $c.Released -ge 64 }
-    Check "the copy cleared, the old collection is released; twenty-four live, no misses" ($c.Live -eq 24 -and $c.Released -eq 64 -and $c.Published -eq 88 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 25 -and $c.Released -ge 64 }
+    Check "the copy cleared, the old collection is released; twenty-five live, no misses" ($c.Live -eq 25 -and $c.Released -eq 64 -and $c.Published -eq 89 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 
     # The last workbook closes: every publication goes, none missed, none failed.
     Close-Book $state $book
     $scratch = New-Book $state
     $watch = Sheet $state $scratch
     $c = Settle $state $watch { param($c) $c.Live -eq 0 }
-    Check "closing the last workbook releases every publication" ($c.Live -eq 0 -and $c.Released -eq 88) $c.Text
+    Check "closing the last workbook releases every publication" ($c.Live -eq 0 -and $c.Released -eq 89) $c.Text
     Check "no release missed, no disposal error, none skipped" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
 }
 
@@ -1492,7 +1495,7 @@ $quit = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
-    Check "the chain is live before quitting" ($c.Live -eq 11) $c.Text
+    Check "the chain is live before quitting" ($c.Live -eq 12) $c.Text
     # Quitting closes the workbook and Excel disconnects its subscriptions: every release reaches
     # the seam and the store empties. A workbook left open at Quit keeps a hidden Excel driven from
     # outside alive, with or without a handle in it, so the tools close first, as this does; the
@@ -1501,7 +1504,7 @@ $quit = {
     $scratch = New-Book $state
     $watch = Sheet $state $scratch
     $c = Settle $state $watch { param($c) $c.Live -eq 0 }
-    Check "closing on the way out releases every publication, none missed, none failed" ($c.Live -eq 0 -and $c.Released -eq 11 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
+    Check "closing on the way out releases every publication, none missed, none failed" ($c.Live -eq 0 -and $c.Released -eq 12 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
 }
 
 # --- quotes ---------------------------------------------------------------------------------------
@@ -1525,9 +1528,9 @@ $quotes = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
-    Put $state $sheet "D13" '=_CreateHolidayCalendar(C13,"PAYS")'
-    Put $state $sheet "E13" "=_CollectPaymentCalendars(D13)"
-    Put $state $sheet "K26" "route"; Put $state $sheet "L26" "settlement_method"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "quantity_per"; Put $state $sheet "O26" "payment_day"; Put $state $sheet "P26" "payment_calendar_key"; Put $state $sheet "Q26" "discount_curve_key"; Put $state $sheet "R26" "settlement_frequency"
+    Put $state $sheet "D13" '=_CreateHolidayCalendar("PAYS",C13)'
+    Put $state $sheet "E13" "=_CollectHolidayCalendars(D13)"
+    Put $state $sheet "K26" "route"; Put $state $sheet "L26" "settlement_method"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "quantity_per"; Put $state $sheet "O26" "payment_day"; Put $state $sheet "P26" "payment_holiday_key"; Put $state $sheet "Q26" "discount_curve_key"; Put $state $sheet "R26" "settlement_frequency"
     Put $state $sheet "K27" "cleared"; Put $state $sheet "L27" "financial"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "month"; Put $state $sheet "O27" "+1bd"; Put $state $sheet "P27" "PAYS"; Put $state $sheet "R27" "monthly"
     Put $state $sheet "K28" "bilateral"; Put $state $sheet "L28" "financial"; Put $state $sheet "M28" "lastday"; Put $state $sheet "N28" "month"; Put $state $sheet "O28" "+1bd"; Put $state $sheet "P28" "PAYS"; Put $state $sheet "Q28" "SOFR"; Put $state $sheet "R28" "monthly"
     Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
@@ -1544,27 +1547,27 @@ $quotes = {
     Check "the strip quotes 72.45, the two live quotes at equal weight, a number and no handle" ((Text $state $sheet "D27") -eq "72.45") (Text $state $sheet "D27")
     Check "the strip's months by their dates, 1 July to 31 August, quote the same 72.45 and publish nothing" ((Text $state $sheet "D34") -eq "72.45") (Text $state $sheet "D34")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 3) }
-    Check "the chain, the payment calendar, its collection and the template: fourteen live, fourteen published, the quote publishing nothing" ($c.Live -eq 14 -and $c.Published -eq 14 -and $c.Released -eq 0) $c.Text
+    Check "the chain, the payment calendar, its collection and the template: fifteen live, fifteen published, the quote publishing nothing" ($c.Live -eq 15 -and $c.Published -eq 15 -and $c.Released -eq 0) $c.Text
 
     # The basis changed to calendar days: a new template, the old released; July's and August's 31
     # days weigh the two quotes alike, so the price stands.
     Put $state $sheet "N27" "calday"
     Check "a changed basis gives the template a new handle" ((Text $state $sheet "D26") -ne $template -and (Text $state $sheet "D26").StartsWith("${id}:quote_template:")) (Text $state $sheet "D26")
     Check "and the price stands, July's and August's 31 days weighing alike, 72.4500" ((Text $state $sheet "D28") -eq "72.4500") (Text $state $sheet "D28")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 14 -and $c.Released -ge 1 }
-    Check "the old template released, one more published" ($c.Live -eq 14 -and $c.Published -eq 15 -and $c.Released -eq 1) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 15 -and $c.Released -ge 1 }
+    Check "the old template released, one more published" ($c.Live -eq 15 -and $c.Published -eq 16 -and $c.Released -eq 1) $c.Text
 
     # The template cleared: the quote fails in the seam's words and owns nothing; restored, a new
     # template and the price again.
     $template = Text $state $sheet "D26"
     Clear-Cell $state $sheet "D26"
     Check "the template cleared fails the quote in the seam's words" ((Text $state $sheet "D27") -eq "#ERROR _Quote: template is blank, expected quote template handle") (Text $state $sheet "D27")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 13 }
-    Check "thirteen live, the template released" ($c.Live -eq 13 -and $c.Published -eq 15 -and $c.Released -eq 2) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 14 }
+    Check "fourteen live, the template released" ($c.Live -eq 14 -and $c.Published -eq 16 -and $c.Released -eq 2) $c.Text
     Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",HSTACK(K26:P26,R26,"nearby"),HSTACK(K27:P27,R27,1),E13)'
     Check "restored, a new template and the price again" ((Text $state $sheet "D26") -ne $template -and (Text $state $sheet "D26").StartsWith("${id}:quote_template:") -and (Text $state $sheet "D28") -eq "72.4500") ((Text $state $sheet "D26") + " " + (Text $state $sheet "D28"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 14 }
-    Check "fourteen live again, one more published" ($c.Live -eq 14 -and $c.Published -eq 16 -and $c.Released -eq 2) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 15 }
+    Check "fifteen live again, one more published" ($c.Live -eq 15 -and $c.Published -eq 17 -and $c.Released -eq 2) $c.Text
 
     # A bilateral template naming SOFR, the curve flat at 0.98 on both payment days and its
     # collection: one factor cancels, the quote is the cleared 72.45; August's factor moved to 0.97,
@@ -1576,15 +1579,15 @@ $quotes = {
     Put $state $sheet "D32" '=TEXT(D31,"0.0000")'
     Check "the bilateral template, the curve and the collection show their kinds" ((Text $state $sheet "D29").StartsWith("${id}:quote_template:") -and (Text $state $sheet "D30").StartsWith("${id}:discount_curve:SOFR:") -and (Text $state $sheet "E30").StartsWith("${id}:discount_curve_set:")) ((Text $state $sheet "D29") + " " + (Text $state $sheet "E30"))
     Check "one factor on both payments cancels: the bilateral strip quotes the cleared 72.45" ((Text $state $sheet "D31") -eq "72.45") (Text $state $sheet "D31")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 17 }
-    Check "seventeen live, three more published" ($c.Live -eq 17 -and $c.Published -eq 19 -and $c.Released -eq 2) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 18 }
+    Check "eighteen live, three more published" ($c.Live -eq 18 -and $c.Published -eq 20 -and $c.Released -eq 2) $c.Text
     $curve = Text $state $sheet "D30"
     $collection = Text $state $sheet "E30"
     Put $state $sheet "X4" "0.97"
     Check "a moved factor remakes the curve and the collection" ((Text $state $sheet "D30") -ne $curve -and (Text $state $sheet "E30") -ne $collection -and (Text $state $sheet "E30").StartsWith("${id}:discount_curve_set:")) ((Text $state $sheet "D30") + " " + (Text $state $sheet "E30"))
     Check "and reprices the strip, 72.4482 with July at 0.98 and August at 0.97" ((Text $state $sheet "D32") -eq "72.4482") (Text $state $sheet "D32")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 17 -and $c.Released -ge 4 }
-    Check "the old curve and collection released, two more published" ($c.Live -eq 17 -and $c.Published -eq 21 -and $c.Released -eq 4) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 18 -and $c.Released -ge 4 }
+    Check "the old curve and collection released, two more published" ($c.Live -eq 18 -and $c.Published -eq 22 -and $c.Released -eq 4) $c.Text
 
     # The key renamed: the template remakes and the quote fails naming the key and the collection's
     # names; repaired, the price again.
@@ -1592,12 +1595,12 @@ $quotes = {
     Put $state $sheet "Q28" "SONIA"
     Check "a renamed key remakes the template" ((Text $state $sheet "D29") -ne $template -and (Text $state $sheet "D29").StartsWith("${id}:quote_template:")) (Text $state $sheet "D29")
     Check "and fails the quote naming the key and the collection's names" ((Text $state $sheet "D31") -eq "#ERROR _Quote: ValueError: discount_curve_key 'SONIA' names no curve of the collection, which holds 'SOFR'; expected a curve of that name") (Text $state $sheet "D31")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 17 -and $c.Released -ge 5 }
-    Check "the renamed template published, the old released" ($c.Live -eq 17 -and $c.Published -eq 22 -and $c.Released -eq 5) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 18 -and $c.Released -ge 5 }
+    Check "the renamed template published, the old released" ($c.Live -eq 18 -and $c.Published -eq 23 -and $c.Released -eq 5) $c.Text
     Put $state $sheet "Q28" "SOFR"
     Check "repaired, the quote prices again" ((Text $state $sheet "D32") -eq "72.4482") (Text $state $sheet "D32")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 17 -and $c.Released -ge 6 }
-    Check "seventeen live, one more published, the renamed template released" ($c.Live -eq 17 -and $c.Published -eq 23 -and $c.Released -eq 6) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 18 -and $c.Released -ge 6 }
+    Check "eighteen live, one more published, the renamed template released" ($c.Live -eq 18 -and $c.Published -eq 24 -and $c.Released -eq 6) $c.Text
 
     # The payment calendar's day moved onto n26's payment day, Tuesday 23 June: the calendar, its
     # collection and both templates, each holding the calendar its key selected when it was
@@ -1609,12 +1612,12 @@ $quotes = {
     $template = Text $state $sheet "D29"
     $calendars = Text $state $sheet "E13"
     Put $state $sheet "C13" "23-Jun-2026"
-    Check "a moved payment calendar gives its collection a new handle" ((Text $state $sheet "E13") -ne $calendars -and (Text $state $sheet "E13").StartsWith("${id}:payment_calendars:")) (Text $state $sheet "E13")
+    Check "a moved payment calendar gives its collection a new handle" ((Text $state $sheet "E13") -ne $calendars -and (Text $state $sheet "E13").StartsWith("${id}:holiday_calendars:")) (Text $state $sheet "E13")
     Check "and both quote templates new ones, each holding the calendar its key selected" ((Text $state $sheet "D26") -ne $cleared -and (Text $state $sheet "D29") -ne $template -and (Text $state $sheet "D29").StartsWith("${id}:quote_template:")) ((Text $state $sheet "D26") + " " + (Text $state $sheet "D29"))
     Check "the bilateral strip reprices on n26's later payment day, 72.4483" ((Text $state $sheet "D32") -eq "72.4483") (Text $state $sheet "D32")
     Check "while the cleared strip, on no factor, stands at 72.4500" ((Text $state $sheet "D28") -eq "72.4500") (Text $state $sheet "D28")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 17 -and $c.Released -ge 10 }
-    Check "the old calendar, collection and two templates released, four more published" ($c.Live -eq 17 -and $c.Published -eq 27 -and $c.Released -eq 10) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 18 -and $c.Released -ge 10 }
+    Check "the old calendar, collection and two templates released, four more published" ($c.Live -eq 18 -and $c.Published -eq 28 -and $c.Released -eq 10) $c.Text
     Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Close-Book $state $book
 }
@@ -1660,16 +1663,16 @@ $pairs = {
     Put $state $sheet "D4" "date"; Put $state $sheet "E4" "discount_factor"
     Put $state $sheet "D5" "4-Jan-2027"; Put $state $sheet "E5" "1"
     Put $state $sheet "D6" "4-Jan-2028"; Put $state $sheet "E6" "0.95"
-    Put $state $sheet "L1" "quantity_unit"; Put $state $sheet "M1" "quantity_per"; Put $state $sheet "N1" "schedule_method"; Put $state $sheet "O1" "second_schedule_method"; Put $state $sheet "P1" "route"; Put $state $sheet "Q1" "settlement_method"; Put $state $sheet "R1" "counterparty"; Put $state $sheet "S1" "discount_curve_key"; Put $state $sheet "T1" "payment_day"; Put $state $sheet "U1" "payment_calendar_key"; Put $state $sheet "V1" "settlement_frequency"
+    Put $state $sheet "L1" "quantity_unit"; Put $state $sheet "M1" "quantity_per"; Put $state $sheet "N1" "schedule_method"; Put $state $sheet "O1" "second_schedule_method"; Put $state $sheet "P1" "route"; Put $state $sheet "Q1" "settlement_method"; Put $state $sheet "R1" "counterparty"; Put $state $sheet "S1" "discount_curve_key"; Put $state $sheet "T1" "payment_day"; Put $state $sheet "U1" "payment_holiday_key"; Put $state $sheet "V1" "settlement_frequency"
     Put $state $sheet "L2" "NYMEX NG"; Put $state $sheet "M2" "month"; Put $state $sheet "N2" "lastday"; Put $state $sheet "O2" "lastday"; Put $state $sheet "P2" "bilateral"; Put $state $sheet "Q2" "financial"; Put $state $sheet "R2" "ACME Trading"; Put $state $sheet "S2" "SOFR"; Put $state $sheet "T2" "4-Jan-2028"; Put $state $sheet "U2" "PAYS"; Put $state $sheet "V2" "monthly"
     Put $state $sheet "L4" "trade_id"; Put $state $sheet "M4" "trade_date"; Put $state $sheet "N4" "contract_code"; Put $state $sheet "O4" "quantity"; Put $state $sheet "P4" "fixed_price"
     Put $state $sheet "L5" "1"; Put $state $sheet "M5" "15-Dec-2026"; Put $state $sheet "N5" "G27"; Put $state $sheet "O5" "1"; Put $state $sheet "P5" "3"
     Put $state $sheet "J1" "=_CreateFuturesSchedule(A1:A3,B1:B3)"
-    Put $state $sheet "J2" '=_CreateHolidayCalendar(C1,"PAYS")'
-    Put $state $sheet "K2" "=_CollectPaymentCalendars(J2)"
+    Put $state $sheet "J2" '=_CreateHolidayCalendar("PAYS",C1)'
+    Put $state $sheet "K2" "=_CollectHolidayCalendars(J2)"
     Put $state $sheet "J3" '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     Put $state $sheet "J4" "=_CreateContractSpecifications(D1:H1,D2:H2)"
-    Put $state $sheet "J5" '=_CreateIndex("A","Pair leg A, a futures index",J1,J3,J4,J2,"NYMEX NG")'
+    Put $state $sheet "J5" '=_CreateIndex("A","Pair leg A, a futures index",J1,J3,J4,"PAYS","NYMEX NG",K2)'
     Put $state $sheet "J7" "=_CreateIfercSchedule(A5:A9,B5:B9)"
     Put $state $sheet "J6" '=_CreateIndex("B","Pair leg B, an IFERC index",J7,J3,J4,,"NYMEX NG")'
     Put $state $sheet "J8" "=_CreateValuationDate(A11,0.5)"
@@ -1828,9 +1831,9 @@ $rfq = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
-    Put $state $sheet "D13" '=_CreateHolidayCalendar(C13,"PAYS")'
-    Put $state $sheet "E13" "=_CollectPaymentCalendars(D13)"
-    Put $state $sheet "K26" "route"; Put $state $sheet "L26" "settlement_method"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "quantity_per"; Put $state $sheet "O26" "payment_day"; Put $state $sheet "P26" "payment_calendar_key"; Put $state $sheet "Q26" "settlement_frequency"
+    Put $state $sheet "D13" '=_CreateHolidayCalendar("PAYS",C13)'
+    Put $state $sheet "E13" "=_CollectHolidayCalendars(D13)"
+    Put $state $sheet "K26" "route"; Put $state $sheet "L26" "settlement_method"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "quantity_per"; Put $state $sheet "O26" "payment_day"; Put $state $sheet "P26" "payment_holiday_key"; Put $state $sheet "Q26" "settlement_frequency"
     Put $state $sheet "K27" "cleared"; Put $state $sheet "L27" "financial"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "month"; Put $state $sheet "O27" "+1bd"; Put $state $sheet "P27" "PAYS"; Put $state $sheet "Q27" "monthly"
     Put $state $sheet "K30" "n26"; Put $state $sheet "L30" "1"; Put $state $sheet "M30" "1-Jul-2026"
     Put $state $sheet "K31" "q26"; Put $state $sheet "L31" "3"; Put $state $sheet "M31" "1-Aug-2026"
@@ -1852,23 +1855,23 @@ $rfq = {
     Check "the readback reads q26's quantity, 3" ((Text $state $sheet "D35") -eq "3") (Text $state $sheet "D35")
     Check "and the dated request's payment source, the request's" ((Text $state $sheet "D38") -eq "request") (Text $state $sheet "D38")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) }
-    Check "the chain, the payment calendar, its collection, the template and the two requests: sixteen live, sixteen published, the quotes publishing nothing" ($c.Live -eq 16 -and $c.Published -eq 16 -and $c.Released -eq 0) $c.Text
+    Check "the chain, the payment calendar, its collection, the template and the two requests: seventeen live, seventeen published, the quotes publishing nothing" ($c.Live -eq 17 -and $c.Published -eq 17 -and $c.Released -eq 0) $c.Text
 
     # A quote tick: the vector and the market publish anew, the old two released; both requests
     # stand and reprice, 72.975 with n26 at 73.5.
     Put $state $sheet "A10" "73.5"
     Check "a tick leaves the request's handle as it was" ((Text $state $sheet "D33") -eq $saved) (Text $state $sheet "D33")
     Check "and reprices it, 72.975" ((Text $state $sheet "D34") -eq "72.975" -and (Text $state $sheet "D37") -eq "72.975") ((Text $state $sheet "D34") + " " + (Text $state $sheet "D37"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 16 -and $c.Released -ge 2 }
-    Check "the old vector and market released, two more published" ($c.Live -eq 16 -and $c.Published -eq 18 -and $c.Released -eq 2) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 17 -and $c.Released -ge 2 }
+    Check "the old vector and market released, two more published" ($c.Live -eq 17 -and $c.Published -eq 19 -and $c.Released -eq 2) $c.Text
 
     # A changed quantity: both requests publish anew and the old two are released; the price
     # follows, 73.15 at one of each.
     Put $state $sheet "L31" "1"
     Check "a changed quantity gives the request a new handle" ((Text $state $sheet "D33") -ne $saved -and (Text $state $sheet "D33").StartsWith("${id}:rfq:WTI NYMEX:")) (Text $state $sheet "D33")
     Check "and the price follows, 73.15" ((Text $state $sheet "D34") -eq "73.15" -and (Text $state $sheet "D35") -eq "1") ((Text $state $sheet "D34") + " " + (Text $state $sheet "D35"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 16 -and $c.Released -ge 4 }
-    Check "the old two requests released, two more published" ($c.Live -eq 16 -and $c.Published -eq 20 -and $c.Released -eq 4) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 17 -and $c.Released -ge 4 }
+    Check "the old two requests released, two more published" ($c.Live -eq 17 -and $c.Published -eq 21 -and $c.Released -eq 4) $c.Text
 
     # A code naming no month fails both requests at the row and the quotes as their consumers, the
     # reads showing #REF!; typed back, both publish anew and the price again.
@@ -1877,12 +1880,12 @@ $rfq = {
     Check "a code naming no month fails the request in the library's words" ($failed -eq "#ERROR _CreateRFQ: ValueError: contract_code row 1 is 'x', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28") $failed
     Check "and the quote as its consumer, the creator's text carried once" ((Text $state $sheet "D34") -eq "#ERROR _QuoteRFQ: rfq is the creator's failure, expected rfq handle: $failed") (Text $state $sheet "D34")
     Check "and the read shows #REF!, no number" ((Text $state $sheet "D35") -eq "#REF!") (Text $state $sheet "D35")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 14 }
-    Check "the two requests released, fourteen live, nothing published" ($c.Live -eq 14 -and $c.Published -eq 20 -and $c.Released -eq 6) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 15 }
+    Check "the two requests released, fifteen live, nothing published" ($c.Live -eq 15 -and $c.Published -eq 21 -and $c.Released -eq 6) $c.Text
     Put $state $sheet "K30" "n26"
     Check "the code typed back rebuilds the request and the price, 73.15" ((Text $state $sheet "D33").StartsWith("${id}:rfq:WTI NYMEX:") -and (Text $state $sheet "D34") -eq "73.15") ((Text $state $sheet "D33") + " " + (Text $state $sheet "D34"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 16 }
-    Check "sixteen live again, two more published" ($c.Live -eq 16 -and $c.Published -eq 22 -and $c.Released -eq 6) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 17 }
+    Check "seventeen live again, two more published" ($c.Live -eq 17 -and $c.Published -eq 23 -and $c.Released -eq 6) $c.Text
 
     # A payment day on n26's expiry fails the dated request alone, by the month and its row;
     # the day after, typed back, rebuilds it.
@@ -1890,12 +1893,12 @@ $rfq = {
     Put $state $sheet "M30" "22-Jun-2026"
     Check "a payment day on the month's last observation fails the dated request by its row" ((Text $state $sheet "D36") -eq "#ERROR _CreateRFQ: ValueError: n26 of row 1 pays on 2026-06-22, expected a day after its last observation, 2026-06-22, when its final price exists") (Text $state $sheet "D36")
     Check "while the request on the template's day stands" ((Text $state $sheet "D34") -eq "73.15") (Text $state $sheet "D34")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 15 }
-    Check "the dated request released, fifteen live" ($c.Live -eq 15 -and $c.Published -eq 22 -and $c.Released -eq 7) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 16 }
+    Check "the dated request released, sixteen live" ($c.Live -eq 16 -and $c.Published -eq 23 -and $c.Released -eq 7) $c.Text
     Put $state $sheet "M30" "1-Jul-2026"
     Check "the day typed back rebuilds the dated request and its price" ((Text $state $sheet "D36") -ne $dated -and (Text $state $sheet "D36").StartsWith("${id}:rfq:WTI NYMEX:") -and (Text $state $sheet "D37") -eq "73.15") ((Text $state $sheet "D36") + " " + (Text $state $sheet "D37"))
-    $c = Settle $state $sheet { param($c) $c.Live -eq 16 }
-    Check "sixteen live, one more published, no misses, no disposal errors" ($c.Live -eq 16 -and $c.Published -eq 23 -and $c.Released -eq 7 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    $c = Settle $state $sheet { param($c) $c.Live -eq 17 }
+    Check "seventeen live, one more published, no misses, no disposal errors" ($c.Live -eq 17 -and $c.Published -eq 24 -and $c.Released -eq 7 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Close-Book $state $book
 }
 
@@ -1936,7 +1939,7 @@ $physical = {
     Check "nothing is cash" ((Text $state $sheet "D21") -eq "0") (Text $state $sheet "D21")
     Check "and n26 is unsettled" ((Text $state $sheet "D22") -eq "FALSE") (Text $state $sheet "D22")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 4) }
-    Check "fifteen creators, fifteen live publications" ($c.Live -eq 15 -and $c.Published -eq 15 -and $c.Released -eq 0) $c.Text
+    Check "sixteen creators, sixteen live publications" ($c.Live -eq 16 -and $c.Published -eq 16 -and $c.Released -eq 0) $c.Text
 
     # The valuation day moves past the expiry with the fixings through the 22nd and the vector
     # trimmed to the one contract left, together under manual calculation: the 4,000 is cash.
@@ -1956,7 +1959,7 @@ $physical = {
     Check "the mark is 0" ((Text $state $sheet "D19") -eq "0") (Text $state $sheet "D19")
     Check "and the delta 0" ((Text $state $sheet "D20") -eq "0") (Text $state $sheet "D20")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 4) -and $c.Released -ge 8 }
-    Check "the old date, calendar, fixings, history, vector, market, preparation and results are released; fifteen live, eight more published" ($c.Live -eq 15 -and $c.Released -eq 8 -and $c.Published -eq 23 -and $c.Misses -eq 0) $c.Text
+    Check "the old date, calendar, fixings, history, vector, market, preparation and results are released; sixteen live, eight more published" ($c.Live -eq 16 -and $c.Released -eq 8 -and $c.Published -eq 24 -and $c.Misses -eq 0) $c.Text
 
     # The sell corrected to one lot leaves a lot open past the expiry: a delivery. The batch
     # publishes anew; the preparation fails by the contract and the count, and the results as
@@ -1969,7 +1972,7 @@ $physical = {
     Check "the cash read through INDEX shows #REF!, no number" ((Text $state $sheet "D21") -eq "#REF!") (Text $state $sheet "D21")
     Check "the mark read likewise" ((Text $state $sheet "D19") -eq "#REF!") (Text $state $sheet "D19")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 2) -and $c.Released -ge 11 }
-    Check "the preparation and the results own nothing: thirteen live, the old batch, preparation and results released" ($c.Live -eq 13 -and $c.Released -eq 11 -and $c.Published -eq 24 -and $c.Misses -eq 0) $c.Text
+    Check "the preparation and the results own nothing: fourteen live, the old batch, preparation and results released" ($c.Live -eq 14 -and $c.Released -eq 11 -and $c.Published -eq 25 -and $c.Misses -eq 0) $c.Text
 
     # The row put right: the batch, the preparation and the results rebuild and the cash reads
     # as it did.
@@ -1980,7 +1983,7 @@ $physical = {
     Check "the mark 0" ((Text $state $sheet "D19") -eq "0") (Text $state $sheet "D19")
     Check "and the contract settled" ((Text $state $sheet "D22") -eq "TRUE") (Text $state $sheet "D22")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 4) -and $c.Released -ge 12 }
-    Check "fifteen live again, three more published, the open batch released, no misses, no disposal errors" ($c.Live -eq 15 -and $c.Released -eq 12 -and $c.Published -eq 27 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Check "sixteen live again, three more published, the open batch released, no misses, no disposal errors" ($c.Live -eq 16 -and $c.Released -eq 12 -and $c.Published -eq 28 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Close-Book $state $book
 }
 

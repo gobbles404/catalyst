@@ -4,6 +4,7 @@ aligned."""
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
@@ -12,9 +13,8 @@ from catalyst.globals.unit_conversions import UNITS
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
-from catalyst.index_definitions.holiday_calendar import holiday_calendar
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.market_data.futures_fixings import futures_fixings
 
@@ -65,13 +65,13 @@ SPECIFICATIONS = contract_specifications(
 
 def an_index(holidays: NDArray[np.datetime64]) -> Index:
     """A futures index whose holiday calendar lists those days."""
-    return index(
+    return index_on(
         "sample",
         "Sample futures index",
         SCHEDULE,
         CONVENTIONS,
         SPECIFICATIONS,
-        holiday_calendar(holidays),
+        closed_on(holidays),
         None,
         UNITS,
     )
@@ -149,7 +149,7 @@ def test_a_holiday_listed_twice_or_on_a_weekend_changes_nothing() -> None:
 
 
 def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() -> None:
-    gas_daily = index(
+    gas_daily = index_on(
         "Henry Hub Gas Daily",
         "Henry Hub natural gas - Platts Gas Daily",
         gas_daily_schedule(("U26",), dates("2026-09-01"), dates("2026-09-30")),
@@ -162,7 +162,7 @@ def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() 
     with pytest.raises(ValueError) as failure:
         futures_fixings(DATES, SETTLES[:2], gas_daily)
     assert str(failure.value) == "index is a Gas Daily index, expected a futures index"
-    iferc = index(
+    iferc = index_on(
         "Henry Hub IFERC",
         "Henry Hub natural gas - Inside FERC monthly index",
         iferc_schedule(("V26",), dates("2026-10-01")),

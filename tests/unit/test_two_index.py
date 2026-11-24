@@ -16,10 +16,19 @@ from typing import Any, cast
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name, closed_on, index_on
 from numpy.typing import NDArray
 from test_aggregate_risk import column, same_view
 from test_bilateral_kernel import curve_of, curve_set
-from test_create_trades import a_template, a_ticket, key_of, seam_key, the_calendars, with_calendars
+from test_create_trades import (
+    a_template,
+    a_ticket,
+    key_of,
+    seam_calendars,
+    seam_key,
+    the_calendars,
+    with_calendars,
+)
 from test_trades import dates, day, history_on, numbers, quoted, waha_history
 from test_utilities import rows
 
@@ -34,9 +43,8 @@ from catalyst.globals.unit_conversions import UNITS
 from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
-from catalyst.index_definitions.holiday_calendar import holiday_calendar
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import CASHFLOW, FIXED_FLOAT
@@ -89,7 +97,7 @@ def futures(
     units = ("MMBTU",) * len(names)
     if spec is not None:  # one more specification, in a unit of its own
         names, sizes, units = (*names, spec[0]), np.append(sizes, spec[1]), (*units, spec[2])
-    return index(
+    return index_on(
         name,
         f"Index {name}",
         futures_schedule(tuple(c for c, _ in contracts), dates(*(e for _, e in contracts)), None),
@@ -102,7 +110,7 @@ def futures(
             sizes * clearing,
             UNITS,
         ),
-        holiday_calendar(dates("2026-12-25", "2027-01-01")),
+        closed_on(dates("2026-12-25", "2027-01-01")),
         "LOT",
         UNITS,
     )
@@ -119,7 +127,7 @@ def iferc(
     units: tuple[str, ...] = ("MMBTU", "MMBTU")
     if spec is not None:
         names, sizes, units = (*names, spec[0]), np.append(sizes, spec[1]), (*units, spec[2])
-    return index(
+    return index_on(
         name,
         f"Index {name}",
         iferc_schedule(
@@ -136,7 +144,7 @@ def iferc(
 
 A = futures("A", 10_000.0, 0.01, 0.005, extra=("THERM10",))
 B = iferc("B", 2_500.0)
-PAYS = holiday_calendar(dates())  # weekends alone
+PAYS = closed_on(dates())  # weekends alone
 AS_OF = "2027-01-04"
 PAY = "2028-01-04"  # exactly 365 days on, tau 1
 SOFR = curve_of((AS_OF, 1.0), (PAY, 0.95))
@@ -148,7 +156,7 @@ SHARED: dict[str, object] = {
     "schedule_method": "lastday",
     "second_schedule_method": "lastday",
     "settlement_method": "financial",
-    "payment_calendar_key": key_of(PAYS),
+    "payment_holiday_key": key_of(PAYS),
 }
 BILATERAL: dict[str, object] = {
     **SHARED,
@@ -720,7 +728,7 @@ def test_the_pair_is_two_distinct_indexes_of_one_quoting_on_a_financial_settleme
         "settled in DOLLAR as index 1 'A'; two legs' prices add in one unit"
     )
     physical = {
-        k: v for k, v in CLEARED.items() if k not in ("payment_day", "payment_calendar_key")
+        k: v for k, v in CLEARED.items() if k not in ("payment_day", "payment_holiday_key")
     } | {"settlement_method": "physical"}
     assert refused(physical) == (
         "settlement_method is 'physical', expected 'financial' with two indexes; a two-index "
@@ -1226,14 +1234,21 @@ def the_sheet() -> dict[str, Any]:
         across("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
         across("NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0),
     )
-    holidays = SEAM["_CreateHolidayCalendar"](serial("2027-01-01"), bridge.MISSING)
+    holidays = SEAM["_CreateHolidayCalendar"](a_name(), serial("2027-01-01"))
     a_schedule = SEAM["_CreateFuturesSchedule"](
         down("F27", "G27", "H27"),
         down(serial("2026-12-29"), serial("2027-01-27"), serial("2027-02-24")),
         bridge.MISSING,
     )
     a = SEAM["_CreateIndex"](
-        "A", "Pair leg A, a futures index", a_schedule, conventions, specs, holidays, "NYMEX NG"
+        "A",
+        "Pair leg A, a futures index",
+        a_schedule,
+        conventions,
+        specs,
+        seam_key(holidays),
+        "NYMEX NG",
+        seam_calendars(),
     )
     b_schedule = SEAM["_CreateIfercSchedule"](
         down("Z26", "F27", "G27", "H27", "J27"),
@@ -1252,6 +1267,7 @@ def the_sheet() -> dict[str, Any]:
         specs,
         bridge.MISSING,
         "NYMEX NG",
+        bridge.MISSING,
     )
     date = SEAM["_CreateValuationDate"](serial(AS_OF), 0.5)
     hist_a = SEAM["_CreateMarketHistory"](
@@ -1288,7 +1304,7 @@ def the_sheet() -> dict[str, Any]:
             "counterparty",
             "discount_curve_key",
             "payment_day",
-            "payment_calendar_key",
+            "payment_holiday_key",
         ),
         across(
             "NYMEX NG",
@@ -1419,7 +1435,7 @@ def test_the_sheet_prepares_and_values_a_pair_from_ranges_in_either_order(
                 "counterparty",
                 "discount_curve_key",
                 "payment_day",
-                "payment_calendar_key",
+                "payment_holiday_key",
             ),
             across(
                 "NYMEX NG",
@@ -1432,7 +1448,7 @@ def test_the_sheet_prepares_and_values_a_pair_from_ranges_in_either_order(
                 "ACME Trading",
                 "SOFR",
                 serial(PAY),
-                seam_key(SEAM["_CreateHolidayCalendar"](serial("2027-01-01"), bridge.MISSING)),
+                seam_key(SEAM["_CreateHolidayCalendar"](a_name(), serial("2027-01-01"))),
             ),
         ),
     )
@@ -1515,7 +1531,7 @@ FIELDS = (
     "trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, "
     "settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, "
     "quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, "
-    "payment_calendar_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
 )
 
 

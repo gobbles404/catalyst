@@ -11,6 +11,7 @@ from types import MappingProxyType
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name, closed_on, index_on
 from test_bilateral_kernel import CLOSE, curve_of, curve_set
 from test_create_trades import bound_calendar, key_of, seam_key, with_calendars
 from test_market import a_gas_daily_history
@@ -43,7 +44,7 @@ from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.periods import end_date, start_date
 from catalyst.instrumentation.work_counts import WorkCounter
@@ -100,7 +101,7 @@ STRIP = an_index(
     ("VOLUME", "BBL"),
     ("BBL", 1.0, "BBL"),
 )
-WEEKENDS_ONLY = holiday_calendar(dates("2030-01-01"), "WEEKENDS_ONLY")
+WEEKENDS_ONLY = holiday_calendar("WEEKENDS_ONLY", dates("2030-01-01"))
 # The ordinary named curve: 1 on the valuation day, 0.99 on 1 February and 0.98 on 1 March, the
 # two payment days of +1bd; a second with visibly different factors; a flat one.
 SOFR = curve_of((DEC_31, 1.0), ("2027-02-01", 0.99), ("2027-03-01", 0.98))
@@ -137,7 +138,7 @@ def financial(
         "payment_day": DayOrRule(None, lag)
         if day is None
         else DayOrRule(np.datetime64(day, "D"), None),
-        "payment_calendar_key": key_of(payment_calendar),
+        "payment_holiday_key": key_of(payment_calendar),
     }
     if key is not None:
         values["discount_curve_key"] = key
@@ -307,7 +308,7 @@ def test_a_payment_holiday_moves_one_factor_and_the_cleared_price_stands() -> No
     # 1 February closed on the payment calendar moves January's payment to the 2nd, whose factor
     # lies between the curve's anchors; February's stands, so the bilateral price moves alone.
     m = priced(STRIP, DEC_31, 3.0, 30.0, 60.0)
-    closed = holiday_calendar(dates("2027-02-01"))
+    closed = closed_on(dates("2027-02-01"))
     feb_2 = float(factors_on(SOFR, dates("2027-02-02"))[0])
     assert 0.98 < feb_2 < 0.99
     assert quote_on(m, "F27-G27", bilateral(payment_calendar=closed), RATES) == pytest.approx(
@@ -404,7 +405,7 @@ def test_the_expiry_based_methods_by_hand_with_a_holiday_before_the_expiry() -> 
 
 
 # A Waha-like IFERC index: three months published on their first business days.
-WAHA = index(
+WAHA = index_on(
     "WAHA",
     "Waha basis - ICE",
     iferc_schedule(("X26", "Z26", "F27"), dates("2026-11-02", "2026-12-01", "2027-01-04")),
@@ -683,7 +684,7 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             nearby=1.0,
             payment_day=DayOrRule(None, "+1bd"),
         ),
-        f"payment_calendar_key is missing, {in_template} when settlement_method = financial",
+        f"payment_holiday_key is missing, {in_template} when settlement_method = financial",
     )
     refused(
         m,
@@ -710,9 +711,9 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             quantity_per="month",
             settlement_frequency="monthly",
             nearby=1.0,
-            payment_calendar_key=key_of(WEEKENDS_ONLY),
+            payment_holiday_key=key_of(WEEKENDS_ONLY),
         ),
-        "payment_calendar_key is 'WEEKENDS_ONLY', expected none in the quote template "
+        "payment_holiday_key is 'WEEKENDS_ONLY', expected none in the quote template "
         "unless settlement_method = financial",
     )
     # The collection: required with a bilateral quote, refused with a cleared one.
@@ -1064,16 +1065,14 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
     )
     history = seam_history(ix, "2026-12-16", DEC_31, ["2027-01-01"], {})
     market = seam_market(history, "SEAM", 30.0, 60.0)
-    weekends = seam_key(
-        ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING)
-    )
+    weekends = seam_key(ENTRY["_CreateHolidayCalendar"](a_name(), column([serial("2030-01-01")])))
     fields = row(
         "route",
         "settlement_method",
         "schedule_method",
         "quantity_per",
         "payment_day",
-        "payment_calendar_key",
+        "payment_holiday_key",
         "discount_curve_key",
         "settlement_frequency",
         "nearby",
@@ -1091,7 +1090,7 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
             "schedule_method",
             "quantity_per",
             "payment_day",
-            "payment_calendar_key",
+            "payment_holiday_key",
             "settlement_frequency",
             "nearby",
         ),

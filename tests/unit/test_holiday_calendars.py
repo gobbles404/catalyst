@@ -1,8 +1,8 @@
-"""A named holiday calendar and the collection of them, payment-calendar-keys.md: the name a
-calendar may carry and its rule, a calendar with none as it always was; the collection, the
-calendars as they are, by reference, in the order given, every one named and each name once;
-through the seam, the handle that shows a name, the two readbacks and the refusals in the seam's
-words and the library's. docs/library/index-definitions/collect-payment-calendars.md is the page."""
+"""A holiday calendar's name and the collection of calendars, holiday-keys.md: the name every
+calendar is made with and its rule; the union of calendars, named by its sources; the
+collection, the calendars as they are, by reference, in the order given, each name once; through
+the seam, the handle that shows the name, the two readbacks and the refusals in the seam's words
+and the library's. docs/library/index-definitions/collect-holiday-calendars.md is the page."""
 
 import os
 import re
@@ -22,9 +22,10 @@ from catalyst.index_definitions.holiday_calendar import (
     combine_holiday_calendars,
     holiday_calendar,
 )
-from catalyst.index_definitions.payment_calendars import (
-    PaymentCalendars,
-    collect_payment_calendars,
+from catalyst.index_definitions.holiday_calendars import (
+    HolidayCalendars,
+    calendar_of,
+    collect_holiday_calendars,
 )
 from catalyst.instrumentation.work_counts import WorkCounter
 
@@ -33,8 +34,7 @@ ENTRY = {
     name: bridge.entry(name)
     for name in (
         "_CreateHolidayCalendar",
-        "_CombineHolidayCalendars",
-        "_CollectPaymentCalendars",
+        "_CollectHolidayCalendars",
         "_CreateFuturesSchedule",
         "util_ReadHandle",
     )
@@ -55,19 +55,18 @@ def column(*values: object) -> Cells:
 
 # Two synthetic calendars, claiming no market's convention: Thanksgiving 2026 under one name, the
 # two days after it under another.
-NYFED = holiday_calendar(days("2026-11-26"), "NYFED")
-LON = holiday_calendar(days("2026-11-27", "2026-11-30"), "LON")
-UNNAMED = holiday_calendar(days("2026-12-25"))
+NYFED = holiday_calendar("NYFED", days("2026-11-26"))
+LON = holiday_calendar("LON", days("2026-11-27", "2026-11-30"))
 
 
-def collected(*calendars: HolidayCalendar, counter: WorkCounter | None = None) -> PaymentCalendars:
-    return collect_payment_calendars(calendars, counter or WorkCounter())
+def collected(*calendars: HolidayCalendar, counter: WorkCounter | None = None) -> HolidayCalendars:
+    return collect_holiday_calendars(calendars, counter or WorkCounter())
 
 
 def refused(*calendars: HolidayCalendar) -> str:
     counter = WorkCounter()
     with pytest.raises(ValueError) as caught:
-        collect_payment_calendars(calendars, counter)
+        collect_holiday_calendars(calendars, counter)
     assert counter.freeze().as_dict() == {}  # a refusal counts nothing
     return str(caught.value)
 
@@ -89,17 +88,17 @@ def spilled(handle: object) -> list[list[object]]:
 # --- the name -------------------------------------------------------------------------------------
 
 
-def test_a_calendar_carries_the_name_it_was_made_with_and_none_where_it_had_none() -> None:
+def test_a_calendar_carries_the_name_it_was_made_with() -> None:
     assert NYFED.name == "NYFED" and LON.name == "LON"
-    assert UNNAMED.name is None
     np.testing.assert_array_equal(NYFED.holiday, days("2026-11-26"))
-    # A name changes nothing of the days: the same listed days with a name and without.
+    # A name changes nothing of the days: the same listed days under two names.
     np.testing.assert_array_equal(
-        holiday_calendar(days("2026-12-25"), "XMAS").holiday, UNNAMED.holiday
+        holiday_calendar("XMAS", days("2026-12-25")).holiday,
+        holiday_calendar("NOEL", days("2026-12-25")).holiday,
     )
     # Names as the desk types them: case kept, digits, marks other than the plus sign.
     for name in ("nyfed", "NYFed", "NY_FED", "LME-2", "US.NY", "a b"):
-        assert holiday_calendar(days("2026-12-25"), name).name == name
+        assert holiday_calendar(name, days("2026-12-25")).name == name
 
 
 @pytest.mark.parametrize(
@@ -120,17 +119,22 @@ def test_a_name_no_key_could_select_is_refused_when_the_calendar_is_made(
     name: str, message: str
 ) -> None:
     with pytest.raises(ValueError) as caught:
-        holiday_calendar(days("2026-12-25"), name)
+        holiday_calendar(name, days("2026-12-25"))
     assert str(caught.value) == message
     with pytest.raises(ValueError) as again:
         calendar_name("name", name)
     assert str(again.value) == message
 
 
-def test_a_combination_has_no_name_whatever_its_sources_are_called() -> None:
-    both = combine_holiday_calendars((NYFED, LON), WorkCounter())
-    assert both.name is None
+def test_a_union_is_named_by_its_sources_in_the_order_given() -> None:
+    # The one calendar whose name holds a plus sign: made by a key of several names, which
+    # gives the names sorted, never typed.
+    both = combine_holiday_calendars((LON, NYFED), WorkCounter())
+    assert both.name == "LON+NYFED"
     np.testing.assert_array_equal(both.holiday, days("2026-11-26", "2026-11-27", "2026-11-30"))
+    for key in ("NYFED+LON", "LON+NYFED"):
+        bound = calendar_of("holiday_key", key, collected(NYFED, LON), WorkCounter())
+        assert bound is not None and bound.name == "LON+NYFED"
 
 
 # --- what a collection is -------------------------------------------------------------------------
@@ -147,20 +151,12 @@ def test_a_collection_keeps_the_calendars_as_given_in_order_by_reference() -> No
     assert collected(NYFED, counter=one).names == ("NYFED",)  # one follows the same path
     assert one.freeze().as_dict() == {"calendars_collected": 1}
     # Nothing of the days is read: two calendars listing the same days are two members.
-    twin = holiday_calendar(NYFED.holiday, "FED_TWIN")
+    twin = holiday_calendar("FED_TWIN", NYFED.holiday)
     assert collected(NYFED, twin).names == ("NYFED", "FED_TWIN")
 
 
-def test_every_member_has_a_name_and_each_name_once() -> None:
-    assert refused(NYFED, UNNAMED) == (
-        "calendar_handles cell 2 is a calendar with no name, expected one made with a name, the "
-        "word a payment calendar key selects it by"
-    )
-    assert refused(UNNAMED) == (
-        "calendar_handles cell 1 is a calendar with no name, expected one made with a name, the "
-        "word a payment calendar key selects it by"
-    )
-    again = holiday_calendar(days("2027-01-01"), "NYFED")
+def test_each_name_is_collected_once() -> None:
+    again = holiday_calendar("NYFED", days("2027-01-01"))
     assert refused(NYFED, LON, again) == (
         "calendar_handles cell 1 and cell 3 are both named 'NYFED', expected each name once"
     )
@@ -169,29 +165,24 @@ def test_every_member_has_a_name_and_each_name_once() -> None:
         "calendar_handles cell 2 and cell 3 are both named 'NYFED', expected each name once"
     )
     # Names match exactly, so two that differ in case are two names.
-    assert collected(NYFED, holiday_calendar(days("2027-01-01"), "nyfed")).names == (
+    assert collected(NYFED, holiday_calendar("nyfed", days("2027-01-01"))).names == (
         "NYFED",
         "nyfed",
-    )
-    # A combination has no name, so it is no member.
-    assert refused(combine_holiday_calendars((NYFED, LON), WorkCounter())) == (
-        "calendar_handles cell 1 is a calendar with no name, expected one made with a name, the "
-        "word a payment calendar key selects it by"
     )
 
 
 @given(st.lists(st.sampled_from(["NYFED", "LON", "TOK", "SIN", "nyfed"]), min_size=1, max_size=8))
 def test_any_names_collect_exactly_when_each_is_given_once(names: list[str]) -> None:
-    calendars = tuple(holiday_calendar(days("2027-01-01"), name) for name in names)
+    calendars = tuple(holiday_calendar(name, days("2027-01-01")) for name in names)
     counter = WorkCounter()
     if len(set(names)) == len(names):
-        made = collect_payment_calendars(calendars, counter)
+        made = collect_holiday_calendars(calendars, counter)
         assert made.names == tuple(names)
         assert all(mine is given for mine, given in zip(made.calendars, calendars, strict=True))
         assert counter.freeze().as_dict() == {"calendars_collected": len(names)}
     else:
         with pytest.raises(ValueError, match=r"are both named '.+', expected each name once$"):
-            collect_payment_calendars(calendars, counter)
+            collect_holiday_calendars(calendars, counter)
         assert counter.freeze().as_dict() == {}
 
 
@@ -199,55 +190,55 @@ def test_any_names_collect_exactly_when_each_is_given_once(names: list[str]) -> 
 
 
 def a_named(name: object, *holidays: str) -> object:
-    return ENTRY["_CreateHolidayCalendar"](column(*(serial(day) for day in holidays)), name)
+    return ENTRY["_CreateHolidayCalendar"](name, column(*(serial(day) for day in holidays)))
 
 
-def test_the_creator_takes_a_name_and_the_handle_shows_it() -> None:
+def test_the_creator_takes_the_name_first_and_the_handle_shows_it() -> None:
     nyfed = a_named("NYFED", "2026-11-26")
     assert re.fullmatch(rf"{PID}:holiday_calendar:NYFED:\d+", str(nyfed))
-    # Left out, the calendar and its handle are as they always were.
-    plain = a_named(bridge.MISSING, "2026-11-26")
-    assert re.fullmatch(rf"{PID}:holiday_calendar:\d+", str(plain))
-    # The readbacks: the days, and beside each the name where there is one.
+    # The readback: the days, and beside each the name.
     assert spilled(nyfed) == [
         ["holiday", "name"],
         ["datetime64[D]", "str"],
         [serial("2026-11-26"), "NYFED"],
     ]
-    assert spilled(plain) == [["holiday"], ["datetime64[D]"], [serial("2026-11-26")]]
     lon = a_named("LON", "2026-11-27", "2026-11-30")
     assert spilled(lon)[2:] == [[serial("2026-11-27"), "LON"], [serial("2026-11-30"), "LON"]]
-    # A combination of named calendars is an ordinary calendar with no name.
-    both = ENTRY["_CombineHolidayCalendars"](column(nyfed, lon))
-    assert re.fullmatch(rf"{PID}:holiday_calendar:\d+", str(both))
-    assert spilled(both)[0] == ["holiday"]
 
 
 def test_the_creator_refuses_a_name_in_the_seams_words_and_the_librarys() -> None:
     create = ENTRY["_CreateHolidayCalendar"]
     holidays = column(serial("2026-11-26"))
-    assert create(holidays, 7.0) == (
+    # Required since holiday-keys.md: a calendar no name was typed for is not made.
+    assert create(bridge.MISSING, holidays) == (
+        "#ERROR _CreateHolidayCalendar: name is missing, expected text"
+    )
+    assert create(7.0, holidays) == (
         "#ERROR _CreateHolidayCalendar: name is number 7.0, expected text"
     )
-    assert create(holidays, None) == "#ERROR _CreateHolidayCalendar: name is blank, expected text"
-    assert create(holidays, "") == (
+    assert create(None, holidays) == "#ERROR _CreateHolidayCalendar: name is blank, expected text"
+    assert create("", holidays) == (
         "#ERROR _CreateHolidayCalendar: name is empty text, expected text"
     )
-    assert create(holidays, " NYFED") == (
+    assert create(" NYFED", holidays) == (
         "#ERROR _CreateHolidayCalendar: ValueError: name is ' NYFED', expected a name with no "
         "whitespace around it"
     )
-    assert create(holidays, "NYFED+LON") == (
+    assert create("NYFED+LON", holidays) == (
         "#ERROR _CreateHolidayCalendar: ValueError: name is 'NYFED+LON', expected a name "
         "without '+', which joins names in a key"
+    )
+    # The arguments in the order they were before, the days first: the days are no name.
+    assert create(holidays, "NYFED") == (
+        "#ERROR _CreateHolidayCalendar: name is 1x1 array, expected text"
     )
 
 
 def test_the_collection_on_the_sheet_reads_back_each_name_and_its_count_of_days() -> None:
     nyfed = a_named("NYFED", "2026-11-26")
     lon = a_named("LON", "2026-11-27", "2026-11-30")
-    collection = ENTRY["_CollectPaymentCalendars"](column(nyfed, lon))
-    assert re.fullmatch(rf"{PID}:payment_calendars:\d+", str(collection))
+    collection = ENTRY["_CollectHolidayCalendars"](column(nyfed, lon))
+    assert re.fullmatch(rf"{PID}:holiday_calendars:\d+", str(collection))
     assert spilled(collection) == [
         ["name", "holidays"],
         ["str", "int64"],
@@ -255,35 +246,62 @@ def test_the_collection_on_the_sheet_reads_back_each_name_and_its_count_of_days(
         ["LON", 2.0],
     ]
     # A row, a column and a single cell are one form; the order given is the order kept.
-    across = ENTRY["_CollectPaymentCalendars"](Cells.from_rows([[lon, nyfed]]))
+    across = ENTRY["_CollectHolidayCalendars"](Cells.from_rows([[lon, nyfed]]))
     assert [line[0] for line in spilled(across)[2:]] == ["LON", "NYFED"]
-    assert [line[0] for line in spilled(ENTRY["_CollectPaymentCalendars"](lon))[2:]] == ["LON"]
+    assert [line[0] for line in spilled(ENTRY["_CollectHolidayCalendars"](lon))[2:]] == ["LON"]
 
 
 def test_the_collection_refuses_in_the_seams_words_and_the_librarys() -> None:
-    collect = ENTRY["_CollectPaymentCalendars"]
+    collect = ENTRY["_CollectHolidayCalendars"]
     nyfed = a_named("NYFED", "2026-11-26")
-    plain = a_named(bridge.MISSING, "2026-12-25")
-    assert collect(column(nyfed, plain)) == (
-        "#ERROR _CollectPaymentCalendars: ValueError: calendar_handles cell 2 is a calendar with "
-        "no name, expected one made with a name, the word a payment calendar key selects it by"
-    )
+    lon = a_named("LON", "2026-11-27")
     assert collect(column(nyfed, nyfed)) == (
-        "#ERROR _CollectPaymentCalendars: ValueError: calendar_handles cell 1 and cell 2 are "
+        "#ERROR _CollectHolidayCalendars: ValueError: calendar_handles cell 1 and cell 2 are "
         "both named 'NYFED', expected each name once"
     )
     schedule = ENTRY["_CreateFuturesSchedule"](
         column("F27"), column(serial("2026-12-29")), bridge.MISSING
     )
     assert collect(column(nyfed, schedule)) == (
-        f"#ERROR _CollectPaymentCalendars: calendar_handles cell (2, 1) is futures schedule "
+        f"#ERROR _CollectHolidayCalendars: calendar_handles cell (2, 1) is futures schedule "
         f"handle {schedule!r}, expected holiday calendar handle"
     )
     assert collect(column(nyfed, None)) == (
-        "#ERROR _CollectPaymentCalendars: calendar_handles cell (2, 1) is blank, expected "
+        "#ERROR _CollectHolidayCalendars: calendar_handles cell (2, 1) is blank, expected "
         "holiday calendar handle"
     )
     assert collect(column(nyfed, "NYFED")) == (
-        "#ERROR _CollectPaymentCalendars: calendar_handles cell (2, 1) is text 'NYFED' naming "
+        "#ERROR _CollectHolidayCalendars: calendar_handles cell (2, 1) is text 'NYFED' naming "
         "no live object, expected holiday calendar handle"
+    )
+    # The shapes and the cells a range of handles refuses, in the seam's words.
+    assert collect(Cells.from_rows([[nyfed, lon], [lon, nyfed]])) == (
+        "#ERROR _CollectHolidayCalendars: calendar_handles is 2x2 array, expected one cell, one "
+        "row or one column of holiday calendar handles"
+    )
+    assert collect(Cells.from_rows([[nyfed, 46307.0]])) == (
+        "#ERROR _CollectHolidayCalendars: calendar_handles cell (1, 2) is number 46307.0, "
+        "expected holiday calendar handle"
+    )
+    assert collect(column(nyfed, "")) == (
+        "#ERROR _CollectHolidayCalendars: calendar_handles cell (2, 1) is empty text, expected "
+        "holiday calendar handle"
+    )
+    failed = str(ENTRY["_CreateHolidayCalendar"]("BROKEN", column(serial("2026-11-26"), None)))
+    assert failed == "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
+    assert collect(column(nyfed, failed)) == (
+        "#ERROR _CollectHolidayCalendars: calendar_handles cell (2, 1) is the creator's failure, "
+        "expected holiday calendar handle: " + failed
+    )
+    assert collect(bridge.MISSING) == (
+        "#ERROR _CollectHolidayCalendars: calendar_handles is missing, expected holiday calendar "
+        "handles in a cell, a row or a column"
+    )
+    assert collect(None) == (
+        "#ERROR _CollectHolidayCalendars: calendar_handles is blank, expected holiday calendar "
+        "handles in a cell, a row or a column"
+    )
+    assert collect(schedule) == (
+        f"#ERROR _CollectHolidayCalendars: calendar_handles is futures schedule handle "
+        f"{schedule!r}, expected holiday calendar handle"
     )

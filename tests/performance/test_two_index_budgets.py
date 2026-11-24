@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from numpy.typing import NDArray
 from test_seam_allocation import SLACK, least_peak
 
@@ -23,10 +24,10 @@ from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from catalyst.index_definitions.holiday_calendar import holiday_calendar
+from catalyst.index_definitions.holiday_calendars import collect_holiday_calendars
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
-from catalyst.index_definitions.payment_calendars import collect_payment_calendars
 from catalyst.instrumentation.work_counts import WorkCounter, WorkCounts
 from catalyst.instruments.definitions import FIXED_FLOAT, FieldType, Instrument
 from catalyst.instruments.fields import DatesOrTexts, FieldValues
@@ -64,7 +65,7 @@ def futures_index() -> Index:
         ("J27", "2027-03-29"),
     )
     sizes = numbers(10_000.0, 1.0)
-    return index(
+    return index_on(
         "A",
         "Index A",
         futures_schedule(tuple(c for c, _ in contracts), dates(*(e for _, e in contracts)), None),
@@ -72,7 +73,7 @@ def futures_index() -> Index:
         contract_specifications(
             ("LOT", "MMBTU"), sizes, ("MMBTU", "MMBTU"), sizes * 0.01, sizes * 0.005, UNITS
         ),
-        holiday_calendar(dates("2026-12-25", "2027-01-01")),
+        closed_on(dates("2026-12-25", "2027-01-01")),
         "LOT",
         UNITS,
     )
@@ -80,7 +81,7 @@ def futures_index() -> Index:
 
 def iferc_index() -> Index:
     sizes = numbers(2_500.0, 1.0)
-    return index(
+    return index_on(
         "B",
         "Index B",
         iferc_schedule(
@@ -102,7 +103,7 @@ B = iferc_index()
 SOFR = discount_curve("SOFR", dates(AS_OF, PAY), numbers(1.0, 0.95))
 # The payment calendar, weekends alone, under its name, and the collection a batch selects
 # it from by key, payment-calendar-keys.md: made once, outside every measured call.
-CALENDARS = collect_payment_calendars((holiday_calendar(dates(), "PAYS"),), WorkCounter())
+CALENDARS = collect_holiday_calendars((holiday_calendar("PAYS", dates()),), WorkCounter())
 TEMPLATE: dict[str, object] = {
     "quantity_unit": "MMBTU",
     "quantity_per": "month",
@@ -115,7 +116,7 @@ TEMPLATE: dict[str, object] = {
     "counterparty": "ACME Trading",
     "discount_curve_key": "SOFR",
     "payment_day": np.datetime64(PAY, "D"),
-    "payment_calendar_key": "PAYS",
+    "payment_holiday_key": "PAYS",
 }
 TICKET: dict[str, list[object]] = {
     "trade_id": [1],

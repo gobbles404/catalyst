@@ -1478,8 +1478,7 @@ _published = 0
 # The kinds whose text carries an index's name, and where each keeps it. Registration prepares
 # the path once, so publishing reads two or three attributes and builds one string; the
 # library's records learn nothing of handles, and a kind absent here shows its tag and the
-# count alone, as does an object of a kind here that has no name, a holiday calendar made
-# without one. docs/seam/handles.md is the page.
+# count alone. docs/seam/handles.md is the page.
 _NAMED: Final[dict[type[object], str]] = {
     Index: "name",
     Calendar: "index.name",
@@ -1496,7 +1495,7 @@ _NAMED: Final[dict[type[object], str]] = {
     Rfq: "request.index.name",  # the request's index, rfq-quoting.md
     Cashflows: "currency",  # the batch's one currency where an index's name would be, since #200
     CashflowResults: "currency",
-    HolidayCalendar: "name",  # where it was made with one, payment-calendar-keys.md
+    HolidayCalendar: "name",  # the word a holiday key selects it by, holiday-keys.md
 }
 
 
@@ -1561,12 +1560,12 @@ def _publish(
     kind: type[object],
     tag: str,
     words: str,
-    name: Callable[[object], str | None] | None,
+    name: Callable[[object], str] | None,
     value: object,
 ) -> str:
     """Retain the object a creator returned and hand back the text that stands for it: the
-    process ID, the tag, the index's name where the kind carries one and the object has one,
-    and the runtime's publication count.
+    process ID, the tag, the index's name where the kind carries one, and the runtime's
+    publication count.
 
     A creator that raised never reaches here, so a failure is never published and the count
     does not move; nor does it move for a text longer than a cell holds, refused before
@@ -1578,8 +1577,7 @@ def _publish(
     if type(value) is not kind:
         raise _returned(value, words)
     count = _published + 1
-    named = None if name is None else name(value)
-    text = f"{_PID}:{tag}:{count}" if named is None else f"{_PID}:{tag}:{named}:{count}"
+    text = f"{_PID}:{tag}:{count}" if name is None else f"{_PID}:{tag}:{name(value)}:{count}"
     units = len(text.encode("utf-16-le")) // 2  # Excel counts UTF-16 units, as LEN does
     if units > MAX_TEXT:
         raise _BadResult(f"returned handle of {units} characters, expected at most {MAX_TEXT}")

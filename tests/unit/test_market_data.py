@@ -8,8 +8,10 @@ from typing import cast
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from test_create_trades import seam_calendars, seam_key
 from test_utilities import read, rows
 
 from catalyst.excel import bridge
@@ -63,13 +65,13 @@ HOLIDAY_SERIALS = (
     46381.0,
 )
 HOLIDAYS = Cells.from_rows([[s] for s in HOLIDAY_SERIALS])
-CALENDAR = re.compile(r"[0-9]+:holiday_calendar:([0-9]+)")
+CALENDAR = re.compile(r"[0-9]+:holiday_calendar:CAL[0-9]+:([0-9]+)")
 THE_CALENDAR = object()  # in a case's arguments: the calendar's handle, made below
 
 
 @functools.cache
 def the_calendar() -> str:
-    text = bridge.call("_CreateHolidayCalendar", [HOLIDAYS, bridge.MISSING])
+    text = bridge.call("_CreateHolidayCalendar", [a_name(), HOLIDAYS])
     assert isinstance(text, str) and CALENDAR.fullmatch(text), text
     return text
 
@@ -99,7 +101,16 @@ def an_index_of(name: str, schedule: object, holidays: object) -> str:
     )
     text = bridge.call(
         "_CreateIndex",
-        [name, f"{name} index", schedule, conventions, specifications, holidays, MISSING],
+        [
+            name,
+            f"{name} index",
+            schedule,
+            conventions,
+            specifications,
+            seam_key(holidays),
+            MISSING,
+            seam_calendars(),
+        ],
     )
     assert isinstance(text, str) and text.startswith(f"{PID}:index:"), text
     return text
@@ -414,6 +425,7 @@ def test_an_index_of_another_kind_is_refused_in_the_librarys_words() -> None:
             schedule,
             conventions,
             specifications,
+            MISSING,
             MISSING,
             MISSING,
         ],

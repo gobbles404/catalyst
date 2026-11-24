@@ -13,9 +13,10 @@ from typing import Any
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name, closed_on, index_on
 from numpy.typing import NDArray
 from test_bilateral_kernel import curve_of, curve_set
-from test_create_trades import a_template, a_ticket, seam_key, the_calendars
+from test_create_trades import a_template, a_ticket, seam_calendars, seam_key, the_calendars
 from test_float_float import BILATERAL as GAS_SPREAD
 from test_float_float import FIELDS, NTO, PAN, TEMPLATE_FIELDS
 from test_float_float import TICKET as GAS_TICKET
@@ -51,8 +52,7 @@ from catalyst.globals.unit_conversions import UNITS
 from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
-from catalyst.index_definitions.holiday_calendar import holiday_calendar
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FLOAT_FLOAT
@@ -89,7 +89,7 @@ def an_index(
         f27 if code == "F27" else expiry for code, expiry in zip(CODES, EXPIRIES, strict=True)
     )
     sizes = numbers(lot[0], 1.0)
-    return index(
+    return index_on(
         name,
         f"Index {name}",
         futures_schedule(CODES, dates(*expiries), None),
@@ -97,7 +97,7 @@ def an_index(
         contract_specifications(
             ("LOT", word), sizes, (lot[1], word), sizes * 0.0, sizes * 0.0, UNITS
         ),
-        holiday_calendar(dates(*holidays)),
+        closed_on(dates(*holidays)),
         "LOT",
         UNITS,
     )
@@ -736,7 +736,7 @@ def sheet() -> dict[str, Any]:
     headers = across(
         "name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"
     )
-    holidays = SEAM["_CreateHolidayCalendar"](serial("2027-01-01"), bridge.MISSING)
+    holidays = SEAM["_CreateHolidayCalendar"](a_name(), serial("2027-01-01"))
     date = SEAM["_CreateValuationDate"](serial(AS_OF), 0.5)
     cells: dict[str, Any] = {"holidays": holidays}
     for key, name, unit, lot, settles, quotes in (
@@ -756,8 +756,9 @@ def sheet() -> dict[str, Any]:
                 headers,
                 Cells.from_rows([["LOT", lot, unit, 0.0, 0.0], ["BBL", 1.0, "BBL", 0.0, 0.0]]),
             ),
-            holidays,
+            seam_key(holidays),
             "LOT",
+            seam_calendars(),
         )
         history = SEAM["_CreateMarketHistory"](
             SEAM["_CreateCalendar"](date, made),

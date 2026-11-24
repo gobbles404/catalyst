@@ -26,25 +26,20 @@ from catalyst.index_definitions.contract_specifications import (
 )
 from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
-from catalyst.index_definitions.holiday_calendar import (
-    HolidayCalendar,
-    combine_holiday_calendars,
-    holiday_calendar,
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from catalyst.index_definitions.holiday_calendars import (
+    HolidayCalendars,
+    collect_holiday_calendars,
 )
 from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
 from catalyst.index_definitions.index import Index, index
 from catalyst.index_definitions.index_conventions import IndexConventions, index_conventions
-from catalyst.index_definitions.payment_calendars import (
-    PaymentCalendars,
-    collect_payment_calendars,
-)
 from catalyst.instrumentation.work_counts import WorkCounter
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
 __all__ = [
-    "_CollectPaymentCalendars",
-    "_CombineHolidayCalendars",
+    "_CollectHolidayCalendars",
     "_CreateContractSpecifications",
     "_CreateFuturesSchedule",
     "_CreateGasDailySchedule",
@@ -78,51 +73,33 @@ def _CreateFuturesSchedule(
 
 @excel_function
 def _CreateHolidayCalendar(
+    name: Annotated[
+        str,
+        "The calendar's name, text such as NYFED, exact and case-sensitive with no whitespace "
+        "around it and no plus sign: what a holiday key selects it by.",
+    ],
     holiday: Annotated[
         DateColumn,
         "The column of dates the market is closed, such as A2:A11, one holiday per row.",
     ],
-    name: Annotated[
-        str | None,
-        "The calendar's name, text such as NYFED, exact and case-sensitive with no whitespace "
-        "around it and no plus sign: what a payment calendar key selects. Leave it out for a "
-        "calendar no key selects.",
-    ] = None,
 ) -> Handle[HolidayCalendar]:
-    """Creates a holiday calendar from the days one market is closed, under a name where a
-    payment calendar key will select it, and shows its handle, the text other formulas take as
-    the calendar."""
-    return holiday_calendar(holiday, name)
+    """Creates a holiday calendar from its name and the days one market is closed, and shows
+    its handle, the text _CollectHolidayCalendars takes as the calendar."""
+    return holiday_calendar(name, holiday)
 
 
 @excel_function
-def _CombineHolidayCalendars(
-    calendar_handles: Annotated[
-        Handles[HolidayCalendar],
-        "The calendars to combine: a cell, a row or a column of cells showing "
-        "_CreateHolidayCalendar's or this function's results, such as B2:B3, every one read and a "
-        "repeat read again.",
-    ],
-) -> Handle[HolidayCalendar]:
-    """Combines holiday calendars into one closed on every day any of them is closed, the days
-    in order, once each, and shows its handle, an ordinary calendar for an index,
-    util_ShiftDate or another combination."""
-    return combine_holiday_calendars(calendar_handles, WorkCounter())
-
-
-@excel_function
-def _CollectPaymentCalendars(
+def _CollectHolidayCalendars(
     calendar_handles: Annotated[
         Handles[HolidayCalendar],
         "The calendars to collect: a cell, a row or a column of cells showing "
-        "_CreateHolidayCalendar's results, such as B2:B3, each made with a name and each name "
-        "once.",
+        "_CreateHolidayCalendar's results, such as B2:B3, each name once.",
     ],
-) -> Handle[PaymentCalendars]:
-    """Collects named holiday calendars into one collection, each name once, the calendars as
-    they are and nothing of their days combined, and shows its handle, the text other formulas
-    take as the collection."""
-    return collect_payment_calendars(calendar_handles, WorkCounter())
+) -> Handle[HolidayCalendars]:
+    """Collects holiday calendars into one collection, each name once, the calendars as they
+    are and nothing of their days combined, and shows its handle, the text other formulas take
+    as the collection a holiday key selects from."""
+    return collect_holiday_calendars(calendar_handles, WorkCounter())
 
 
 @excel_function
@@ -223,11 +200,11 @@ def _CreateIndex(
         "The contract-specifications handle: the cell showing _CreateContractSpecifications's "
         "result, such as B5, or a name for it.",
     ],
-    holiday_calendar: Annotated[
-        Handle[HolidayCalendar] | None,
-        "The market's holiday-calendar handle with a futures schedule: the cell showing "
-        "_CreateHolidayCalendar's result, such as B3, or a name for it; left out for an IFERC "
-        "or Gas Daily schedule.",
+    holiday_key: Annotated[
+        str | None,
+        "The market's holiday calendar with a futures schedule, by key: one calendar's name, "
+        "such as NYMEX, or several joined by +, such as NYMEX+ICE, closed when any is; left out "
+        "for an IFERC or Gas Daily schedule.",
     ] = None,
     reporting_lot: Annotated[
         str | None,
@@ -235,9 +212,14 @@ def _CreateIndex(
         "exactly as the specifications spell it; left out for an index that only builds markets "
         "and prices no trades.",
     ] = None,
+    holiday_calendars: Annotated[
+        Handle[HolidayCalendars] | None,
+        "The collection holiday_key selects from: the cell showing _CollectHolidayCalendars's "
+        "result, such as B3. Leave it out where there is no holiday_key.",
+    ] = None,
 ) -> Handle[Index]:
     """Creates the index behind one reference price from its name, a description, schedule,
-    conventions, specifications, a futures index's holiday calendar and the lot its delta is
+    conventions, specifications, a futures index's holiday key and the lot its delta is
     reported in, and shows its handle, the text other formulas take as the index."""
     return index(
         name,
@@ -245,9 +227,11 @@ def _CreateIndex(
         schedule,
         index_conventions,
         contract_specifications,
-        holiday_calendar,
+        holiday_key,
         reporting_lot,
         UNITS,
+        holiday_calendars,
+        WorkCounter(),
     )
 
 

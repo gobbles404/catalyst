@@ -4,6 +4,7 @@ kept."""
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
@@ -12,9 +13,8 @@ from catalyst.globals.unit_conversions import UNITS
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
-from catalyst.index_definitions.holiday_calendar import holiday_calendar
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.market_data.gas_daily_fixings import gas_daily_fixings
 
@@ -39,7 +39,7 @@ def an_index(schedule: object, name: str = "Henry Hub Gas Daily") -> Index:
     """The index of that schedule with one set of conventions and specifications throughout,
     since nothing here reads either, and no holiday calendar, as an IFERC or a Gas Daily index
     has none."""
-    return index(name, f"{name} index", schedule, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
+    return index_on(name, f"{name} index", schedule, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
 
 
 # The page's sample as the desk keeps it, the newest flow day in the first row: Henry Hub Gas
@@ -48,13 +48,13 @@ def an_index(schedule: object, name: str = "Henry Hub Gas Daily") -> Index:
 DAYS = dates("2026-09-09", "2026-09-08", "2026-09-07", "2026-09-06", "2026-09-05", "2026-09-04")
 PRICES = prices(2.900, 2.875, 2.875, 2.875, 2.875, 2.930)
 INDEX = an_index(gas_daily_schedule(("U26",), dates("2026-09-01"), dates("2026-09-30")))
-FUTURES_INDEX = index(
+FUTURES_INDEX = index_on(
     "WTI NYMEX",
     "West Texas Intermediate crude oil - NYMEX",
     futures_schedule(("m26", "n26"), dates("2026-05-19", "2026-06-22"), None),
     CONVENTIONS,
     SPECIFICATIONS,
-    holiday_calendar(dates("2026-05-25")),
+    closed_on(dates("2026-05-25")),
     None,
     UNITS,
 )

@@ -2,7 +2,8 @@
 
 [Pipeline overview](README.md) · [UAT item 16](surface-uat-notes.md#16-combine-payment-holiday-calendars)
 
-**Status:** Built in #183 on `claude/combine-holiday-calendars`, stacked on PR #182 at `9c00a9f`,
+**Status:** The function was removed by [holiday-keys.md](holiday-keys.md), #270: a calendar closed when any of several is closed is now a key of their names joined by `+`, and this page keeps the words of its day.
+Built in #183 on `claude/combine-holiday-calendars`, stacked on PR #182 at `9c00a9f`,
 12 October 2026, the page as the ticket; the [As built](#as-built-183) section at the end says what
 was built and what was not. One focused PR on the current prototype, reusing its existing
 collection-of-handles input support; it does not claim the stack has shipped.
@@ -118,7 +119,7 @@ payment convention would require a separate specification.
 
 ## As built (#183)
 
-Built on `claude/combine-holiday-calendars` above #182's `9c00a9f`, one pull request. The function's page is [combine-holiday-calendars.md](../../library/index-definitions/combine-holiday-calendars.md).
+Built on `claude/combine-holiday-calendars` above #182's `9c00a9f`, one pull request. The function's page was `docs/library/index-definitions/combine-holiday-calendars.md`, removed with the function; the union is [collect-holiday-calendars.md](../../library/index-definitions/collect-holiday-calendars.md#binding-a-key)'s now.
 
 **The function.** `combine_holiday_calendars(calendars, counter)` in `index_definitions/holiday_calendar.py` concatenates the sources' days, keeps their distinct days in order with `np.unique` and makes the result through `holiday_calendar`, the one builder, so a combination is an ordinary frozen calendar owning its days. It counts `calendars_combined`, `holidays_read` and `holidays_kept`. `_CombineHolidayCalendars(calendar_handles: Handles[HolidayCalendar])` in `excel/index_definitions.py` is the worksheet function, the second use of decision 44's vector of handles after `_AggregateResults`: one cell, one row or one column, each cell resolved once in sheet order, a block refused by shape, a blank, a number, an empty text, text naming nothing, another kind and a creator's failure refused at their cell, the failure carried whole so a consumer shows the creator's text once. Nothing is published by a refusal.
 

@@ -18,12 +18,7 @@ from types import MappingProxyType
 from typing import cast
 
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
-from catalyst.index_definitions.payment_calendars import (
-    KEYS_BOUND,
-    PaymentCalendars,
-    no_collection,
-    payment_calendar,
-)
+from catalyst.index_definitions.holiday_calendars import HolidayCalendars, calendar_of
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import CATALOG, Instrument
 from catalyst.instruments.fields import FieldValues, selected
@@ -35,7 +30,7 @@ class QuoteTemplate:
     """The instrument, the definition the fields were bound against; the names, the fields the
     template's row named, in the sheet's order, each one a quote template may hold; and the
     values by field name, in the same order: each the one value the row held, a code, the curve
-    key, the payment calendar key and a payment rule as the text typed; owned, and read for
+    key, the payment holiday key and a payment rule as the text typed; owned, and read for
     nothing until a quote is made. And, since payment-calendar-keys.md, the payment calendar
     the row's key selected from the collection given when the template was made, bound once
     then and held by reference, or None where the row held no key, so that no quote and no
@@ -48,16 +43,16 @@ class QuoteTemplate:
 
 
 def quote_template(
-    values: FieldValues, calendars: PaymentCalendars | None, counter: WorkCounter
+    values: FieldValues, calendars: HolidayCalendars | None, counter: WorkCounter
 ) -> QuoteTemplate:
     """The one way to make a QuoteTemplate: one row of field values under an instrument a quote
     prices, every header a field a quote template may hold, in the sheet's order and before any
     value is read, then each value read once for the rule intrinsic to its field, the first
-    failure being the message. Then, since payment-calendar-keys.md, a payment calendar key
-    the row holds is bound to its calendar by the step a batch of trades shares,
-    payment_calendar, from the collection given, which a template holding a key must be
-    given; a template holding none binds nothing and needs none. Work: `payment_keys_bound`,
-    one for a template that holds a key."""
+    failure being the message. Then, since payment-calendar-keys.md, a payment holiday key
+    the row holds is bound to its calendar by the step every reader of one key shares,
+    calendar_of, from the collection given, which a template holding a key must be given; a
+    template holding none binds nothing and needs none. Work: `holiday_keys_bound`, one for a
+    template that holds a key."""
     if values.rows != 1:
         raise ValueError(f"values has {values.rows} rows, expected one row of field values")
     instrument = values.instrument
@@ -76,14 +71,8 @@ def quote_template(
                 f"{allowed}"
             )
     read = {name: field_value(values, name) for name in values.names}
-    bound = None
-    if "payment_calendar_key" in read:
-        if calendars is None:
-            raise no_collection("payment_calendar_key")
-        bound = payment_calendar(
-            calendars, {}, counter, "payment_calendar_key", cast(str, read["payment_calendar_key"])
-        )
-        counter.hit(KEYS_BOUND, 1)
+    key = cast(str | None, read.get("payment_holiday_key"))
+    bound = calendar_of("payment_holiday_key", key, calendars, counter)
     return QuoteTemplate(instrument, values.names, MappingProxyType(read), bound)
 
 

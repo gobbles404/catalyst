@@ -16,6 +16,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name
 from test_bilateral_kernel import CLOSE, curve_of, curve_set
 from test_create_trades import a_ticket, bound_calendar, created, key_of, seam_key
 from test_quote import (
@@ -464,7 +465,7 @@ def no_payment_day(route: str = "cleared") -> QuoteTemplate:
         "quantity_per": "month",
         "settlement_frequency": "monthly",
         "nearby": 1.0,
-        "payment_calendar_key": key_of(WEEKENDS_ONLY),
+        "payment_holiday_key": key_of(WEEKENDS_ONLY),
     }
     if route == "bilateral":
         values["discount_curve_key"] = "SOFR"
@@ -635,7 +636,7 @@ def test_windows_weigh_by_quantity_and_factor_and_match_the_booked_portfolio() -
         "nearby": 1.0,
         "schedule_method": "asian",
         "settlement_method": "financial",
-        "payment_calendar_key": key_of(WEEKENDS_ONLY),
+        "payment_holiday_key": key_of(WEEKENDS_ONLY),
     }
     ticket: dict[str, list[object]] = {
         "trade_id": [1, 2],
@@ -865,7 +866,7 @@ def test_the_template_the_index_and_the_market_refuse_as_a_quote_does() -> None:
             settlement_frequency="monthly",
             nearby=1.0,
             payment_day=otc().values["payment_day"],
-            payment_calendar_key=key_of(WEEKENDS_ONLY),
+            payment_holiday_key=key_of(WEEKENDS_ONLY),
         ),
     )
     assert price(MARKET, request()) == pytest.approx(CLEARED_PRICE, **CLOSE)  # the same index
@@ -946,16 +947,14 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
     )
     history = seam_history(ix, "2026-12-16", DEC_31, ["2027-01-01"], {})
     market = seam_market(history, "SEAM", 1.0, 1.2)
-    weekends = seam_key(
-        ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING)
-    )
+    weekends = seam_key(ENTRY["_CreateHolidayCalendar"](a_name(), column([serial("2030-01-01")])))
     fields = row(
         "route",
         "settlement_method",
         "schedule_method",
         "quantity_per",
         "payment_day",
-        "payment_calendar_key",
+        "payment_holiday_key",
         "discount_curve_key",
         "settlement_frequency",
         "nearby",
@@ -973,7 +972,7 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
             "schedule_method",
             "quantity_per",
             "payment_day",
-            "payment_calendar_key",
+            "payment_holiday_key",
             "settlement_frequency",
             "nearby",
         ),

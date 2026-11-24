@@ -9,14 +9,14 @@ from collections.abc import Callable
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from test_seam_allocation import SLACK, least_peak
 
 from catalyst.globals.unit_conversions import UNITS
 from catalyst.index_definitions.contract_codes import code_of_month
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
-from catalyst.index_definitions.holiday_calendar import holiday_calendar
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market_data.interpolated_contracts import interpolate_contracts
@@ -25,7 +25,7 @@ CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 
 
 def futures_index(name: str, codes: tuple[str, ...], expiries: np.ndarray) -> Index:
-    return index(
+    return index_on(
         name,
         f"{name} index",
         futures_schedule(codes, expiries, None),
@@ -33,7 +33,7 @@ def futures_index(name: str, codes: tuple[str, ...], expiries: np.ndarray) -> In
         contract_specifications(
             ("LOT",), np.array([1000.0]), ("BBL",), np.array([0.0]), np.array([0.0]), UNITS
         ),
-        holiday_calendar(np.array(["2030-01-01"], dtype="datetime64[D]")),
+        closed_on(np.array(["2030-01-01"], dtype="datetime64[D]")),
         "LOT",
         UNITS,
     )

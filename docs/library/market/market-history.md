@@ -22,7 +22,7 @@ def _CreateMarketHistory(
 | 5 | 21-May-2026 | 71.10 | | |
 | 6 | 20-May-2026 | 70.85 | | |
 | 7 | `=_CreateValuationDate(B1, 0.5)` | shows `30512:valuation_date:1` | `=_CreateFuturesSchedule(C2:C4, D2:D4)` | shows `30512:futures_schedule:4` |
-| 8 | `=_CreateHolidayCalendar(B2)` | shows `30512:holiday_calendar:7` | `=_CreateIndex("WTI NYMEX", "West Texas Intermediate crude oil - NYMEX", C7, B15, B16, A8)` | shows `30512:index:WTI NYMEX:10`, B15 and B16 holding the conventions and the specifications |
+| 8 | `=_CreateHolidayCalendar("NYMEX", B2)` | shows `30512:holiday_calendar:NYMEX:7` | `=_CreateIndex("WTI NYMEX", "West Texas Intermediate crude oil - NYMEX", C7, B15, B16, "NYMEX", , B17)` | shows `30512:index:WTI NYMEX:10`, B15 and B16 holding the conventions and the specifications and B17 `=_CollectHolidayCalendars(A8)`, the collection the key `NYMEX` selects from |
 | 9 | `=_CreateCalendar(A7, C8)` | shows `30512:calendar:WTI NYMEX:12` | `=_CreateFuturesFixings(A4:A6, B4:B6, C8)` | shows `30512:futures_fixings:WTI NYMEX:15` |
 | 10 | `=_CreateMarketHistory(A9, C9)` | shows `30512:market_history:WTI NYMEX:19` | | |
 | 11 | `=_CreateMarketHistory(B20, B21)` | shows `30512:market_history:Henry Hub Gas Daily:20`, B20 a Gas Daily calendar and B21 Gas Daily fixings, both over one index cell | | |

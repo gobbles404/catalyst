@@ -9,6 +9,7 @@ from typing import cast
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on
 from test_bilateral_kernel import curve_of, curve_set
 from test_create_trades import a_template, a_ticket, key_of, the_calendars
 from test_quote import priced
@@ -17,7 +18,6 @@ from test_two_index import cell, grid
 
 from catalyst.globals.discount_curve_set import DiscountCurveSet
 from catalyst.globals.unit_conversions import UNITS
-from catalyst.index_definitions.holiday_calendar import holiday_calendar
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.trades.evaluation import trade_results
 from catalyst.trades.preparation import prepared_trades
@@ -34,7 +34,7 @@ HG = an_index(
     ("MASS", "LB"),
     ("LB", 1.0, "LB"),
 )
-PAYS = holiday_calendar(np.array(["2030-01-01"], dtype="datetime64[D]"))
+PAYS = closed_on(np.array(["2030-01-01"], dtype="datetime64[D]"))
 CLEARED: dict[str, object] = {
     "quantity_unit": "LB",
     "quantity_per": "month",
@@ -45,7 +45,7 @@ CLEARED: dict[str, object] = {
     "settlement_method": "financial",
     "clearing_house": "CME Clearing",
     "payment_day": "+2bd",
-    "payment_calendar_key": key_of(PAYS),
+    "payment_holiday_key": key_of(PAYS),
 }
 BILATERAL: dict[str, object] = {
     **{field: value for field, value in CLEARED.items() if field != "clearing_house"},

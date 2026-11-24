@@ -718,7 +718,7 @@ def test_the_pairs_rules_stand_in_their_words() -> None:
         "index 2 is another index named 'NTO', the name of index 1, expected one index for one name"
     )
     physical = {
-        k: v for k, v in BILATERAL.items() if k not in ("payment_day", "payment_calendar_key")
+        k: v for k, v in BILATERAL.items() if k not in ("payment_day", "payment_holiday_key")
     } | {"settlement_method": "physical"}
     assert refused(physical, indexes=(A, B)) == (
         "settlement_method is 'physical', expected 'financial' with two indexes; a two-index "
@@ -772,7 +772,7 @@ FIELDS = (
     "trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, "
     "settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, "
     "quantity_unit, quantity_per, {price}, second_schedule_method, payment_day, "
-    "payment_calendar_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
 )
 SPREAD_FIELDS = FIELDS.format(
     price="spread_price, spread_price_currency_unit, spread_price_quantity_unit"
@@ -791,7 +791,7 @@ TEMPLATE_FIELDS = (
     "counterparty",
     "discount_curve_key",
     "payment_day",
-    "payment_calendar_key",
+    "payment_holiday_key",
 )
 
 

@@ -3,6 +3,7 @@
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on
 from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
@@ -13,7 +14,6 @@ from catalyst.index_definitions.holiday_calendar import (
     HOLIDAYS_READ,
     HolidayCalendar,
     combine_holiday_calendars,
-    holiday_calendar,
 )
 from catalyst.instrumentation.work_counts import WorkCounter
 
@@ -43,14 +43,14 @@ HOLIDAYS = dates(
 
 
 def test_the_sample_keeps_every_holiday_as_given() -> None:
-    calendar = holiday_calendar(HOLIDAYS)
+    calendar = closed_on(HOLIDAYS)
     assert np.array_equal(calendar.holiday, HOLIDAYS)
     assert calendar.holiday.dtype == np.dtype("datetime64[D]")
     assert calendar.holiday.ndim == 1
 
 
 def test_a_one_row_calendar_is_a_calendar() -> None:
-    calendar = holiday_calendar(HOLIDAYS[:1])
+    calendar = closed_on(HOLIDAYS[:1])
     assert np.array_equal(calendar.holiday, dates("2026-01-01"))
 
 
@@ -58,7 +58,7 @@ def test_a_one_row_calendar_is_a_calendar() -> None:
 # the reader is. The calendar keeps them as given.
 def test_nothing_else_is_checked() -> None:
     listed = dates("2026-12-25", "2026-01-01", "2026-01-01", "2026-01-03")
-    calendar = holiday_calendar(listed)
+    calendar = closed_on(listed)
     assert np.array_equal(calendar.holiday, listed)
 
 
@@ -68,7 +68,7 @@ def test_nothing_else_is_checked() -> None:
 @given(serials=st.lists(st.integers(61, 2958465), min_size=1, max_size=400))
 def test_any_column_of_dates_is_kept_as_given(serials: list[int]) -> None:
     listed = EPOCH + np.array(serials).astype("timedelta64[D]")
-    calendar = holiday_calendar(listed)
+    calendar = closed_on(listed)
     assert calendar.holiday.size == len(serials)
     assert np.array_equal(calendar.holiday, listed)
 
@@ -78,7 +78,7 @@ def test_any_column_of_dates_is_kept_as_given(serials: list[int]) -> None:
 
 def test_the_calendar_owns_its_dates() -> None:
     listed = HOLIDAYS.copy()
-    calendar = holiday_calendar(listed)
+    calendar = closed_on(listed)
     listed[0] = np.datetime64("2030-01-01")
     assert calendar.holiday[0] == np.datetime64("2026-01-01")
     assert not calendar.holiday.flags.writeable
@@ -90,8 +90,8 @@ def test_the_calendar_owns_its_dates() -> None:
 
 # The ticket's synthetic calendars: A lists Wednesday 14 October 2026 twice around Monday the 12th,
 # B Tuesday the 13th and the 14th. Neither claims any exchange's rules.
-A = holiday_calendar(dates("2026-10-14", "2026-10-12", "2026-10-14"))
-B = holiday_calendar(dates("2026-10-13", "2026-10-14"))
+A = closed_on(dates("2026-10-14", "2026-10-12", "2026-10-14"))
+B = closed_on(dates("2026-10-13", "2026-10-14"))
 UNION = dates("2026-10-12", "2026-10-13", "2026-10-14")
 
 
@@ -107,7 +107,7 @@ def test_the_tickets_two_calendars_combine_into_their_three_distinct_days_in_ord
     # Two calendars taken, five listed days read, three distinct days kept.
     assert counts == {CALENDARS_COMBINED: 2, HOLIDAYS_READ: 5, HOLIDAYS_KEPT: 3}
     # The same days as a calendar the desk listed as the union itself.
-    assert np.array_equal(calendar.holiday, holiday_calendar(UNION).holiday)
+    assert np.array_equal(calendar.holiday, closed_on(UNION).holiday)
 
 
 def test_one_calendar_combines_into_its_own_distinct_days_in_order() -> None:
@@ -127,7 +127,7 @@ def test_order_repeats_and_overlaps_change_nothing_and_a_combination_combines_ag
     assert np.array_equal(twice.holiday, dates("2026-10-12", "2026-10-14"))
     assert counts == {CALENDARS_COMBINED: 2, HOLIDAYS_READ: 6, HOLIDAYS_KEPT: 2}
     # Nested: the combination of a combination and a third calendar is the combination of all three.
-    saturday = holiday_calendar(dates("2026-10-10"))  # a weekend day listed is kept as any other
+    saturday = closed_on(dates("2026-10-10"))  # a weekend day listed is kept as any other
     first, _ = combined(A, B)
     nested, counts = combined(first, saturday)
     flat, _ = combined(A, B, saturday)
@@ -158,7 +158,7 @@ def test_any_calendars_combine_into_the_distinct_days_of_all_of_them_whatever_th
     columns: list[list[int]],
 ) -> None:
     calendars = [
-        holiday_calendar(EPOCH + np.array(serials).astype("timedelta64[D]")) for serials in columns
+        closed_on(EPOCH + np.array(serials).astype("timedelta64[D]")) for serials in columns
     ]
     calendar, counts = combined(*calendars)
     every = np.concatenate([c.holiday for c in calendars])

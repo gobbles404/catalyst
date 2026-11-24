@@ -87,7 +87,7 @@ SWAP: dict[str, object] = {
     "counterparty": "ACME Trading",
     "discount_curve_key": "SOFR",
     "payment_day": day(PAY),
-    "payment_calendar_key": key_of(OIL.holiday_calendar),
+    "payment_holiday_key": key_of(OIL.holiday_calendar),
 }
 CLEARED: dict[str, object] = {
     **{k: v for k, v in SWAP.items() if k not in ("counterparty", "discount_curve_key")},

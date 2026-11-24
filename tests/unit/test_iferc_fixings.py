@@ -4,6 +4,7 @@ kept."""
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
@@ -12,9 +13,8 @@ from catalyst.globals.unit_conversions import UNITS
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
-from catalyst.index_definitions.holiday_calendar import holiday_calendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.market_data.iferc_fixings import iferc_fixings
 
@@ -37,7 +37,7 @@ def an_index(schedule: object, name: str = "Waha IFERC") -> Index:
     """The index of that schedule with one set of conventions and specifications throughout,
     since nothing here reads either, and no holiday calendar, as an IFERC or a Gas Daily index
     has none."""
-    return index(name, f"{name} index", schedule, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
+    return index_on(name, f"{name} index", schedule, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
 
 
 # The page's sample: Waha IFERC, the first four months of 2026, the codes as the desk keeps
@@ -51,13 +51,13 @@ KEPT_CODES = ("F26", "G26", "H26", "J26")
 KEPT_PRICES = prices(1.85, 2.10, 1.95, 1.60)
 SCHEDULE = iferc_schedule(KEPT_CODES, dates("2026-01-05", "2026-02-02", "2026-03-02", "2026-04-01"))
 INDEX = an_index(SCHEDULE)
-FUTURES_INDEX = index(
+FUTURES_INDEX = index_on(
     "WTI NYMEX",
     "West Texas Intermediate crude oil - NYMEX",
     futures_schedule(("m26", "n26"), dates("2026-05-19", "2026-06-22"), None),
     CONVENTIONS,
     SPECIFICATIONS,
-    holiday_calendar(dates("2026-05-25")),
+    closed_on(dates("2026-05-25")),
     None,
     UNITS,
 )

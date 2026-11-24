@@ -7,6 +7,7 @@ import dataclasses
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
@@ -17,9 +18,9 @@ from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
-from catalyst.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
-from catalyst.index_definitions.index import Index, index
+from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.market.market import Market, market
 from catalyst.market.market_history import MarketHistory, market_history
@@ -51,8 +52,8 @@ def a_vector(*prices: float, name: str = "sample") -> PriceVector:
 # The page's sample: three contracts of one index, the valuation date 26 May 2026, the Monday
 # before it a holiday, the fixings on the three past business days, and two quotes.
 SCHEDULE = a_schedule(("m26", "2026-05-19"), ("n26", "2026-06-22"), ("q26", "2026-07-21"))
-CLOSED_MAY_25 = holiday_calendar(dates("2026-05-25"))
-ELSEWHERE = holiday_calendar(dates("2026-01-01"))
+CLOSED_MAY_25 = closed_on(dates("2026-05-25"))
+ELSEWHERE = closed_on(dates("2026-01-01"))
 
 CONVENTIONS = index_conventions("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL", UNITS)
 SPECIFICATIONS = contract_specifications(
@@ -65,7 +66,7 @@ def an_index(
 ) -> Index:
     """The index of that schedule and holiday calendar, with one set of conventions and
     specifications throughout, since nothing here reads either."""
-    return index(
+    return index_on(
         "sample",
         "Sample futures index",
         schedule,
@@ -190,7 +191,7 @@ def test_the_fraction_of_the_valuation_day_changes_nothing() -> None:
 # Valued on the calendar's last day, a holiday: the last contract has no open day left, and its
 # quote is required all the same.
 def test_a_contract_prompt_on_closed_days_alone_still_takes_a_quote() -> None:
-    closed = holiday_calendar(dates("2026-05-25", "2026-07-21"))
+    closed = closed_on(dates("2026-05-25", "2026-07-21"))
     history = a_history("2026-07-21", holidays=closed)
     assert not history.calendar.is_priced[-1]
     made = market(history, a_vector(72.80))
@@ -603,7 +604,7 @@ def any_history(data: st.DataObject) -> MarketHistory:
     listed = expiries[0] + np.array(
         data.draw(st.lists(st.integers(-20, 400), max_size=30)), dtype="timedelta64[D]"
     )
-    holidays = holiday_calendar(listed)
+    holidays = closed_on(listed)
     span = int(offsets[-1] - offsets[0])
     as_of = expiries[0] + np.timedelta64(data.draw(st.integers(-10, span)), "D")
     made = calendar(
@@ -919,7 +920,7 @@ def test_the_coverage_rule_is_the_same_on_every_kind_and_for_a_whole_vector() ->
         ),
         (
             (("a", "2026-05-19"), ("b", "2026-05-26"), ("c", "2026-05-28"), ("d", "2026-06-22")),
-            holiday_calendar(dates("2026-05-27", "2026-05-28")),
+            closed_on(dates("2026-05-27", "2026-05-28")),
         ),
     ],
     ids=["a weekend alone", "two holidays alone"],

@@ -201,9 +201,16 @@ def test_the_date_shift_explains_itself() -> None:
             "cell such as B2.",
         ),
         (
-            "[holiday_calendar]",
-            "The holiday-calendar handle whose holidays business days skip, such as C2; left out "
+            "[holiday_key]",
+            "The calendar whose holidays business days skip, by key: one calendar's name, such "
+            "as NYFED, or several joined by +, such as NYFED+LON, closed when any is; left out "
             "for Monday to Friday with no holidays.",
+        ),
+        (
+            "[holiday_calendars]",
+            "The collection holiday_key selects from: the cell showing "
+            "_CollectHolidayCalendars's result, such as C2. Leave it out where there is no "
+            "holiday_key.",
         ),
     ]
 
@@ -284,53 +291,36 @@ def test_the_futures_schedule_creator_explains_itself() -> None:
 
 
 def test_the_holiday_calendar_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["_CombineHolidayCalendars"]
-    assert not hidden
-    assert description == (
-        "Combines holiday calendars into one closed on every day any of them is closed, the days "
-        "in order, once each, and shows its handle, an ordinary calendar for an index, "
-        "util_ShiftDate or another combination."
-    )
-    assert arguments == [
-        (
-            "calendar_handles",
-            "The calendars to combine: a cell, a row or a column of cells showing "
-            "_CreateHolidayCalendar's or this function's results, such as B2:B3, every one read "
-            "and a repeat read again.",
-        )
-    ]
+    assert "_CombineHolidayCalendars" not in SPECS  # removed by holiday-keys.md
     description, arguments, hidden = SPECS["_CreateHolidayCalendar"]
     assert not hidden
     assert description == (
-        "Creates a holiday calendar from the days one market is closed, under a name where a "
-        "payment calendar key will select it, and shows its handle, the text other formulas take "
-        "as the calendar."
+        "Creates a holiday calendar from its name and the days one market is closed, and shows "
+        "its handle, the text _CollectHolidayCalendars takes as the calendar."
     )
     assert arguments == [
+        (  # required and first, since holiday-keys.md
+            "name",
+            "The calendar's name, text such as NYFED, exact and case-sensitive with no whitespace "
+            "around it and no plus sign: what a holiday key selects it by.",
+        ),
         (
             "holiday",
             "The column of dates the market is closed, such as A2:A11, one holiday per row.",
         ),
-        (  # optional, so shown in brackets, since payment-calendar-keys.md
-            "[name]",
-            "The calendar's name, text such as NYFED, exact and case-sensitive with no whitespace "
-            "around it and no plus sign: what a payment calendar key selects. Leave it out for a "
-            "calendar no key selects.",
-        ),
     ]
-    description, arguments, hidden = SPECS["_CollectPaymentCalendars"]
+    description, arguments, hidden = SPECS["_CollectHolidayCalendars"]
     assert not hidden
     assert description == (
-        "Collects named holiday calendars into one collection, each name once, the calendars as "
-        "they are and nothing of their days combined, and shows its handle, the text other "
-        "formulas take as the collection."
+        "Collects holiday calendars into one collection, each name once, the calendars as they "
+        "are and nothing of their days combined, and shows its handle, the text other formulas "
+        "take as the collection a holiday key selects from."
     )
     assert arguments == [
         (
             "calendar_handles",
             "The calendars to collect: a cell, a row or a column of cells showing "
-            "_CreateHolidayCalendar's results, such as B2:B3, each made with a name and each name "
-            "once.",
+            "_CreateHolidayCalendar's results, such as B2:B3, each name once.",
         )
     ]
 
@@ -562,7 +552,7 @@ def test_the_index_creator_explains_itself() -> None:
     assert not hidden
     assert description == (
         "Creates the index behind one reference price from its name, a description, "
-        "schedule, conventions, specifications, a futures index's holiday calendar and the lot "
+        "schedule, conventions, specifications, a futures index's holiday key and the lot "
         "its delta is reported in, and shows its handle, the text other formulas take as the "
         "index."
     )
@@ -592,16 +582,22 @@ def test_the_index_creator_explains_itself() -> None:
             "_CreateContractSpecifications's result, such as B5, or a name for it.",
         ),
         (
-            "[holiday_calendar]",
-            "The market's holiday-calendar handle with a futures schedule: the cell showing "
-            "_CreateHolidayCalendar's result, such as B3, or a name for it; left out for an "
-            "IFERC or Gas Daily schedule.",
+            "[holiday_key]",
+            "The market's holiday calendar with a futures schedule, by key: one calendar's name, "
+            "such as NYMEX, or several joined by +, such as NYMEX+ICE, closed when any is; left "
+            "out for an IFERC or Gas Daily schedule.",
         ),
         (
             "[reporting_lot]",
             "The name of the specification a batch's delta is reported in lots of, such as "
             "NYMEX NG, exactly as the specifications spell it; left out for an index that only "
             "builds markets and prices no trades.",
+        ),
+        (
+            "[holiday_calendars]",
+            "The collection holiday_key selects from: the cell showing "
+            "_CollectHolidayCalendars's result, such as B3. Leave it out where there is no "
+            "holiday_key.",
         ),
     ]
 
@@ -718,10 +714,10 @@ def test_the_trades_creator_explains_itself() -> None:
             "B3, or a name for it, which selects the instrument and supplies the shared fields.",
         ),
         (  # optional, since payment-calendar-keys.md
-            "[payment_calendars]",
-            "The collection each row's payment_calendar_key selects from: the cell showing "
+            "[holiday_calendars]",
+            "The collection each row's payment_holiday_key selects from: the cell showing "
             # I5, outside the ticket the other examples lay out in A4:E9, beside the indexes.
-            "_CollectPaymentCalendars's result, such as I5. Leave it out for a physically "
+            "_CollectHolidayCalendars's result, such as I5. Leave it out for a physically "
             "settled batch.",
         ),
     ]
@@ -799,10 +795,10 @@ def test_the_quote_template_creator_explains_itself() -> None:
         ),
         ("values", "The values in one row beneath those fields, such as A2:G2."),
         (  # optional, since payment-calendar-keys.md
-            "[payment_calendars]",
-            "The collection payment_calendar_key selects from: the cell showing "
-            "_CollectPaymentCalendars's result, such as B4. Leave it out where the row holds no "
-            "payment_calendar_key.",
+            "[holiday_calendars]",
+            "The collection payment_holiday_key selects from: the cell showing "
+            "_CollectHolidayCalendars's result, such as B4. Leave it out where the row holds no "
+            "payment_holiday_key.",
         ),
     ]
 

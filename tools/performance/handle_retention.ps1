@@ -134,10 +134,11 @@ try {
     Put "H1" "name"; Put "I1" "lot_size"; Put "J1" "brokerage_rate_per_lot"; Put "K1" "clearing_rate_per_lot"; Put "L1" "lot_unit"
     Put "H2" "NYMEX"; Put "I2" "1000"; Put "J2" "0"; Put "K2" "0"; Put "L2" "BBL"
     Put "M1" "=_CreateFuturesSchedule(A1:A$contracts,B1:B$contracts)"
-    Put "M2" "=_CreateHolidayCalendar(F2)"
+    Put "M2" '=_CreateHolidayCalendar("NYMEX",F2)'
+    Put "N2" "=_CollectHolidayCalendars(M2)"  # the collection the index's holiday key selects from
     Put "M3" '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     Put "M4" "=_CreateContractSpecifications(H1:L1,H2:L2)"
-    Put "M5" "=_CreateIndex(F1,""West Texas Intermediate crude oil - NYMEX"",M1,M3,M4,M2)"
+    Put "M5" '=_CreateIndex(F1,"West Texas Intermediate crude oil - NYMEX",M1,M3,M4,"NYMEX",,N2)'
     Put "M6" "=_CreateValuationDate(F3,0.5)"
     Put "M7" "=_CreateCalendar(M6,M5)"
     Put "M8" "=_CreateFuturesFixings(F4:F5,G4:G5,M5)"
@@ -147,7 +148,7 @@ try {
     Put "M12" "=INDEX(util_ReadHandle(M11),3,5)"  # the first calendar day's quote: the first price
     $reader = Own $sheet.Range("M12")
     $watch = Own $sheet.Range("O1")
-    $baseline = 11
+    $baseline = 12  # the eleven creators of column M, and the collection in N2
     $counts = Settle $watch $baseline
     Assert-Counts "at the baseline" $counts $baseline
     $read = Read-Quote $reader 70.0

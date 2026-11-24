@@ -28,7 +28,7 @@ namespace Catalyst.Host.Tests
         {
             var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0 } });
-            var handle = (string)Seam.Call("_CreateIndex", name, name + " index", schedule, conventions, specifications, holidays, "NYMEX NG");
+            var handle = (string)Seam.Call("_CreateIndex", name, name + " index", schedule, conventions, specifications, Key(holidays), "NYMEX NG", Calendars());
             Assert.StartsWith(Pid + ":index:" + name + ":", handle);
             return handle;
         }
@@ -56,15 +56,23 @@ namespace Catalyst.Host.Tests
             return grid;
         }
 
-        // Payment calendars by key, payment-calendar-keys.md. A fact still says which calendar a
-        // template pays on by writing the calendar's handle among the template's values: Template
-        // gives the creator the calendar's key in its place, the same days made once under a name,
-        // CAL1, CAL2, in the order met, and Trades and Template name the collection of those
-        // calendars as the creator's last argument, as a formula names the collection's cell. A
-        // value that is no live calendar handle, a key already or a cell made wrong on purpose, is
-        // left as written.
+        // Holiday calendars by key, holiday-keys.md. Every calendar has a name and is chosen by key
+        // from a collection. A fact still holds a calendar's handle where it says which calendar a
+        // template pays on, an index prices on or a date shifts on: Key gives the creator the
+        // calendar's key in its place, the name its readback shows, and Calendars is the collection
+        // of every calendar keyed so far, the creator's last argument, as a formula names the
+        // collection's cell. Fresh is a name no other calendar made here has, CAL1, CAL2. A value
+        // that is no live calendar handle, a key already, an argument left out or a cell made wrong
+        // on purpose, is left as written.
         private static readonly Dictionary<string, string> Keys = new Dictionary<string, string>();
         private static readonly List<object> Named = new List<object>();
+        private static int Made;
+
+        private static string Fresh()
+        {
+            Made += 1;
+            return "CAL" + Made;
+        }
 
         private static object Key(object cell)
         {
@@ -79,24 +87,19 @@ namespace Catalyst.Host.Tests
                 return key;
             }
             var spill = Seam.Call("util_ReadHandle", text) as object[,];
-            if (spill == null || !Equals(spill[0, 0], "holiday") || spill.GetLength(1) != 1)
+            if (spill == null || spill.GetLength(1) != 2 || !Equals(spill[0, 0], "holiday") || !Equals(spill[0, 1], "name"))
             {
                 return cell;
             }
-            var days = new object[spill.GetLength(0) - 2];
-            for (var i = 0; i < days.Length; i++)
-            {
-                days[i] = spill[i + 2, 0];
-            }
-            key = "CAL" + (Keys.Count + 1);
-            Named.Add(Seam.Call("_CreateHolidayCalendar", Column(days), key));
+            key = (string)spill[2, 1];
+            Named.Add(text);
             Keys[text] = key;
             return key;
         }
 
         private static object Calendars()
         {
-            return Named.Count == 0 ? (object)ExcelMissing.Value : Seam.Call("_CollectPaymentCalendars", Column(Named.ToArray()));
+            return Named.Count == 0 ? (object)ExcelMissing.Value : Seam.Call("_CollectHolidayCalendars", Column(Named.ToArray()));
         }
 
         private static object Template(string creator, object instrument, object fields, object values)
@@ -108,7 +111,7 @@ namespace Catalyst.Host.Tests
                 cells = (object[,])cells.Clone();
                 for (var j = 0; j < names.GetLength(1); j++)
                 {
-                    if (Equals(names[0, j], "payment_calendar_key"))
+                    if (Equals(names[0, j], "payment_holiday_key"))
                     {
                         cells[0, j] = Key(cells[0, j]);
                     }
@@ -297,41 +300,43 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "util_StartDate", new object[] { "BALBALZ26", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: period is 'BALBALZ26', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28" };
             yield return new object[] { "util_EndDate", new object[] { "BALZ28-F26", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: period is 'BALZ28-F26', expected range endpoints in chronological order" };
             // A date shifted by a text offset, the calendar left out: the ticket's table, Friday 9 October 2026 at 46304, the Saturday at 46305 and the Sunday at 46306; the month ends through a leap February; the library's words for no offset, a result past the sheet's calendar and a count of too many digits; the seam's for the date, the offset and a blank where the calendar should be, a blank being no omission.
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd", ExcelMissing.Value }, 46307.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "+1bd", ExcelMissing.Value }, 46307.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46306.0, "-1bd", ExcelMissing.Value }, 46304.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "+0bd", ExcelMissing.Value }, 46305.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+7cd", ExcelMissing.Value }, 46311.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "-7cd", ExcelMissing.Value }, 46297.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+0em", ExcelMissing.Value }, 46326.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1em", ExcelMissing.Value }, 46356.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "-1em", ExcelMissing.Value }, 46295.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46783.0, "+1em", ExcelMissing.Value }, 46812.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46371.0, "+1em", ExcelMissing.Value }, 46418.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+001cD", ExcelMissing.Value }, 46305.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 2958465.0, "+0em", ExcelMissing.Value }, 2958465.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "1bd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset is '1bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd", ExcelMissing.Value, ExcelMissing.Value }, 46307.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "+1bd", ExcelMissing.Value, ExcelMissing.Value }, 46307.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46306.0, "-1bd", ExcelMissing.Value, ExcelMissing.Value }, 46304.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "+0bd", ExcelMissing.Value, ExcelMissing.Value }, 46305.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+7cd", ExcelMissing.Value, ExcelMissing.Value }, 46311.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "-7cd", ExcelMissing.Value, ExcelMissing.Value }, 46297.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+0em", ExcelMissing.Value, ExcelMissing.Value }, 46326.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1em", ExcelMissing.Value, ExcelMissing.Value }, 46356.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "-1em", ExcelMissing.Value, ExcelMissing.Value }, 46295.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46783.0, "+1em", ExcelMissing.Value, ExcelMissing.Value }, 46812.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46371.0, "+1em", ExcelMissing.Value, ExcelMissing.Value }, 46418.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+001cD", ExcelMissing.Value, ExcelMissing.Value }, 46305.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 2958465.0, "+0em", ExcelMissing.Value, ExcelMissing.Value }, 2958465.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "1bd", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset is '1bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd" };
             // Since #181 a chain, compound-date-offsets.md: the requested chain from 12 August 2026 without a calendar, 25 December; the order the rule and no roll at the end; a chain malformed late, one leaving the sheet at its first instruction and too many digits in a later one.
-            yield return new object[] { "util_ShiftDate", new object[] { 46246.0, "+3em+25cd-1bd+1bd", ExcelMissing.Value }, 46381.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46246.0, "+003EM+025cD-01BD+001bd", ExcelMissing.Value }, 46381.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "-1bd+1bd", ExcelMissing.Value }, 46304.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "-1bd+1bd", ExcelMissing.Value }, 46307.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46052.0, "+1cd+0em", ExcelMissing.Value }, 46053.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46052.0, "+0em+1cd", ExcelMissing.Value }, 46054.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46783.0, "+1em+1cd", ExcelMissing.Value }, 46813.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "+0bd+0cd", ExcelMissing.Value }, 46305.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1cd", ExcelMissing.Value }, 46305.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd+2xd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset is '+1bd+2xd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, '+2xd' begins with no instruction" };
-            yield return new object[] { "util_ShiftDate", new object[] { 2958465.0, "+1cd-1cd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd-1cd' is 10000-01-01 at instruction 1, '+1cd', outside the sheet's calendar, 1900-03-01 to 9999-12-31" };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd+99999999cd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset has a count of 8 digits in instruction 2, '+99999999cd', expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31" };
-            yield return new object[] { "util_ShiftDate", new object[] { 2958465.0, "+1cd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd' is 10000-01-01, outside the sheet's calendar, 1900-03-01 to 9999-12-31" };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+99999999cd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset has a count of 8 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31" };
-            yield return new object[] { "util_ShiftDate", new object[] { ExcelMissing.Value, "+1bd", ExcelMissing.Value }, "#ERROR util_ShiftDate: date is missing, expected date" };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.5, "+1bd", ExcelMissing.Value }, "#ERROR util_ShiftDate: date is number 46304.5, expected date" };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, ExcelEmpty.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: offset is blank, expected text" };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, 1.0, ExcelMissing.Value }, "#ERROR util_ShiftDate: offset is number 1.0, expected text" };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd", ExcelEmpty.Value }, "#ERROR util_ShiftDate: holiday_calendar is blank, expected holiday calendar handle" };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+7cd", "x:holiday_calendar:9" }, "#ERROR util_ShiftDate: holiday_calendar is text 'x:holiday_calendar:9' naming no live object, expected holiday calendar handle" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46246.0, "+3em+25cd-1bd+1bd", ExcelMissing.Value, ExcelMissing.Value }, 46381.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46246.0, "+003EM+025cD-01BD+001bd", ExcelMissing.Value, ExcelMissing.Value }, 46381.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "-1bd+1bd", ExcelMissing.Value, ExcelMissing.Value }, 46304.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "-1bd+1bd", ExcelMissing.Value, ExcelMissing.Value }, 46307.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46052.0, "+1cd+0em", ExcelMissing.Value, ExcelMissing.Value }, 46053.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46052.0, "+0em+1cd", ExcelMissing.Value, ExcelMissing.Value }, 46054.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46783.0, "+1em+1cd", ExcelMissing.Value, ExcelMissing.Value }, 46813.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "+0bd+0cd", ExcelMissing.Value, ExcelMissing.Value }, 46305.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1cd", ExcelMissing.Value, ExcelMissing.Value }, 46305.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd+2xd", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset is '+1bd+2xd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, '+2xd' begins with no instruction" };
+            yield return new object[] { "util_ShiftDate", new object[] { 2958465.0, "+1cd-1cd", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd-1cd' is 10000-01-01 at instruction 1, '+1cd', outside the sheet's calendar, 1900-03-01 to 9999-12-31" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd+99999999cd", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset has a count of 8 digits in instruction 2, '+99999999cd', expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31" };
+            yield return new object[] { "util_ShiftDate", new object[] { 2958465.0, "+1cd", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd' is 10000-01-01, outside the sheet's calendar, 1900-03-01 to 9999-12-31" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+99999999cd", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset has a count of 8 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31" };
+            yield return new object[] { "util_ShiftDate", new object[] { ExcelMissing.Value, "+1bd", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: date is missing, expected date" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.5, "+1bd", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: date is number 46304.5, expected date" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, ExcelEmpty.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: offset is blank, expected text" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, 1.0, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: offset is number 1.0, expected text" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd", ExcelEmpty.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: holiday_key is blank, expected text" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd", 7.0, ExcelMissing.Value }, "#ERROR util_ShiftDate: holiday_key is number 7.0, expected text" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+7cd", "NYFED", "x:holiday_calendars:9" }, "#ERROR util_ShiftDate: holiday_calendars is text 'x:holiday_calendars:9' naming no live object, expected holiday calendars handle" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+7cd", "NYFED", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: holiday_calendars is missing, expected a _CollectHolidayCalendars collection, which holiday_key selects a calendar from" };
             // The instrument catalog's show: one exact name in. Another case, a blank, a number and a left-out name fail, the name in the library's words and the rest in the seam's; the spills are in the catalog fact below.
             yield return new object[] { "_ShowInstrument", new object[] { "Future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'" };
             yield return new object[] { "_ShowInstrument", new object[] { "future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float', 'float_float', 'cashflow'" };  // the name until #174
@@ -342,7 +347,7 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "CountFieldRows", new object[] { "fixed_float", Row("quantity", "fixed_price"), new object[,] { { 1.0, 3.1 }, { 2.0, 3.2 }, { 3.0, 3.3 } } }, 3.0 };
             yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values" };
-            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_calendar_key, marketing_reserve, cva_reserve, settlement_frequency, nearby" };
+            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields cell (1, 2) is text 'quantity', already given at cell (1, 1)" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "fixed_price"), Row("ten", "eleven") }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("trade_date"), 46164.5 }, "#ERROR EchoFieldRow: values cell (1, 1) is number 46164.5, expected date" };
@@ -358,8 +363,8 @@ namespace Catalyst.Host.Tests
             // fractional-quantities.md: a quantity's rule follows the settlement method, so the fraction is refused where the template settles physically, in the words a template always gave.
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("settlement_method", "quantity"), Row("physical", 1.5) }, "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number" };
             // The quote template, template-based-quoting.md: a booking field and a blank period header refused by name, the cashflow refused as no instrument a quote prices, a value by the trade template's rule; and the quote's arguments in the seam's words, the market left out or naming nothing.
-            yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("route", "quantity"), Row("cleared", 10.0), ExcelMissing.Value }, "#ERROR _CreateQuoteTemplate: ValueError: quantity is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_calendar_key, settlement_frequency, nearby" };
-            yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("contract_code", "route"), Row(ExcelEmpty.Value, "cleared"), ExcelMissing.Value }, "#ERROR _CreateQuoteTemplate: ValueError: contract_code is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_calendar_key, settlement_frequency, nearby" };
+            yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("route", "quantity"), Row("cleared", 10.0), ExcelMissing.Value }, "#ERROR _CreateQuoteTemplate: ValueError: quantity is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_key, settlement_frequency, nearby" };
+            yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("contract_code", "route"), Row(ExcelEmpty.Value, "cleared"), ExcelMissing.Value }, "#ERROR _CreateQuoteTemplate: ValueError: contract_code is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_key, settlement_frequency, nearby" };
             yield return new object[] { "_CreateQuoteTemplate", new object[] { "cashflow", Row("currency"), "USD", ExcelMissing.Value }, "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'cashflow', expected one a quote prices: 'fixed_float'" };
             yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("route"), "Cleared", ExcelMissing.Value }, "#ERROR _CreateQuoteTemplate: ValueError: route is 'Cleared', expected cleared or bilateral" };
             yield return new object[] { "_Quote", new object[] { ExcelMissing.Value, "F27", ExcelMissing.Value, "flat", ExcelMissing.Value }, "#ERROR _Quote: market is missing, expected market handle" };
@@ -393,8 +398,8 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "_CreateFuturesSchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0), Column(46156.0, 46189.0, 46219.0) }, "#ERROR _CreateFuturesSchedule: ValueError: future_expiry has 2 dates, expected 3, one per contract_code" };
             yield return new object[] { "_CreateFuturesSchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), Column(46156.0, ExcelEmpty.Value, 46219.0) }, "#ERROR _CreateFuturesSchedule: option_expiry cell (2, 1) is blank, expected date" };
             // The holiday calendar: one column of dates, a blank in it, and a row where a column is expected.
-            yield return new object[] { "_CreateHolidayCalendar", new object[] { Column(46023.0, ExcelEmpty.Value, 46069.0), ExcelMissing.Value }, "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date" };
-            yield return new object[] { "_CreateHolidayCalendar", new object[] { Row(46023.0, 46023.0), ExcelMissing.Value }, "#ERROR _CreateHolidayCalendar: holiday is 1x2 array, expected column of dates" };
+            yield return new object[] { "_CreateHolidayCalendar", new object[] { "NYMEX", Column(46023.0, ExcelEmpty.Value, 46069.0) }, "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date" };
+            yield return new object[] { "_CreateHolidayCalendar", new object[] { "NYMEX", Row(46023.0, 46023.0) }, "#ERROR _CreateHolidayCalendar: holiday is 1x2 array, expected column of dates" };
             // The IFERC schedule: a publication column one row short, the library's words; a blank among the publication dates, a number among the codes, the publication dates left out and a row where a column is expected, the seam's.
             yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26", "Z26"), Column(46296.0, 46328.0) }, "#ERROR _CreateIfercSchedule: ValueError: publication_date has 2 dates, expected 3, one per contract_code" };
             yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26"), Column(46296.0, ExcelEmpty.Value) }, "#ERROR _CreateIfercSchedule: publication_date cell (2, 1) is blank, expected date" };
@@ -424,9 +429,9 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 0.0, "MMBTU", 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 0.0, expected 1 or more" };
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", -0.5, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: brokerage_rate_per_lot row 1 is -0.5, expected 0 or more" };
             // The index: two texts and four handles. A blank where the name should be, a number and text naming no live object where the schedule should be, and the specifications left out fail in the seam's words; the library's rules, which need live handles, are in the fact below.
-            yield return new object[] { "_CreateIndex", new object[] { ExcelEmpty.Value, "Henry Hub natural gas - NYMEX", ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: name is blank, expected text" };
-            yield return new object[] { "_CreateIndex", new object[] { "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", 46161.0, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: schedule is number 46161.0, expected a handle" };
-            yield return new object[] { "_CreateIndex", new object[] { "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", "x", ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: schedule is text 'x' naming no live object, expected a handle" };
+            yield return new object[] { "_CreateIndex", new object[] { ExcelEmpty.Value, "Henry Hub natural gas - NYMEX", ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: name is blank, expected text" };
+            yield return new object[] { "_CreateIndex", new object[] { "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", 46161.0, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: schedule is number 46161.0, expected a handle" };
+            yield return new object[] { "_CreateIndex", new object[] { "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", "x", ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: schedule is text 'x' naming no live object, expected a handle" };
             // The futures fixings: a column of days, a column of settles and the index by handle. The index left out, a number in its place and text naming no live object fail in the seam's words, as do a blank among the settles and a row where a column is expected; the library's rules, which need a live index, are in the fact below.
             yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46146.0, 46143.0), Column(106.42, 101.94), ExcelMissing.Value }, "#ERROR _CreateFuturesFixings: index is missing, expected index handle" };
             yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46146.0, 46143.0), Column(106.42, 101.94), 101.94 }, "#ERROR _CreateFuturesFixings: index is number 101.94, expected index handle" };
@@ -510,7 +515,7 @@ namespace Catalyst.Host.Tests
         [Fact]
         public void contract_prices_are_interpolated_between_anchors_on_the_index_schedule()
         {
-            var holidays = Seam.Call("_CreateHolidayCalendar", Column(47484.0), ExcelMissing.Value);
+            var holidays = Seam.Call("_CreateHolidayCalendar", Fresh(), Column(47484.0));
             var index = Index(Seam.Call("_CreateFuturesSchedule", Column("J27", "K27", "M27"), Column(46468.0, 46497.0, 46527.0), ExcelMissing.Value), holidays, "CL");
             var spill = (object[,])Seam.Call("util_InterpolateContracts", index, Column("202704", "M27"), Column(70.0, 76.0));
             Assert.Equal(5, spill.GetLength(0));
@@ -813,7 +818,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _CreateCashflows: cashflow_rows cell (1, 3) is text '+5bd', expected date", Seam.Call("_CreateCashflows", Row("trade_date", "amount", "payment_day"), Row(46391.0, 1.0, "+5bd"), template));
             Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk", Seam.Call("_ReportRisk", results, "delta", "day"));
             var fixedFloat = Template("_CreateTradeTemplate", "fixed_float", Row("route"), Row("cleared"));
-            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_calendar_key, marketing_reserve, cva_reserve, settlement_frequency, nearby", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
+            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
             Assert.Equal("#ERROR _CreateCashflows: ValueError: template is of instrument 'fixed_float', expected cashflow, the one instrument whose cashflows are built", Seam.Call("_CreateCashflows", Row("trade_date"), Row(46391.0), fixedFloat));
         }
 
@@ -824,18 +829,18 @@ namespace Catalyst.Host.Tests
         [Fact]
         public void a_row_of_fields_is_bound_against_the_instrument_named_and_its_key_kept_as_typed()
         {
-            var headers = Row("quantity_unit", "payment_calendar_key", "trade_date", "quantity");
+            var headers = Row("quantity_unit", "payment_holiday_key", "trade_date", "quantity");
             var spill = (object[,])Seam.Call("EchoFieldRow", "fixed_float", headers, Row("LOT", "NYFED+LON", 46164.0, 10.0));
             Assert.Equal(2, spill.GetLength(0));
             Assert.Equal(4, spill.GetLength(1));
-            Assert.Equal("payment_calendar_key", spill[0, 1]);
+            Assert.Equal("payment_holiday_key", spill[0, 1]);
             Assert.Equal("LOT", spill[1, 0]);
             Assert.Equal("NYFED+LON", spill[1, 1]);
             Assert.Equal(46164.0, spill[1, 2]);
             Assert.Equal(10.0, spill[1, 3]);
             var date = (string)Seam.Call("_CreateValuationDate", 46276.0, 0.5);
-            Assert.Equal(date, ((object[,])Seam.Call("EchoFieldRow", "fixed_float", Row("payment_calendar_key"), date))[1, 0]);
-            Assert.Equal("#ERROR EchoFieldRow: values cell (1, 1) is number 46023.0, expected text", Seam.Call("EchoFieldRow", "fixed_float", Row("payment_calendar_key"), 46023.0));
+            Assert.Equal(date, ((object[,])Seam.Call("EchoFieldRow", "fixed_float", Row("payment_holiday_key"), date))[1, 0]);
+            Assert.Equal("#ERROR EchoFieldRow: values cell (1, 1) is number 46023.0, expected text", Seam.Call("EchoFieldRow", "fixed_float", Row("payment_holiday_key"), 46023.0));
         }
 
         // A pair of indexes, two-index-fixed-float.md and two-index-one-price.md: A a futures index
@@ -849,7 +854,7 @@ namespace Catalyst.Host.Tests
         [Fact]
         public void a_pair_of_indexes_is_booked_prepared_and_valued_as_one_payment()
         {
-            var a = Index((string)Seam.Call("_CreateFuturesSchedule", Column("F27", "G27", "H27"), Column(46385.0, 46414.0, 46442.0), ExcelMissing.Value), (string)Seam.Call("_CreateHolidayCalendar", 46388.0, ExcelMissing.Value), "A");
+            var a = Index((string)Seam.Call("_CreateFuturesSchedule", Column("F27", "G27", "H27"), Column(46385.0, 46414.0, 46442.0), ExcelMissing.Value), (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0), "A");
             var b = Index((string)Seam.Call("_CreateIfercSchedule", Column("Z26", "F27", "G27", "H27"), Column(46357.0, 46391.0, 46419.0, 46447.0)), ExcelMissing.Value, "B");
             var date = (string)Seam.Call("_CreateValuationDate", 46391.0, 0.5);
             var historyA = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", date, a), (string)Seam.Call("_CreateFuturesFixings", Column(46387.0, 46386.0), Column(3.60, 3.58), a));
@@ -857,8 +862,8 @@ namespace Catalyst.Host.Tests
             var marketA = (string)Seam.Call("_CreateMarket", historyA, (string)Seam.Call("_CreatePriceVector", "A", Column(3.50, 3.60)));
             var marketB = (string)Seam.Call("_CreateMarket", historyB, (string)Seam.Call("_CreatePriceVector", "B", Column(-0.38, -0.40, -0.42)));
             var curves = (string)Seam.Call("_CollectDiscountCurves", (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 } }));
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_calendar_key");
-            var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, (string)Seam.Call("_CreateHolidayCalendar", 46388.0, ExcelMissing.Value)));
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_key");
+            var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0)));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var row = Row(1.0, 46371.0, "G27", 1.0, 3.00);
             var trades = (string)Trades(Column(a, b), headers, row, template);
@@ -919,7 +924,7 @@ namespace Catalyst.Host.Tests
         [Fact]
         public void a_spread_of_two_indexes_is_booked_prepared_and_valued_as_one_net_payment()
         {
-            var a = Index((string)Seam.Call("_CreateFuturesSchedule", Column("F27", "G27", "H27"), Column(46385.0, 46414.0, 46442.0), ExcelMissing.Value), (string)Seam.Call("_CreateHolidayCalendar", 46388.0, ExcelMissing.Value), "A");
+            var a = Index((string)Seam.Call("_CreateFuturesSchedule", Column("F27", "G27", "H27"), Column(46385.0, 46414.0, 46442.0), ExcelMissing.Value), (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0), "A");
             var b = Index((string)Seam.Call("_CreateIfercSchedule", Column("Z26", "F27", "G27", "H27"), Column(46357.0, 46391.0, 46419.0, 46447.0)), ExcelMissing.Value, "B");
             var date = (string)Seam.Call("_CreateValuationDate", 46391.0, 0.5);
             var historyA = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", date, a), (string)Seam.Call("_CreateFuturesFixings", Column(46387.0, 46386.0), Column(3.60, 3.58), a));
@@ -927,10 +932,10 @@ namespace Catalyst.Host.Tests
             var marketA = (string)Seam.Call("_CreateMarket", historyA, (string)Seam.Call("_CreatePriceVector", "A", Column(3.50, 3.60)));
             var marketB = (string)Seam.Call("_CreateMarket", historyB, (string)Seam.Call("_CreatePriceVector", "B", Column(-0.38, -0.40, -0.42)));
             var curves = (string)Seam.Call("_CollectDiscountCurves", (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 } }));
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46388.0, ExcelMissing.Value);
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_calendar_key");
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0);
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_key");
             // Since float-float-units.md every float_float types its spread price's unit: dollars per MMBTU here.
-            var spreadFields = Row("spread_price_currency_unit", "spread_price_quantity_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_calendar_key");
+            var spreadFields = Row("spread_price_currency_unit", "spread_price_quantity_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "float_float", spreadFields, Row("DOLLAR", "MMBTU", "NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "spread_price");
             var row = Row(1.0, 46371.0, "G27", 1.0, 3.80);
@@ -983,7 +988,7 @@ namespace Catalyst.Host.Tests
             Assert.StartsWith("#ERROR _CreateTrades: fields cell (1, 5) is text 'fixed_price', expected a field of float_float: trade_id,", (string)Trades(Column(a, b), Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price"), row, template));
             var pair = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays));
             Assert.StartsWith("#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of fixed_float: trade_id,", (string)Trades(Column(a, b), headers, row, pair));
-            var clearedFields = Row("spread_price_currency_unit", "spread_price_quantity_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
+            var clearedFields = Row("spread_price_currency_unit", "spread_price_quantity_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
             var cleared = (string)Template("_CreateTradeTemplate", "float_float", clearedFields, Row("DOLLAR", "MMBTU", "NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "cleared", "financial", "ICE Clear Europe", 46756.0, holidays));
             Assert.Equal("#ERROR _CreateTrades: ValueError: route is 'cleared', expected 'bilateral' on a float_float; a cleared spread is not built", Trades(Column(a, b), headers, row, cleared));
             Assert.Equal("#ERROR _CreateTrades: ValueError: broker of trade 7 at row 1 is 'ICAP', expected none on a float_float; a brokered spread is not built", Trades(Column(a, b), Row("trade_id", "trade_date", "contract_code", "quantity", "spread_price", "broker"), Row(7.0, 46371.0, "G27", 1.0, 3.80, "ICAP"), template));
@@ -997,7 +1002,7 @@ namespace Catalyst.Host.Tests
             var schedule = Seam.Call("_CreateFuturesSchedule", Column("F27", "G27", "H27"), Column(46385.0, 46414.0, 46442.0), ExcelMissing.Value);
             var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", unit, "DOLLAR", "VOLUME", unit);
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "LOT", lot, unit, 0.0, 0.0 }, { "BBL", 1.0, "BBL", 0.0, 0.0 } });
-            var handle = (string)Seam.Call("_CreateIndex", name, name + " index", schedule, conventions, specifications, holidays, "LOT");
+            var handle = (string)Seam.Call("_CreateIndex", name, name + " index", schedule, conventions, specifications, Key(holidays), "LOT", Calendars());
             Assert.StartsWith(Pid + ":index:" + name + ":", handle);
             return handle;
         }
@@ -1011,7 +1016,7 @@ namespace Catalyst.Host.Tests
         [Fact]
         public void a_crack_prices_two_indexes_of_different_units_at_a_spread_price_in_its_own()
         {
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46388.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0);
             var rb = VolumeIndex("RB", "GAL", 42000.0, holidays);
             var wti = VolumeIndex("WTI", "BBL", 1000.0, holidays);
             var date = (string)Seam.Call("_CreateValuationDate", 46391.0, 0.5);
@@ -1021,7 +1026,7 @@ namespace Catalyst.Host.Tests
             var marketWti = (string)Seam.Call("_CreateMarket", historyWti, (string)Seam.Call("_CreatePriceVector", "WTI", Column(70.00, 71.00)));
             var curves = (string)Seam.Call("_CollectDiscountCurves", (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 } }));
             var rest = new object[] { "BBL", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays };
-            var fields = Row("spread_price_currency_unit", "spread_price_quantity_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_calendar_key");
+            var fields = Row("spread_price_currency_unit", "spread_price_quantity_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_key");
             object[,] Values(params object[] units)
             {
                 var cells = new object[units.Length + rest.Length];
@@ -1069,7 +1074,7 @@ namespace Catalyst.Host.Tests
             var inCents = (object[,])Seam.Call("util_ReadHandle", (string)Trades(Column(rb, wti), headers, Row(1.0, 46371.0, "G27", 1000.0, 1500.0), cents));
             Assert.Equal(-15000.0, (double)inCents[2, Heading(inCents, "offset")], 6);
             // The unit is typed on every float_float, a code of the tables and a unit of the indexes' measure.
-            var unitless = (string)Template("_CreateTradeTemplate", "float_float", Row("spread_price_currency_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_calendar_key"), Values("DOLLAR"));
+            var unitless = (string)Template("_CreateTradeTemplate", "float_float", Row("spread_price_currency_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_key"), Values("DOLLAR"));
             Assert.Equal("#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is missing, expected a value in the template or a column in the ticket", Trades(Column(rb, wti), headers, row, unitless));
             var euros = (string)Template("_CreateTradeTemplate", "float_float", fields, Values("EUR", "BBL"));
             Assert.Equal("#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'EUR', expected DOLLAR or CENT", Trades(Column(rb, wti), headers, row, euros));
@@ -1088,10 +1093,10 @@ namespace Catalyst.Host.Tests
         public void a_closed_physical_contract_past_its_expiry_is_cash_and_an_open_one_is_refused()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46342.0, 46344.0, 46385.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46381.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46381.0);
             var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "LOT", 10000.0, "MMBTU", 10.0, 4.0 }, { "MMBTU", 1.0, "MMBTU", 0.0, 0.0 } });
-            var index = (string)Seam.Call("_CreateIndex", "GAS", "Gas with a contract to close", schedule, conventions, specifications, holidays, "LOT");
+            var index = (string)Seam.Call("_CreateIndex", "GAS", "Gas with a contract to close", schedule, conventions, specifications, Key(holidays), "LOT", Calendars());
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "broker");
             var values = Row("LOT", "month", "monthly", 1.0, "lastday", "cleared", "physical", "ION");
             var housed = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "broker", "clearing_house"), Row("LOT", "month", "monthly", 1.0, "lastday", "cleared", "physical", "ION", "CME Clearing"));
@@ -1200,7 +1205,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("route = bilateral", shown[3, 11]);
             Assert.Equal("second_schedule_method", shown[0, 17]);  // the second leg's one field since two-index-one-price.md
             Assert.Equal("two indexes", shown[3, 17]);
-            Assert.Equal("payment_calendar_key", shown[0, 19]);
+            Assert.Equal("payment_holiday_key", shown[0, 19]);
             Assert.Equal("marketing_reserve", shown[0, 20]);
             Assert.Equal("cva_reserve", shown[0, 21]);  // signed, since cva-reserve.md
             Assert.Equal("settlement_frequency", shown[0, 22]);  // since onetime-averaging.md
@@ -1239,7 +1244,7 @@ namespace Catalyst.Host.Tests
         public void a_batch_of_trades_is_created_from_a_template_and_a_ticket_on_an_index()
         {
             var schedule = Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46323.0, 46351.0, 46385.0), ExcelMissing.Value);
-            var holidays = Seam.Call("_CreateHolidayCalendar", Column(46352.0, 46381.0), ExcelMissing.Value);
+            var holidays = Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46352.0, 46381.0));
             var ng = Index(schedule, holidays, "Henry Hub NYMEX");
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "cleared", "physical", "CME Clearing"));
@@ -1288,10 +1293,10 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _CreateTrades: ValueError: route is supplied by the template and by the ticket, expected by one of them", Trades(ng, Row("trade_date", "contract_code", "quantity", "fixed_price", "route"), Row(46289.0, "Z26", 1.0, 3.0, "cleared"), template));
             Assert.Equal("#ERROR _CreateTrades: ValueError: quantity of trade 1 at row 1 is 2.5, expected a whole number", Trades(ng, headers, Row(1.0, 46289.0, "Z26", 2.5, 3.0), template));
             Assert.Equal("#ERROR _CreateTrades: template is holiday calendar handle '" + holidays + "', expected trade template handle", Trades(ng, headers, rows, holidays));
-            var financial = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key"), Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "cleared", "financial", "TEST", "+2bd", holidays));
+            var financial = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key"), Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "cleared", "financial", "TEST", "+2bd", holidays));
             var strip = (object[,])Seam.Call("util_ReadHandle", (string)Trades(ng, Row("trade_date", "contract_code", "quantity", "fixed_price"), Row(46289.0, "Z26-F27", 3.0, 3.2), financial));
             Assert.Equal(4, strip.GetLength(0));
-            Assert.Equal(24, strip.GetLength(1));  // payment_calendar_key last, since payment-calendar-keys.md
+            Assert.Equal(24, strip.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
             Assert.Equal("payment_date", strip[0, 12]);
             Assert.Equal("+2bd", strip[2, 11]);
             Assert.Equal(46356.0, strip[2, 12]);
@@ -1320,11 +1325,11 @@ namespace Catalyst.Host.Tests
         public void a_onetime_window_is_one_average_one_quantity_and_one_payment()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("K26", "M26", "N26", "Q26", "U26"), Column(46133.0, 46161.0, 46195.0, 46224.0, 46254.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46167.0, 46192.0, 46206.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46167.0, 46192.0, 46206.0));
             var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 } });
-            var index = (string)Seam.Call("_CreateIndex", "CL", "CL index", schedule, conventions, specifications, holidays, "BBL");
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
+            var index = (string)Seam.Call("_CreateIndex", "CL", "CL index", schedule, conventions, specifications, Key(holidays), "BBL", Calendars());
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("BBL", "period", "onetime", 1.0, "asian", "cleared", "financial", "CME Clearing", 46202.0, holidays));
             var headers = Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price");
             var booking = Row(1.0, 46157.0, 46168.0, 46198.0, 2200.0, 71.0);
@@ -1378,15 +1383,15 @@ namespace Catalyst.Host.Tests
         public void a_window_is_quoted_by_its_dates_under_the_templates_frequency()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("K26", "M26", "N26", "Q26", "U26"), Column(46133.0, 46161.0, 46195.0, 46224.0, 46254.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46167.0, 46192.0, 46206.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46167.0, 46192.0, 46206.0));
             var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 } });
-            var index = (string)Seam.Call("_CreateIndex", "CL", "CL index", schedule, conventions, specifications, holidays, "BBL");
+            var index = (string)Seam.Call("_CreateIndex", "CL", "CL index", schedule, conventions, specifications, Key(holidays), "BBL", Calendars());
             var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46135.0, 0.5), index);
             var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46134.0), Column(69.0), index);
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
             var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "CL", Column(69.0, 70.0, 72.0, 74.0)));
-            var fields = Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_calendar_key", "settlement_frequency", "nearby");
+            var fields = Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_holiday_key", "settlement_frequency", "nearby");
             var onetime = (string)Template("_CreateQuoteTemplate", "fixed_float", fields, Row("cleared", "financial", "asian", "period", 46202.0, holidays, "onetime", 1.0));
             var monthly = (string)Template("_CreateQuoteTemplate", "fixed_float", fields, Row("cleared", "financial", "asian", "month", 46202.0, holidays, "monthly", 1.0));
             var window = (double)Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, onetime, "flat", ExcelMissing.Value);
@@ -1396,7 +1401,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal((70.0 + (15 * 70.0 + 3 * 72.0) / 18) / 2, (double)Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, monthly, "ftc", ExcelMissing.Value), 12);
             Assert.Equal(window, (double)Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, onetime, "ftc", ExcelMissing.Value), 12);
             Assert.Equal("#ERROR _QuoteByDates: ValueError: pricing is 'Flat', expected flat or ftc", Seam.Call("_QuoteByDates", market, 46168.0, 46198.0, monthly, "Flat", ExcelMissing.Value));
-            var booking = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
+            var booking = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", booking, Row("BBL", "period", "onetime", 1.0, "asian", "cleared", "financial", "CME Clearing", 46202.0, holidays));
             var trades = (string)Trades(index, Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price"), Row(1.0, 46157.0, 46168.0, 46198.0, 2200.0, window), template);
             var results = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", trades, history), market, ExcelMissing.Value);
@@ -1415,7 +1420,7 @@ namespace Catalyst.Host.Tests
         public void a_batch_is_prepared_evaluated_and_reported()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46167.0);
             var index = Index(schedule, holidays);
             var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46168.0, 0.5), index);
             var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46164.0, 46163.0, 46162.0), Column(71.25, 71.10, 70.85), index);
@@ -1592,78 +1597,70 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results or cashflow results handle: #ERROR _EvaluateTrades: ValueError: x", Seam.Call("_ReportRisk", broken, "all", "day"));
         }
 
-        // Combined holiday calendars, combine-holiday-calendars.md: the ticket's calendars A, listing
-        // 14 October 2026 twice around the 12th, and B, the 13th and the 14th, combine into the 12th,
-        // the 13th and the 14th once each in order, in a column as in a row, one calendar alone into its
-        // own distinct days; from Friday the 9th +1bd is the 15th and +2bd the 16th, from the 15th -1bd
-        // the 9th; a trade anchored on the 9th pays the 15th; the seam's refusals at their cells, and a
-        // failed source carried whole.
+        // A key of two names, holiday-keys.md: the ticket's calendars A, listing 14 October 2026 twice
+        // around the 12th, and B, the 13th and the 14th, joined by a plus sign close the 12th, the 13th
+        // and the 14th, the names in either order; from Friday the 9th +1bd is the 15th and +2bd the
+        // 16th, from the 15th -1bd the 9th, on A alone +1bd the 13th and with no key the 12th; a trade
+        // anchored on the 9th pays the 15th; an index prices on a key of two names; a name the
+        // collection lacks, a key with no collection, a calendar's handle typed as a key, a calendar
+        // where the collection goes and a failed calendar carried whole, each in its owner's words.
         [Fact]
-        public void combined_holiday_calendars_close_every_day_any_source_closes()
+        public void a_key_of_two_names_closes_every_day_either_calendar_closes()
         {
-            var a = (string)Seam.Call("_CreateHolidayCalendar", Column(46309.0, 46307.0, 46309.0), ExcelMissing.Value);
-            var b = (string)Seam.Call("_CreateHolidayCalendar", Column(46308.0, 46309.0), ExcelMissing.Value);
-            var combined = (string)Seam.Call("_CombineHolidayCalendars", Column(a, b));
-            Assert.Matches(@"^\d+:holiday_calendar:\d+$", combined);
-            var days = (object[,])Seam.Call("util_ReadHandle", combined);
-            Assert.Equal(5, days.GetLength(0));
-            Assert.Equal("holiday", days[0, 0]);
-            Assert.Equal(46307.0, days[2, 0]);
-            Assert.Equal(46308.0, days[3, 0]);
-            Assert.Equal(46309.0, days[4, 0]);
-            var inRow = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CombineHolidayCalendars", Row(b, a)));
-            Assert.Equal(days, inRow);
-            var alone = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CombineHolidayCalendars", a));
-            Assert.Equal(4, alone.GetLength(0));
-            Assert.Equal(46307.0, alone[2, 0]);
-            Assert.Equal(46309.0, alone[3, 0]);
-            Assert.Equal(46310.0, Seam.Call("util_ShiftDate", 46304.0, "+1bd", combined));
-            Assert.Equal(46311.0, Seam.Call("util_ShiftDate", 46304.0, "+2bd", combined));
-            Assert.Equal(46304.0, Seam.Call("util_ShiftDate", 46310.0, "-1bd", combined));
-            Assert.Equal(46308.0, Seam.Call("util_ShiftDate", 46304.0, "+1bd", a));
+            var a = (string)Seam.Call("_CreateHolidayCalendar", "UNION_A", Column(46309.0, 46307.0, 46309.0));
+            var b = (string)Seam.Call("_CreateHolidayCalendar", "UNION_B", Column(46308.0, 46309.0));
+            var both = (string)Seam.Call("_CollectHolidayCalendars", Column(a, b));
+            Assert.Equal(46310.0, Seam.Call("util_ShiftDate", 46304.0, "+1bd", "UNION_A+UNION_B", both));
+            Assert.Equal(46310.0, Seam.Call("util_ShiftDate", 46304.0, "+1bd", "UNION_B+UNION_A", both));
+            Assert.Equal(46311.0, Seam.Call("util_ShiftDate", 46304.0, "+2bd", "UNION_A+UNION_B", both));
+            Assert.Equal(46304.0, Seam.Call("util_ShiftDate", 46310.0, "-1bd", "UNION_A+UNION_B", both));
+            Assert.Equal(46308.0, Seam.Call("util_ShiftDate", 46304.0, "+1bd", "UNION_A", both));
+            Assert.Equal(46307.0, Seam.Call("util_ShiftDate", 46304.0, "+1bd", ExcelMissing.Value, both));
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("U26", "V26", "X26"), Column(46261.0, 46293.0, 46304.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 47484.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 47484.0);
             var anchored = Index(schedule, holidays, "ANCHORED");
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
-            var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "cleared", "financial", "Prototype Clearing", "+1bd", combined));
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "cleared", "financial", "Prototype Clearing", "+1bd", "UNION_A+UNION_B"));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
-            var trade = (object[,])Seam.Call("util_ReadHandle", (string)Trades(anchored, headers, Row(4001.0, 46296.0, "X26", 1.0, 3.0), template));
+            var trade = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", anchored, headers, Row(4001.0, 46296.0, "X26", 1.0, 3.0), template, both));
             Assert.Equal("payment_date", trade[0, 13]);
             Assert.Equal(46310.0, trade[2, 13]);
-            Assert.Equal("#ERROR _CombineHolidayCalendars: calendar_handles is 2x2 array, expected one cell, one row or one column of holiday calendar handles", Seam.Call("_CombineHolidayCalendars", new object[,] { { a, b }, { b, a } }));
-            Assert.Equal("#ERROR _CombineHolidayCalendars: calendar_handles cell (2, 1) is blank, expected holiday calendar handle", Seam.Call("_CombineHolidayCalendars", Column(a, ExcelEmpty.Value)));
-            Assert.Equal("#ERROR _CombineHolidayCalendars: calendar_handles cell (1, 2) is number 46307.0, expected holiday calendar handle", Seam.Call("_CombineHolidayCalendars", Row(a, 46307.0)));
-            Assert.Equal($"#ERROR _CombineHolidayCalendars: calendar_handles cell (2, 1) is futures schedule handle '{schedule}', expected holiday calendar handle", Seam.Call("_CombineHolidayCalendars", Column(a, schedule)));
-            Assert.Equal("#ERROR _CombineHolidayCalendars: calendar_handles is text 'x' naming no live object, expected holiday calendar handle", Seam.Call("_CombineHolidayCalendars", "x"));
-            Assert.Equal("#ERROR _CombineHolidayCalendars: calendar_handles is missing, expected holiday calendar handles in a cell, a row or a column", Seam.Call("_CombineHolidayCalendars", ExcelMissing.Value));
-            var failed = (string)Seam.Call("_CreateHolidayCalendar", Column(46023.0, ExcelEmpty.Value), ExcelMissing.Value);
-            var broken = (string)Seam.Call("_CombineHolidayCalendars", Column(a, failed));
-            Assert.Equal($"#ERROR _CombineHolidayCalendars: calendar_handles cell (2, 1) is the creator's failure, expected holiday calendar handle: {failed}", broken);
-            Assert.Equal($"#ERROR util_ShiftDate: holiday_calendar is the creator's failure, expected holiday calendar handle: {failed}", Seam.Call("util_ShiftDate", 46304.0, "+1bd", broken));
+            var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
+            var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0 } });
+            var keyed = (string)Seam.Call("_CreateIndex", "KEYED", "An index on a key of two names", schedule, conventions, specifications, "UNION_B+UNION_A", ExcelMissing.Value, both);
+            Assert.StartsWith(Pid + ":index:KEYED:", keyed);
+            Assert.Equal(true, ((object[,])Seam.Call("util_ReadHandle", keyed))[2, 5]);
+            Assert.Equal("#ERROR _CreateIndex: ValueError: holiday_key is missing, expected a holiday calendar's key with a futures schedule", Seam.Call("_CreateIndex", "KEYED", "An index with no key", schedule, conventions, specifications, ExcelMissing.Value, ExcelMissing.Value, both));
+            Assert.Equal("#ERROR util_ShiftDate: ValueError: holiday_key is 'UNION_A+UNION_C', expected names of the collection's calendars, 'UNION_A' and 'UNION_B'; it holds no 'UNION_C'", Seam.Call("util_ShiftDate", 46304.0, "+1bd", "UNION_A+UNION_C", both));
+            Assert.Equal("#ERROR util_ShiftDate: ValueError: holiday_key is 'UNION_A + UNION_B', expected a calendar's name, or several joined by '+', each with no whitespace around it", Seam.Call("util_ShiftDate", 46304.0, "+1bd", "UNION_A + UNION_B", both));
+            Assert.Equal("#ERROR util_ShiftDate: ValueError: holiday_calendars is missing, expected a _CollectHolidayCalendars collection, which holiday_key selects a calendar from", Seam.Call("util_ShiftDate", 46304.0, "+1bd", "UNION_A", ExcelMissing.Value));
+            Assert.Equal($"#ERROR util_ShiftDate: ValueError: holiday_key is '{a}', expected names of the collection's calendars, 'UNION_A' and 'UNION_B'; it holds no '{a}'", Seam.Call("util_ShiftDate", 46304.0, "+1bd", a, both));
+            Assert.Equal($"#ERROR util_ShiftDate: holiday_calendars is holiday calendar handle '{a}', expected holiday calendars handle", Seam.Call("util_ShiftDate", 46304.0, "+1bd", "UNION_A", a));
+            var failed = (string)Seam.Call("_CreateHolidayCalendar", "BROKEN", Column(46023.0, ExcelEmpty.Value));
+            var broken = (string)Seam.Call("_CollectHolidayCalendars", Column(a, failed));
+            Assert.Equal($"#ERROR _CollectHolidayCalendars: calendar_handles cell (2, 1) is the creator's failure, expected holiday calendar handle: {failed}", broken);
+            Assert.Equal($"#ERROR util_ShiftDate: holiday_calendars is the creator's failure, expected holiday calendars handle: {failed}", Seam.Call("util_ShiftDate", 46304.0, "+1bd", "UNION_A", broken));
         }
 
-        // Named holiday calendars and their collection, payment-calendar-keys.md: a calendar made
-        // under a name shows it in its handle and beside each day of its readback, one made without
-        // is as it was; two named calendars collect in the order given, each name and its count of
-        // days read back; a member with no name, a name twice and a name no key could select are
-        // refused in the library's words, a wrong kind and a name that is no text in the seam's.
+        // Holiday calendars and their collection, holiday-keys.md: a calendar is made under its name,
+        // the first argument, and shows it in its handle and beside each day of its readback; two
+        // calendars collect in the order given, each name and its count of days read back; a name
+        // twice and a name no key could select are refused in the library's words, a name left out,
+        // a wrong kind and a name that is no text in the seam's.
         [Fact]
         public void named_holiday_calendars_collect_each_name_once()
         {
-            var a = (string)Seam.Call("_CreateHolidayCalendar", Column(46352.0), "PAY_A");
-            var b = (string)Seam.Call("_CreateHolidayCalendar", Column(46353.0, 46356.0), "PAY_B");
-            var plain = (string)Seam.Call("_CreateHolidayCalendar", Column(46352.0), ExcelMissing.Value);
+            var a = (string)Seam.Call("_CreateHolidayCalendar", "PAY_A", Column(46352.0));
+            var b = (string)Seam.Call("_CreateHolidayCalendar", "PAY_B", Column(46353.0, 46356.0));
             Assert.Matches(@"^\d+:holiday_calendar:PAY_A:\d+$", a);
-            Assert.Matches(@"^\d+:holiday_calendar:\d+$", plain);
             var named = (object[,])Seam.Call("util_ReadHandle", b);
             Assert.Equal(4, named.GetLength(0));
             Assert.Equal(2, named.GetLength(1));
             Assert.Equal("name", named[0, 1]);
             Assert.Equal(46356.0, named[3, 0]);
             Assert.Equal("PAY_B", named[3, 1]);
-            Assert.Equal(1, ((object[,])Seam.Call("util_ReadHandle", plain)).GetLength(1));
-            var collection = (string)Seam.Call("_CollectPaymentCalendars", Column(a, b));
-            Assert.Matches(@"^\d+:payment_calendars:\d+$", collection);
+            var collection = (string)Seam.Call("_CollectHolidayCalendars", Column(a, b));
+            Assert.Matches(@"^\d+:holiday_calendars:\d+$", collection);
             var spill = (object[,])Seam.Call("util_ReadHandle", collection);
             Assert.Equal(4, spill.GetLength(0));
             Assert.Equal("name", spill[0, 0]);
@@ -1672,15 +1669,16 @@ namespace Catalyst.Host.Tests
             Assert.Equal(1.0, spill[2, 1]);
             Assert.Equal("PAY_B", spill[3, 0]);
             Assert.Equal(2.0, spill[3, 1]);
-            var inRow = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CollectPaymentCalendars", Row(b, a)));
+            var inRow = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CollectHolidayCalendars", Row(b, a)));
             Assert.Equal("PAY_B", inRow[2, 0]);
-            Assert.Equal("#ERROR _CollectPaymentCalendars: ValueError: calendar_handles cell 2 is a calendar with no name, expected one made with a name, the word a payment calendar key selects it by", Seam.Call("_CollectPaymentCalendars", Column(a, plain)));
-            Assert.Equal("#ERROR _CollectPaymentCalendars: ValueError: calendar_handles cell 1 and cell 2 are both named 'PAY_A', expected each name once", Seam.Call("_CollectPaymentCalendars", Column(a, a)));
-            Assert.Equal("#ERROR _CollectPaymentCalendars: calendar_handles cell (2, 1) is blank, expected holiday calendar handle", Seam.Call("_CollectPaymentCalendars", Column(a, ExcelEmpty.Value)));
-            Assert.Equal("#ERROR _CollectPaymentCalendars: calendar_handles is missing, expected holiday calendar handles in a cell, a row or a column", Seam.Call("_CollectPaymentCalendars", ExcelMissing.Value));
-            Assert.Equal("#ERROR _CreateHolidayCalendar: ValueError: name is 'PAY_A+PAY_B', expected a name without '+', which joins names in a key", Seam.Call("_CreateHolidayCalendar", Column(46352.0), "PAY_A+PAY_B"));
-            Assert.Equal("#ERROR _CreateHolidayCalendar: ValueError: name is ' PAY_A', expected a name with no whitespace around it", Seam.Call("_CreateHolidayCalendar", Column(46352.0), " PAY_A"));
-            Assert.Equal("#ERROR _CreateHolidayCalendar: name is number 7.0, expected text", Seam.Call("_CreateHolidayCalendar", Column(46352.0), 7.0));
+            Assert.Equal("#ERROR _CreateHolidayCalendar: name is missing, expected text", Seam.Call("_CreateHolidayCalendar", ExcelMissing.Value, Column(46352.0)));
+            Assert.Equal("#ERROR _CreateHolidayCalendar: name is 1x1 array, expected text", Seam.Call("_CreateHolidayCalendar", Column(46352.0), "PAY_A"));
+            Assert.Equal("#ERROR _CollectHolidayCalendars: ValueError: calendar_handles cell 1 and cell 2 are both named 'PAY_A', expected each name once", Seam.Call("_CollectHolidayCalendars", Column(a, a)));
+            Assert.Equal("#ERROR _CollectHolidayCalendars: calendar_handles cell (2, 1) is blank, expected holiday calendar handle", Seam.Call("_CollectHolidayCalendars", Column(a, ExcelEmpty.Value)));
+            Assert.Equal("#ERROR _CollectHolidayCalendars: calendar_handles is missing, expected holiday calendar handles in a cell, a row or a column", Seam.Call("_CollectHolidayCalendars", ExcelMissing.Value));
+            Assert.Equal("#ERROR _CreateHolidayCalendar: ValueError: name is 'PAY_A+PAY_B', expected a name without '+', which joins names in a key", Seam.Call("_CreateHolidayCalendar", "PAY_A+PAY_B", Column(46352.0)));
+            Assert.Equal("#ERROR _CreateHolidayCalendar: ValueError: name is ' PAY_A', expected a name with no whitespace around it", Seam.Call("_CreateHolidayCalendar", " PAY_A", Column(46352.0)));
+            Assert.Equal("#ERROR _CreateHolidayCalendar: name is number 7.0, expected text", Seam.Call("_CreateHolidayCalendar", 7.0, Column(46352.0)));
         }
 
         // A payment calendar chosen by key, payment-calendar-keys.md, the creators called with their
@@ -1694,13 +1692,13 @@ namespace Catalyst.Host.Tests
         public void a_payment_calendar_is_chosen_by_key_from_a_collection()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46323.0, 46351.0, 46385.0), ExcelMissing.Value);
-            var payA = (string)Seam.Call("_CreateHolidayCalendar", Column(46352.0), "PAY_A");
-            var payB = (string)Seam.Call("_CreateHolidayCalendar", Column(46353.0, 46356.0), "PAY_B");
-            var calendars = (string)Seam.Call("_CollectPaymentCalendars", Column(payA, payB));
+            var payA = (string)Seam.Call("_CreateHolidayCalendar", "PAY_A", Column(46352.0));
+            var payB = (string)Seam.Call("_CreateHolidayCalendar", "PAY_B", Column(46353.0, 46356.0));
+            var calendars = (string)Seam.Call("_CollectHolidayCalendars", Column(payA, payB));
             var index = Index(schedule, payA, "KEYED");
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "cleared", "financial", "TEST", "+2bd"));
-            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "payment_calendar_key");
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "payment_holiday_key");
             var rows = new object[,] { { 1.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A" }, { 2.0, 46289.0, "Z26", 1.0, 3.0, "PAY_B" }, { 3.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A+PAY_B" }, { 4.0, 46289.0, "Z26", 1.0, 3.0, "PAY_B+PAY_A" } };
             var trades = (string)Seam.Call("_CreateTrades", index, headers, rows, template, calendars);
             Assert.StartsWith(Pid + ":trades:KEYED:", trades);
@@ -1711,24 +1709,24 @@ namespace Catalyst.Host.Tests
             Assert.Equal(46357.0, spill[3, paid]);
             Assert.Equal(46358.0, spill[4, paid]);
             Assert.Equal(46358.0, spill[5, paid]);
-            Assert.Equal("payment_calendar_key", spill[0, last]);
+            Assert.Equal("payment_holiday_key", spill[0, last]);
             Assert.Equal("str", spill[1, last]);
             Assert.Equal("PAY_A", spill[2, last]);
             Assert.Equal("PAY_B+PAY_A", spill[5, last]);
             var dated = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "cleared", "financial", "TEST", 46361.0));
             var onTheDate = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", index, headers, Row(1.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A+PAY_B"), dated, calendars));
             Assert.Equal(46361.0, onTheDate[2, Heading(onTheDate, "payment_date")]);  // Saturday 5 December 2026, as entered
-            Assert.Equal("#ERROR _CreateTrades: ValueError: payment_calendar_key row 1 is 'PAY_C', expected names of the collection's calendars, 'PAY_A' and 'PAY_B'; it holds no 'PAY_C'", Seam.Call("_CreateTrades", index, headers, Row(1.0, 46289.0, "Z26", 1.0, 3.0, "PAY_C"), dated, calendars));
-            Assert.Equal("#ERROR _CreateTrades: ValueError: payment_calendar_key row 2 is 'PAY_A+PAY_C', expected names of the collection's calendars, 'PAY_A' and 'PAY_B'; it holds no 'PAY_C'", Seam.Call("_CreateTrades", index, headers, new object[,] { { 1.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A" }, { 2.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A+PAY_C" } }, template, calendars));
-            Assert.Equal("#ERROR _CreateTrades: ValueError: payment_calendar_key row 1 is 'PAY_A+', expected a calendar's name, or several joined by '+'; a name is missing", Seam.Call("_CreateTrades", index, headers, Row(1.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A+"), template, calendars));
-            Assert.Equal("#ERROR _CreateTrades: ValueError: payment_calendars is missing, expected a _CollectPaymentCalendars collection, which a financially settled batch selects its payment calendar from", Seam.Call("_CreateTrades", index, headers, Row(1.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A"), template, ExcelMissing.Value));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: payment_holiday_key row 1 is 'PAY_C', expected names of the collection's calendars, 'PAY_A' and 'PAY_B'; it holds no 'PAY_C'", Seam.Call("_CreateTrades", index, headers, Row(1.0, 46289.0, "Z26", 1.0, 3.0, "PAY_C"), dated, calendars));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: payment_holiday_key row 2 is 'PAY_A+PAY_C', expected names of the collection's calendars, 'PAY_A' and 'PAY_B'; it holds no 'PAY_C'", Seam.Call("_CreateTrades", index, headers, new object[,] { { 1.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A" }, { 2.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A+PAY_C" } }, template, calendars));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: payment_holiday_key row 1 is 'PAY_A+', expected a calendar's name, or several joined by '+'; a name is missing", Seam.Call("_CreateTrades", index, headers, Row(1.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A+"), template, calendars));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: holiday_calendars is missing, expected a _CollectHolidayCalendars collection, which a financially settled batch selects a calendar from", Seam.Call("_CreateTrades", index, headers, Row(1.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A"), template, ExcelMissing.Value));
             Assert.Equal("#ERROR _CreateTrades: trade_rows cell (1, 6) is blank, expected text", Seam.Call("_CreateTrades", index, headers, Row(1.0, 46289.0, "Z26", 1.0, 3.0, ExcelEmpty.Value), template, calendars));
-            Assert.Equal($"#ERROR _CreateTrades: payment_calendars is holiday calendar handle '{payA}', expected payment calendars handle", Seam.Call("_CreateTrades", index, headers, Row(1.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A"), template, payA));
-            var quoted = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", Row("payment_calendar_key"), "PAY_B+PAY_A", calendars);
+            Assert.Equal($"#ERROR _CreateTrades: holiday_calendars is holiday calendar handle '{payA}', expected holiday calendars handle", Seam.Call("_CreateTrades", index, headers, Row(1.0, 46289.0, "Z26", 1.0, 3.0, "PAY_A"), template, payA));
+            var quoted = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", Row("payment_holiday_key"), "PAY_B+PAY_A", calendars);
             Assert.StartsWith(Pid + ":quote_template:", quoted);
             Assert.Equal("PAY_B+PAY_A", ((object[,])Seam.Call("util_ReadHandle", quoted))[2, 1]);
-            Assert.Equal("#ERROR _CreateQuoteTemplate: ValueError: payment_calendar_key is 'TOK', expected names of the collection's calendars, 'PAY_A' and 'PAY_B'; it holds no 'TOK'", Seam.Call("_CreateQuoteTemplate", "fixed_float", Row("payment_calendar_key"), "TOK", calendars));
-            Assert.Equal("#ERROR _CreateQuoteTemplate: ValueError: payment_calendars is missing, expected a _CollectPaymentCalendars collection, which payment_calendar_key selects its payment calendar from", Seam.Call("_CreateQuoteTemplate", "fixed_float", Row("payment_calendar_key"), "PAY_A", ExcelMissing.Value));
+            Assert.Equal("#ERROR _CreateQuoteTemplate: ValueError: payment_holiday_key is 'TOK', expected names of the collection's calendars, 'PAY_A' and 'PAY_B'; it holds no 'TOK'", Seam.Call("_CreateQuoteTemplate", "fixed_float", Row("payment_holiday_key"), "TOK", calendars));
+            Assert.Equal("#ERROR _CreateQuoteTemplate: ValueError: holiday_calendars is missing, expected a _CollectHolidayCalendars collection, which payment_holiday_key selects a calendar from", Seam.Call("_CreateQuoteTemplate", "fixed_float", Row("payment_holiday_key"), "PAY_A", ExcelMissing.Value));
         }
 
         // A half-year strip, half-year-strips.md: on an index of nine months, X26 the boundary and N27
@@ -1739,9 +1737,9 @@ namespace Catalyst.Host.Tests
         public void a_half_year_strip_resolves_to_its_six_months_as_the_strip_of_them_does()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27", "H27", "J27", "K27", "M27", "N27"), Column(46351.0, 46385.0, 46414.0, 46442.0, 46475.0, 46505.0, 46533.0, 46566.0, 46596.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 47484.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 47484.0);
             var half = Index(schedule, holidays, "HALF");
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", holidays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var one = (object[,])Seam.Call("util_ReadHandle", (string)Trades(half, headers, Row(3001.0, 46357.0, "1h27", 1.0, 3.0), template));
@@ -1781,16 +1779,16 @@ namespace Catalyst.Host.Tests
         public void a_quote_prices_the_tickets_strip_cleared_and_bilateral()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("Z26", "F27", "G27"), Column(46371.0, 46416.0, 46444.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46388.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0);
             var index = Index(schedule, holidays, "STRIP");
             var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46387.0, 0.5), index);
             var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46386.0, 46385.0, 46384.0, 46381.0, 46380.0, 46379.0, 46378.0, 46377.0, 46374.0, 46373.0, 46372.0), Column(3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0), index);
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
             var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "STRIP", Column(30.0, 60.0)));
-            var weekends = (string)Seam.Call("_CreateHolidayCalendar", 47484.0, ExcelMissing.Value);
-            var fields = Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_calendar_key", "discount_curve_key", "settlement_frequency", "nearby");
+            var weekends = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 47484.0);
+            var fields = Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_holiday_key", "discount_curve_key", "settlement_frequency", "nearby");
             var otc = (string)Template("_CreateQuoteTemplate", "fixed_float", fields, Row("bilateral", "financial", "asian", "month", "+1bd", weekends, "SOFR", "monthly", 1.0));
-            var cleared = (string)Template("_CreateQuoteTemplate", "fixed_float", Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_calendar_key", "settlement_frequency", "nearby"), Row("cleared", "financial", "asian", "calday", "+1bd", weekends, "monthly", 1.0));
+            var cleared = (string)Template("_CreateQuoteTemplate", "fixed_float", Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_holiday_key", "settlement_frequency", "nearby"), Row("cleared", "financial", "asian", "calday", "+1bd", weekends, "monthly", 1.0));
             Assert.StartsWith(Pid + ":quote_template:", otc);
             var sofr = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46387.0, 1.0 }, { 46419.0, 0.99 }, { 46447.0, 0.98 } });
             var rates = (string)Seam.Call("_CollectDiscountCurves", sofr);
@@ -1840,16 +1838,16 @@ namespace Catalyst.Host.Tests
         public void a_request_for_quote_is_saved_and_priced_on_the_strip()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("Z26", "F27", "G27"), Column(46371.0, 46416.0, 46444.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46388.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0);
             var index = Index(schedule, holidays, "STRIP");
             var date = (string)Seam.Call("_CreateValuationDate", 46387.0, 0.5);
             var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46386.0, 46385.0, 46384.0, 46381.0, 46380.0, 46379.0, 46378.0, 46377.0, 46374.0, 46373.0, 46372.0), Column(3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0), index);
             var history = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", date, index), fixings);
             var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "STRIP", Column(30.0, 60.0)));
-            var weekends = (string)Seam.Call("_CreateHolidayCalendar", 47484.0, ExcelMissing.Value);
-            var fields = Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_calendar_key", "discount_curve_key", "settlement_frequency", "nearby");
+            var weekends = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 47484.0);
+            var fields = Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_holiday_key", "discount_curve_key", "settlement_frequency", "nearby");
             var otc = (string)Template("_CreateQuoteTemplate", "fixed_float", fields, Row("bilateral", "financial", "asian", "month", "+1bd", weekends, "SOFR", "monthly", 1.0));
-            var cleared = (string)Template("_CreateQuoteTemplate", "fixed_float", Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_calendar_key", "settlement_frequency", "nearby"), Row("cleared", "financial", "asian", "calday", "+1bd", weekends, "monthly", 1.0));
+            var cleared = (string)Template("_CreateQuoteTemplate", "fixed_float", Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_holiday_key", "settlement_frequency", "nearby"), Row("cleared", "financial", "asian", "calday", "+1bd", weekends, "monthly", 1.0));
             var sofr = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46387.0, 1.0 }, { 46419.0, 0.99 }, { 46447.0, 0.98 } });
             var rates = (string)Seam.Call("_CollectDiscountCurves", sofr);
             var byCode = Row("contract_code", "quantity");
@@ -1960,11 +1958,11 @@ namespace Catalyst.Host.Tests
         public void a_payment_day_is_a_date_or_a_rule_and_reads_back_as_entered()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46323.0, 46351.0, 46416.0, 46444.0), ExcelMissing.Value);
-            var weekends = (string)Seam.Call("_CreateHolidayCalendar", 47484.0, ExcelMissing.Value);
+            var weekends = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 47484.0);
             var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "MMBTU", 1.0, "MMBTU", 0.0, 0.0 } });
-            var index = (string)Seam.Call("_CreateIndex", "SYN", "Synthetic gas index for the payment-day example", schedule, conventions, specifications, weekends, "MMBTU");
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_calendar_key");
+            var index = (string)Seam.Call("_CreateIndex", "SYN", "Synthetic gas index for the payment-day example", schedule, conventions, specifications, Key(weekends), "MMBTU", Calendars());
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("MMBTU", "month", "monthly", 1.0, "lastday", "bilateral", "financial", "ACME Trading", "SOFR", weekends));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "payment_day");
             var rows = new object[,] { { 1001.0, 46371.0, "F27", 10000.0, 2.65, "+2bd" }, { 1002.0, 46371.0, "F27", 10000.0, 2.65, 46443.0 } };
@@ -2009,19 +2007,19 @@ namespace Catalyst.Host.Tests
         public void a_penultimate_batch_observes_the_day_before_expiry_and_pays_after_it()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46167.0);
             var index = Index(schedule, holidays);
             var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46168.0, 0.5), index);
             var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46164.0, 46163.0, 46162.0), Column(71.25, 71.10, 70.85), index);
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
             var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.10, 72.80)));
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "penultimate", "cleared", "financial", "ICE Clear Europe", "+1bd", holidays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var rows = new object[,] { { 1.0, 46153.0, "n26", 2.0, 70.0 }, { 2.0, 46153.0, "q26", -1.0, 72.0 } };
             var trades = (string)Trades(index, headers, rows, template);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
-            Assert.Equal(25, spill.GetLength(1));  // payment_calendar_key last, since payment-calendar-keys.md
+            Assert.Equal(25, spill.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
             Assert.Equal("penultimate", spill[2, 4]);
             Assert.Equal("payment_date", spill[0, 13]);
             Assert.Equal(46195.0, spill[2, 13]);
@@ -2053,12 +2051,12 @@ namespace Catalyst.Host.Tests
         public void a_last3day_batch_observes_three_days_a_third_each_and_pays_after_the_last()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46356.0, 46363.0, 46394.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46360.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46360.0);
             var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), Row("UNIT", 1.0, "MMBTU", 0.0, 0.0));
-            var index = (string)Seam.Call("_CreateIndex", "SYN", "Synthetic gas index for the last3day example", schedule, conventions, specifications, holidays, "UNIT");
-            var weekdays = (string)Seam.Call("_CreateHolidayCalendar", 46023.0, ExcelMissing.Value);
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
+            var index = (string)Seam.Call("_CreateIndex", "SYN", "Synthetic gas index for the last3day example", schedule, conventions, specifications, Key(holidays), "UNIT", Calendars());
+            var weekdays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46023.0);
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("UNIT", "month", "monthly", 1.0, "last3day", "cleared", "financial", "Prototype Clearing", "+2bd", weekdays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var rows = new object[,] { { 1.0, 46346.0, "Z26", 60.0, 70.0 }, { 2.0, 46346.0, "Z26", -30.0, 72.0 } };
@@ -2107,12 +2105,12 @@ namespace Catalyst.Host.Tests
         public void an_asian_batch_observes_every_pricing_day_of_its_month_and_pays_after_the_last()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46356.0, 46387.0, 46416.0, 46444.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46381.0, 46388.0));
             var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "GAL", "DOLLAR", "VOLUME", "GAL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), Row("GAL", 1.0, "GAL", 0.0, 0.0));
-            var index = (string)Seam.Call("_CreateIndex", "ETHANE", "Ethane - synthetic volume index", schedule, conventions, specifications, holidays, "GAL");
-            var payments = (string)Seam.Call("_CreateHolidayCalendar", 46388.0, ExcelMissing.Value);
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
+            var index = (string)Seam.Call("_CreateIndex", "ETHANE", "Ethane - synthetic volume index", schedule, conventions, specifications, Key(holidays), "GAL", Calendars());
+            var payments = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0);
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("GAL", "month", "monthly", 1.0, "asian", "cleared", "financial", "Prototype Clearing", "+2bd", payments));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var rows = new object[,] { { 1.0, 46346.0, "Z26", 4400.0, 0.25 }, { 2.0, 46346.0, "Z26", -2200.0, 0.26 } };
@@ -2159,7 +2157,7 @@ namespace Catalyst.Host.Tests
         public void a_calday_batch_holds_the_entered_quantity_times_the_days_its_month_covers()
         {
             var schedule = Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46323.0, 46351.0, 46385.0), ExcelMissing.Value);
-            var holidays = Seam.Call("_CreateHolidayCalendar", Column(46352.0, 46381.0), ExcelMissing.Value);
+            var holidays = Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46352.0, 46381.0));
             var ng = Index(schedule, holidays, "Henry Hub NYMEX");
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "calday", "monthly", 1.0, "lastday", "cleared", "physical", "CME Clearing"));
@@ -2198,12 +2196,12 @@ namespace Catalyst.Host.Tests
         public void a_batch_booked_by_dates_covers_its_days_and_values_beside_the_coded_one()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46356.0, 46387.0, 46416.0, 46444.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46381.0, 46388.0));
             var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "GAL", "DOLLAR", "VOLUME", "GAL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), Row("GAL", 1.0, "GAL", 0.0, 0.0));
-            var index = (string)Seam.Call("_CreateIndex", "ETHANE", "Ethane - synthetic volume index", schedule, conventions, specifications, holidays, "GAL");
-            var payments = (string)Seam.Call("_CreateHolidayCalendar", 46388.0, ExcelMissing.Value);
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
+            var index = (string)Seam.Call("_CreateIndex", "ETHANE", "Ethane - synthetic volume index", schedule, conventions, specifications, Key(holidays), "GAL", Calendars());
+            var payments = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0);
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("GAL", "month", "monthly", 1.0, "asian", "cleared", "financial", "Prototype Clearing", "+2bd", payments));
             var midDecember = (string)Seam.Call("_CreateValuationDate", 46371.0, 0.5);  // the helpers take the handle since #173
             var start = (double)Seam.Call("util_StartDate", "BALZ26", midDecember);
@@ -2214,7 +2212,7 @@ namespace Catalyst.Host.Tests
             var rows = new object[,] { { 16.0, 46346.0, start, end, 2000.0, 0.25 }, { 17.0, 46346.0, first, last, 2200.0, 0.25 } };
             var trades = (string)Trades(index, headers, rows, template);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
-            Assert.Equal(25, spill.GetLength(1));  // payment_calendar_key last, since payment-calendar-keys.md
+            Assert.Equal(25, spill.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
             Assert.Equal("Z26", spill[2, 3]);
             Assert.Equal("start_date", spill[0, 15]);
             Assert.Equal(46371.0, spill[2, 15]);
@@ -2251,11 +2249,11 @@ namespace Catalyst.Host.Tests
         public void two_payment_days_on_one_contract_are_two_groups_each_paid_on_its_own_day()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46356.0, 46360.0, 46395.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46023.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46023.0);
             var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), Row("UNIT", 1.0, "MMBTU", 0.0, 0.0));
-            var index = (string)Seam.Call("_CreateIndex", "PAYS", "Synthetic gas index for the payment-groups example", schedule, conventions, specifications, holidays, "UNIT");
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_calendar_key");
+            var index = (string)Seam.Call("_CreateIndex", "PAYS", "Synthetic gas index for the payment-groups example", schedule, conventions, specifications, Key(holidays), "UNIT", Calendars());
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("UNIT", "month", "monthly", 1.0, "last3day", "cleared", "financial", "Prototype Clearing", holidays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "payment_day");
             var rows = new object[,] { { 1.0, 46356.0, "Z26", 60.0, 70.0, "+1bd" }, { 2.0, 46356.0, "Z26", -30.0, 72.0, "+3bd" } };
@@ -2340,12 +2338,12 @@ namespace Catalyst.Host.Tests
         public void a_mixed_batch_values_each_row_by_its_own_unit_basis_and_method()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46356.0, 46387.0, 46416.0, 46444.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46381.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46381.0);
             var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "GAL", "DOLLAR", "VOLUME", "GAL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "GAL", 1.0, "GAL", 0.0, 0.0 }, { "BBL", 1.0, "BBL", 0.0, 0.0 } });
-            var index = (string)Seam.Call("_CreateIndex", "MIXED", "Synthetic volume index for the mixed-fields example", schedule, conventions, specifications, holidays, "GAL");
-            var payments = (string)Seam.Call("_CreateHolidayCalendar", 46388.0, ExcelMissing.Value);
-            var fields = Row("route", "settlement_method", "trade_date", "fixed_price", "payment_day", "payment_calendar_key", "settlement_frequency", "nearby");
+            var index = (string)Seam.Call("_CreateIndex", "MIXED", "Synthetic volume index for the mixed-fields example", schedule, conventions, specifications, Key(holidays), "GAL", Calendars());
+            var payments = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0);
+            var fields = Row("route", "settlement_method", "trade_date", "fixed_price", "payment_day", "payment_holiday_key", "settlement_frequency", "nearby");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("cleared", "financial", 46356.0, 10.0, "+1bd", payments, "monthly", 1.0));
             var headers = Row("trade_id", "contract_code", "quantity", "quantity_unit", "quantity_per", "schedule_method", "clearing_house");
             var rows = new object[,] { { 1.0, "Z26", 1.0, "BBL", "month", "lastday", "Clearer A" }, { 2.0, "Z26", -2.0, "GAL", "calday", "penultimate", "Clearer B" }, { 3.0, "Z26", 3.0, "BBL", "month", "last3day", "Clearer A" }, { 4.0, "Z26", 22.0, "GAL", "month", "asian", "Clearer B" } };
@@ -2392,11 +2390,11 @@ namespace Catalyst.Host.Tests
             var risk = (object[,])Seam.Call("_ReportRisk", paid, "nominal_delta", "year");
             Assert.Equal(85.0, (double)risk[3, 1], 6);
             Assert.Equal("MIXED nominal_delta [GAL]", risk[1, 1]);
-            var withMethod = (string)Template("_CreateTradeTemplate", "fixed_float", Row("route", "settlement_method", "trade_date", "fixed_price", "payment_day", "payment_calendar_key", "schedule_method"), Row("cleared", "financial", 46356.0, 10.0, "+1bd", payments, "lastday"));
+            var withMethod = (string)Template("_CreateTradeTemplate", "fixed_float", Row("route", "settlement_method", "trade_date", "fixed_price", "payment_day", "payment_holiday_key", "schedule_method"), Row("cleared", "financial", 46356.0, 10.0, "+1bd", payments, "lastday"));
             Assert.Equal("#ERROR _CreateTrades: ValueError: schedule_method is supplied by the template and by the ticket, expected by one of them", Trades(index, headers, rows, withMethod));
             Assert.Equal("#ERROR _CreateTrades: ValueError: quantity_unit row 2 is 'ICE', expected one of the index's specifications: 'GAL', 'BBL'", Trades(index, headers, new object[,] { { 1.0, "Z26", 1.0, "BBL", "month", "lastday", "Clearer A" }, { 5.0, "Z26", 1.0, "ICE", "month", "lastday", "Clearer A" } }, template));
             // A batch on an index made without a reporting lot is refused when it is made, never when its risk is read.
-            var lotless = (string)Seam.Call("_CreateIndex", "MIXED", "Synthetic volume index for the mixed-fields example", schedule, conventions, specifications, holidays, ExcelMissing.Value);
+            var lotless = (string)Seam.Call("_CreateIndex", "MIXED", "Synthetic volume index for the mixed-fields example", schedule, conventions, specifications, Key(holidays), ExcelMissing.Value, Calendars());
             Assert.Equal("#ERROR _CreateTrades: ValueError: index 'MIXED' has no reporting_lot, expected one of its specifications named when the index was made; a batch's delta is reported in lots of it", Trades(lotless, headers, rows, template));
         }
 
@@ -2408,29 +2406,31 @@ namespace Catalyst.Host.Tests
         [Fact]
         public void a_date_is_shifted_on_a_holiday_calendar_the_host_made()
         {
-            var calendar = (string)Seam.Call("_CreateHolidayCalendar", 46307.0, ExcelMissing.Value);
-            Assert.Equal(46308.0, Seam.Call("util_ShiftDate", 46304.0, "+1BD", calendar));
-            Assert.Equal(46304.0, Seam.Call("util_ShiftDate", 46307.0, "-1bd", calendar));
-            Assert.Equal(46305.0, Seam.Call("util_ShiftDate", 46305.0, "+0bd", calendar));
-            Assert.Equal(46311.0, Seam.Call("util_ShiftDate", 46304.0, "+7cd", calendar));
-            Assert.Equal(46326.0, Seam.Call("util_ShiftDate", 46304.0, "+0em", calendar));
+            var calendar = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46307.0);
+            Assert.Equal(46308.0, Seam.Call("util_ShiftDate", 46304.0, "+1BD", Key(calendar), Calendars()));
+            Assert.Equal(46304.0, Seam.Call("util_ShiftDate", 46307.0, "-1bd", Key(calendar), Calendars()));
+            Assert.Equal(46305.0, Seam.Call("util_ShiftDate", 46305.0, "+0bd", Key(calendar), Calendars()));
+            Assert.Equal(46311.0, Seam.Call("util_ShiftDate", 46304.0, "+7cd", Key(calendar), Calendars()));
+            Assert.Equal(46326.0, Seam.Call("util_ShiftDate", 46304.0, "+0em", Key(calendar), Calendars()));
             var valuation = (string)Seam.Call("_CreateValuationDate", 46304.0, 0.5);
-            Assert.Equal("#ERROR util_ShiftDate: holiday_calendar is valuation date handle '" + valuation + "', expected holiday calendar handle", Seam.Call("util_ShiftDate", 46304.0, "+1bd", valuation));
+            Assert.Equal("#ERROR util_ShiftDate: holiday_calendars is valuation date handle '" + valuation + "', expected holiday calendars handle", Seam.Call("util_ShiftDate", 46304.0, "+1bd", Key(calendar), valuation));
         }
 
         // util_ReadHandle spills it back, the header, the type, then a row per holiday.
         [Fact]
         public void a_holiday_calendar_is_created_from_a_column_and_read_back_through_its_handle()
         {
-            var handle = (string)Seam.Call("_CreateHolidayCalendar", Column(46023.0, 46041.0, 46069.0), ExcelMissing.Value);
-            Assert.StartsWith(Pid + ":holiday_calendar:", handle);
+            var handle = (string)Seam.Call("_CreateHolidayCalendar", "NYMEX", Column(46023.0, 46041.0, 46069.0));
+            Assert.StartsWith(Pid + ":holiday_calendar:NYMEX:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(5, spill.GetLength(0));
-            Assert.Equal(1, spill.GetLength(1));
+            Assert.Equal(2, spill.GetLength(1));
+            Assert.Equal("name", spill[0, 1]);
+            Assert.Equal("NYMEX", spill[3, 1]);
             Assert.Equal("holiday", spill[0, 0]);
             Assert.Equal("datetime64[D]", spill[1, 0]);
             Assert.Equal(46041.0, spill[3, 0]);
-            var oneDay = (string)Seam.Call("_CreateHolidayCalendar", 46023.0, ExcelMissing.Value);
+            var oneDay = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46023.0);
             Assert.NotEqual(handle, oneDay);
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneDay)).GetLength(0));
         }
@@ -2540,13 +2540,13 @@ namespace Catalyst.Host.Tests
         public void an_index_is_created_from_two_texts_and_four_handles_and_read_back_through_its_handle()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46167.0);
             var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0 }, { "ICE NG", 2500.0, "MMBTU", 0.75, 0.5 } });
-            var handle = (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, conventions, specifications, holidays, ExcelMissing.Value);
+            var handle = (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, conventions, specifications, Key(holidays), ExcelMissing.Value, Calendars());
             Assert.StartsWith(Pid + ":index:Henry Hub NYMEX:", handle);
             // The reporting lot, named: read back with its size, unit and two conversions after the six; a name the specifications lack refused naming them.
-            var lotted = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, conventions, specifications, holidays, "NYMEX NG"));
+            var lotted = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, conventions, specifications, Key(holidays), "NYMEX NG", Calendars()));
             Assert.Equal(11, lotted.GetLength(1));
             Assert.Equal("reporting_lot", lotted[0, 6]);
             Assert.Equal("NYMEX NG", lotted[2, 6]);
@@ -2554,10 +2554,10 @@ namespace Catalyst.Host.Tests
             Assert.Equal("MMBTU", lotted[2, 8]);
             Assert.Equal(10000.0, lotted[2, 9]);
             Assert.Equal(10000.0, lotted[2, 10]);
-            Assert.Equal("#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the specifications: 'NYMEX NG', 'ICE NG'", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, conventions, specifications, holidays, "LOT"));
+            Assert.Equal("#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the specifications: 'NYMEX NG', 'ICE NG'", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, conventions, specifications, Key(holidays), "LOT", Calendars()));
             // The lot units are units of the conventions' quantity type: the same MMBTU lots under volume conventions are refused, naming the row and the units that would have done.
             var volume = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
-            Assert.Equal("#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3", Seam.Call("_CreateIndex", "WTI NYMEX", "West Texas Intermediate crude oil - NYMEX", schedule, volume, specifications, holidays, ExcelMissing.Value));
+            Assert.Equal("#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3", Seam.Call("_CreateIndex", "WTI NYMEX", "West Texas Intermediate crude oil - NYMEX", schedule, volume, specifications, Key(holidays), ExcelMissing.Value, Calendars()));
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(3, spill.GetLength(0));
             Assert.Equal(7, spill.GetLength(1));
@@ -2574,15 +2574,15 @@ namespace Catalyst.Host.Tests
             Assert.Equal(2.0, spill[2, 4]);
             Assert.Equal(true, spill[2, 5]);
             var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46296.0, 46328.0, 46357.0));
-            var monthly = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateIndex", "Henry Hub IFERC", "Henry Hub natural gas - Inside FERC monthly index", iferc, conventions, specifications, ExcelMissing.Value, ExcelMissing.Value));
+            var monthly = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateIndex", "Henry Hub IFERC", "Henry Hub natural gas - Inside FERC monthly index", iferc, conventions, specifications, Key(ExcelMissing.Value), ExcelMissing.Value, Calendars()));
             Assert.Equal("Henry Hub natural gas - Inside FERC monthly index", monthly[2, 1]);
             Assert.Equal("IFERC", monthly[2, 2]);
             Assert.Equal(false, monthly[2, 5]);
-            Assert.Equal("#ERROR _CreateIndex: ValueError: holiday_calendar is missing, expected holiday calendar handle with a futures schedule", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, conventions, specifications, ExcelMissing.Value, ExcelMissing.Value));
+            Assert.Equal("#ERROR _CreateIndex: ValueError: holiday_key is missing, expected a holiday calendar's key with a futures schedule", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, conventions, specifications, Key(ExcelMissing.Value), ExcelMissing.Value, Calendars()));
             var gasDaily = (string)Seam.Call("_CreateGasDailySchedule", Column("U26", "V26", "X26"), Column(46266.0, 46296.0, 46327.0), Column(46295.0, 46326.0, 46356.0));
-            Assert.Equal("#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, expected none with a Gas Daily schedule", Seam.Call("_CreateIndex", "Henry Hub Gas Daily", "Henry Hub natural gas - Platts Gas Daily", gasDaily, conventions, specifications, holidays, ExcelMissing.Value));
-            Assert.Equal("#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", holidays, conventions, specifications, ExcelMissing.Value, ExcelMissing.Value));
-            Assert.Equal("#ERROR _CreateIndex: index_conventions is holiday calendar handle '" + holidays + "', expected index conventions handle", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, holidays, specifications, holidays, ExcelMissing.Value));
+            Assert.Equal("#ERROR _CreateIndex: ValueError: holiday_key is '" + Key(holidays) + "', expected none with a Gas Daily schedule", Seam.Call("_CreateIndex", "Henry Hub Gas Daily", "Henry Hub natural gas - Platts Gas Daily", gasDaily, conventions, specifications, Key(holidays), ExcelMissing.Value, Calendars()));
+            Assert.Equal("#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", holidays, conventions, specifications, Key(ExcelMissing.Value), ExcelMissing.Value, Calendars()));
+            Assert.Equal("#ERROR _CreateIndex: index_conventions is holiday calendar handle '" + holidays + "', expected index conventions handle", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, holidays, specifications, Key(holidays), ExcelMissing.Value, Calendars()));
         }
 
         // Futures fixings: a column of days, newest first, a column of settles and the index, holding
@@ -2596,7 +2596,7 @@ namespace Catalyst.Host.Tests
         [Fact]
         public void futures_fixings_are_created_from_two_columns_and_an_index_and_read_back_through_their_handle()
         {
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46023.0, 46041.0, 46069.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46023.0, 46041.0, 46069.0));
             var index = Index(Seam.Call("_CreateFuturesSchedule", Column("m26", "n26"), Column(46161.0, 46195.0), ExcelMissing.Value), holidays);
             var handle = (string)Seam.Call("_CreateFuturesFixings", Column(46146.0, 46143.0), Column(106.42, 101.94), index);
             Assert.StartsWith(Pid + ":futures_fixings:sample:", handle);
@@ -2651,7 +2651,7 @@ namespace Catalyst.Host.Tests
         public void a_history_holds_a_settle_for_each_nearby_and_reads_back_the_contract_it_is_of()
         {
             var schedule = Seam.Call("_CreateFuturesSchedule", Column("K26", "M26", "N26", "Q26", "U26"), Column(46157.0, 46188.0, 46218.0, 46248.0, 46280.0), ExcelMissing.Value);
-            var index = Index(schedule, (string)Seam.Call("_CreateHolidayCalendar", 46388.0, ExcelMissing.Value), "ROLL");
+            var index = Index(schedule, (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0), "ROLL");
             var days = new List<double>();
             for (var serial = 46189.0; serial >= 46160.0; serial--)
             {
@@ -2726,7 +2726,7 @@ namespace Catalyst.Host.Tests
         public void a_row_reads_the_nearby_it_names_and_a_second_nearby_averages_the_next_contract()
         {
             var schedule = Seam.Call("_CreateFuturesSchedule", Column("K26", "M26", "N26", "Q26", "U26"), Column(46157.0, 46188.0, 46218.0, 46248.0, 46280.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46388.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0);
             var index = Index(schedule, holidays, "ROLL");
             var days = new List<double>();
             for (var serial = 46189.0; serial >= 46160.0; serial--)
@@ -2747,7 +2747,7 @@ namespace Catalyst.Host.Tests
             var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46190.0, 0.5), index);
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, (string)Seam.Call("_CreateFuturesFixings", dates, settles, index));
             var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "ROLL", Column(81.5, 83.5)));
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "period", "onetime", "asian", "cleared", "financial", "CME Clearing", 46191.0, holidays));
             var headers = Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price", "nearby");
             var trades = (string)Trades(index, headers, new object[,] { { 1.0, 46174.0, 46188.0, 46189.0, 1.0, 80.0, 1.0 }, { 2.0, 46174.0, 46188.0, 46189.0, 1.0, 80.0, 2.0 } }, template);
@@ -2780,7 +2780,7 @@ namespace Catalyst.Host.Tests
             var third = (string)Trades(index, headers, Row(3.0, 46174.0, 46188.0, 46189.0, 1.0, 80.0, 3.0), template);
             Assert.StartsWith(Pid + ":trades:ROLL:", third);
             Assert.Equal("#ERROR _PrepareTrades: ValueError: requested fixing of 'Q26' on 2026-06-15 is the 3rd nearby's, 'M26' being prompt that day, beyond the 2 settles a day the history holds; expected fixings with a settle column for it", Seam.Call("_PrepareTrades", third, history));
-            var quoteFields = Row("route", "settlement_method", "schedule_method", "quantity_per", "settlement_frequency", "payment_day", "payment_calendar_key", "nearby");
+            var quoteFields = Row("route", "settlement_method", "schedule_method", "quantity_per", "settlement_frequency", "payment_day", "payment_holiday_key", "nearby");
             var later = (string)Template("_CreateQuoteTemplate", "fixed_float", quoteFields, Row("cleared", "financial", "asian", "period", "onetime", 46191.0, holidays, 2.0));
             Assert.StartsWith(Pid + ":quote_template:", later);
             Assert.Equal(82.5, (double)Seam.Call("_QuoteByDates", market, 46188.0, 46189.0, later, "flat", ExcelMissing.Value), 12);
@@ -2805,7 +2805,7 @@ namespace Catalyst.Host.Tests
         {
             var valuation = (string)Seam.Call("_CreateValuationDate", 46167.0, 0.5);
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46167.0);
             var index = Index(schedule, holidays);
             var handle = (string)Seam.Call("_CreateCalendar", valuation, index);
             Assert.StartsWith(Pid + ":calendar:sample:", handle);
@@ -2869,7 +2869,7 @@ namespace Catalyst.Host.Tests
         {
             var valuation = (string)Seam.Call("_CreateValuationDate", 46168.0, 0.5);
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46167.0);
             var index = Index(schedule, holidays);
             var calendar = (string)Seam.Call("_CreateCalendar", valuation, index);
             var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46164.0, 46163.0, 46162.0), Column(71.25, 71.10, 70.85), index);
@@ -2894,7 +2894,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings date 2026-05-26 is on or after valuation date 2026-05-26, expected dates before the valuation date", Seam.Call("_CreateMarketHistory", calendar, late));
             var twoDays = (string)Seam.Call("_CreateFuturesFixings", Column(46163.0, 46162.0), Column(71.10, 70.85), index);
             Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 2026-05-22, expected a fixing for every fixed day in calendar", Seam.Call("_CreateMarketHistory", calendar, twoDays));
-            var elsewhere = (string)Seam.Call("_CreateHolidayCalendar", 46023.0, ExcelMissing.Value);
+            var elsewhere = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46023.0);
             var onTheHoliday = (string)Seam.Call("_CreateFuturesFixings", Column(46167.0, 46164.0, 46163.0, 46162.0), Column(71.4, 71.25, 71.10, 70.85), Index(schedule, elsewhere));
             Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is over another index, 'sample', expected the calendar's, 'sample'", Seam.Call("_CreateMarketHistory", calendar, onTheHoliday));
             Assert.Equal("#ERROR _CreateMarketHistory: calendar is futures fixings handle '" + fixings + "', expected calendar handle", Seam.Call("_CreateMarketHistory", fixings, fixings));
@@ -2989,7 +2989,7 @@ namespace Catalyst.Host.Tests
         public void a_market_is_created_from_two_handles_and_read_back_through_its_handle()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46167.0);
             var index = Index(schedule, holidays);
             var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46168.0, 0.5), index);
             var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46164.0, 46163.0, 46162.0), Column(71.25, 71.10, 70.85), index);
@@ -3133,7 +3133,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'F26', already given at row 1", Seam.Call("_CreateIfercFixings", Column("F26", "F26"), Column(1.85, 2.10), index));
             Assert.Equal("#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'K26', expected one of the index's months", Seam.Call("_CreateIfercFixings", Column("F26", "K26"), Column(1.85, 2.10), index));
             Assert.Equal("#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'G26', published 2026-02-02, expected a month published before row 1's 'F26', published 2026-01-05", Seam.Call("_CreateIfercFixings", Column("F26", "G26", "H26", "J26"), Column(1.85, 2.10, 1.95, 1.60), index));
-            var futures = Index(Seam.Call("_CreateFuturesSchedule", Column("m26", "n26"), Column(46161.0, 46195.0), ExcelMissing.Value), Seam.Call("_CreateHolidayCalendar", 46167.0, ExcelMissing.Value));
+            var futures = Index(Seam.Call("_CreateFuturesSchedule", Column("m26", "n26"), Column(46161.0, 46195.0), ExcelMissing.Value), Seam.Call("_CreateHolidayCalendar", Fresh(), 46167.0));
             Assert.Equal("#ERROR _CreateIfercFixings: ValueError: index is a futures index, expected an IFERC index", Seam.Call("_CreateIfercFixings", "F26", 1.85, futures));
             Assert.Equal("#ERROR _CreateIfercFixings: index is iferc schedule handle '" + schedule + "', expected index handle", Seam.Call("_CreateIfercFixings", "F26", 1.85, schedule));
         }
@@ -3298,11 +3298,11 @@ namespace Catalyst.Host.Tests
         public void a_december_asian_prices_off_the_calendars_contract_for_each_day()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("Z26", "F27", "G27", "H27"), Column(46346.0, 46377.0, 46407.0, 46440.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46381.0, 46388.0));
             var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 }, { "LOT", 1000.0, "BBL", 0.0, 0.0 } });
-            var index = (string)Seam.Call("_CreateIndex", "WTI", "West Texas Intermediate crude oil - NYMEX", schedule, conventions, specifications, holidays, "LOT");
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
+            var index = (string)Seam.Call("_CreateIndex", "WTI", "West Texas Intermediate crude oil - NYMEX", schedule, conventions, specifications, Key(holidays), "LOT", Calendars());
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("BBL", "month", "monthly", 1.0, "asian", "cleared", "financial", "Prototype Clearing", "+2bd", holidays));
             var headers = Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price");
             var trades = (string)Trades(index, headers, new object[,] { { 23.0, 46346.0, 46374.0, 46384.0, 1200.0, 70.0 } }, template);
@@ -3373,11 +3373,11 @@ namespace Catalyst.Host.Tests
         public void a_batch_reports_its_delta_by_day_month_and_year_from_the_same_results()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46356.0, 46387.0, 46416.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46381.0, 46388.0));
             var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 }, { "LOT", 1000.0, "BBL", 0.0, 0.0 } });
-            var index = (string)Seam.Call("_CreateIndex", "MONTHLY", "Month-aligned WTI-like index", schedule, conventions, specifications, holidays, "LOT");
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
+            var index = (string)Seam.Call("_CreateIndex", "MONTHLY", "Month-aligned WTI-like index", schedule, conventions, specifications, Key(holidays), "LOT", Calendars());
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("LOT", "month", "monthly", 1.0, "cleared", "financial", "Prototype Clearing", "+1bd", holidays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "schedule_method");
             var trades = (string)Trades(index, headers, new object[,] { { 1.0, 46346.0, "Z26", 22.0, 70.0, "asian" }, { 16.0, 46346.0, "Z26", 3.0, 70.0, "penultimate" } }, template);
@@ -3463,12 +3463,12 @@ namespace Catalyst.Host.Tests
         public void an_iferc_basis_future_marks_fixes_and_pays_from_its_published_index()
         {
             var schedule = (string)Seam.Call("_CreateIfercSchedule", Column("X26", "Z26", "F27"), Column(46328.0, 46357.0, 46391.0));
-            var pays = (string)Seam.Call("_CreateHolidayCalendar", Column(46388.0), ExcelMissing.Value);
+            var pays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46388.0));
             var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "LOT", 2500.0, "MMBTU", 0.0, 0.0 }, { "MMBTU", 1.0, "MMBTU", 0.0, 0.0 } });
-            var index = (string)Seam.Call("_CreateIndex", "WAHA", "Waha basis - ICE", schedule, conventions, specifications, ExcelMissing.Value, "LOT");
+            var index = (string)Seam.Call("_CreateIndex", "WAHA", "Waha basis - ICE", schedule, conventions, specifications, Key(ExcelMissing.Value), "LOT", Calendars());
             Assert.StartsWith(Pid + ":index:WAHA:", index);
-            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key");
+            var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("LOT", "month", "monthly", 1.0, "lastday", "cleared", "financial", "ICE Clear Europe", "+2bd", pays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var row = new object[,] { { 1001.0, 46356.0, "Z26", 1.0, -0.5 } };
@@ -3543,22 +3543,22 @@ namespace Catalyst.Host.Tests
         public void a_batch_books_its_reserves_once_and_its_results_report_them_unchanged()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46356.0, 46387.0, 46416.0, 46444.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46381.0, 46388.0));
             var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "GAL", "DOLLAR", "VOLUME", "GAL");
             var headings = Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", headings, new object[,] { { "LOT", 1000.0, "BBL", 10.0, 4.0 }, { "BBL", 1.0, "BBL", 0.01, 0.004 }, { "GAL", 1.0, "GAL", 0.0, 0.0 } });
-            var index = (string)Seam.Call("_CreateIndex", "RESERVES", "Ethane with the reserve ticket rates", schedule, conventions, specifications, holidays, "LOT");
-            var pays = (string)Seam.Call("_CreateHolidayCalendar", Column(46388.0), ExcelMissing.Value);
+            var index = (string)Seam.Call("_CreateIndex", "RESERVES", "Ethane with the reserve ticket rates", schedule, conventions, specifications, Key(holidays), "LOT", Calendars());
+            var pays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46388.0));
             // Since #188, reserve-fee-applicability.md, the template names ION as broker: brokerage charges the rows
             // naming a broker and clearing the cleared route, so the 50 below stands and the readback gains a column.
-            var fields = Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_day", "payment_calendar_key");
+            var fields = Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_day", "payment_holiday_key");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("month", "monthly", 1.0, "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price");
             var rows = new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25 }, { 102.0, 46346.0, "Z26", -2.0, "LOT", 0.25 }, { 103.0, 46346.0, "Z26", 1000.0, "BBL", 0.25 }, { 104.0, 46346.0, "Z26", 0.0, "LOT", 0.25 } };
             var trades = (string)Trades(index, headers, rows, template);
             Assert.StartsWith(Pid + ":trades:RESERVES:", trades);
             var batch = (object[,])Seam.Call("util_ReadHandle", trades);
-            Assert.Equal(26, batch.GetLength(1));  // payment_calendar_key last, since payment-calendar-keys.md
+            Assert.Equal(26, batch.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
             Assert.Equal("broker", batch[0, 8]);
             Assert.Equal("ION", batch[2, 8]);
             Assert.Equal("offset", batch[0, 22]);
@@ -3613,7 +3613,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(50.0, (double)again[2, 0], 9);
             Assert.Equal(20.0, (double)again[2, 1], 9);
             var dear = (string)Seam.Call("_CreateContractSpecifications", headings, new object[,] { { "LOT", 1000.0, "BBL", 1e308, 0.0 } });
-            var huge = (string)Seam.Call("_CreateIndex", "HUGE", "A rate a cell holds that two lots outrun", schedule, conventions, dear, holidays, "LOT");
+            var huge = (string)Seam.Call("_CreateIndex", "HUGE", "A rate a cell holds that two lots outrun", schedule, conventions, dear, Key(holidays), "LOT", Calendars());
             Assert.Equal("#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, expected a finite amount of DOLLAR; 2.0 of 'LOT' at 1e+308 a lot", Trades(huge, headers, new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25 } }, template));
             Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has inf of brokerage reserve in all, expected a finite amount of DOLLAR; the components' reserves, each finite, sum past the largest number", Trades(huge, headers, new object[,] { { 101.0, 46346.0, "Z26", 1.0, "LOT", 0.25 }, { 102.0, 46346.0, "Z26", 1.0, "LOT", 0.25 } }, template));
             // Since #175, booking-fields-and-marketing-reserve.md: a marketing column books 15, 20, 25 and 5
@@ -3625,7 +3625,7 @@ namespace Catalyst.Host.Tests
             var marketedRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 15.0 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 20.0 }, { 1003.0, 46346.0, "Z26-F27", 1.0, "LOT", 0.25, 25.0 }, { 1004.0, 46346.0, "Z26", 0.0, "LOT", 0.25, 5.0 } };
             var marketed = (string)Trades(index, marketedHeaders, marketedRows, template);
             var marketedTable = (object[,])Seam.Call("util_ReadHandle", marketed);
-            Assert.Equal(27, marketedTable.GetLength(1));  // a cleared batch names no curve; payment_calendar_key last since payment-calendar-keys.md
+            Assert.Equal(27, marketedTable.GetLength(1));  // a cleared batch names no curve; payment_holiday_key last since payment-calendar-keys.md
             Assert.Equal("marketing_reserve", marketedTable[0, 15]);
             Assert.Equal("entered_contract_code", marketedTable[0, 16]);
             Assert.Equal(15.0, (double)marketedTable[2, 15], 9);
@@ -3641,7 +3641,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("USD", marketedReserves[2, 4]);
             Assert.Equal(0.0, (double)marketedReserves[2, 3], 9);
             Assert.Equal("#ERROR _CreateTrades: ValueError: marketing_reserve row 2 is -5.0, expected a finite amount of zero or more", Trades(index, marketedHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 15.0 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, -5.0 } }, template));
-            var seven = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_day", "payment_calendar_key", "marketing_reserve"), Row("month", "monthly", 1.0, "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays, 7.0));
+            var seven = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_day", "payment_holiday_key", "marketing_reserve"), Row("month", "monthly", 1.0, "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays, 7.0));
             var templated = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Trades(index, headers, rows, seven), history), Market(), ExcelMissing.Value);
             var templatedReserves = (object[,])Seam.Call("_ReportReserves", templated);
             Assert.Equal(50.0, (double)templatedReserves[2, 0], 9);
@@ -3651,7 +3651,7 @@ namespace Catalyst.Host.Tests
             // Since #188, reserve-fee-applicability.md: the same rows under a cleared template naming no broker book no
             // brokerage and the same 20 of clearing; a broker column mixing ION and None, none and NONE charges the
             // ION row alone, 20, every text read back as typed; a broker from both the template and the ticket is refused.
-            var direct = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key"), Row("month", "monthly", 1.0, "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", pays));
+            var direct = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key"), Row("month", "monthly", 1.0, "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", pays));
             var directReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Trades(index, headers, rows, direct), history), Market(), ExcelMissing.Value));
             Assert.Equal(0.0, (double)directReserves[2, 0], 9);
             Assert.Equal(20.0, (double)directReserves[2, 1], 9);
@@ -3677,7 +3677,7 @@ namespace Catalyst.Host.Tests
             var cvaRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 25.0 }, { 1002.0, 46346.0, "Z26-F27", -2.0, "LOT", 0.25, -40.0 }, { 1003.0, 46346.0, "Z26", 0.0, "LOT", 0.25, 0.0 } };
             var cva = (string)Trades(index, cvaHeaders, cvaRows, template);
             var cvaTable = (object[,])Seam.Call("util_ReadHandle", cva);
-            Assert.Equal(27, cvaTable.GetLength(1));  // payment_calendar_key last, since payment-calendar-keys.md
+            Assert.Equal(27, cvaTable.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
             Assert.Equal("cva_reserve", cvaTable[0, 15]);
             Assert.Equal("entered_contract_code", cvaTable[0, 16]);
             Assert.Equal(25.0, (double)cvaTable[2, 15], 9);
@@ -3699,7 +3699,7 @@ namespace Catalyst.Host.Tests
             var bothReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", both, history), Market(), ExcelMissing.Value));
             Assert.Equal(65.0, (double)bothReserves[2, 2], 9);
             Assert.Equal(-10.0, (double)bothReserves[2, 3], 9);
-            var forty = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_day", "payment_calendar_key", "cva_reserve"), Row("month", "monthly", 1.0, "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays, -40.0));
+            var forty = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_day", "payment_holiday_key", "cva_reserve"), Row("month", "monthly", 1.0, "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays, -40.0));
             var fortyResults = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Trades(index, headers, rows, forty), history), Market(), ExcelMissing.Value);
             var fortyReserves = (object[,])Seam.Call("_ReportReserves", fortyResults);
             Assert.Equal(50.0, (double)fortyReserves[2, 0], 9);
@@ -3732,10 +3732,10 @@ namespace Catalyst.Host.Tests
                 var pastReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Trades(index, cvaHeaders, past, template), history), Market(), ExcelMissing.Value));
                 Assert.Equal(3e-308, (double)pastReserves[2, 3]);
             }
-            var bilateral = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_calendar_key"), Row("month", "monthly", 1.0, "lastday", "bilateral", "financial", "ACME Trading", "SOFR", "+2bd", pays));
+            var bilateral = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_key"), Row("month", "monthly", 1.0, "lastday", "bilateral", "financial", "ACME Trading", "SOFR", "+2bd", pays));
             var faced = (string)Trades(index, headers, rows, bilateral);
             var facedTable = (object[,])Seam.Call("util_ReadHandle", faced);
-            Assert.Equal(26, facedTable.GetLength(1));  // payment_calendar_key last, since payment-calendar-keys.md
+            Assert.Equal(26, facedTable.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
             Assert.Equal("counterparty", facedTable[0, 7]);
             Assert.Equal("ACME Trading", facedTable[2, 7]);
             Assert.Equal("discount_curve_key", facedTable[0, 8]);  // after the counterparty, since named-curves-slice-3.md
@@ -3777,7 +3777,7 @@ namespace Catalyst.Host.Tests
             // and a collection missing a key refused with the key, the row and the names it holds.
             var keyedHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "discount_curve_key");
             var keyedRows = new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25, "SOFR" }, { 102.0, 46346.0, "Z26", -1.0, "LOT", 0.25, "FFOIS" } };
-            var unkeyed = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "counterparty", "payment_day", "payment_calendar_key"), Row("month", "monthly", 1.0, "lastday", "bilateral", "financial", "ACME Trading", "+2bd", pays));
+            var unkeyed = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "counterparty", "payment_day", "payment_holiday_key"), Row("month", "monthly", 1.0, "lastday", "bilateral", "financial", "ACME Trading", "+2bd", pays));
             var keyed = (string)Trades(index, keyedHeaders, keyedRows, unkeyed);
             var keyedTable = (object[,])Seam.Call("util_ReadHandle", keyed);
             Assert.Equal("discount_curve_key", keyedTable[0, 8]);
@@ -3814,7 +3814,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("SOFR, FFOIS", keyedCollection[2, 4]);
             var facedHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "counterparty");
             var facedRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, "ACME Trading" }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, "Beta Energy" } };
-            var unfaced = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "discount_curve_key", "payment_day", "payment_calendar_key"), Row("month", "monthly", 1.0, "lastday", "bilateral", "financial", "SOFR", "+2bd", pays));
+            var unfaced = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "discount_curve_key", "payment_day", "payment_holiday_key"), Row("month", "monthly", 1.0, "lastday", "bilateral", "financial", "SOFR", "+2bd", pays));
             var byRow = (object[,])Seam.Call("util_ReadHandle", (string)Trades(index, facedHeaders, facedRows, unfaced));
             Assert.Equal("ACME Trading", byRow[2, 7]);
             Assert.Equal("Beta Energy", byRow[3, 7]);
@@ -3840,18 +3840,18 @@ namespace Catalyst.Host.Tests
         public void a_ticket_books_each_row_by_its_dates_or_its_code_and_values_as_the_page_says()
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("U26", "V26", "X26", "Z26"), Column(46294.0, 46325.0, 46356.0, 46387.0), ExcelMissing.Value);
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 47484.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 47484.0);
             var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 }, { "LOT", 1000.0, "BBL", 0.0, 0.0 } });
-            var index = (string)Seam.Call("_CreateIndex", "BBL_ASIAN", "Synthetic barrel index for the codes-and-dates example", schedule, conventions, specifications, holidays, "LOT");
-            var fields = Row("quantity_unit", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_calendar_key", "settlement_frequency", "nearby");
+            var index = (string)Seam.Call("_CreateIndex", "BBL_ASIAN", "Synthetic barrel index for the codes-and-dates example", schedule, conventions, specifications, Key(holidays), "LOT", Calendars());
+            var fields = Row("quantity_unit", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key", "settlement_frequency", "nearby");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("BBL", "asian", "cleared", "financial", "Prototype Clearing", "+1bd", holidays, "monthly", 1.0));
             var headers = Row("trade_id", "trade_date", "contract_code", "start_date", "end_date", "quantity", "quantity_per", "fixed_price");
             var rows = new object[,] { { 1.0, 46280.0, "V26", "", "", 100.0, "month", 70.0 }, { 2.0, 46280.0, "V26", 46307.0, 46326.0, 100.0, "month", 70.0 }, { 3.0, 46280.0, "", 46307.0, 46315.0, 10.0, "calday", 70.0 } };
             var trades = (string)Trades(index, headers, rows, template);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
             Assert.Equal(5, spill.GetLength(0));
-            Assert.Equal(25, spill.GetLength(1));  // payment_calendar_key last, since payment-calendar-keys.md
+            Assert.Equal(25, spill.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
             Assert.Equal("payment_date", spill[0, 13]);
             Assert.Equal("entered_contract_code", spill[0, 14]);
             Assert.Equal("start_date", spill[0, 15]);
@@ -3938,7 +3938,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(46387.0, Seam.Call("util_EndDate", "Z26", october12));
             Assert.Equal("#ERROR util_StartDate: ValueError: valuation_date is 2026-11-01, after 'balv26' ended on 2026-10-31, expected a valuation day on or before the period's last day", Seam.Call("util_StartDate", "balv26", november));
             Assert.Equal("#ERROR util_EndDate: ValueError: valuation_date is 2026-11-01, after 'balv26' ended on 2026-10-31, expected a valuation day on or before the period's last day", Seam.Call("util_EndDate", "balv26", november));
-            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46381.0, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46381.0);
             Assert.Equal("#ERROR util_StartDate: valuation_date is holiday calendar handle '" + holidays + "', expected valuation date handle", Seam.Call("util_StartDate", "Z26", holidays));
         }
 
@@ -3961,10 +3961,10 @@ namespace Catalyst.Host.Tests
         public void a_batch_past_the_largest_number_publishes_nothing_and_a_corrected_one_creates()
         {
             var schedule = Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46323.0, 46351.0, 46385.0), ExcelMissing.Value);
-            var holidays = Seam.Call("_CreateHolidayCalendar", Column(46352.0, 46381.0), ExcelMissing.Value);
+            var holidays = Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46352.0, 46381.0));
             var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 0.0, 0.0 } });
-            var ng = (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub NYMEX index", schedule, conventions, specifications, holidays, "NYMEX NG");
+            var ng = (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub NYMEX index", schedule, conventions, specifications, Key(holidays), "NYMEX NG", Calendars());
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house");
             var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "cleared", "physical", "CME Clearing"));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");

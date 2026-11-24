@@ -175,8 +175,8 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AM1),2,1)" = "datetime64[D]"
     "=INDEX(util_ReadHandle(AM1),4,1)" = "46041"
     "=ROWS(util_ReadHandle(AM2))"      = "3"
-    "=_CreateHolidayCalendar(AL2:AL4)" = "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
-    "=_CreateHolidayCalendar(AK2:AL2)" = "#ERROR _CreateHolidayCalendar: holiday is 1x2 array, expected column of dates"
+    '=_CreateHolidayCalendar("X",AL2:AL4)' = "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
+    '=_CreateHolidayCalendar("X",AK2:AL2)' = "#ERROR _CreateHolidayCalendar: holiday is 1x2 array, expected column of dates"
     # The index conventions: a creator over five text cells, read back through util_ReadHandle, and
     # one over the gasoline index, cents a gallon quoted and dollars a barrel settled; a category in
     # another case and an energy unit where a volume unit should be, the library's words; a blank
@@ -223,7 +223,7 @@ $formulas = [ordered]@{
     "=_CreateContractSpecifications(EI1:EM1,EI9:EM9)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 0.0, expected 1 or more"
     "=_CreateContractSpecifications(EI1:EM1,EI10:EM10)" = "#ERROR _CreateContractSpecifications: ValueError: brokerage_rate_per_lot row 1 is -0.5, expected 0 or more"
     "=_CreateContractSpecifications(EI1:EM1,EI11:EM11)" = "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', expected a VOLUME, MASS or ENERGY unit"
-    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,EN12,AM1)' = "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
+    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,EN12,"AM1",,ZU1)' = "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     # The index: a creator over a name, the futures schedule in AI1, the conventions in AP1, the
     # specifications in BY1 and the holiday calendar in AM1, and over the IFERC schedule in DE1
     # and the Gas Daily schedule in DK1 without one, each read back through util_ReadHandle as one
@@ -277,13 +277,13 @@ $formulas = [ordered]@{
     "=COLUMNS(util_ReadHandle(EB2))"   = "7"
     "=INDEX(util_ReadHandle(EB3),3,3)" = "Gas Daily"
     "=INDEX(util_ReadHandle(EB3),3,4)" = "3"
-    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1)' = "#ERROR _CreateIndex: ValueError: holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
-    '=_CreateIndex(EC4,"Henry Hub natural gas - Platts Gas Daily",DK1,AP1,BY1,AM1)' = "#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, expected none with a Gas Daily schedule"
+    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1)' = "#ERROR _CreateIndex: ValueError: holiday_key is missing, expected a holiday calendar's key with a futures schedule"
+    '=_CreateIndex(EC4,"Henry Hub natural gas - Platts Gas Daily",DK1,AP1,BY1,"AM1",,ZU1)' = "#ERROR _CreateIndex: ValueError: holiday_key is 'AM1', expected none with a Gas Daily schedule"
     '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AM1,AP1,BY1)' = "#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule"
     '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1)' = "#ERROR _CreateIndex: contract_specifications is missing, expected contract specifications handle"
-    '=_CreateIndex(C2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,AM1)' = "#ERROR _CreateIndex: name is blank, expected text"
-    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,AM1,"LOT")' = "#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the specifications: 'lots', 'gal'"
-    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,AM1,C2)' = "#ERROR _CreateIndex: reporting_lot is blank, expected text"
+    '=_CreateIndex(C2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,"AM1",,ZU1)' = "#ERROR _CreateIndex: name is blank, expected text"
+    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,"AM1","LOT",ZU1)' = "#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the specifications: 'lots', 'gal'"
+    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,"AM1",C2,ZU1)' = "#ERROR _CreateIndex: reporting_lot is blank, expected text"
     # Readable index names, readable-index-names.md: the display name right after the name, text
     # kept as typed and shown beside the name by util_ReadHandle, nothing else reading it; the
     # handle still carries the name; a missing, blank, numeric or empty display name refused in the
@@ -292,9 +292,9 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EB1),1,2)"   = "display_name"
     "=INDEX(util_ReadHandle(EB1),2,2)"   = "str"
     "=_CreateIndex(EC2)"                 = "#ERROR _CreateIndex: display_name is missing, expected text"
-    '=_CreateIndex(EC2,C2,AI1,AP1,BY1,AM1)' = "#ERROR _CreateIndex: display_name is blank, expected text"
-    '=_CreateIndex(EC2,A1,AI1,AP1,BY1,AM1)' = "#ERROR _CreateIndex: display_name is number 1.0, expected text"
-    '=_CreateIndex(EC2,I2,AI1,AP1,BY1,AM1)' = "#ERROR _CreateIndex: display_name is empty text, expected text"
+    '=_CreateIndex(EC2,C2,AI1,AP1,BY1,"AM1",,ZU1)' = "#ERROR _CreateIndex: display_name is blank, expected text"
+    '=_CreateIndex(EC2,A1,AI1,AP1,BY1,"AM1",,ZU1)' = "#ERROR _CreateIndex: display_name is number 1.0, expected text"
+    '=_CreateIndex(EC2,I2,AI1,AP1,BY1,"AM1",,ZU1)' = "#ERROR _CreateIndex: display_name is empty text, expected text"
     "=_CreateTrades(ED2,FG1:FK1,FG2:FK2,EW3,ZU1)" = "#ERROR _CreateTrades: ValueError: index 'Henry Hub NYMEX' has no reporting_lot, expected one of its specifications named when the index was made; a batch's delta is reported in lots of it"
     # The futures fixings: a creator over a column of four days, newest first, and a column of
     # their settles and the futures index in EB1, and over the first row alone, read back through
@@ -385,12 +385,12 @@ $formulas = [ordered]@{
     '=MID(XV23,FIND(":",XV23)+1,12)'     = "trades:ROLL:"
     "=ROWS(util_ReadHandle(XV23))"      = "4"
     # The nearby the column before the last since payment-calendar-keys.md, which appends each
-    # row's payment calendar key, as entered, after it.
+    # row's payment holiday key, as entered, after it.
     "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23))-1)" = "nearby"
     "=INDEX(util_ReadHandle(XV23),2,COLUMNS(util_ReadHandle(XV23))-1)" = "int64"
     "=INDEX(util_ReadHandle(XV23),3,COLUMNS(util_ReadHandle(XV23))-1)" = "1"
     "=INDEX(util_ReadHandle(XV23),4,COLUMNS(util_ReadHandle(XV23))-1)" = "2"
-    "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23)))" = "payment_calendar_key"
+    "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23)))" = "payment_holiday_key"
     "=INDEX(util_ReadHandle(XV23),2,COLUMNS(util_ReadHandle(XV23)))" = "str"
     "=INDEX(util_ReadHandle(XV23),3,COLUMNS(util_ReadHandle(XV23)))&INDEX(util_ReadHandle(XV23),4,COLUMNS(util_ReadHandle(XV23)))" = "XV2XV2"
     "=ROWS(util_ReadHandle(XV24))"      = "6"
@@ -569,62 +569,60 @@ $formulas = [ordered]@{
     '=util_EndDate("3H27")' = "#ERROR util_EndDate: ValueError: period is '3H27', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
     '=util_StartDate("1H2027")' = "#ERROR util_StartDate: ValueError: period is '1H2027', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
     '=util_EndDate("2H27-1H27")' = "#ERROR util_EndDate: ValueError: period is '2H27-1H27', expected range endpoints in chronological order"
-    # Combined holiday calendars, combine-holiday-calendars.md: the combination of A and B is the
-    # 12th, the 13th and the 14th once each in order, in a column as in a row; one calendar combined is
-    # its own distinct days; a combination combines again, with the Saturday first; from Friday the
-    # 9th +1bd is Thursday the 15th and +2bd Friday the 16th, from the 15th -1bd the 9th, on A alone
-    # the 13th; the trade anchored on the 9th pays the 15th; a block, a blank cell, a date where a
-    # handle should be, text naming nothing and the argument left out refused in the seam's words.
-    '=LEFT(TE1,FIND(":",TE1,FIND(":",TE1)+1))' = "{pid}:holiday_calendar:"
-    "=ROWS(util_ReadHandle(TE1))"            = "5"
-    "=INDEX(util_ReadHandle(TE1),1,1)"       = "holiday"
-    "=INDEX(util_ReadHandle(TE1),3,1)"       = "46307"
-    "=INDEX(util_ReadHandle(TE1),4,1)"       = "46308"
-    "=INDEX(util_ReadHandle(TE1),5,1)"       = "46309"
-    "=AND(util_ReadHandle(TE2)=util_ReadHandle(TE1))" = "TRUE"
-    "=ROWS(util_ReadHandle(TE3))"            = "4"
-    "=INDEX(util_ReadHandle(TE3),4,1)"       = "46309"
-    "=ROWS(util_ReadHandle(TE4))"            = "6"
-    "=INDEX(util_ReadHandle(TE4),3,1)"       = "46305"
+    # A key of several names, holiday-keys.md: A and B joined by a plus sign close the 12th, the
+    # 13th and the 14th, the names in either order, and the Saturday's calendar a third name
+    # that moves no weekday; from Friday the 9th +1bd is Thursday the 15th and +2bd Friday the
+    # 16th, from the 15th -1bd the 9th, on A alone the 13th; the trade anchored on the 9th pays
+    # the 15th; a calendar reads back its name beside each day.
+    '=LEFT(TC1,FIND(":",TC1,FIND(":",TC1)+1)+4)' = "{pid}:holiday_calendar:TC1:"
+    "=COLUMNS(util_ReadHandle(TC1))"         = "2"
+    "=INDEX(util_ReadHandle(TC1),1,2)"       = "name"
+    "=INDEX(util_ReadHandle(TC1),3,2)"       = "TC1"
     "=ROWS(util_ReadHandle(TC1))"            = "5"
     "=INDEX(util_ReadHandle(TC1),3,1)"       = "46309"
-    '=util_ShiftDate(DATE(2026,10,9),"+1bd",TE1)'  = "46310"
-    '=util_ShiftDate(DATE(2026,10,9),"+2bd",TE1)'  = "46311"
-    '=util_ShiftDate(DATE(2026,10,15),"-1bd",TE1)' = "46304"
-    '=util_ShiftDate(DATE(2026,10,9),"+1bd",TC1)'  = "46308"
-    '=util_ShiftDate(DATE(2026,10,9),"+2bd",TE4)'  = "46311"
+    '=util_ShiftDate(DATE(2026,10,9),"+1bd","TC1+TC2",ZU1)'  = "46310"
+    '=util_ShiftDate(DATE(2026,10,9),"+1bd","TC2+TC1",ZU1)'  = "46310"
+    '=util_ShiftDate(DATE(2026,10,9),"+2bd","TC1+TC2",ZU1)'  = "46311"
+    '=util_ShiftDate(DATE(2026,10,15),"-1bd","TC1+TC2",ZU1)' = "46304"
+    '=util_ShiftDate(DATE(2026,10,9),"+1bd","TC1",ZU1)'  = "46308"
+    '=util_ShiftDate(DATE(2026,10,9),"+2bd","TC1+TC2+TC3",ZU1)' = "46311"
+    '=util_ShiftDate(DATE(2026,10,9),"+1bd",,ZU1)' = "46307"
     "=INDEX(util_ReadHandle(TE12),1,14)"     = "payment_date"
     "=INDEX(util_ReadHandle(TE12),3,14)"     = "46310"
     "=INDEX(util_ReadHandle(TE12),3,4)"      = "X26"
-    "=_CombineHolidayCalendars(TC1:TD2)"     = "#ERROR _CombineHolidayCalendars: calendar_handles is 2x2 array, expected one cell, one row or one column of holiday calendar handles"
-    "=_CombineHolidayCalendars(TC1:TC4)"     = "#ERROR _CombineHolidayCalendars: calendar_handles cell (4, 1) is blank, expected holiday calendar handle"
-    "=_CombineHolidayCalendars(TA1:TA2)"     = "#ERROR _CombineHolidayCalendars: calendar_handles cell (1, 1) is number 46309.0, expected holiday calendar handle"
-    '=_CombineHolidayCalendars("x")'         = "#ERROR _CombineHolidayCalendars: calendar_handles is text 'x' naming no live object, expected holiday calendar handle"
-    "=_CombineHolidayCalendars()"            = "#ERROR _CombineHolidayCalendars: calendar_handles is missing, expected holiday calendar handles in a cell, a row or a column"
-    # Named holiday calendars and their collection, payment-calendar-keys.md: PAY_A in TC20,
-    # closed on 26 November 2026, PAY_B in TC21, closed on the 27th and the 30th, a calendar with
-    # no name in TC22 and the collection of the two named in TD20. A name shows in the handle
-    # and beside each day of the readback; the collection reads back each name and its count
-    # of days; a member with no name, a name twice and a name no key could select are refused
-    # in the library's words, a number for a name and no handles in the seam's.
+    # A key the collection of PAY_A and PAY_B cannot bind, a key with no collection and a single
+    # calendar where the collection goes, each in its owner's words.
+    '=util_ShiftDate(DATE(2026,10,9),"+1bd","PAY_A+PAY_C",TD20)' = "#ERROR util_ShiftDate: ValueError: holiday_key is 'PAY_A+PAY_C', expected names of the collection's calendars, 'PAY_A' and 'PAY_B'; it holds no 'PAY_C'"
+    '=util_ShiftDate(DATE(2026,10,9),"+1bd","PAY_A + PAY_B",TD20)' = "#ERROR util_ShiftDate: ValueError: holiday_key is 'PAY_A + PAY_B', expected a calendar's name, or several joined by '+', each with no whitespace around it"
+    '=util_ShiftDate(DATE(2026,10,9),"+1bd","PAY_A")' = "#ERROR util_ShiftDate: ValueError: holiday_calendars is missing, expected a _CollectHolidayCalendars collection, which holiday_key selects a calendar from"
+    '=util_ShiftDate(DATE(2026,10,9),"+1bd","PAY_A",TC20)="#ERROR util_ShiftDate: holiday_calendars is holiday calendar handle ''"&TC20&"'', expected holiday calendars handle"' = "TRUE"
+    "=_CollectHolidayCalendars(TC1:TD2)"     = "#ERROR _CollectHolidayCalendars: calendar_handles is 2x2 array, expected one cell, one row or one column of holiday calendar handles"
+    "=_CollectHolidayCalendars(TC1:TC4)"     = "#ERROR _CollectHolidayCalendars: calendar_handles cell (4, 1) is blank, expected holiday calendar handle"
+    "=_CollectHolidayCalendars(TA1:TA2)"     = "#ERROR _CollectHolidayCalendars: calendar_handles cell (1, 1) is number 46309.0, expected holiday calendar handle"
+    '=_CollectHolidayCalendars("x")'         = "#ERROR _CollectHolidayCalendars: calendar_handles is text 'x' naming no live object, expected holiday calendar handle"
+    # Holiday calendars and their collection, holiday-keys.md: PAY_A in TC20, closed on 26
+    # November 2026, PAY_B in TC21, closed on the 27th and the 30th, and the collection of the
+    # two in TD20. A name shows in the handle and beside each day of the readback; the collection
+    # reads back each name and its count of days; a name twice and a name no key could select are
+    # refused in the library's words, a name left out, a number for a name and no handles in the
+    # seam's.
     '=MID(TC20,FIND(":",TC20)+1,23)'         = "holiday_calendar:PAY_A:"
     "=COLUMNS(util_ReadHandle(TC20))"        = "2"
     "=INDEX(util_ReadHandle(TC20),1,2)"      = "name"
     "=INDEX(util_ReadHandle(TC21),4,2)"      = "PAY_B"
     "=INDEX(util_ReadHandle(TC21),4,1)"      = "46356"
-    "=COLUMNS(util_ReadHandle(TC22))"        = "1"
-    '=ISNUMBER(VALUE(MID(TC22,FIND(":",TC22,FIND(":",TC22)+1)+1,9)))' = "TRUE"
-    '=MID(TD20,FIND(":",TD20)+1,18)'         = "payment_calendars:"
+    '=MID(TD20,FIND(":",TD20)+1,18)'         = "holiday_calendars:"
     "=ROWS(util_ReadHandle(TD20))"           = "4"
     '=INDEX(util_ReadHandle(TD20),1,1)&" "&INDEX(util_ReadHandle(TD20),1,2)' = "name holidays"
     '=INDEX(util_ReadHandle(TD20),3,1)&" "&INDEX(util_ReadHandle(TD20),3,2)' = "PAY_A 1"
     '=INDEX(util_ReadHandle(TD20),4,1)&" "&INDEX(util_ReadHandle(TD20),4,2)' = "PAY_B 2"
-    "=_CollectPaymentCalendars(TC20:TC22)"   = "#ERROR _CollectPaymentCalendars: ValueError: calendar_handles cell 3 is a calendar with no name, expected one made with a name, the word a payment calendar key selects it by"
-    "=_CollectPaymentCalendars(HSTACK(TC20,TC20))" = "#ERROR _CollectPaymentCalendars: ValueError: calendar_handles cell 1 and cell 2 are both named 'PAY_A', expected each name once"
-    "=_CollectPaymentCalendars()"            = "#ERROR _CollectPaymentCalendars: calendar_handles is missing, expected holiday calendar handles in a cell, a row or a column"
-    '=_CreateHolidayCalendar(TA20,"PAY_A+PAY_B")' = "#ERROR _CreateHolidayCalendar: ValueError: name is 'PAY_A+PAY_B', expected a name without '+', which joins names in a key"
-    '=_CreateHolidayCalendar(TA20," PAY_A")'  = "#ERROR _CreateHolidayCalendar: ValueError: name is ' PAY_A', expected a name with no whitespace around it"
-    '=_CreateHolidayCalendar(TA20,7)'         = "#ERROR _CreateHolidayCalendar: name is number 7.0, expected text"
+    "=_CreateHolidayCalendar(,TA20)"         = "#ERROR _CreateHolidayCalendar: name is missing, expected text"
+    '=_CreateHolidayCalendar(TA20,"PAY_A")'  = "#ERROR _CreateHolidayCalendar: name is number 46352.0, expected text"
+    "=_CollectHolidayCalendars(HSTACK(TC20,TC20))" = "#ERROR _CollectHolidayCalendars: ValueError: calendar_handles cell 1 and cell 2 are both named 'PAY_A', expected each name once"
+    "=_CollectHolidayCalendars()"            = "#ERROR _CollectHolidayCalendars: calendar_handles is missing, expected holiday calendar handles in a cell, a row or a column"
+    '=_CreateHolidayCalendar("PAY_A+PAY_B",TA20)' = "#ERROR _CreateHolidayCalendar: ValueError: name is 'PAY_A+PAY_B', expected a name without '+', which joins names in a key"
+    '=_CreateHolidayCalendar(" PAY_A",TA20)'  = "#ERROR _CreateHolidayCalendar: ValueError: name is ' PAY_A', expected a name with no whitespace around it"
+    '=_CreateHolidayCalendar(7,TA20)'         = "#ERROR _CreateHolidayCalendar: name is number 7.0, expected text"
     # The balance of a period, date-helper-inputs.md: one BAL prefix in either case on any label and
     # the valuation-date handle beside it, from QH1:QH12, the balance running from the later of the
     # handle's day and the label's first day to the label's last: the ticket's table on October 2026
@@ -675,16 +673,16 @@ $formulas = [ordered]@{
     # where the date should be, a number where the offset should be, and a blank, a text naming
     # nothing and a valuation date where the calendar should be.
     '=util_ShiftDate(PA3,"+1bd")'            = "46307"
-    '=util_ShiftDate(PA3,"+1BD",PA2)'        = "46308"
+    '=util_ShiftDate(PA3,"+1BD","PA2",ZU1)'        = "46308"
     '=util_ShiftDate(PA4,"+1bd")'            = "46307"
     '=util_ShiftDate(PA5,"-1bd")'            = "46304"
-    '=util_ShiftDate(PA6,"+1bd",PA2)'        = "46308"
-    '=util_ShiftDate(PA6,"-1bd",PA2)'        = "46304"
-    '=util_ShiftDate(PA4,"+0bd",PA2)'        = "46305"
-    '=util_ShiftDate(PA3,"+7cd",PA2)'        = "46311"
+    '=util_ShiftDate(PA6,"+1bd","PA2",ZU1)'        = "46308"
+    '=util_ShiftDate(PA6,"-1bd","PA2",ZU1)'        = "46304"
+    '=util_ShiftDate(PA4,"+0bd","PA2",ZU1)'        = "46305"
+    '=util_ShiftDate(PA3,"+7cd","PA2",ZU1)'        = "46311"
     '=util_ShiftDate(PA3,"-7cd")'            = "46297"
     '=util_ShiftDate(PA4,"-0cd")'            = "46305"
-    '=util_ShiftDate(PA3,"+0em",PA2)'        = "46326"
+    '=util_ShiftDate(PA3,"+0em","PA2",ZU1)'        = "46326"
     '=util_ShiftDate(PA3,"+1em")'            = "46356"
     '=util_ShiftDate(PA3,"-1em")'            = "46295"
     '=util_ShiftDate(DATE(2028,1,31),"+1em")' = "46812"
@@ -696,9 +694,9 @@ $formulas = [ordered]@{
     # PB2, Christmas Day closed, 28 December, and 25 December without it, the zeros and cases as one;
     # the order the rule, no roll at the end; a chain malformed late, one leaving the sheet at its
     # first instruction and too many digits in a later one, each refused naming where.
-    '=util_ShiftDate(PB3,"+3em+25cd-1bd+1bd",PB2)' = "46384"
+    '=util_ShiftDate(PB3,"+3em+25cd-1bd+1bd","PB2",ZU1)' = "46384"
     '=util_ShiftDate(PB3,"+3em+25cd-1bd+1bd")'     = "46381"
-    '=util_ShiftDate(PB3,"+003EM+025cD-01BD+001bd",PB2)' = "46384"
+    '=util_ShiftDate(PB3,"+003EM+025cD-01BD+001bd","PB2",ZU1)' = "46384"
     '=util_ShiftDate(PA3,"-1bd+1bd")'       = "46304"
     '=util_ShiftDate(PA4,"-1bd+1bd")'       = "46307"
     '=util_ShiftDate(PB4,"+1cd+0em")'       = "46053"
@@ -713,8 +711,8 @@ $formulas = [ordered]@{
     '=util_ShiftDate(PA3,"+99999999cd")'     = "#ERROR util_ShiftDate: ValueError: offset has a count of 8 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
     '=util_ShiftDate(E1,"+1bd")'             = "#ERROR util_ShiftDate: date is text 'x', expected date"
     "=util_ShiftDate(PA3,A1)"                = "#ERROR util_ShiftDate: offset is number 1.0, expected text"
-    '=util_ShiftDate(PA3,"+1bd",C2)'         = "#ERROR util_ShiftDate: holiday_calendar is blank, expected holiday calendar handle"
-    '=util_ShiftDate(PA3,"+7cd","x:holiday_calendar:9")' = "#ERROR util_ShiftDate: holiday_calendar is text 'x:holiday_calendar:9' naming no live object, expected holiday calendar handle"
+    '=util_ShiftDate(PA3,"+1bd",C2,ZU1)'     = "#ERROR util_ShiftDate: holiday_key is blank, expected text"
+    '=util_ShiftDate(PA3,"+7cd","PA2","x:holiday_calendars:9")' = "#ERROR util_ShiftDate: holiday_calendars is text 'x:holiday_calendars:9' naming no live object, expected holiday calendars handle"
     # The instrument catalog: the list and the shown fixed_float read one cell at a time with INDEX, the
     # required row booleans among rows of text; a name in another case fails in the library's words
     # and a blank in the seam's.
@@ -786,14 +784,14 @@ $formulas = [ordered]@{
     # to its calendar and echoed as the words of its kind; rows of two fields counted; the name in
     # another case, a header the fixed_float does not have, two rows where one is wanted and a header
     # row of another width refused, in that order of checking.
-    '=INDEX(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2),1,4)' = "payment_calendar_key"
+    '=INDEX(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2),1,4)' = "payment_holiday_key"
     '=INDEX(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2),2,4)' = "AM1"
     '=INDEX(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2),2,5)' = "46164"
     '=INDEX(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2),2,6)' = "10"
     '=COLUMNS(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2))'  = "6"
     '=CountFieldRows("fixed_float",EP4:EQ4,EP5:EQ7)'        = "3"
     '=EchoFieldRow("Future",EP1:EU1,EP2:EU2)' = "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'"
-    '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_calendar_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EQ7)' = "#ERROR EchoFieldRow: values is 3x2 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EP7)' = "#ERROR EchoFieldRow: values is 3x1 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP7:EQ8)' = "#ERROR EchoFieldRow: values is 2x2 array, expected one row of field values"
@@ -2313,7 +2311,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(UF8),1,13)" = "discount_curve_key"
     "=INDEX(util_ReadHandle(UF8),5,13)" = "SOFR"
     '=_ReportRisk(UF8,"delta","day")' = "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk"
-    "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_calendar_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
     "=_EvaluateCashflows(UF5,UF6,UQ5)" = "#ERROR _EvaluateCashflows: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2027-01-04, the valuation date; a curve is never rebased"
     "=_EvaluateCashflows(UF5)" = "#ERROR _EvaluateCashflows: valuation_date is missing, expected valuation date handle"
     "=_EvaluateCashflows(UF5,UF6)" = "#ERROR _EvaluateCashflows: discount_curve_set is missing, expected discount curve set handle"
@@ -2385,7 +2383,7 @@ $formulas = [ordered]@{
     '=_Quote(VA7,"F27",VF7,"flat",VN6)' = "#ERROR _Quote: ValueError: discount_curve_set is a collection of 1 curve, expected none with route = cleared; a cleared quote discounts nothing"
     '=_Quote(VA7,"F27",VF3,"flat",UQ5)' = "#ERROR _Quote: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2026-12-31, the valuation date; a curve is never rebased"
     '=_Quote(VA7,"CAL28",VF7,"flat")' = "#ERROR _Quote: ValueError: contract_code is 'CAL28', expected months the index's schedule has a contract for; it has none for 2028-01"
-    '=_CreateQuoteTemplate("fixed_float",FG1:FK1,FG2:FK2,ZU1)' = "#ERROR _CreateQuoteTemplate: ValueError: trade_id is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_calendar_key, settlement_frequency, nearby"
+    '=_CreateQuoteTemplate("fixed_float",FG1:FK1,FG2:FK2,ZU1)' = "#ERROR _CreateQuoteTemplate: ValueError: trade_id is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_key, settlement_frequency, nearby"
     '=_CreateQuoteTemplate("cashflow",UH1:UL1,UH2:UL2,ZU1)' = "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'cashflow', expected one a quote prices: 'fixed_float'"
     '=_CreateQuoteTemplate("fixed_float",VF1:VM1,VF6:VM6,ZU1)' = "#ERROR _CreateQuoteTemplate: values cell (1, 8) is blank, expected text"
     "=LEFT(_CreateTrades(UX5,FG1:FK1,FG2:FK2,VF7,ZU1),55)" = "#ERROR _CreateTrades: template is quote template handle"
@@ -2512,7 +2510,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(WJ26,"dv01","year"),4,2)' = "-0.095"
     "=_CreateTrades(WJ5:WK6,WL4:WP4,WL5:WP5,WJ21,ZU1)" = "#ERROR _CreateTrades: indexes is 2x2 array, expected one cell, one row or one column of index handles"
     "=_CreateTrades(WJ5,WL4:WP4,WL5:WP5,WJ21,ZU1)"     = "#ERROR _CreateTrades: ValueError: second_schedule_method is 'lastday', expected none unless two indexes"
-    "=_CreateTrades(WJ5:WJ6,WL4:WQ4,WL5:WQ5,WJ21,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 6) is text 'second_fixed_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_calendar_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "=_CreateTrades(WJ5:WJ6,WL4:WQ4,WL5:WQ5,WJ21,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 6) is text 'second_fixed_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
     "=_PrepareTrades(WJ22,WJ13)"      = "#ERROR _PrepareTrades: ValueError: histories are 1, expected 2, one per leg of the trades"
     "=_PrepareTrades(WJ22,WK15:WK16)" = "#ERROR _PrepareTrades: ValueError: history 2 is over index 'A' as history 1 is, expected one history per index of the trades"
     "=_EvaluateTrades(WJ23,WJ17,WJ20)" = "#ERROR _EvaluateTrades: ValueError: markets are 1, expected 2, one per leg of the trades"
@@ -2567,8 +2565,8 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(WJ38),5,2)"  = "B"
     "=INDEX(util_ReadHandle(WJ38),5,7)"  = "-1"
     "=_CreateTrades(WJ5,WL10:WP10,WL11:WP11,WJ33,ZU1)" = "#ERROR _CreateTrades: ValueError: indexes are 1, expected two with a float_float; a spread is the first index's price less the second's"
-    "=_CreateTrades(WJ5:WJ6,WL4:WP4,WL5:WP5,WJ33,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'fixed_price', expected a field of float_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, spread_price, spread_price_currency_unit, spread_price_quantity_unit, second_schedule_method, payment_day, payment_calendar_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
-    "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ21,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_calendar_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "=_CreateTrades(WJ5:WJ6,WL4:WP4,WL5:WP5,WJ33,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'fixed_price', expected a field of float_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, spread_price, spread_price_currency_unit, spread_price_quantity_unit, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ21,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
     "=_CreateTrades(WJ5:WJ6,WL10:WQ10,WL11:WQ11,WJ33,ZU1)" = "#ERROR _CreateTrades: ValueError: broker of trade 1 at row 1 is 'ICAP', expected none on a float_float; a brokered spread is not built"
     "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ39,ZU1)" = "#ERROR _CreateTrades: ValueError: route is 'cleared', expected 'bilateral' on a float_float; a cleared spread is not built"
     '=_CreateQuoteTemplate("float_float",WP1,WP2,ZU1)' = "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'float_float', expected one a quote prices: 'fixed_float'"
@@ -2626,7 +2624,7 @@ $formulas = [ordered]@{
     "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ26,ZU1)" = "#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'EUR', expected DOLLAR or CENT"
     "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ27,ZU1)" = "#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     "=_CreateTrades(VSTACK(YJ7,WJ5),YL4:YP4,YL5:YP5,YJ19,ZU1)" = "#ERROR _CreateTrades: ValueError: index 2 'A' measures ENERGY, expected VOLUME as index 1 'RB'; a spread across two measures needs a density or a heat content, which the unit tables do not carry"
-    '=_CreateTradeTemplate("fixed_float",HSTACK("route","spread_price_currency_unit"),HSTACK("bilateral","DOLLAR"))' = "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_calendar_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    '=_CreateTradeTemplate("fixed_float",HSTACK("route","spread_price_currency_unit"),HSTACK("bilateral","DOLLAR"))' = "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
     # A closed physical contract past its expiry, expired-physical-cash.md: one LOT of Z26 bought
     # at 3.00 and sold at 3.10 through ION under one clearing house, in ZJ19. On the expiry day,
     # 18 November, the 1,000 is the mark, ZJ21; the day after it is cash, ZJ23, whatever the
@@ -2828,8 +2826,8 @@ $cells = [ordered]@{
     "AK2" = "1-Jan-2026"; "AL2" = "1-Jan-2026"
     "AK3" = "19-Jan-2026"
     "AK4" = "16-Feb-2026"; "AL4" = "16-Feb-2026"
-    "AM1" = "=_CreateHolidayCalendar(AK2:AK4)"
-    "AM2" = "=_CreateHolidayCalendar(AK2)"
+    "AM1" = '=_CreateHolidayCalendar("AM1",AK2:AK4)'
+    "AM2" = '=_CreateHolidayCalendar("AM2",AK2)'
     # The index conventions: five codes as the desk types them and one creator cell; a category in
     # another case and an energy unit, for the conventions to refuse; and the gasoline index's
     # quoted units, cents a gallon, with a second creator cell settling in dollars a barrel.
@@ -2858,7 +2856,7 @@ $cells = [ordered]@{
     "EI12" = "mmbtu"; "EJ12" = "1"; "EK12" = "MMBTU"; "EL12" = "0"; "EM12" = "0"
     # A row of the fixed_float's fields and rows of two of them, for the field-value probes: the handle
     # cell refers to the holiday calendar creator in AM1, as a sheet does.
-    "EP1" = "quantity_unit"; "EQ1" = "schedule_method"; "ER1" = "payment_day"; "ES1" = "payment_calendar_key"; "ET1" = "trade_date"; "EU1" = "quantity"
+    "EP1" = "quantity_unit"; "EQ1" = "schedule_method"; "ER1" = "payment_day"; "ES1" = "payment_holiday_key"; "ET1" = "trade_date"; "EU1" = "quantity"
     "EP2" = "lots"; "EQ2" = "lastday"; "ER2" = "+2bd"; "ES2" = "AM1"; "ET2" = "22-May-2026"; "EU2" = "10"
     "EP4" = "quantity"; "EQ4" = "fixed_price"
     "EP5" = "1"; "EQ5" = "3.1"; "EP6" = "2"; "EQ6" = "3.2"; "EP7" = "3"; "EQ7" = "3.3"
@@ -2878,7 +2876,7 @@ $cells = [ordered]@{
     "EW6" = "2"; "EX6" = "24-Sep-2026"; "EY6" = "X26"; "EZ6" = "-4"; "FA6" = "71.5"
     "EW7" = "1"; "EX7" = "24-Sep-2026"; "EY7" = "U26"; "EZ7" = "10"; "FA7" = "70"
     "EW8" = "=_CreateTrades(EB1,EW4:FA4,EW5:FA7,EW3,ZU1)"
-    "EW9" = "quantity_unit"; "EX9" = "quantity_per"; "EY9" = "schedule_method"; "EZ9" = "route"; "FA9" = "settlement_method"; "FB9" = "clearing_house"; "FC9" = "payment_day"; "FD9" = "payment_calendar_key"; "FE9" = "settlement_frequency"
+    "EW9" = "quantity_unit"; "EX9" = "quantity_per"; "EY9" = "schedule_method"; "EZ9" = "route"; "FA9" = "settlement_method"; "FB9" = "clearing_house"; "FC9" = "payment_day"; "FD9" = "payment_holiday_key"; "FE9" = "settlement_frequency"
     "EW10" = "lots"; "EX10" = "month"; "EY10" = "lastday"; "EZ10" = "cleared"; "FA10" = "financial"; "FB10" = "ICE Clear"; "FC10" = "+2bd"; "FD10" = "AM1"; "FE10" = "monthly"
     "EW11" = '=_CreateTradeTemplate("fixed_float",HSTACK(EW9:FE9,"nearby"),HSTACK(EW10:FE10,1))'
     "EX12" = "24-Sep-2026"; "EY12" = "q26-u26"; "EZ12" = "2"; "FA12" = "71"
@@ -2945,7 +2943,7 @@ $cells = [ordered]@{
     "FW20" = "30-Oct-2026"; "FX20" = "3"
     "FW21" = "29-Oct-2026"; "FX21" = "3"
     "FY1" = "3.5"; "FY2" = "3.6"
-    "FZ1" = "quantity_unit"; "GA1" = "quantity_per"; "GB1" = "schedule_method"; "GC1" = "route"; "GD1" = "settlement_method"; "GE1" = "clearing_house"; "GF1" = "payment_day"; "GG1" = "payment_calendar_key"; "GH1" = "settlement_frequency"
+    "FZ1" = "quantity_unit"; "GA1" = "quantity_per"; "GB1" = "schedule_method"; "GC1" = "route"; "GD1" = "settlement_method"; "GE1" = "clearing_house"; "GF1" = "payment_day"; "GG1" = "payment_holiday_key"; "GH1" = "settlement_frequency"
     "FZ2" = "TOY"; "GA2" = "month"; "GB2" = "lastday"; "GC2" = "cleared"; "GD2" = "financial"; "GE2" = "TEST_CLEARER"; "GF2" = "+2bd"; "GG2" = "FM4"; "GH2" = "monthly"
     "GJ1" = "trade_id"; "GK1" = "trade_date"; "GL1" = "contract_code"; "GM1" = "quantity"; "GN1" = "fixed_price"
     "GJ2" = "1001"; "GK2" = "24-Sep-2026"; "GL2" = "Z26"; "GM2" = "10"; "GN2" = "3.1"
@@ -2953,8 +2951,8 @@ $cells = [ordered]@{
     "FM1" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "FM2" = "=_CreateContractSpecifications(EI1:EM1,FN2:FR2)"
     "FM3" = "=_CreateFuturesSchedule(FS1:FS4,FT1:FT4)"
-    "FM4" = "=_CreateHolidayCalendar(FU1:FU3)"
-    "FM5" = '=_CreateIndex("TOY_GAS","Toy natural gas for the NG example",FM3,FM1,FM2,FM4,"TOY")'
+    "FM4" = '=_CreateHolidayCalendar("FM4",FU1:FU3)'
+    "FM5" = '=_CreateIndex("TOY_GAS","Toy natural gas for the NG example",FM3,FM1,FM2,"FM4","TOY",ZU1)'
     "FM6" = "=_CreateValuationDate(FV1,0.5)"
     "FM7" = "=_CreateCalendar(FM6,FM5)"
     "FM8" = "=_CreateFuturesFixings(FW1:FW21,FX1:FX21,FM5)"
@@ -2970,7 +2968,7 @@ $cells = [ordered]@{
     # under it in GP4, prepared against the chain's history in GP5 and evaluated in GP6; a
     # physical penultimate template in GP9, which no batch can be made under, and one naming
     # LOT in GP11, which no index of the smoke defines.
-    "GP1" = "quantity_unit"; "GQ1" = "quantity_per"; "GR1" = "schedule_method"; "GS1" = "route"; "GT1" = "settlement_method"; "GU1" = "clearing_house"; "GV1" = "payment_day"; "GW1" = "payment_calendar_key"; "GX1" = "settlement_frequency"
+    "GP1" = "quantity_unit"; "GQ1" = "quantity_per"; "GR1" = "schedule_method"; "GS1" = "route"; "GT1" = "settlement_method"; "GU1" = "clearing_house"; "GV1" = "payment_day"; "GW1" = "payment_holiday_key"; "GX1" = "settlement_frequency"
     "GP2" = "lots"; "GQ2" = "month"; "GR2" = "penultimate"; "GS2" = "cleared"; "GT2" = "financial"; "GU2" = "ICE Clear Europe"; "GV2" = "+1bd"; "GW2" = "AM1"; "GX2" = "monthly"
     "GP3" = '=_CreateTradeTemplate("fixed_float",HSTACK(GP1:GX1,"nearby"),HSTACK(GP2:GX2,1))'
     "GP4" = "=_CreateTrades(ED1,FG1:FK1,FG2:FK2,GP3,ZU1)"
@@ -3000,13 +2998,13 @@ $cells = [ordered]@{
     "HA3" = "F27"; "HB3" = "7-Jan-2027"
     "HA4" = "=_CreateFuturesSchedule(HA1:HA3,HB1:HB3)"
     "HC3" = "4-Dec-2026"; "HC4" = "1-Jan-2026"
-    "HC1" = "=_CreateHolidayCalendar(HC3)"
-    "HC2" = "=_CreateHolidayCalendar(HC4)"
+    "HC1" = '=_CreateHolidayCalendar("HC1",HC3)'
+    "HC2" = '=_CreateHolidayCalendar("HC2",HC4)'
     "HD1" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "HE2" = "UNIT"; "HF2" = "1"; "HG2" = "MMBTU"; "HH2" = "0"; "HI2" = "0"
     "HE1" = "=_CreateContractSpecifications(EI1:EM1,HE2:HI2)"
-    "HA5" = '=_CreateIndex("SYN","Synthetic gas index for the last3day example",HA4,HD1,HE1,HC1,"UNIT")'
-    "HJ1" = "quantity_unit"; "HK1" = "quantity_per"; "HL1" = "schedule_method"; "HM1" = "route"; "HN1" = "settlement_method"; "HO1" = "clearing_house"; "HP1" = "payment_day"; "HQ1" = "payment_calendar_key"; "HR1" = "settlement_frequency"
+    "HA5" = '=_CreateIndex("SYN","Synthetic gas index for the last3day example",HA4,HD1,HE1,"HC1","UNIT",ZU1)'
+    "HJ1" = "quantity_unit"; "HK1" = "quantity_per"; "HL1" = "schedule_method"; "HM1" = "route"; "HN1" = "settlement_method"; "HO1" = "clearing_house"; "HP1" = "payment_day"; "HQ1" = "payment_holiday_key"; "HR1" = "settlement_frequency"
     "HJ2" = "UNIT"; "HK2" = "month"; "HL2" = "last3day"; "HM2" = "cleared"; "HN2" = "financial"; "HO2" = "Prototype Clearing"; "HP2" = "+2bd"; "HQ2" = "HC2"; "HR2" = "monthly"
     "HJ3" = '=_CreateTradeTemplate("fixed_float",HSTACK(HJ1:HR1,"nearby"),HSTACK(HJ2:HR2,1))'
     "HJ5" = "UNIT"; "HK5" = "month"; "HL5" = "last3day"; "HM5" = "cleared"; "HN5" = "physical"; "HO5" = "Prototype Clearing"; "HR5" = "monthly"
@@ -3048,13 +3046,13 @@ $cells = [ordered]@{
     "IA4" = "G27"; "IB4" = "26-Feb-2027"
     "IA5" = "=_CreateFuturesSchedule(IA1:IA4,IB1:IB4)"
     "IC3" = "25-Dec-2026"; "IC4" = "1-Jan-2027"; "IC5" = "1-Jan-2027"
-    "IC1" = "=_CreateHolidayCalendar(IC3:IC4)"
-    "IC2" = "=_CreateHolidayCalendar(IC5)"
+    "IC1" = '=_CreateHolidayCalendar("IC1",IC3:IC4)'
+    "IC2" = '=_CreateHolidayCalendar("IC2",IC5)'
     "ID1" = '=_CreateIndexConventions("DOLLAR","GAL","DOLLAR","VOLUME","GAL")'
     "IE2" = "GAL"; "IF2" = "1"; "IG2" = "GAL"; "IH2" = "0"; "II2" = "0"
     "IE1" = "=_CreateContractSpecifications(EI1:EM1,IE2:II2)"
-    "IA6" = '=_CreateIndex("ETHANE","Ethane - synthetic volume index",IA5,ID1,IE1,IC1,"GAL")'
-    "IJ1" = "quantity_unit"; "IK1" = "quantity_per"; "IL1" = "schedule_method"; "IM1" = "route"; "IN1" = "settlement_method"; "IO1" = "clearing_house"; "IP1" = "payment_day"; "IQ1" = "payment_calendar_key"; "IR1" = "settlement_frequency"
+    "IA6" = '=_CreateIndex("ETHANE","Ethane - synthetic volume index",IA5,ID1,IE1,"IC1","GAL",ZU1)'
+    "IJ1" = "quantity_unit"; "IK1" = "quantity_per"; "IL1" = "schedule_method"; "IM1" = "route"; "IN1" = "settlement_method"; "IO1" = "clearing_house"; "IP1" = "payment_day"; "IQ1" = "payment_holiday_key"; "IR1" = "settlement_frequency"
     "IJ2" = "GAL"; "IK2" = "month"; "IL2" = "asian"; "IM2" = "cleared"; "IN2" = "financial"; "IO2" = "Prototype Clearing"; "IP2" = "+2bd"; "IQ2" = "IC2"; "IR2" = "monthly"
     "IJ3" = '=_CreateTradeTemplate("fixed_float",HSTACK(IJ1:IR1,"nearby"),HSTACK(IJ2:IR2,1))'
     "IJ5" = "GAL"; "IK5" = "month"; "IL5" = "asian"; "IM5" = "cleared"; "IN5" = "physical"; "IO5" = "Prototype Clearing"; "IR5" = "monthly"
@@ -3126,12 +3124,12 @@ $cells = [ordered]@{
     "JB3" = "F27"; "JC3" = "8-Jan-2027"
     "JB4" = "=_CreateFuturesSchedule(JB1:JB3,JC1:JC3)"
     "JD3" = "1-Jan-2026"
-    "JD1" = "=_CreateHolidayCalendar(JD3)"
+    "JD1" = '=_CreateHolidayCalendar("JD1",JD3)'
     "JE1" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "JF2" = "UNIT"; "JG2" = "1"; "JH2" = "MMBTU"; "JI2" = "0"; "JJ2" = "0"
     "JF1" = "=_CreateContractSpecifications(EI1:EM1,JF2:JJ2)"
-    "JB5" = '=_CreateIndex("PAYS","Synthetic gas index for the payment-groups example",JB4,JE1,JF1,JD1,"UNIT")'
-    "JL1" = "quantity_unit"; "JM1" = "quantity_per"; "JN1" = "schedule_method"; "JO1" = "route"; "JP1" = "settlement_method"; "JQ1" = "clearing_house"; "JR1" = "payment_calendar_key"; "JS1" = "settlement_frequency"
+    "JB5" = '=_CreateIndex("PAYS","Synthetic gas index for the payment-groups example",JB4,JE1,JF1,"JD1","UNIT",ZU1)'
+    "JL1" = "quantity_unit"; "JM1" = "quantity_per"; "JN1" = "schedule_method"; "JO1" = "route"; "JP1" = "settlement_method"; "JQ1" = "clearing_house"; "JR1" = "payment_holiday_key"; "JS1" = "settlement_frequency"
     "JL2" = "UNIT"; "JM2" = "month"; "JN2" = "last3day"; "JO2" = "cleared"; "JP2" = "financial"; "JQ2" = "Prototype Clearing"; "JR2" = "JD1"; "JS2" = "monthly"
     "JL3" = '=_CreateTradeTemplate("fixed_float",HSTACK(JL1:JS1,"nearby"),HSTACK(JL2:JS2,1))'
     "JT1" = "trade_id"; "JU1" = "trade_date"; "JV1" = "contract_code"; "JW1" = "quantity"; "JX1" = "fixed_price"; "JY1" = "payment_day"
@@ -3174,17 +3172,17 @@ $cells = [ordered]@{
     "KD4" = "G27"; "KE4" = "26-Feb-2027"
     "KD5" = "=_CreateFuturesSchedule(KD1:KD4,KE1:KE4)"
     "KF3" = "25-Dec-2026"; "KF4" = "1-Jan-2027"
-    "KF1" = "=_CreateHolidayCalendar(KF3)"
-    "KF2" = "=_CreateHolidayCalendar(KF4)"
+    "KF1" = '=_CreateHolidayCalendar("KF1",KF3)'
+    "KF2" = '=_CreateHolidayCalendar("KF2",KF4)'
     "KG1" = '=_CreateIndexConventions("DOLLAR","GAL","DOLLAR","VOLUME","GAL")'
     "KH2" = "GAL"; "KI2" = "1"; "KJ2" = "GAL"; "KK2" = "0"; "KL2" = "0"
     "KH3" = "BBL"; "KI3" = "1"; "KJ3" = "BBL"; "KK3" = "0"; "KL3" = "0"
     "KH1" = "=_CreateContractSpecifications(EI1:EM1,KH2:KL3)"
-    "KD6" = '=_CreateIndex("MIXED","Synthetic volume index for the mixed-fields example",KD5,KG1,KH1,KF1,"GAL")'
-    "KN1" = "route"; "KO1" = "settlement_method"; "KP1" = "trade_date"; "KQ1" = "fixed_price"; "KR1" = "payment_day"; "KS1" = "payment_calendar_key"; "KT1" = "settlement_frequency"
+    "KD6" = '=_CreateIndex("MIXED","Synthetic volume index for the mixed-fields example",KD5,KG1,KH1,"KF1","GAL",ZU1)'
+    "KN1" = "route"; "KO1" = "settlement_method"; "KP1" = "trade_date"; "KQ1" = "fixed_price"; "KR1" = "payment_day"; "KS1" = "payment_holiday_key"; "KT1" = "settlement_frequency"
     "KN2" = "cleared"; "KO2" = "financial"; "KP2" = "30-Nov-2026"; "KQ2" = "10"; "KR2" = "+1bd"; "KS2" = "KF2"; "KT2" = "monthly"
     "KN3" = '=_CreateTradeTemplate("fixed_float",HSTACK(KN1:KT1,"nearby"),HSTACK(KN2:KT2,1))'
-    "KN4" = "route"; "KO4" = "settlement_method"; "KP4" = "trade_date"; "KQ4" = "fixed_price"; "KR4" = "payment_day"; "KS4" = "payment_calendar_key"; "KT4" = "schedule_method"
+    "KN4" = "route"; "KO4" = "settlement_method"; "KP4" = "trade_date"; "KQ4" = "fixed_price"; "KR4" = "payment_day"; "KS4" = "payment_holiday_key"; "KT4" = "schedule_method"
     "KN5" = "cleared"; "KO5" = "financial"; "KP5" = "30-Nov-2026"; "KQ5" = "10"; "KR5" = "+1bd"; "KS5" = "KF2"; "KT5" = "lastday"
     "KN6" = '=_CreateTradeTemplate("fixed_float",HSTACK(KN4:KT4,KT1,"nearby"),HSTACK(KN5:KT5,KT2,1))'
     "KU1" = "trade_id"; "KV1" = "contract_code"; "KW1" = "quantity"; "KX1" = "quantity_unit"; "KY1" = "quantity_per"; "KZ1" = "schedule_method"; "LA1" = "clearing_house"
@@ -3233,12 +3231,12 @@ $cells = [ordered]@{
     "MA4" = "H27"; "MB4" = "22-Feb-2027"
     "MA5" = "=_CreateFuturesSchedule(MA1:MA4,MB1:MB4)"
     "MC1" = "25-Dec-2026"; "MC2" = "1-Jan-2027"
-    "MC3" = "=_CreateHolidayCalendar(MC1:MC2)"
+    "MC3" = '=_CreateHolidayCalendar("MC3",MC1:MC2)'
     "MD1" = '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     "ME1" = "BBL"; "MF1" = "1"; "MG1" = "BBL"; "MH1" = "0"; "MI1" = "0"
     "ME2" = "LOT"; "MF2" = "1000"; "MG2" = "BBL"; "MH2" = "0"; "MI2" = "0"
     "ME3" = "=_CreateContractSpecifications(EI1:EM1,ME1:MI2)"
-    "MA6" = '=_CreateIndex("WTI","West Texas Intermediate crude oil - NYMEX",MA5,MD1,ME3,MC3,"LOT")'
+    "MA6" = '=_CreateIndex("WTI","West Texas Intermediate crude oil - NYMEX",MA5,MD1,ME3,"MC3","LOT",ZU1)'
     "MJ2" = "BBL"; "MK2" = "month"; "ML2" = "asian"; "MM2" = "cleared"; "MN2" = "financial"; "MO2" = "Prototype Clearing"; "MP2" = "+2bd"; "MQ2" = "MC3"; "MR2" = "monthly"
     "MJ3" = '=_CreateTradeTemplate("fixed_float",HSTACK(IJ1:IR1,"nearby"),HSTACK(MJ2:MR2,1))'
     "MS1" = "trade_id"; "MT1" = "trade_date"; "MU1" = "start_date"; "MV1" = "end_date"; "MW1" = "quantity"; "MX1" = "fixed_price"
@@ -3317,7 +3315,7 @@ $cells = [ordered]@{
     "NH3" = "F27"; "NJ3" = "4-Jan-2027"
     "NH4" = "=_CreateIfercSchedule(NH1:NH3,NJ1:NJ3)"
     "NK1" = "1-Jan-2027"
-    "NK2" = "=_CreateHolidayCalendar(NK1)"
+    "NK2" = '=_CreateHolidayCalendar("NK2",NK1)'
     "NL1" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "NM1" = "LOT"; "NN1" = "2500"; "NO1" = "MMBTU"; "NP1" = "0"; "NQ1" = "0"
     "NM2" = "MMBTU"; "NN2" = "1"; "NO2" = "MMBTU"; "NP2" = "0"; "NQ2" = "0"
@@ -3331,7 +3329,7 @@ $cells = [ordered]@{
     "NR9" = '=_CreateTradeTemplate("fixed_float",HSTACK(IJ1:IO1,IR1,"nearby"),HSTACK(NR8:NW8,NZ8,1))'
     "NR11" = "trade_id"; "NS11" = "trade_date"; "NT11" = "contract_code"; "NU11" = "quantity"; "NV11" = "fixed_price"; "NW11" = "schedule_method"
     "NR12" = "1001"; "NS12" = "30-Nov-2026"; "NT12" = "Z26"; "NU12" = "1"; "NV12" = "-0.5"; "NW12" = "asian"
-    "NR14" = "quantity_unit"; "NS14" = "quantity_per"; "NT14" = "route"; "NU14" = "settlement_method"; "NV14" = "clearing_house"; "NW14" = "payment_day"; "NX14" = "payment_calendar_key"; "NY14" = "settlement_frequency"
+    "NR14" = "quantity_unit"; "NS14" = "quantity_per"; "NT14" = "route"; "NU14" = "settlement_method"; "NV14" = "clearing_house"; "NW14" = "payment_day"; "NX14" = "payment_holiday_key"; "NY14" = "settlement_frequency"
     "NR15" = "LOT"; "NS15" = "month"; "NT15" = "cleared"; "NU15" = "financial"; "NV15" = "ICE Clear Europe"; "NW15" = "+2bd"; "NX15" = "NK2"; "NY15" = "monthly"
     "NR16" = '=_CreateTradeTemplate("fixed_float",HSTACK(NR14:NY14,"nearby"),HSTACK(NR15:NY15,1))'
     "OA1" = "Z26"; "OB1" = "-0.2"
@@ -3385,8 +3383,8 @@ $cells = [ordered]@{
     "OR2" = "BBL"; "OS2" = "1"; "OT2" = "BBL"; "OU2" = "0.01"; "OV2" = "0.004"
     "OR3" = "GAL"; "OS3" = "1"; "OT3" = "GAL"; "OU3" = "0"; "OV3" = "0"
     "OR4" = "=_CreateContractSpecifications(EI1:EM1,OR1:OV3)"
-    "OR5" = '=_CreateIndex("RESERVES","Ethane with the reserve ticket rates",IA5,ID1,OR4,IC1,"LOT")'
-    "OR7" = "quantity_per"; "OS7" = "schedule_method"; "OT7" = "route"; "OU7" = "settlement_method"; "OV7" = "clearing_house"; "OW7" = "payment_day"; "OX7" = "payment_calendar_key"; "OY7" = "broker"; "OZ7" = "settlement_frequency"
+    "OR5" = '=_CreateIndex("RESERVES","Ethane with the reserve ticket rates",IA5,ID1,OR4,"IC1","LOT",ZU1)'
+    "OR7" = "quantity_per"; "OS7" = "schedule_method"; "OT7" = "route"; "OU7" = "settlement_method"; "OV7" = "clearing_house"; "OW7" = "payment_day"; "OX7" = "payment_holiday_key"; "OY7" = "broker"; "OZ7" = "settlement_frequency"
     "OR8" = "month"; "OS8" = "lastday"; "OT8" = "cleared"; "OU8" = "financial"; "OV8" = "Prototype Clearing"; "OW8" = "+2bd"; "OX8" = "IC2"; "OY8" = "ION"; "OZ8" = "monthly"
     "OR9" = '=_CreateTradeTemplate("fixed_float",HSTACK(OR7:OZ7,"nearby"),HSTACK(OR8:OZ8,1))'
     "OR10" = "trade_id"; "OS10" = "trade_date"; "OT10" = "contract_code"; "OU10" = "quantity"; "OV10" = "quantity_unit"; "OW10" = "fixed_price"
@@ -3404,7 +3402,7 @@ $cells = [ordered]@{
     "OR23" = "=_EvaluateTrades(OR22,OR21)"
     "OR25" = "LOT"; "OS25" = "1000"; "OT25" = "BBL"; "OU25" = "9E+307"; "OV25" = "0"
     "OR26" = "=_CreateContractSpecifications(EI1:EM1,OR25:OV25)"
-    "OR27" = '=_CreateIndex("HUGE","A rate a cell holds that two lots outrun",IA5,ID1,OR26,IC1,"LOT")'
+    "OR27" = '=_CreateIndex("HUGE","A rate a cell holds that two lots outrun",IA5,ID1,OR26,"IC1","LOT",ZU1)'
     "OR28" = "101"; "OS28" = "20-Nov-2026"; "OT28" = "Z26"; "OU28" = "2"; "OV28" = "LOT"; "OW28" = "0.25"
     "OR29" = "101"; "OS29" = "20-Nov-2026"; "OT29" = "Z26"; "OU29" = "1"; "OV29" = "LOT"; "OW29" = "0.25"
     "OR30" = "102"; "OS30" = "20-Nov-2026"; "OT30" = "Z26"; "OU30" = "1"; "OV30" = "LOT"; "OW30" = "0.25"
@@ -3423,13 +3421,13 @@ $cells = [ordered]@{
     "OR38" = "=_PrepareTrades(OR37,OR19)"
     "OR39" = "=_EvaluateTrades(OR38,OR21)"
     "OR40" = "1002"; "OS40" = "20-Nov-2026"; "OT40" = "Z26"; "OU40" = "-2"; "OV40" = "LOT"; "OW40" = "0.25"; "OX40" = "-5"
-    "OR42" = "quantity_per"; "OS42" = "schedule_method"; "OT42" = "route"; "OU42" = "settlement_method"; "OV42" = "clearing_house"; "OW42" = "payment_day"; "OX42" = "payment_calendar_key"; "OY42" = "marketing_reserve"; "OZ42" = "broker"; "PA42" = "settlement_frequency"
+    "OR42" = "quantity_per"; "OS42" = "schedule_method"; "OT42" = "route"; "OU42" = "settlement_method"; "OV42" = "clearing_house"; "OW42" = "payment_day"; "OX42" = "payment_holiday_key"; "OY42" = "marketing_reserve"; "OZ42" = "broker"; "PA42" = "settlement_frequency"
     "OR43" = "month"; "OS43" = "lastday"; "OT43" = "cleared"; "OU43" = "financial"; "OV43" = "Prototype Clearing"; "OW43" = "+2bd"; "OX43" = "IC2"; "OY43" = "7"; "OZ43" = "ION"; "PA43" = "monthly"
     "OR44" = '=_CreateTradeTemplate("fixed_float",HSTACK(OR42:PA42,"nearby"),HSTACK(OR43:PA43,1))'
     "OR45" = "=_CreateTrades(OR5,OR10:OW10,OR11:OW14,OR44,ZU1)"
     "OR46" = "=_PrepareTrades(OR45,OR19)"
     "OR47" = "=_EvaluateTrades(OR46,OR21)"
-    "OR49" = "quantity_per"; "OS49" = "schedule_method"; "OT49" = "route"; "OU49" = "settlement_method"; "OV49" = "counterparty"; "OW49" = "payment_day"; "OX49" = "payment_calendar_key"; "OY49" = "discount_curve_key"; "OZ49" = "settlement_frequency"
+    "OR49" = "quantity_per"; "OS49" = "schedule_method"; "OT49" = "route"; "OU49" = "settlement_method"; "OV49" = "counterparty"; "OW49" = "payment_day"; "OX49" = "payment_holiday_key"; "OY49" = "discount_curve_key"; "OZ49" = "settlement_frequency"
     "OR50" = "month"; "OS50" = "lastday"; "OT50" = "bilateral"; "OU50" = "financial"; "OV50" = "ACME Trading"; "OW50" = "+2bd"; "OX50" = "IC2"; "OY50" = "SOFR"; "OZ50" = "monthly"
     "OR51" = '=_CreateTradeTemplate("fixed_float",HSTACK(OR49:OZ49,"nearby"),HSTACK(OR50:OZ50,1))'
     "OR52" = "=_CreateTrades(OR5,OR10:OW10,OR11:OW14,OR51,ZU1)"
@@ -3438,7 +3436,7 @@ $cells = [ordered]@{
     "OR56" = "101"; "OS56" = "20-Nov-2026"; "OT56" = "Z26"; "OU56" = "2"; "OV56" = "LOT"; "OW56" = "0.25"; "OX56" = "ACME Trading"
     "OR57" = "102"; "OS57" = "20-Nov-2026"; "OT57" = "Z26"; "OU57" = "-2"; "OV57" = "LOT"; "OW57" = "0.25"; "OX57" = "Beta Energy"
     "OR58" = "=_CreateTrades(OR5,OR55:OX55,OR56:OX57,OR60,ZU1)"
-    "OR61" = "quantity_per"; "OS61" = "schedule_method"; "OT61" = "route"; "OU61" = "settlement_method"; "OV61" = "payment_day"; "OW61" = "payment_calendar_key"; "OX61" = "discount_curve_key"; "OY61" = "settlement_frequency"
+    "OR61" = "quantity_per"; "OS61" = "schedule_method"; "OT61" = "route"; "OU61" = "settlement_method"; "OV61" = "payment_day"; "OW61" = "payment_holiday_key"; "OX61" = "discount_curve_key"; "OY61" = "settlement_frequency"
     "OR62" = "month"; "OS62" = "lastday"; "OT62" = "bilateral"; "OU62" = "financial"; "OV62" = "+2bd"; "OW62" = "IC2"; "OX62" = "SOFR"; "OY62" = "monthly"
     "OR60" = '=_CreateTradeTemplate("fixed_float",HSTACK(OR61:OY61,"nearby"),HSTACK(OR62:OY62,1))'
     # Since #188, reserve-fee-applicability.md: the cleared template without a broker over the same
@@ -3481,7 +3479,7 @@ $cells = [ordered]@{
     "OR92" = "=_CreateTrades(OR5,OR88:OY88,OR89:OY91,OR9,ZU1)"
     "OR93" = "=_PrepareTrades(OR92,OR19)"
     "OR94" = "=_EvaluateTrades(OR93,OR21)"
-    "OR96" = "quantity_per"; "OS96" = "schedule_method"; "OT96" = "route"; "OU96" = "settlement_method"; "OV96" = "clearing_house"; "OW96" = "payment_day"; "OX96" = "payment_calendar_key"; "OY96" = "cva_reserve"; "OZ96" = "broker"; "PA96" = "settlement_frequency"
+    "OR96" = "quantity_per"; "OS96" = "schedule_method"; "OT96" = "route"; "OU96" = "settlement_method"; "OV96" = "clearing_house"; "OW96" = "payment_day"; "OX96" = "payment_holiday_key"; "OY96" = "cva_reserve"; "OZ96" = "broker"; "PA96" = "settlement_frequency"
     "OR97" = "month"; "OS97" = "lastday"; "OT97" = "cleared"; "OU97" = "financial"; "OV97" = "Prototype Clearing"; "OW97" = "+2bd"; "OX97" = "IC2"; "OY97" = "-40"; "OZ97" = "ION"; "PA97" = "monthly"
     "OR98" = '=_CreateTradeTemplate("fixed_float",HSTACK(OR96:PA96,"nearby"),HSTACK(OR97:PA97,1))'
     "OR99" = "=_CreateTrades(OR5,OR10:OW10,OR11:OW14,OR98,ZU1)"
@@ -3627,7 +3625,7 @@ $cells = [ordered]@{
     "CT7" = "=_CreateMarketHistory(CT5,CT6)"
     "CT8" = "=_CreateFuturesFixings(CQ1:CQ5,CR1:CR5,ED1)"
     "CT9" = "=_CreateFuturesFixings(CQ3:CQ5,CR3:CR5,ED1)"
-    "CT10" = "=_CreateHolidayCalendar(CQ2)"
+    "CT10" = '=_CreateHolidayCalendar("CT10",CQ2)'
     "CT11" = "=_CreateCalendar(CT3,ED2)"
     # The price vector: a header over four prices, a zero and a negative among them and the
     # first repeated, a cell of numeric text under them, and one creator cell over the prices,
@@ -3750,31 +3748,31 @@ $cells = [ordered]@{
     # calendar in AM1, the IFERC schedule in DE1 and the Gas Daily schedule in DK1, each with the
     # conventions in AP1 and the specifications in BY1.
     "EC2" = "Henry Hub NYMEX"; "EC3" = "Henry Hub IFERC"; "EC4" = "Henry Hub Gas Daily"
-    "EB1" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,AM1,"lots")'
+    "EB1" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,"AM1","lots",ZU1)'
     "EB2" = '=_CreateIndex(EC3,"Henry Hub natural gas - Inside FERC monthly index",DE1,AP1,BY1)'
     "EB3" = '=_CreateIndex(EC4,"Henry Hub natural gas - Platts Gas Daily",DK1,AP1,BY1)'
     # The indices the calendars and the futures fixings take, the schedule and the holiday calendar
     # reached through them: over the two-contract schedule in CT4 with the holiday calendar in AM1
     # and with the one in CT10, over the two contracts after m26 in CW3, over the four schedules
     # the calendar refuses, AR2 to AR5, and over the Gas Daily schedule with a gap in DK3.
-    "ED1" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",CT4,AP1,BY1,AM1,"lots")'
-    "ED2" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",CT4,AP1,BY1,CT10)'
-    "ED3" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",CW3,AP1,BY1,AM1)'
-    "ED4" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR2,AP1,BY1,AM1)'
-    "ED5" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR3,AP1,BY1,AM1)'
-    "ED6" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR4,AP1,BY1,AM1)'
-    "ED7" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR5,AP1,BY1,AM1)'
+    "ED1" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",CT4,AP1,BY1,"AM1","lots",ZU1)'
+    "ED2" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",CT4,AP1,BY1,"CT10",,ZU1)'
+    "ED3" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",CW3,AP1,BY1,"AM1",,ZU1)'
+    "ED4" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR2,AP1,BY1,"AM1",,ZU1)'
+    "ED5" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR3,AP1,BY1,"AM1",,ZU1)'
+    "ED6" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR4,AP1,BY1,"AM1",,ZU1)'
+    "ED7" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR5,AP1,BY1,"AM1",,ZU1)'
     "ED8" = '=_CreateIndex(EC4,"Henry Hub natural gas - Platts Gas Daily",DK3,AP1,BY1)'
     # A date shifted by a text offset: the synthetic holiday calendar of date-offset-utility.md,
     # Monday 12 October 2026 closed and nothing else, in PA2 over PA1; Friday 9 October, the
     # Saturday, the Sunday and the closed Monday in PA3 to PA6.
     "PA1" = "12-Oct-2026"
-    "PA2" = "=_CreateHolidayCalendar(PA1)"
+    "PA2" = '=_CreateHolidayCalendar("PA2",PA1)'
     "PA3" = "9-Oct-2026"; "PA4" = "10-Oct-2026"; "PA5" = "11-Oct-2026"; "PA6" = "12-Oct-2026"
     # Since #181 the compound ticket's calendar H, Christmas Day 2026 closed and nothing else, in PB2
     # over PB1, and its dates: 12 August 2026, 30 January 2026 and 31 January 2028.
     "PB1" = "25-Dec-2026"
-    "PB2" = "=_CreateHolidayCalendar(PB1)"
+    "PB2" = '=_CreateHolidayCalendar("PB2",PB1)'
     "PB3" = "12-Aug-2026"; "PB4" = "30-Jan-2026"; "PB5" = "31-Jan-2028"
     # The IFERC index the fixings in BQ1 take: a schedule of their four months, January first as
     # a schedule runs, the codes in BV and Platts' publication days beside them, and an index
@@ -3804,13 +3802,13 @@ $cells = [ordered]@{
     "PD4" = "Z26"; "PE4" = "31-Dec-2026"
     "PD5" = "=_CreateFuturesSchedule(PD1:PD4,PE1:PE4)"
     "PF3" = "1-Jan-2030"
-    "PF1" = "=_CreateHolidayCalendar(PF3)"
+    "PF1" = '=_CreateHolidayCalendar("PF1",PF3)'
     "PG1" = '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     "PH2" = "BBL"; "PI2" = "1"; "PJ2" = "BBL"; "PK2" = "0"; "PL2" = "0"
     "PH3" = "LOT"; "PI3" = "1000"; "PJ3" = "BBL"; "PK3" = "0"; "PL3" = "0"
     "PH1" = "=_CreateContractSpecifications(EI1:EM1,PH2:PL3)"
-    "PD6" = '=_CreateIndex("BBL_ASIAN","Synthetic barrel index for the codes-and-dates example",PD5,PG1,PH1,PF1,"LOT")'
-    "PN1" = "quantity_unit"; "PO1" = "schedule_method"; "PP1" = "route"; "PQ1" = "settlement_method"; "PR1" = "clearing_house"; "PS1" = "payment_day"; "PT1" = "payment_calendar_key"; "PU1" = "settlement_frequency"
+    "PD6" = '=_CreateIndex("BBL_ASIAN","Synthetic barrel index for the codes-and-dates example",PD5,PG1,PH1,"PF1","LOT",ZU1)'
+    "PN1" = "quantity_unit"; "PO1" = "schedule_method"; "PP1" = "route"; "PQ1" = "settlement_method"; "PR1" = "clearing_house"; "PS1" = "payment_day"; "PT1" = "payment_holiday_key"; "PU1" = "settlement_frequency"
     "PN2" = "BBL"; "PO2" = "asian"; "PP2" = "cleared"; "PQ2" = "financial"; "PR2" = "Prototype Clearing"; "PS2" = "+1bd"; "PT2" = "PF1"; "PU2" = "monthly"
     "PN3" = '=_CreateTradeTemplate("fixed_float",HSTACK(PN1:PU1,"nearby"),HSTACK(PN2:PU2,1))'
     "PN5" = "contract_code"; "PO5" = "quantity_unit"; "PP5" = "settlement_frequency"
@@ -3859,17 +3857,17 @@ $cells = [ordered]@{
     "QJ3" = "F29"; "QK3" = "5-Jan-2029"
     "QJ4" = "=_CreateFuturesSchedule(QJ1:QJ3,QK1:QK3)"
     "QL1" = "27-Dec-2027"; "QL2" = "1-Jan-2030"
-    "QJ5" = "=_CreateHolidayCalendar(QL1)"
+    "QJ5" = '=_CreateHolidayCalendar("QJ5",QL1)'
     "QJ6" = '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     "QM1" = "name"; "QN1" = "lot_size"; "QO1" = "lot_unit"; "QP1" = "brokerage_rate_per_lot"; "QQ1" = "clearing_rate_per_lot"
     "QM2" = "UNIT"; "QN2" = "1"; "QO2" = "BBL"; "QP2" = "0"; "QQ2" = "0"
     "QJ7" = "=_CreateContractSpecifications(QM1:QQ1,QM2:QQ2)"
-    "QJ8" = '=_CreateIndex("UNIT","Synthetic one-barrel index",QJ4,QJ6,QJ7,QJ5,"UNIT")'
-    "QJ9" = "=_CreateHolidayCalendar(QL2)"
-    "QM4" = "quantity_unit"; "QN4" = "quantity_per"; "QO4" = "schedule_method"; "QP4" = "route"; "QQ4" = "settlement_method"; "QR4" = "counterparty"; "QS4" = "payment_calendar_key"; "QT4" = "marketing_reserve"; "QU4" = "discount_curve_key"
+    "QJ8" = '=_CreateIndex("UNIT","Synthetic one-barrel index",QJ4,QJ6,QJ7,"QJ5","UNIT",ZU1)'
+    "QJ9" = '=_CreateHolidayCalendar("QJ9",QL2)'
+    "QM4" = "quantity_unit"; "QN4" = "quantity_per"; "QO4" = "schedule_method"; "QP4" = "route"; "QQ4" = "settlement_method"; "QR4" = "counterparty"; "QS4" = "payment_holiday_key"; "QT4" = "marketing_reserve"; "QU4" = "discount_curve_key"
     "QM5" = "UNIT"; "QN5" = "month"; "QO5" = "lastday"; "QP5" = "bilateral"; "QQ5" = "financial"; "QR5" = "ACME Trading"; "QS5" = "QJ9"; "QT5" = "5"; "QU5" = "SOFR"
     "QJ10" = '=_CreateTradeTemplate("fixed_float",HSTACK(QM4:QU4,QU6,"nearby"),HSTACK(QM5:QU5,QU7,1))'
-    "QM6" = "quantity_unit"; "QN6" = "quantity_per"; "QO6" = "schedule_method"; "QP6" = "route"; "QQ6" = "settlement_method"; "QR6" = "clearing_house"; "QS6" = "payment_calendar_key"; "QT6" = "marketing_reserve"; "QU6" = "settlement_frequency"
+    "QM6" = "quantity_unit"; "QN6" = "quantity_per"; "QO6" = "schedule_method"; "QP6" = "route"; "QQ6" = "settlement_method"; "QR6" = "clearing_house"; "QS6" = "payment_holiday_key"; "QT6" = "marketing_reserve"; "QU6" = "settlement_frequency"
     "QM7" = "UNIT"; "QN7" = "month"; "QO7" = "lastday"; "QP7" = "cleared"; "QQ7" = "financial"; "QR7" = "Prototype Clearing"; "QS7" = "QJ9"; "QT7" = "5"; "QU7" = "monthly"
     "QJ11" = '=_CreateTradeTemplate("fixed_float",HSTACK(QM6:QU6,"nearby"),HSTACK(QM7:QU7,1))'
     "QM9" = "trade_id"; "QN9" = "trade_date"; "QO9" = "contract_code"; "QP9" = "quantity"; "QQ9" = "fixed_price"; "QR9" = "payment_day"
@@ -3994,7 +3992,7 @@ $cells = [ordered]@{
     # the ticket's first row under the bilateral template, valued on 4 January 2027 at 80 on
     # the collection QV8 is valued on; and QV8 and it collected, in that order.
     "QJ20" = '=_CreateIndexConventions("DOLLAR","BBL","CENT","VOLUME","BBL")'
-    "QJ21" = '=_CreateIndex("UNITC","One-barrel index settled in cents",QJ4,QJ20,QJ7,QJ5,"UNIT")'
+    "QJ21" = '=_CreateIndex("UNITC","One-barrel index settled in cents",QJ4,QJ20,QJ7,"QJ5","UNIT",ZU1)'
     "QJ22" = "=_CreateTrades(QJ21,QM9:QR9,QM10:QR10,QJ10,ZU1)"
     "QJ23" = "=_CreateCalendar(QV2,QJ21)"
     "QJ24" = "=_CreateFuturesFixings(QW1,QX1,QJ21)"
@@ -4022,11 +4020,11 @@ $cells = [ordered]@{
     "SD1" = "name"; "SE1" = "lot_size"; "SF1" = "lot_unit"; "SG1" = "brokerage_rate_per_lot"; "SH1" = "clearing_rate_per_lot"
     "SD2" = "LOT"; "SE2" = "1"; "SF2" = "MMBTU"; "SG2" = "0"; "SH2" = "0"
     "SA11" = "=_CreateFuturesSchedule(SA1:SA9,SB1:SB9)"
-    "SA12" = "=_CreateHolidayCalendar(SC1)"
+    "SA12" = '=_CreateHolidayCalendar("SA12",SC1)'
     "SA13" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "SA14" = "=_CreateContractSpecifications(SD1:SH1,SD2:SH2)"
-    "SA15" = '=_CreateIndex("HALF","Synthetic one-unit index for half-year strips",SA11,SA13,SA14,SA12,"LOT")'
-    "SD4" = "quantity_unit"; "SE4" = "quantity_per"; "SF4" = "schedule_method"; "SG4" = "route"; "SH4" = "settlement_method"; "SI4" = "clearing_house"; "SJ4" = "payment_day"; "SK4" = "payment_calendar_key"; "SL4" = "settlement_frequency"
+    "SA15" = '=_CreateIndex("HALF","Synthetic one-unit index for half-year strips",SA11,SA13,SA14,"SA12","LOT",ZU1)'
+    "SD4" = "quantity_unit"; "SE4" = "quantity_per"; "SF4" = "schedule_method"; "SG4" = "route"; "SH4" = "settlement_method"; "SI4" = "clearing_house"; "SJ4" = "payment_day"; "SK4" = "payment_holiday_key"; "SL4" = "settlement_frequency"
     "SD5" = "LOT"; "SE5" = "month"; "SF5" = "lastday"; "SG5" = "cleared"; "SH5" = "financial"; "SI5" = "Prototype Clearing"; "SJ5" = "+2bd"; "SK5" = "SA12"; "SL5" = "monthly"
     "SA16" = '=_CreateTradeTemplate("fixed_float",HSTACK(SD4:SL4,"nearby"),HSTACK(SD5:SL5,1))'
     "SD7" = "trade_id"; "SE7" = "trade_date"; "SF7" = "contract_code"; "SG7" = "quantity"; "SH7" = "fixed_price"
@@ -4049,52 +4047,28 @@ $cells = [ordered]@{
     "SA28" = "=_EvaluateTrades(SA27,SA26)"
     "SA29" = "=_PrepareTrades(SA18,SA24)"
     "SA30" = "=_EvaluateTrades(SA29,SA26)"
-    # Combined holiday calendars, combine-holiday-calendars.md: the ticket's synthetic calendars, A
-    # listing Wednesday 14 October 2026 twice around Monday the 12th and B the 13th and the 14th, a
-    # Saturday calendar, their combinations in a column, a row, alone and nested; an index whose X26
-    # stops trading on Friday 9 October behind two boundary contracts, a cleared lastday template
-    # paying one business day later on the combined calendar, and one lot of X26 booked on it.
+    # A key of several names, holiday-keys.md: the ticket's synthetic calendars, A listing
+    # Wednesday 14 October 2026 twice around Monday the 12th and B the 13th and the 14th, and a
+    # Saturday calendar; an index whose X26 stops trading on Friday 9 October behind two boundary
+    # contracts, a cleared lastday template paying one business day later on the key of A and B,
+    # and one lot of X26 booked on it.
     "TA1" = "14-Oct-2026"; "TB1" = "13-Oct-2026"
     "TA2" = "12-Oct-2026"; "TB2" = "14-Oct-2026"
     "TA3" = "14-Oct-2026"
     "TA5" = "10-Oct-2026"
-    "TC1" = "=_CreateHolidayCalendar(TA1:TA3)"
-    "TC2" = "=_CreateHolidayCalendar(TB1:TB2)"
-    "TC3" = "=_CreateHolidayCalendar(TA5)"
+    "TC1" = '=_CreateHolidayCalendar("TC1",TA1:TA3)'
+    "TC2" = '=_CreateHolidayCalendar("TC2",TB1:TB2)'
+    "TC3" = '=_CreateHolidayCalendar("TC3",TA5)'
     "TD1" = "=TC2"
-    "TE1" = "=_CombineHolidayCalendars(TC1:TC2)"
-    "TE2" = "=_CombineHolidayCalendars(TC1:TD1)"
-    "TE3" = "=_CombineHolidayCalendars(TC1)"
-    "TF1" = "=TE1"; "TF2" = "=TC3"
-    # payment-calendar-keys.md: every payment calendar a template selects, made again under a
-    # name, its own cell's address, in ZZ, and collected in ZU1; a template's value is that
-    # name, text, a combination's the names of its sources joined by a plus sign, and every
-    # batch and quote template on the sheet names ZU1 as its collection.
-    "ZZ1" = '=_CreateHolidayCalendar(AK2:AK4,"AM1")'
-    "ZZ2" = '=_CreateHolidayCalendar(FU1:FU3,"FM4")'
-    "ZZ3" = '=_CreateHolidayCalendar(HC4,"HC2")'
-    "ZZ4" = '=_CreateHolidayCalendar(IC5,"IC2")'
-    "ZZ5" = '=_CreateHolidayCalendar(JD3,"JD1")'
-    "ZZ6" = '=_CreateHolidayCalendar(KF4,"KF2")'
-    "ZZ7" = '=_CreateHolidayCalendar(NK1,"NK2")'
-    "ZZ8" = '=_CreateHolidayCalendar(PF3,"PF1")'
-    "ZZ9" = '=_CreateHolidayCalendar(QL2,"QJ9")'
-    "ZZ10" = '=_CreateHolidayCalendar(SC1,"SA12")'
-    "ZZ11" = '=_CreateHolidayCalendar(TA1:TA3,"TC1")'
-    "ZZ12" = '=_CreateHolidayCalendar(TB1:TB2,"TC2")'
-    "ZZ13" = '=_CreateHolidayCalendar(VE2,"VE1")'
-    "ZZ14" = '=_CreateHolidayCalendar(WC1,"WJ2")'
-    "ZZ15" = '=_CreateHolidayCalendar(YC1,"YJ2")'
-    "ZZ16" = '=_CreateHolidayCalendar(XS1,"XV2")'
-    "ZZ17" = '=_CreateHolidayCalendar(MC1:MC2,"MC3")'
-    "ZU1" = "=_CollectPaymentCalendars(ZZ1:ZZ17)"
-    # payment-calendar-keys.md: two named calendars, one with no name, and the collection.
+    # holiday-keys.md: every calendar on the sheet is made under a name, its own cell's address,
+    # and collected in ZU1; a key is that name, text, or several joined by a plus sign, and every
+    # index, batch, quote template and date shift on the sheet names ZU1 as its collection.
+    "ZU1" = "=_CollectHolidayCalendars(VSTACK(AM1,AM2,CT10,FM4,HC1,HC2,IC1,IC2,JD1,KF1,KF2,MC3,NK2,PA2,PB2,PF1,QJ5,QJ9,SA12,TC1,TC2,TC3,TE7,UZ1,VE1,WJ2,XV2,YJ2,ZJ2))"
+    # holiday-keys.md: two calendars under names of their own, and their collection.
     "TA20" = "26-Nov-2026"; "TB20" = "27-Nov-2026"; "TB21" = "30-Nov-2026"
-    "TC20" = '=_CreateHolidayCalendar(TA20,"PAY_A")'
-    "TC21" = '=_CreateHolidayCalendar(TB20:TB21,"PAY_B")'
-    "TC22" = "=_CreateHolidayCalendar(TA20)"
-    "TD20" = "=_CollectPaymentCalendars(TC20:TC21)"
-    "TE4" = "=_CombineHolidayCalendars(TF1:TF2)"
+    "TC20" = '=_CreateHolidayCalendar("PAY_A",TA20)'
+    "TC21" = '=_CreateHolidayCalendar("PAY_B",TB20:TB21)'
+    "TD20" = "=_CollectHolidayCalendars(TC20:TC21)"
     "TG1" = "U26"; "TH1" = "27-Aug-2026"
     "TG2" = "V26"; "TH2" = "28-Sep-2026"
     "TG3" = "X26"; "TH3" = "9-Oct-2026"
@@ -4102,11 +4076,11 @@ $cells = [ordered]@{
     "TJ1" = "name"; "TK1" = "lot_size"; "TL1" = "lot_unit"; "TM1" = "brokerage_rate_per_lot"; "TN1" = "clearing_rate_per_lot"
     "TJ2" = "LOT"; "TK2" = "1"; "TL2" = "MMBTU"; "TM2" = "0"; "TN2" = "0"
     "TE6" = "=_CreateFuturesSchedule(TG1:TG3,TH1:TH3)"
-    "TE7" = "=_CreateHolidayCalendar(TI1)"
+    "TE7" = '=_CreateHolidayCalendar("TE7",TI1)'
     "TE8" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "TE9" = "=_CreateContractSpecifications(TJ1:TN1,TJ2:TN2)"
-    "TE10" = '=_CreateIndex("ANCHORED","Synthetic index anchored on 9 October 2026",TE6,TE8,TE9,TE7,"LOT")'
-    "TJ4" = "quantity_unit"; "TK4" = "quantity_per"; "TL4" = "schedule_method"; "TM4" = "route"; "TN4" = "settlement_method"; "TO4" = "clearing_house"; "TP4" = "payment_day"; "TQ4" = "payment_calendar_key"; "TR4" = "settlement_frequency"
+    "TE10" = '=_CreateIndex("ANCHORED","Synthetic index anchored on 9 October 2026",TE6,TE8,TE9,"TE7","LOT",ZU1)'
+    "TJ4" = "quantity_unit"; "TK4" = "quantity_per"; "TL4" = "schedule_method"; "TM4" = "route"; "TN4" = "settlement_method"; "TO4" = "clearing_house"; "TP4" = "payment_day"; "TQ4" = "payment_holiday_key"; "TR4" = "settlement_frequency"
     "TJ5" = "LOT"; "TK5" = "month"; "TL5" = "lastday"; "TM5" = "cleared"; "TN5" = "financial"; "TO5" = "Prototype Clearing"; "TP5" = "+1bd"; "TQ5" = "TC1+TC2"; "TR5" = "monthly"
     "TE11" = '=_CreateTradeTemplate("fixed_float",HSTACK(TJ4:TR4,"nearby"),HSTACK(TJ5:TR5,1))'
     "TJ7" = "trade_id"; "TK7" = "trade_date"; "TL7" = "contract_code"; "TM7" = "quantity"; "TN7" = "fixed_price"
@@ -4206,8 +4180,8 @@ $cells = [ordered]@{
     "UX3" = "G27"; "UY3" = "26-Feb-2027"
     "UX4" = "=_CreateFuturesSchedule(UX1:UX3,UY1:UY3)"
     "UZ3" = "1-Jan-2027"
-    "UZ1" = "=_CreateHolidayCalendar(UZ3)"
-    "UX5" = '=_CreateIndex("STRIP","The quoting ticket''s strip",UX4,HD1,HE1,UZ1,"UNIT")'
+    "UZ1" = '=_CreateHolidayCalendar("UZ1",UZ3)'
+    "UX5" = '=_CreateIndex("STRIP","The quoting ticket''s strip",UX4,HD1,HE1,"UZ1","UNIT",ZU1)'
     "VA1" = "31-Dec-2026"
     "VA2" = "=_CreateValuationDate(VA1,0.5)"
     "VA3" = "=_CreateCalendar(VA2,UX5)"
@@ -4216,11 +4190,11 @@ $cells = [ordered]@{
     "VA6" = '=_CreatePriceVector("STRIP",VD1:VD2)'
     "VA7" = "=_CreateMarket(VA5,VA6)"
     "VE2" = "1-Jan-2030"
-    "VE1" = "=_CreateHolidayCalendar(VE2)"
-    "VF1" = "route"; "VG1" = "settlement_method"; "VH1" = "schedule_method"; "VI1" = "quantity_per"; "VJ1" = "payment_day"; "VK1" = "payment_calendar_key"; "VL1" = "discount_curve_key"; "VM1" = "settlement_frequency"
+    "VE1" = '=_CreateHolidayCalendar("VE1",VE2)'
+    "VF1" = "route"; "VG1" = "settlement_method"; "VH1" = "schedule_method"; "VI1" = "quantity_per"; "VJ1" = "payment_day"; "VK1" = "payment_holiday_key"; "VL1" = "discount_curve_key"; "VM1" = "settlement_frequency"
     "VF2" = "bilateral"; "VG2" = "financial"; "VH2" = "asian"; "VI2" = "month"; "VJ2" = "+1bd"; "VK2" = "VE1"; "VL2" = "SOFR"; "VM2" = "monthly"
     "VF3" = '=_CreateQuoteTemplate("fixed_float",HSTACK(VF1:VM1,"nearby"),HSTACK(VF2:VM2,1),ZU1)'
-    "VF5" = "route"; "VG5" = "settlement_method"; "VH5" = "schedule_method"; "VI5" = "quantity_per"; "VJ5" = "payment_day"; "VK5" = "payment_calendar_key"; "VL5" = "settlement_frequency"
+    "VF5" = "route"; "VG5" = "settlement_method"; "VH5" = "schedule_method"; "VI5" = "quantity_per"; "VJ5" = "payment_day"; "VK5" = "payment_holiday_key"; "VL5" = "settlement_frequency"
     "VF6" = "cleared"; "VG6" = "financial"; "VH6" = "asian"; "VI6" = "calday"; "VJ6" = "+1bd"; "VK6" = "VE1"; "VL6" = "monthly"
     "VF7" = '=_CreateQuoteTemplate("fixed_float",HSTACK(VF5:VL5,"nearby"),HSTACK(VF6:VL6,1),ZU1)'
     "VN1" = "date"; "VO1" = "discount_factor"
@@ -4264,10 +4238,10 @@ $cells = [ordered]@{
     "WD5" = "4-Jan-2027"; "WE5" = "1"
     "WD6" = "4-Jan-2028"; "WE6" = "0.95"
     "WJ1" = "=_CreateFuturesSchedule(WA1:WA3,WB1:WB3)"
-    "WJ2" = "=_CreateHolidayCalendar(WC1)"
+    "WJ2" = '=_CreateHolidayCalendar("WJ2",WC1)'
     "WJ3" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "WJ4" = "=_CreateContractSpecifications(WD1:WH1,WD2:WH2)"
-    "WJ5" = '=_CreateIndex("A","Pair leg A, a futures index",WJ1,WJ3,WJ4,WJ2,"NYMEX NG")'
+    "WJ5" = '=_CreateIndex("A","Pair leg A, a futures index",WJ1,WJ3,WJ4,"WJ2","NYMEX NG",ZU1)'
     "WJ6" = '=_CreateIndex("B","Pair leg B, an IFERC index",WJ7,WJ3,WJ4,,"NYMEX NG")'
     "WJ7" = "=_CreateIfercSchedule(WA5:WA9,WB5:WB9)"
     "WK5" = "=WJ6"; "WK6" = "=WJ5"
@@ -4286,7 +4260,7 @@ $cells = [ordered]@{
     "WK17" = "=WJ18"; "WK18" = "=WJ18"; "WK19" = "=WJ17"
     "WJ19" = '=_CreateDiscountCurve("SOFR",WD4:WE4,WD5:WE6)'
     "WJ20" = "=_CollectDiscountCurves(WJ19)"
-    "WL1" = "quantity_unit"; "WM1" = "quantity_per"; "WN1" = "schedule_method"; "WO1" = "second_schedule_method"; "WP1" = "route"; "WQ1" = "settlement_method"; "WR1" = "counterparty"; "WS1" = "discount_curve_key"; "WT1" = "payment_day"; "WU1" = "payment_calendar_key"; "WV1" = "settlement_frequency"
+    "WL1" = "quantity_unit"; "WM1" = "quantity_per"; "WN1" = "schedule_method"; "WO1" = "second_schedule_method"; "WP1" = "route"; "WQ1" = "settlement_method"; "WR1" = "counterparty"; "WS1" = "discount_curve_key"; "WT1" = "payment_day"; "WU1" = "payment_holiday_key"; "WV1" = "settlement_frequency"
     "WL2" = "NYMEX NG"; "WM2" = "month"; "WN2" = "lastday"; "WO2" = "lastday"; "WP2" = "bilateral"; "WQ2" = "financial"; "WR2" = "ACME Trading"; "WS2" = "SOFR"; "WT2" = "4-Jan-2028"; "WU2" = "WJ2"; "WV2" = "monthly"
     "WJ21" = '=_CreateTradeTemplate("fixed_float",HSTACK(WL1:WV1,"nearby"),HSTACK(WL2:WV2,1))'
     "WL4" = "trade_id"; "WM4" = "trade_date"; "WN4" = "contract_code"; "WO4" = "quantity"; "WP4" = "fixed_price"; "WQ4" = "second_fixed_price"
@@ -4320,7 +4294,7 @@ $cells = [ordered]@{
     "WJ36" = "=_EvaluateTrades(WJ35,WJ17:WK17,WJ20)"
     "WJ37" = "=_CreateTrades(WK5:WK6,WL10:WP10,WL11:WP11,WJ33,ZU1)"
     "WJ38" = "=_AggregateResults(WJ36)"
-    "WJ39" = '=_CreateTradeTemplate("float_float",HSTACK(WL1:WO1,"route","settlement_method","clearing_house","payment_day","payment_calendar_key","settlement_frequency","nearby","spread_price_currency_unit","spread_price_quantity_unit"),HSTACK(WL2:WO2,"cleared","financial","ICE Clear Europe",WT2,"WJ2","monthly",1,"DOLLAR","MMBTU"))'
+    "WJ39" = '=_CreateTradeTemplate("float_float",HSTACK(WL1:WO1,"route","settlement_method","clearing_house","payment_day","payment_holiday_key","settlement_frequency","nearby","spread_price_currency_unit","spread_price_quantity_unit"),HSTACK(WL2:WO2,"cleared","financial","ICE Clear Europe",WT2,"WJ2","monthly",1,"DOLLAR","MMBTU"))'
     # float-float-units.md: a crack. Two futures indexes over F27 to H27 in YA1:YB3, 1 January
     # closed, RB in DOLLAR per GAL with a LOT of 42,000 GAL and WTI in DOLLAR per BBL with a LOT of
     # 1,000 BBL, each defining one BBL, in YJ7 and YJ8; valued 4 January 2027 with two December
@@ -4343,13 +4317,13 @@ $cells = [ordered]@{
     "YB12" = "2.05"; "YB13" = "2.04"; "YC12" = "70.5"; "YC13" = "70.4"
     "YA15" = "2.1"; "YA16" = "2.2"; "YB15" = "70"; "YB16" = "71"
     "YJ1" = "=_CreateFuturesSchedule(YA1:YA3,YB1:YB3)"
-    "YJ2" = "=_CreateHolidayCalendar(YC1)"
+    "YJ2" = '=_CreateHolidayCalendar("YJ2",YC1)'
     "YJ3" = '=_CreateIndexConventions("DOLLAR","GAL","DOLLAR","VOLUME","GAL")'
     "YJ4" = '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     "YJ5" = "=_CreateContractSpecifications(YD1:YH1,YD2:YH3)"
     "YJ6" = "=_CreateContractSpecifications(YD1:YH1,YD5:YH6)"
-    "YJ7" = '=_CreateIndex("RB","Crack leg RB, dollars a gallon",YJ1,YJ3,YJ5,YJ2,"LOT")'
-    "YJ8" = '=_CreateIndex("WTI","Crack leg WTI, dollars a barrel",YJ1,YJ4,YJ6,YJ2,"LOT")'
+    "YJ7" = '=_CreateIndex("RB","Crack leg RB, dollars a gallon",YJ1,YJ3,YJ5,"YJ2","LOT",ZU1)'
+    "YJ8" = '=_CreateIndex("WTI","Crack leg WTI, dollars a barrel",YJ1,YJ4,YJ6,"YJ2","LOT",ZU1)'
     "YJ9" = "=_CreateValuationDate(YA11,0.5)"
     "YJ10" = "=_CreateCalendar(YJ9,YJ7)"
     "YJ11" = "=_CreateCalendar(YJ9,YJ8)"
@@ -4360,7 +4334,7 @@ $cells = [ordered]@{
     "YJ16" = '=_CreatePriceVector("RB",YA15:YA16)'
     "YJ17" = '=_CreatePriceVector("WTI",YB15:YB16)'
     "YJ18" = "=_CreateMarket(YJ14,YJ16)"; "YK18" = "=_CreateMarket(YJ15,YJ17)"
-    "YL1" = "spread_price_currency_unit"; "YM1" = "spread_price_quantity_unit"; "YN1" = "quantity_unit"; "YO1" = "quantity_per"; "YP1" = "schedule_method"; "YQ1" = "second_schedule_method"; "YR1" = "route"; "YS1" = "settlement_method"; "YT1" = "counterparty"; "YU1" = "discount_curve_key"; "YV1" = "payment_day"; "YW1" = "payment_calendar_key"; "YX1" = "settlement_frequency"; "YY1" = "nearby"
+    "YL1" = "spread_price_currency_unit"; "YM1" = "spread_price_quantity_unit"; "YN1" = "quantity_unit"; "YO1" = "quantity_per"; "YP1" = "schedule_method"; "YQ1" = "second_schedule_method"; "YR1" = "route"; "YS1" = "settlement_method"; "YT1" = "counterparty"; "YU1" = "discount_curve_key"; "YV1" = "payment_day"; "YW1" = "payment_holiday_key"; "YX1" = "settlement_frequency"; "YY1" = "nearby"
     "YL2" = "DOLLAR"; "YM2" = "BBL"; "YN2" = "BBL"; "YO2" = "month"; "YP2" = "lastday"; "YQ2" = "lastday"; "YR2" = "bilateral"; "YS2" = "financial"; "YT2" = "ACME Trading"; "YU2" = "SOFR"; "YV2" = "4-Jan-2028"; "YW2" = "YJ2"; "YX2" = "monthly"; "YY2" = "1"
     "YJ19" = '=_CreateTradeTemplate("float_float",YL1:YY1,YL2:YY2)'
     "YL4" = "trade_id"; "YM4" = "trade_date"; "YN4" = "contract_code"; "YO4" = "quantity"; "YP4" = "spread_price"
@@ -4395,10 +4369,10 @@ $cells = [ordered]@{
     "ZB8" = "9"; "ZB9" = "3.05"
     "ZA11" = "3.2"; "ZA12" = "3.5"
     "ZJ1" = "=_CreateFuturesSchedule(ZA1:ZA3,ZB1:ZB3)"
-    "ZJ2" = "=_CreateHolidayCalendar(ZC1)"
+    "ZJ2" = '=_CreateHolidayCalendar("ZJ2",ZC1)'
     "ZJ3" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "ZJ4" = "=_CreateContractSpecifications(ZD1:ZH1,ZD2:ZH3)"
-    "ZJ5" = '=_CreateIndex("PHYS","Gas with a contract to close",ZJ1,ZJ3,ZJ4,ZJ2,"LOT")'
+    "ZJ5" = '=_CreateIndex("PHYS","Gas with a contract to close",ZJ1,ZJ3,ZJ4,"ZJ2","LOT",ZU1)'
     "ZJ6" = "=_CreateValuationDate(ZA5,0.5)"
     "ZJ7" = "=_CreateValuationDate(ZA6,0.5)"
     "ZJ8" = "=_CreateCalendar(ZJ6,ZJ5)"
@@ -4465,16 +4439,16 @@ $cells = [ordered]@{
     "XS1" = "1-Jan-2027"; "XS2" = "17-Jun-2026"
     "XQ7" = "BBL"; "XR7" = "1"; "XS7" = "BBL"; "XT7" = "0"; "XU7" = "0"
     "XV1" = "=_CreateFuturesSchedule(XQ1:XQ5,XR1:XR5)"
-    "XV2" = "=_CreateHolidayCalendar(XS1)"
+    "XV2" = '=_CreateHolidayCalendar("XV2",XS1)'
     "XV3" = '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     "XV4" = "=_CreateContractSpecifications(EI1:EM1,XQ7:XU7)"
-    "XV5" = '=_CreateIndex("ROLL","A futures index expiring mid-month",XV1,XV3,XV4,XV2,"BBL")'
+    "XV5" = '=_CreateIndex("ROLL","A futures index expiring mid-month",XV1,XV3,XV4,"XV2","BBL",ZU1)'
     "XV6" = "=_CreateValuationDate(XS2,0.5)"
     "XV7" = "=_CreateCalendar(XV6,XV5)"
     "XV9" = "=_CreateMarketHistory(XV7,XV8)"
     "XV11" = "=_CreateMarketHistory(XV7,XV10)"
     "XV12" = "=_CreateFuturesFixings(XX1,XY1:XZ1,XV5)"
-    "XQ30" = "quantity_unit"; "XR30" = "quantity_per"; "XS30" = "settlement_frequency"; "XT30" = "schedule_method"; "XU30" = "route"; "XV30" = "settlement_method"; "XW30" = "clearing_house"; "XX30" = "payment_day"; "XY30" = "payment_calendar_key"
+    "XQ30" = "quantity_unit"; "XR30" = "quantity_per"; "XS30" = "settlement_frequency"; "XT30" = "schedule_method"; "XU30" = "route"; "XV30" = "settlement_method"; "XW30" = "clearing_house"; "XX30" = "payment_day"; "XY30" = "payment_holiday_key"
     "XQ31" = "BBL"; "XR31" = "period"; "XS31" = "onetime"; "XT31" = "asian"; "XU31" = "cleared"; "XV31" = "financial"; "XW31" = "CME Clearing"; "XX31" = "18-Jun-2026"; "XY31" = "XV2"
     "XQ33" = "trade_id"; "XR33" = "trade_date"; "XS33" = "start_date"; "XT33" = "end_date"; "XU33" = "quantity"; "XV33" = "fixed_price"
     "XQ34" = "1"; "XR34" = "1-Jun-2026"; "XS34" = "15-Jun-2026"; "XT34" = "16-Jun-2026"; "XU34" = "2000"; "XV34" = "80"
@@ -4507,7 +4481,7 @@ $cells = [ordered]@{
     "XV26" = "=_CreateTrades(XV5,XQ39:XW39,XQ41:XW41,XV22,ZU1)"
     "XV27" = "=_PrepareTrades(XV26,XV9)"
     "XV28" = "=_EvaluateTrades(XV27,XV17)"
-    "XQ47" = "route"; "XR47" = "settlement_method"; "XS47" = "schedule_method"; "XT47" = "quantity_per"; "XU47" = "settlement_frequency"; "XV47" = "payment_day"; "XW47" = "payment_calendar_key"; "XX47" = "nearby"
+    "XQ47" = "route"; "XR47" = "settlement_method"; "XS47" = "schedule_method"; "XT47" = "quantity_per"; "XU47" = "settlement_frequency"; "XV47" = "payment_day"; "XW47" = "payment_holiday_key"; "XX47" = "nearby"
     "XQ48" = "cleared"; "XR48" = "financial"; "XS48" = "asian"; "XT48" = "period"; "XU48" = "onetime"; "XV48" = "18-Jun-2026"; "XW48" = "XV2"; "XX48" = "2"
     "XQ49" = "cleared"; "XR49" = "financial"; "XS49" = "asian"; "XT49" = "period"; "XU49" = "onetime"; "XV49" = "18-Jun-2026"; "XW49" = "XV2"; "XX49" = "1"
     "XV51" = '=_CreateQuoteTemplate("fixed_float",XQ47:XX47,XQ48:XX48,ZU1)'

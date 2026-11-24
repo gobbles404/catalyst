@@ -12,8 +12,9 @@ from typing import cast
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name
 from numpy.typing import NDArray
-from test_create_trades import with_calendars
+from test_create_trades import seam_calendars, seam_key, with_calendars
 
 from catalyst.excel import bridge
 from catalyst.excel.bridge import Cells, Handle, register
@@ -30,8 +31,7 @@ ENTRY = {
         "_CreateQuoteTemplate",
         "_CreateTradeTemplate",
         "_CreateHolidayCalendar",
-        "_CombineHolidayCalendars",
-        "_CollectPaymentCalendars",
+        "_CollectHolidayCalendars",
         "_CreateFuturesSchedule",
         "_CreateIndexConventions",
         "_CreateContractSpecifications",
@@ -84,21 +84,21 @@ def create(
     return ENTRY["_CreateQuoteTemplate"](instrument, fields, values, calendars)
 
 
-def a_calendar(name: object = bridge.MISSING, *holidays: float) -> object:
-    """A calendar closed on 26 November and 25 December 2026, or on the days given, with a name
-    where a key is to select it."""
+def a_calendar(name: str | None = None, *holidays: float) -> object:
+    """A calendar closed on 26 November and 25 December 2026, or on the days given, under the
+    name a key is to select it by, or a name of its own."""
     listed: list[list[object]] = [[day] for day in holidays or (46352.0, 46381.0)]
-    return ENTRY["_CreateHolidayCalendar"](cells(*listed), name)
+    return ENTRY["_CreateHolidayCalendar"](name or a_name(), cells(*listed))
 
 
 def collected(*calendars: object) -> object:
-    return ENTRY["_CollectPaymentCalendars"](cells(*[[calendar] for calendar in calendars]))
+    return ENTRY["_CollectHolidayCalendars"](cells(*[[calendar] for calendar in calendars]))
 
 
 def a_quote_template(**fields: object) -> QuoteTemplate:
     """A quote template of those fields, made through the seam so the values arrive typed; a
     key among them selects from a collection of the one calendar PAYS."""
-    held = collected(a_calendar("PAYS")) if "payment_calendar_key" in fields else bridge.MISSING
+    held = collected(a_calendar("PAYS")) if "payment_holiday_key" in fields else bridge.MISSING
     handle = create("fixed_float", row(*fields), row(*fields.values()), held)
     template = behind("CatchQuoteTemplate", handle)
     assert type(template) is QuoteTemplate
@@ -122,8 +122,9 @@ def an_index() -> object:
         schedule,
         conventions,
         specs,
-        a_calendar(),
+        seam_key(a_calendar()),
         "NYMEX NG",
+        seam_calendars(),
     )
 
 
@@ -151,12 +152,12 @@ BILATERAL: dict[str, object] = {
     "settlement_frequency": "monthly",
     "nearby": 1.0,
     "payment_day": "+5bd",
-    "payment_calendar_key": "PAYS",
+    "payment_holiday_key": "PAYS",
     "discount_curve_key": "SOFR",
 }
 ALLOWED = (
     "schedule_method, route, settlement_method, discount_curve_key, quantity_per, "
-    "payment_day, payment_calendar_key, settlement_frequency, nearby"
+    "payment_day, payment_holiday_key, settlement_frequency, nearby"
 )
 
 
@@ -174,7 +175,7 @@ def test_the_tickets_bilateral_example_makes_a_template_of_its_seven_fields() ->
     assert isinstance(template.values, MappingProxyType)
     # The key is held as typed, and the calendar it selects is bound once, by reference: the
     # collection's own member, nothing copied.
-    assert template.values["payment_calendar_key"] == "PAYS"
+    assert template.values["payment_holiday_key"] == "PAYS"
     held = template.payment_calendar
     assert type(held) is HolidayCalendar and held is behind("CatchQuoteCalendar", calendar)
     expected = dict(BILATERAL)
@@ -192,14 +193,14 @@ def test_a_key_binds_its_calendar_when_the_template_is_made() -> None:
     held = collected(pay_a, pay_b, unused)
 
     def bound(key: str) -> HolidayCalendar:
-        made = create("fixed_float", row("payment_calendar_key"), row(key), held)
+        made = create("fixed_float", row("payment_holiday_key"), row(key), held)
         template = behind("CatchQuoteTemplate", made)
         assert type(template) is QuoteTemplate and template.payment_calendar is not None
         return template.payment_calendar
 
     assert bound("PAY_A") is behind("CatchQuoteCalendar", pay_a)
     both = bound("PAY_A+PAY_B")
-    assert both.name is None  # a combination, an ordinary calendar with no name
+    assert both.name == "PAY_A+PAY_B"  # a union, named by its names in sorted order
     np.testing.assert_array_equal(
         both.holiday, np.array(["2026-11-26", "2026-11-27", "2026-11-30"], dtype="datetime64[D]")
     )
@@ -214,40 +215,40 @@ def test_a_key_binds_its_calendar_when_the_template_is_made() -> None:
 
 def test_a_key_the_collection_cannot_bind_is_refused_when_the_template_is_made() -> None:
     held = collected(a_calendar("PAY_A", 46352.0), a_calendar("PAY_B", 46353.0))
-    key = row("payment_calendar_key")
+    key = row("payment_holiday_key")
     library = "#ERROR _CreateQuoteTemplate: ValueError: "
     assert create("fixed_float", key, row("PAY_C"), held) == (
-        library + "payment_calendar_key is 'PAY_C', expected names of the collection's calendars, "
+        library + "payment_holiday_key is 'PAY_C', expected names of the collection's calendars, "
         "'PAY_A' and 'PAY_B'; it holds no 'PAY_C'"
     )
     assert create("fixed_float", key, row("PAY_A+PAY_C"), held) == (
-        library + "payment_calendar_key is 'PAY_A+PAY_C', expected names of the collection's "
+        library + "payment_holiday_key is 'PAY_A+PAY_C', expected names of the collection's "
         "calendars, 'PAY_A' and 'PAY_B'; it holds no 'PAY_C'"
     )
     assert (
         create("fixed_float", key, row("pay_a"), held)
         == (  # exact, case and all
             library
-            + "payment_calendar_key is 'pay_a', expected names of the collection's calendars, "
+            + "payment_holiday_key is 'pay_a', expected names of the collection's calendars, "
             "'PAY_A' and 'PAY_B'; it holds no 'pay_a'"
         )
     )
     # A key with no collection to select from, a collection of one included in the rule:
     # nothing is chosen for the template.
     assert create("fixed_float", key, row("PAY_A")) == (
-        library + "payment_calendars is missing, expected a _CollectPaymentCalendars collection, "
-        "which payment_calendar_key selects its payment calendar from"
+        library + "holiday_calendars is missing, expected a _CollectHolidayCalendars collection, "
+        "which payment_holiday_key selects a calendar from"
     )
     # The key's form, in the trade template's words.
     assert create("fixed_float", key, row("PAY_A+"), held) == (
-        library + "payment_calendar_key is 'PAY_A+', expected a calendar's name, or several joined "
+        library + "payment_holiday_key is 'PAY_A+', expected a calendar's name, or several joined "
         "by '+'; a name is missing"
     )
     # The seam's words for the argument: a calendar where the collection goes.
     calendar = a_calendar("PAY_A", 46352.0)
     assert create("fixed_float", key, row("PAY_A"), calendar) == (
-        f"#ERROR _CreateQuoteTemplate: payment_calendars is holiday calendar handle {calendar!r}, "
-        "expected payment calendars handle"
+        f"#ERROR _CreateQuoteTemplate: holiday_calendars is holiday calendar handle {calendar!r}, "
+        "expected holiday calendars handle"
     )
 
 
@@ -259,7 +260,7 @@ def test_a_cleared_financial_template_needs_no_key_and_one_field_takes_the_same_
         quantity_per="month",
         settlement_frequency="monthly",
         payment_day="+2bd",
-        payment_calendar_key="PAYS",
+        payment_holiday_key="PAYS",
     )
     assert len(cleared.values) == 7 and cleared.values["route"] == "cleared"
     one = a_quote_template(schedule_method="penultimate")
@@ -374,7 +375,7 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
     assert create("fixed_float", row("route"), row(None)) == (
         "#ERROR _CreateQuoteTemplate: values cell (1, 1) is blank, expected text"
     )
-    assert create("fixed_float", row("payment_calendar_key"), row(46352.0)) == (
+    assert create("fixed_float", row("payment_holiday_key"), row(46352.0)) == (
         "#ERROR _CreateQuoteTemplate: values cell (1, 1) is number 46352.0, expected text"
     )
     # Then the library's, each value for the rule intrinsic to its field, the trade template's.

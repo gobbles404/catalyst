@@ -11,6 +11,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from holiday_fixtures import key_in
 from test_seam_allocation import KEYWORD_CALL, SLACK, least_peak
 
 from catalyst.excel import bridge
@@ -53,7 +54,7 @@ def sheet() -> dict[str, Any]:
     )
     # Under a name since payment-calendar-keys.md: the index prices on it and a template's key
     # selects it from the collection below.
-    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]), "PAYS")
+    holidays = PATH["_CreateHolidayCalendar"]("PAYS", column([serial(d) for d in HOLIDAYS]))
     conventions = PATH["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specifications = PATH["_CreateContractSpecifications"](
         Cells.from_rows(
@@ -62,7 +63,14 @@ def sheet() -> dict[str, Any]:
         Cells.from_rows([["lot", 10000.0, "MMBTU", 0.0, 0.0]]),
     )
     index = PATH["_CreateIndex"](
-        "gas", "Sample gas index", schedule, conventions, specifications, holidays, "lot"
+        "gas",
+        "Sample gas index",
+        schedule,
+        conventions,
+        specifications,
+        key_in(holidays),
+        "lot",
+        PATH["_CollectHolidayCalendars"](holidays),
     )
     fields = [
         "quantity_unit",
@@ -72,7 +80,7 @@ def sheet() -> dict[str, Any]:
         "settlement_method",
         "clearing_house",
         "payment_day",
-        "payment_calendar_key",
+        "payment_holiday_key",
         "settlement_frequency",
         "nearby",
     ]
@@ -115,7 +123,7 @@ def sheet() -> dict[str, Any]:
         "history": history,
         "market": market,
         "holidays": holidays,
-        "calendars": PATH["_CollectPaymentCalendars"](holidays),
+        "calendars": PATH["_CollectHolidayCalendars"](holidays),
     }
 
 
@@ -151,7 +159,7 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
         "counterparty",
         "discount_curve_key",
         "payment_day",
-        "payment_calendar_key",
+        "payment_holiday_key",
         "settlement_frequency",
         "nearby",
     ]
@@ -666,7 +674,7 @@ def test_a_collection_allocates_by_the_saved_entries_and_its_report_by_the_recta
 COMBINED_AT_CREATION = {
     "calendar_named": 1,  # the second name found in the collection
     "combine_holiday_calendars": 1,
-    "holiday_calendar": 1,  # the combination, an ordinary calendar
+    "_owning": 1,  # the union's days, copied once and frozen
     "WorkCounter.hit": 3,  # the calendars taken, the days read and the days kept
 }
 
@@ -678,8 +686,8 @@ COMBINED_AT_CREATION = {
 def test_a_combined_payment_calendar_adds_no_work_after_creation(
     call_profile: CallProfile, sheet: dict[str, Any]
 ) -> None:
-    twin = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]), "TWIN")
-    both = PATH["_CollectPaymentCalendars"](Cells.from_rows([[sheet["holidays"]], [twin]]))
+    twin = PATH["_CreateHolidayCalendar"]("TWIN", column([serial(d) for d in HOLIDAYS]))
+    both = PATH["_CollectHolidayCalendars"](Cells.from_rows([[sheet["holidays"]], [twin]]))
     fields = Cells.from_rows(
         [
             [
@@ -690,7 +698,7 @@ def test_a_combined_payment_calendar_adds_no_work_after_creation(
                 "settlement_method",
                 "clearing_house",
                 "payment_day",
-                "payment_calendar_key",
+                "payment_holiday_key",
                 "settlement_frequency",
                 "nearby",
             ]

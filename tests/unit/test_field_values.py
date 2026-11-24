@@ -56,17 +56,17 @@ def bound(instrument: str, headers: Cells, body: Cells, one_row: bool = True) ->
 
 
 def test_a_row_of_fields_arrives_typed_by_its_fields_in_the_sheets_order() -> None:
-    headers = row("quantity", "payment_calendar_key", "trade_date", "schedule_method")
+    headers = row("quantity", "payment_holiday_key", "trade_date", "schedule_method")
     values = bound("fixed_float", headers, row(10.0, "NYFED+LON", 46164.0, "lastday"))
     assert values.instrument is FIXED_FLOAT and values.rows == 1
-    assert values.names == ("quantity", "payment_calendar_key", "trade_date", "schedule_method")
+    assert values.names == ("quantity", "payment_holiday_key", "trade_date", "schedule_method")
     np.testing.assert_array_equal(values.numbers("quantity"), [10.0])
     assert values.dates("trade_date").dtype == np.dtype("datetime64[D]")
     assert values.dates("trade_date")[0] == np.datetime64("2026-05-22")
     assert values.texts("schedule_method") == ("lastday",)
     # A payment calendar key is text like any other, since payment-calendar-keys.md: the seam
     # hands it over as typed and no field of any instrument holds a handle.
-    assert values.texts("payment_calendar_key") == ("NYFED+LON",)
+    assert values.texts("payment_holiday_key") == ("NYFED+LON",)
     assert values.has("quantity") and not values.has("fixed_price")
     assert values.field("quantity").type is FieldType.NUMBER
 
@@ -85,7 +85,7 @@ def test_rows_of_fields_arrive_as_columns_one_per_row() -> None:
 
 
 def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names() -> None:
-    headers = row("quantity_unit", "payment_calendar_key", "trade_date", "quantity")
+    headers = row("quantity_unit", "payment_holiday_key", "trade_date", "quantity")
     kinds, slots, text = cast(
         tuple[NDArray[np.uint8], NDArray[np.float64], str],
         ENTRY["EchoFieldRow"]("fixed_float", headers, row("lots", "NYFED", 46164.0, 10.0)),
@@ -93,7 +93,7 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names() -> Non
     assert kinds.shape == (2, 4)
     assert text.split("\0") == [
         "quantity_unit",
-        "payment_calendar_key",
+        "payment_holiday_key",
         "trade_date",
         "quantity",
         "lots",
@@ -127,7 +127,7 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names() -> Non
         ("fixed_float", row("trade_date"), row(None), "values cell (1, 1) is blank, expected date"),
         (  # the key is text, and empty text is not text
             "fixed_float",
-            row("payment_calendar_key"),
+            row("payment_holiday_key"),
             row(""),
             "values cell (1, 1) is empty text, expected text",
         ),
@@ -203,7 +203,7 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names() -> Non
         ("fixed_float", row("route"), row(1.0), "values cell (1, 1) is number 1.0, expected text"),
         (  # a number where the key goes; the seam knows the field as text and nothing more
             "fixed_float",
-            row("payment_calendar_key"),
+            row("payment_holiday_key"),
             row(46023.0),
             "values cell (1, 1) is number 46023.0, expected text",
         ),
@@ -243,7 +243,7 @@ def test_a_blank_or_empty_cell_in_a_period_field_is_a_row_that_supplied_nothing(
     # formula-empty code; text on both sides of the three columns, each cell's text
     # found at its own place whatever the cells around it hold.
     headers = row(
-        "route", "contract_code", "start_date", "end_date", "payment_calendar_key", "broker"
+        "route", "contract_code", "start_date", "end_date", "payment_holiday_key", "broker"
     )
     values = bound(
         "fixed_float",
@@ -258,7 +258,7 @@ def test_a_blank_or_empty_cell_in_a_period_field_is_a_row_that_supplied_nothing(
     assert values.rows == 3
     assert values.texts("route") == ("cleared", "cleared", "bilateral")
     assert values.texts("broker") == ("ION", "TP", "ION")
-    assert values.texts("payment_calendar_key") == ("NYFED", "LON", "NYFED+LON")
+    assert values.texts("payment_holiday_key") == ("NYFED", "LON", "NYFED+LON")
     assert values.texts("contract_code") == ("Z26",)
     np.testing.assert_array_equal(values.supplied_rows("contract_code"), [True, False, False])
     np.testing.assert_array_equal(values.supplied_rows("start_date"), [False, True, True])
@@ -354,7 +354,7 @@ def test_a_handle_whose_kind_holds_an_instrument_selects_it() -> None:
 
 def test_a_selector_of_a_kind_that_holds_no_instrument_says_so() -> None:
     with pytest.raises(ValueError, match=r"^a holiday calendar selects no instrument$"):
-        selected(HolidayCalendar(np.array([], dtype="datetime64[D]"), None))
+        selected(HolidayCalendar("NYFED", np.array([], dtype="datetime64[D]")))
 
 
 # --- what registration refuses --------------------------------------------------------------

@@ -1,10 +1,12 @@
-"""The index: the schedule's kind read off the object, the holiday calendar as the kind requires,
-and four objects bound by reference, nothing copied and nothing checked again."""
+"""The index: the schedule's kind read off the object, the holiday key as the kind requires,
+bound to its calendar from the collection, and four objects held by reference, nothing copied and
+nothing checked again."""
 
 import dataclasses
 
 import numpy as np
 import pytest
+from holiday_fixtures import index_on
 from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
@@ -19,10 +21,15 @@ from catalyst.index_definitions.contract_specifications import (
 from catalyst.index_definitions.futures_schedule import futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from catalyst.index_definitions.holiday_calendars import (
+    HolidayCalendars,
+    collect_holiday_calendars,
+)
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index, index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.kind import Kind
+from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market_data.futures_fixings import futures_fixings
 
 
@@ -60,7 +67,9 @@ GAS_DAILY = gas_daily_schedule(
     dates("2026-09-01", "2026-10-01", "2026-11-01"),
     dates("2026-09-30", "2026-10-31", "2026-11-30"),
 )
-HOLIDAYS = holiday_calendar(dates("2026-01-01", "2026-01-19", "2026-02-16"))
+HOLIDAYS = holiday_calendar("NYMEX", dates("2026-01-01", "2026-01-19", "2026-02-16"))
+ICE = holiday_calendar("ICE", dates("2026-01-01", "2026-04-03"))
+CALENDARS = collect_holiday_calendars((HOLIDAYS, ICE), WorkCounter())
 CONVENTIONS = index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS)
 SPECIFICATIONS = contract_specifications(
     ("NYMEX NG", "ICE NG"),
@@ -79,7 +88,7 @@ def an_index(
     holidays: HolidayCalendar | None = HOLIDAYS,
     reporting_lot: str | None = None,
 ) -> Index:
-    return index(
+    return index_on(
         name, f"{name} index", schedule, CONVENTIONS, specifications, holidays, reporting_lot, UNITS
     )
 
@@ -107,6 +116,8 @@ def test_the_iferc_and_gas_daily_samples_carry_no_holiday_calendar() -> None:
         None,
         None,
         UNITS,
+        CALENDARS,
+        WorkCounter(),
     )
     assert monthly.kind is Kind.IFERC
     assert monthly.schedule is IFERC and monthly.holiday_calendar is None
@@ -119,6 +130,8 @@ def test_the_iferc_and_gas_daily_samples_carry_no_holiday_calendar() -> None:
         None,
         None,
         UNITS,
+        CALENDARS,
+        WorkCounter(),
     )
     assert daily.kind is Kind.GAS_DAILY
     assert daily.schedule is GAS_DAILY and daily.holiday_calendar is None
@@ -148,13 +161,15 @@ def test_an_object_that_is_not_a_schedule_is_refused_naming_what_it_is() -> None
                 None,
                 None,
                 UNITS,
+                CALENDARS,
+                WorkCounter(),
             )
         assert str(failure.value) == (
             f"schedule is {what}, expected a futures, IFERC or Gas Daily schedule"
         )
 
 
-def test_a_futures_index_needs_its_holiday_calendar_and_the_other_two_refuse_one() -> None:
+def test_a_futures_index_needs_its_holiday_key_and_the_other_two_refuse_one() -> None:
     with pytest.raises(ValueError) as failure:
         index(
             "Henry Hub NYMEX",
@@ -165,9 +180,11 @@ def test_a_futures_index_needs_its_holiday_calendar_and_the_other_two_refuse_one
             None,
             None,
             UNITS,
+            CALENDARS,
+            WorkCounter(),
         )
     assert str(failure.value) == (
-        "holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
+        "holiday_key is missing, expected a holiday calendar's key with a futures schedule"
     )
     with pytest.raises(ValueError) as failure:
         index(
@@ -176,13 +193,13 @@ def test_a_futures_index_needs_its_holiday_calendar_and_the_other_two_refuse_one
             IFERC,
             CONVENTIONS,
             SPECIFICATIONS,
-            HOLIDAYS,
+            "NYMEX",
             None,
             UNITS,
+            CALENDARS,
+            WorkCounter(),
         )
-    assert str(failure.value) == (
-        "holiday_calendar is a holiday calendar, expected none with an IFERC schedule"
-    )
+    assert str(failure.value) == "holiday_key is 'NYMEX', expected none with an IFERC schedule"
     with pytest.raises(ValueError) as failure:
         index(
             "Henry Hub Gas Daily",
@@ -190,16 +207,113 @@ def test_a_futures_index_needs_its_holiday_calendar_and_the_other_two_refuse_one
             GAS_DAILY,
             CONVENTIONS,
             SPECIFICATIONS,
-            HOLIDAYS,
+            "NYMEX",
             None,
             UNITS,
+            CALENDARS,
+            WorkCounter(),
         )
-    assert str(failure.value) == (
-        "holiday_calendar is a holiday calendar, expected none with a Gas Daily schedule"
+    assert str(failure.value) == "holiday_key is 'NYMEX', expected none with a Gas Daily schedule"
+
+
+# --- the key, holiday-keys.md -------------------------------------------------
+
+
+def keyed(
+    key: str | None,
+    calendars: HolidayCalendars | None = CALENDARS,
+    schedule: object = FUTURES,
+    counter: WorkCounter | None = None,
+) -> Index:
+    return index(
+        "Henry Hub NYMEX",
+        "Henry Hub natural gas - NYMEX",
+        schedule,
+        CONVENTIONS,
+        SPECIFICATIONS,
+        key,
+        None,
+        UNITS,
+        calendars,
+        counter or WorkCounter(),
     )
 
 
-def test_the_schedule_is_checked_before_the_holiday_calendar() -> None:
+def test_the_key_selects_the_indexs_calendar_from_the_collection_by_reference() -> None:
+    # One name is the collection's own calendar, nothing made; several are the calendar closed
+    # on every day any of them is closed, named by the names in sorted order whatever the order
+    # typed.
+    assert keyed("NYMEX").holiday_calendar is HOLIDAYS
+    assert keyed("ICE").holiday_calendar is ICE
+    for key in ("NYMEX+ICE", "ICE+NYMEX"):
+        union = keyed(key).holiday_calendar
+        assert union is not None and union.name == "ICE+NYMEX"
+        assert (
+            union.holiday.tolist()
+            == dates("2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03").tolist()
+        )
+
+
+def test_a_key_needs_a_collection_that_holds_its_names_exactly() -> None:
+    with pytest.raises(ValueError) as failure:
+        keyed("NYMEX", None)
+    assert str(failure.value) == (
+        "holiday_calendars is missing, expected a _CollectHolidayCalendars collection, which "
+        "holiday_key selects a calendar from"
+    )
+    for key, missing in (("NYMX", "NYMX"), ("nymex", "nymex"), ("NYMEX+CME", "CME")):
+        with pytest.raises(ValueError) as failure:
+            keyed(key)
+        assert str(failure.value) == (
+            f"holiday_key is {key!r}, expected names of the collection's calendars, 'NYMEX' and "
+            f"'ICE'; it holds no {missing!r}"
+        )
+    with pytest.raises(ValueError) as failure:
+        keyed("NYMEX + ICE")
+    assert str(failure.value) == (
+        "holiday_key is 'NYMEX + ICE', expected a calendar's name, or several joined by '+', "
+        "each with no whitespace around it"
+    )
+
+
+def test_the_kind_is_read_before_the_key_is_looked_up() -> None:
+    # An IFERC or a Gas Daily index refuses a key whatever it says and whether or not a
+    # collection came with it: nothing is looked up for an index that reads no calendar.
+    for schedule, words in ((IFERC, "an IFERC"), (GAS_DAILY, "a Gas Daily")):
+        for calendars in (CALENDARS, None):
+            with pytest.raises(ValueError) as failure:
+                keyed("NOWHERE", calendars, schedule)
+            assert str(failure.value) == (
+                f"holiday_key is 'NOWHERE', expected none with {words} schedule"
+            )
+    # And a futures index with no key is told the key is missing, collection or none.
+    for calendars in (CALENDARS, None):
+        with pytest.raises(ValueError, match=r"^holiday_key is missing, expected"):
+            keyed(None, calendars)
+
+
+def test_a_collection_nothing_selects_from_is_read_for_nothing() -> None:
+    assert keyed(None, CALENDARS, IFERC).holiday_calendar is None
+    assert keyed(None, None, GAS_DAILY).holiday_calendar is None
+
+
+def test_the_work_of_an_index_is_its_one_key_and_a_unions_own_counts() -> None:
+    def counted(key: str | None, schedule: object = FUTURES) -> dict[str, int]:
+        counter = WorkCounter()
+        keyed(key, CALENDARS, schedule, counter)
+        return counter.freeze().as_dict()
+
+    assert counted("NYMEX") == {"holiday_keys_bound": 1}
+    assert counted("NYMEX+ICE") == {
+        "calendars_combined": 2,
+        "holidays_read": 5,
+        "holidays_kept": 4,
+        "holiday_keys_bound": 1,
+    }
+    assert counted(None, IFERC) == {}
+
+
+def test_the_schedule_is_checked_before_the_holiday_key() -> None:
     with pytest.raises(ValueError) as failure:
         index(
             "Henry Hub NYMEX",
@@ -207,9 +321,11 @@ def test_the_schedule_is_checked_before_the_holiday_calendar() -> None:
             HOLIDAYS,
             CONVENTIONS,
             SPECIFICATIONS,
-            HOLIDAYS,
+            "NYMEX",
             None,
             UNITS,
+            CALENDARS,
+            WorkCounter(),
         )
     assert str(failure.value).startswith("schedule is a holiday calendar")
 
@@ -251,6 +367,8 @@ def test_specifications_need_not_answer_to_the_schedules_codes_or_count() -> Non
             None,
             None,
             UNITS,
+            CALENDARS,
+            WorkCounter(),
         ).specifications
         is three
     )
@@ -271,9 +389,11 @@ def test_lot_units_of_the_indexs_measure_pass_and_another_measures_are_refused()
         FUTURES,
         volume,
         barrels_and_gallons,
-        HOLIDAYS,
+        "NYMEX",
         None,
         UNITS,
+        CALENDARS,
+        WorkCounter(),
     )
     assert made.specifications is barrels_and_gallons
     with pytest.raises(ValueError) as failure:
@@ -283,9 +403,11 @@ def test_lot_units_of_the_indexs_measure_pass_and_another_measures_are_refused()
             FUTURES,
             volume,
             SPECIFICATIONS,
-            HOLIDAYS,
+            "NYMEX",
             None,
             UNITS,
+            CALENDARS,
+            WorkCounter(),
         )
     assert str(failure.value) == (
         "specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
@@ -305,9 +427,11 @@ def test_lot_units_of_the_indexs_measure_pass_and_another_measures_are_refused()
             FUTURES,
             volume,
             mixed,
-            HOLIDAYS,
+            "NYMEX",
             None,
             UNITS,
+            CALENDARS,
+            WorkCounter(),
         )
     assert str(failure.value) == (
         "specifications row 3 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
@@ -319,24 +443,28 @@ def test_lot_units_of_the_indexs_measure_pass_and_another_measures_are_refused()
             FUTURES,
             CONVENTIONS,
             barrels_and_gallons,
-            HOLIDAYS,
+            "NYMEX",
             None,
             UNITS,
+            CALENDARS,
+            WorkCounter(),
         )
     assert str(failure.value) == (
         "specifications row 1 lot_unit is 'BBL', expected an ENERGY unit, MMBTU, BTU, THERM, GJ, "
         "MWH or KWH"
     )
-    with pytest.raises(ValueError, match=r"^holiday_calendar is a holiday calendar, expected none"):
+    with pytest.raises(ValueError, match=r"^holiday_key is 'NYMEX', expected none"):
         index(
             "Henry Hub IFERC",
             "Henry Hub natural gas - Inside FERC monthly index",
             IFERC,
             volume,
             SPECIFICATIONS,
-            HOLIDAYS,
+            "NYMEX",
             None,
             UNITS,
+            CALENDARS,
+            WorkCounter(),
         )
 
 
@@ -395,12 +523,22 @@ def test_any_kind_of_schedule_and_any_name_make_an_index_of_that_kind(
         np.zeros(count),
         UNITS,
     )
-    holidays = HOLIDAYS if kind is Kind.FUTURES else None
+    key = "NYMEX" if kind is Kind.FUTURES else None
     made = index(
-        name, f"{name} index", schedule, CONVENTIONS, specifications, holidays, None, UNITS
+        name,
+        f"{name} index",
+        schedule,
+        CONVENTIONS,
+        specifications,
+        key,
+        None,
+        UNITS,
+        CALENDARS,
+        WorkCounter(),
     )
     assert made.name == name and made.kind is kind
-    assert made.schedule is schedule and made.holiday_calendar is holidays
+    assert made.schedule is schedule
+    assert made.holiday_calendar is (HOLIDAYS if kind is Kind.FUTURES else None)
     assert made.conventions is CONVENTIONS and made.specifications is specifications
     with pytest.raises(ValueError):
         index(
@@ -409,9 +547,11 @@ def test_any_kind_of_schedule_and_any_name_make_an_index_of_that_kind(
             schedule,
             CONVENTIONS,
             specifications,
-            None if holidays else HOLIDAYS,
+            None if key else "NYMEX",
             None,
             UNITS,
+            CALENDARS,
+            WorkCounter(),
         )
 
 
@@ -441,9 +581,11 @@ def ete(
         ETE_FUTURES,
         conventions,
         ETE_SPECIFICATIONS,
-        HOLIDAYS,
+        "NYMEX",
         reporting_lot,
         UNITS,
+        CALENDARS,
+        WorkCounter(),
     )
 
 
@@ -498,9 +640,11 @@ def test_a_reporting_lot_whose_quantity_outruns_the_largest_number_is_refused() 
             ETE_FUTURES,
             conventions,
             huge,
-            HOLIDAYS,
+            "NYMEX",
             "LOT",
             UNITS,
+            CALENDARS,
+            WorkCounter(),
         )
     assert str(failure.value) == (
         "reporting_lot 'LOT' is inf GAL a lot, expected a finite quantity; the lot size outruns "
@@ -515,9 +659,11 @@ def test_a_reporting_lot_whose_quantity_outruns_the_largest_number_is_refused() 
             ETE_FUTURES,
             conventions,
             SPECIFICATIONS,
-            HOLIDAYS,
+            "NYMEX",
             "LOT",
             UNITS,
+            CALENDARS,
+            WorkCounter(),
         )
     assert str(failure.value).startswith("specifications row 1 lot_unit is 'MMBTU'")
 
@@ -531,7 +677,16 @@ def test_the_display_name_is_kept_as_typed_and_may_repeat_the_name() -> None:
     assert an_index().display_name == "Henry Hub NYMEX index"
     for text in ("West Texas Intermediate crude oil - NYMEX", " spaced ", "Henry Hub NYMEX", "x"):
         made = index(
-            "Henry Hub NYMEX", text, FUTURES, CONVENTIONS, SPECIFICATIONS, HOLIDAYS, None, UNITS
+            "Henry Hub NYMEX",
+            text,
+            FUTURES,
+            CONVENTIONS,
+            SPECIFICATIONS,
+            "NYMEX",
+            None,
+            UNITS,
+            CALENDARS,
+            WorkCounter(),
         )
         assert made.display_name == text and made.name == "Henry Hub NYMEX"
         assert made.kind is Kind.FUTURES

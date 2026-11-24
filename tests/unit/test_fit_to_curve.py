@@ -14,6 +14,7 @@ from collections.abc import Callable
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name
 from test_bilateral_kernel import CLOSE, curve_of, curve_set
 from test_create_trades import seam_key, with_calendars
 from test_quote import (
@@ -111,7 +112,7 @@ FIELDS = (
     "schedule_method",
     "quantity_per",
     "payment_day",
-    "payment_calendar_key",
+    "payment_holiday_key",
     "settlement_frequency",
     "nearby",
 )
@@ -465,9 +466,7 @@ def test_the_three_worksheet_functions_take_the_pricing_through_the_seam() -> No
     )
     history = seam_history(ix, "2026-12-16", DEC_31, ["2027-01-01"], {})
     market = seam_market(history, "SEAM", *PRICES)
-    weekends = seam_key(
-        ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING)
-    )
+    weekends = seam_key(ENTRY["_CreateHolidayCalendar"](a_name(), column([serial("2030-01-01")])))
     otc_template = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         row("discount_curve_key", *FIELDS),

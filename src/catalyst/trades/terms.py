@@ -104,7 +104,7 @@ class PaymentTerms:
     row's payment_day since payment-day-date-or-rule.md, a date or a rule text each, `+2bd` or
     since #181 a chain such as `+3em+25cd-1bd+1bd`, a rule's instructions read once at creation
     and applied then; and calendar[i], the holiday calendar a rule's business days are counted
-    on, the calendar the row's payment_calendar_key selected since payment-calendar-keys.md,
+    on, the calendar the row's payment_holiday_key selected since payment-calendar-keys.md,
     held by reference, read for nothing by a row that entered a date. Per component: date[k],
     the day it pays, its row's date as entered or
     its row's rule applied instruction by instruction to its anchor, its contract's expiry under
@@ -254,7 +254,7 @@ class ResolvedTrades:
     clearing_house: tuple[str, ...] | None
     counterparty: tuple[str, ...] | None
     discount_curve_key: tuple[str, ...] | None
-    payment_calendar_key: tuple[str, ...] | None
+    payment_holiday_key: tuple[str, ...] | None
     broker: tuple[str, ...] | None
     brokered: NDArray[np.bool_]
     trade_dates: NDArray[np.datetime64]
@@ -325,7 +325,7 @@ def resolved_trades(
     marketing_reserve: NDArray[np.float64] | None = None,
     cva_reserve: NDArray[np.float64] | None = None,
     discount_curve_key: tuple[str, ...] | None = None,
-    payment_calendar_key: tuple[str, ...] | None = None,
+    payment_holiday_key: tuple[str, ...] | None = None,
     second_leg: LegInputs | None = None,
     price_unit: PriceUnit | None = None,
 ) -> ResolvedTrades:
@@ -423,7 +423,7 @@ def resolved_trades(
         clearing_house,
         counterparty,
         discount_curve_key,
-        payment_calendar_key,
+        payment_holiday_key,
         broker,
         marketing_reserve,
         cva_reserve,
@@ -487,7 +487,7 @@ def resolved_trades(
         clearing_house,
         counterparty,
         discount_curve_key,
-        payment_calendar_key,
+        payment_holiday_key,
         broker,
         brokered,
         _frozen_days(trade_dates),
@@ -1037,7 +1037,7 @@ def _the_occurrences(
     clearing_house: tuple[str, ...] | None,
     counterparty: tuple[str, ...] | None,
     discount_curve_key: tuple[str, ...] | None,
-    payment_calendar_key: tuple[str, ...] | None,
+    payment_holiday_key: tuple[str, ...] | None,
     broker: tuple[str, ...] | None,
     marketing_reserve: NDArray[np.float64] | None,
     cva_reserve: NDArray[np.float64] | None,
@@ -1055,7 +1055,7 @@ def _the_occurrences(
         ("clearing_house", clearing_house),
         ("counterparty", counterparty),
         ("discount_curve_key", discount_curve_key),
-        ("payment_calendar_key", payment_calendar_key),
+        ("payment_holiday_key", payment_holiday_key),
         ("broker", broker),
     ):
         if texts is not None and len(texts) != occurrences:

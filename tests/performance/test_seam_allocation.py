@@ -20,6 +20,7 @@ from collections.abc import Callable
 
 import numpy as np
 import pytest
+from holiday_fixtures import a_name, key_and_collection, key_in
 
 from catalyst.excel import bridge
 from catalyst.excel.bridge import MISSING, Cells
@@ -307,7 +308,7 @@ def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
     days = 100
     holidays = holiday_column(days)
     assert (
-        least_peak(lambda: ENTRY["_CreateHolidayCalendar"](holidays, bridge.MISSING))
+        least_peak(lambda: ENTRY["_CreateHolidayCalendar"](a_name(), holidays))
         <= 17 * days + 2 * SLACK
     )
 
@@ -376,14 +377,16 @@ def specification_body(contracts: int) -> Cells:
 def an_index(schedule: object, holidays: object = MISSING) -> object:
     """The index handle of that schedule handle and holiday calendar handle, with the conventions
     of gas and one lot, since nothing measured here reads either."""
+    key, calendars = key_and_collection(holidays)
     return ENTRY["_CreateIndex"](
         "sample",
         "Sample futures index",
         schedule,
         ENTRY["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU"),
         ENTRY["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(1)),
-        holidays,
+        key,
         MISSING,
+        calendars,
     )
 
 
@@ -409,7 +412,8 @@ def test_an_index_keeps_one_small_record_and_its_reader_stays_small() -> None:
     specifications = ENTRY["_CreateContractSpecifications"](
         SPECIFICATION_HEADERS, specification_body(12)
     )
-    holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING)
+    holidays = ENTRY["_CreateHolidayCalendar"](a_name(), holiday_column(100))
+    key, calendars = key_and_collection(holidays)
     assert (
         least_peak(
             lambda: ENTRY["_CreateIndex"](
@@ -418,8 +422,9 @@ def test_an_index_keeps_one_small_record_and_its_reader_stays_small() -> None:
                 schedule,
                 conventions,
                 specifications,
-                holidays,
+                key,
                 MISSING,
+                calendars,
             )
         )
         <= 2 * SLACK
@@ -430,8 +435,9 @@ def test_an_index_keeps_one_small_record_and_its_reader_stays_small() -> None:
         schedule,
         conventions,
         specifications,
-        holidays,
+        key,
         MISSING,
+        calendars,
     )
     assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 2 * SLACK
 
@@ -473,7 +479,7 @@ def test_futures_fixings_keep_a_copy_of_each_column() -> None:
     codes, futures, _, _ = schedule_columns(2)
     index = an_index(
         ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING),
-        ENTRY["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING),
+        ENTRY["_CreateHolidayCalendar"](a_name(), holiday_column(100)),
     )
     days, settles = fixings_columns(rows, 100)
     assert (
@@ -487,7 +493,7 @@ def calendar_sources(contracts: int) -> tuple[object, object]:
     many monthly contracts a month apart with a calendar of a hundred holidays a week apart."""
     codes, futures, _, _ = schedule_columns(contracts)
     schedule = ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING)
-    holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING)
+    holidays = ENTRY["_CreateHolidayCalendar"](a_name(), holiday_column(100))
     return ENTRY["_CreateValuationDate"](46276.0, 0.5), an_index(schedule, holidays)
 
 
@@ -568,7 +574,10 @@ def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
     date: float, offset: str, slacks: int
 ) -> None:
     live = bridge.live_handles()
-    assert least_peak(lambda: ENTRY["util_ShiftDate"](date, offset, MISSING)) <= slacks * SLACK
+    assert (
+        least_peak(lambda: ENTRY["util_ShiftDate"](date, offset, MISSING, MISSING))
+        <= slacks * SLACK
+    )
     assert bridge.live_handles() == live
 
 
@@ -816,7 +825,7 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     futures = Cells.from_rows([[46161.0 + days_apart * i] for i in range(contracts)])
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     schedule = ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING)
-    index = an_index(schedule, ENTRY["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING))
+    index = an_index(schedule, ENTRY["_CreateHolidayCalendar"](a_name(), holiday_column(100)))
     made = ENTRY["_CreateCalendar"](valuation, index)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
@@ -1022,7 +1031,7 @@ def test_futures_fixings_keep_their_two_columns_and_release_frees_them() -> None
     codes, futures, _, _ = schedule_columns(2)
     index = an_index(
         ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING),
-        ENTRY["_CreateHolidayCalendar"](holiday_column(100), bridge.MISSING),
+        ENTRY["_CreateHolidayCalendar"](a_name(), holiday_column(100)),
     )
     days, settles = fixings_columns(rows, 100)
     kept = retained_numpy_bytes(lambda: ENTRY["_CreateFuturesFixings"](days, settles, index))
@@ -1033,7 +1042,7 @@ def test_futures_fixings_keep_their_two_columns_and_release_frees_them() -> None
 def test_a_holiday_calendar_keeps_its_one_column_and_release_frees_it() -> None:
     dates = 100
     holidays = holiday_column(dates)
-    kept = retained_numpy_bytes(lambda: ENTRY["_CreateHolidayCalendar"](holidays, bridge.MISSING))
+    kept = retained_numpy_bytes(lambda: ENTRY["_CreateHolidayCalendar"](a_name(), holidays))
     assert kept == (dates * DAY_BYTES, 0)
 
 
@@ -1091,7 +1100,7 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
         least_peak(lambda: ENTRY["CountFieldRows"]("fixed_float", headers, body))
         <= 60 * rows + 2 * SLACK
     )
-    one = Cells.from_rows([["quantity_unit", "payment_calendar_key", "trade_date", "quantity"]])
+    one = Cells.from_rows([["quantity_unit", "payment_holiday_key", "trade_date", "quantity"]])
     row = Cells.from_rows([["lots", "NYFED+LON", 46164.0, 10.0]])
     live = bridge.live_handles()
     assert least_peak(lambda: ENTRY["EchoFieldRow"]("fixed_float", one, row)) <= 4 * SLACK
@@ -1142,8 +1151,8 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
     )
     # The index's calendar under a name, so that the templates select it by key from the
     # collection of it, made here, outside every measured call.
-    holidays = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[day] for day in closed]), "PAYS")
-    calendars = ENTRY["_CollectPaymentCalendars"](holidays)
+    holidays = ENTRY["_CreateHolidayCalendar"]("PAYS", Cells.from_rows([[day] for day in closed]))
+    calendars = ENTRY["_CollectHolidayCalendars"](holidays)
     conventions = ENTRY["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specifications = ENTRY["_CreateContractSpecifications"](
         Cells.from_rows(
@@ -1152,7 +1161,14 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         Cells.from_rows([["lot", 10000.0, "MMBTU", 0.0, 0.0]]),
     )
     ix = ENTRY["_CreateIndex"](
-        "gas", "Sample gas index", schedule, conventions, specifications, holidays, "lot"
+        "gas",
+        "Sample gas index",
+        schedule,
+        conventions,
+        specifications,
+        key_in(holidays),
+        "lot",
+        calendars,
     )
     names = Cells.from_rows(
         [
@@ -1164,7 +1180,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
                 "settlement_method",
                 "clearing_house",
                 "payment_day",
-                "payment_calendar_key",
+                "payment_holiday_key",
                 "settlement_frequency",
                 "nearby",
             ]
@@ -1201,7 +1217,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
                 "schedule_method",
                 "quantity_per",
                 "payment_day",
-                "payment_calendar_key",
+                "payment_holiday_key",
                 "discount_curve_key",
                 "settlement_frequency",
                 "nearby",
@@ -1243,15 +1259,24 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
     assert peak <= 340 * rows + 2 * SLACK
 
 
-# A combination keeps its distinct days and nothing of its sources: two calendars of the same
-# hundred days combine into a hundred, one column of days, freed on release.
-def test_a_combination_keeps_its_distinct_days_and_release_frees_them() -> None:
+# A key of two names makes its union and keeps nothing of it, holiday-keys.md: a date shifted
+# on two calendars of the same hundred days publishes nothing and retains nothing, the union
+# made for the one call and gone with it, its hundred days and the small objects around them
+# the peak.
+def test_a_shift_on_a_key_of_two_names_keeps_nothing_of_the_union_it_makes() -> None:
     dates = 100
-    sources = Cells.from_rows(
-        [[ENTRY["_CreateHolidayCalendar"](holiday_column(dates), bridge.MISSING)] for _ in range(2)]
+    held = ENTRY["_CollectHolidayCalendars"](
+        Cells.from_rows(
+            [[ENTRY["_CreateHolidayCalendar"](name, holiday_column(dates))] for name in ("A", "B")]
+        )
     )
-    kept = retained_numpy_bytes(lambda: ENTRY["_CombineHolidayCalendars"](sources))
-    assert kept == (dates * DAY_BYTES, 0)
+    live = bridge.live_handles()
+    peak = least_peak(lambda: ENTRY["util_ShiftDate"](46304.0, "+1bd", "A+B", held))
+    assert bridge.live_handles() == live
+    # Measured 7,528 bytes on 2026-11-21: the shift's own three slacks, and some six columns of
+    # the hundred days while the union is made, the two listed together, the sort's copies and
+    # the days kept.
+    assert peak <= 3 * SLACK + 6 * dates * DAY_BYTES
 
 
 # An interpolation pays the library's own peak, test_interpolation_budgets.py, about 21 bytes a
@@ -1270,7 +1295,7 @@ def test_an_interpolation_costs_its_months_and_publishes_nothing(contracts: int)
     serials = [[float(day + 25569)] for day in days.tolist()]
     index = an_index(
         ENTRY["_CreateFuturesSchedule"](Cells.from_rows(codes), Cells.from_rows(serials), MISSING),
-        ENTRY["_CreateHolidayCalendar"](holiday_column(1), bridge.MISSING),
+        ENTRY["_CreateHolidayCalendar"](a_name(), holiday_column(1)),
     )
     anchors = Cells.from_rows([codes[0], codes[-1]])
     prices = Cells.from_rows([[60.0], [72.0]])

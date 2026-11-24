@@ -11,6 +11,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from holiday_fixtures import closed_on, index_on
 from test_bilateral_kernel import (
     A_YEAR,
     AS_OF,
@@ -34,8 +35,6 @@ from catalyst.globals.discount_curve import DiscountCurve
 from catalyst.globals.unit_conversions import UNITS
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
-from catalyst.index_definitions.holiday_calendar import holiday_calendar
-from catalyst.index_definitions.index import index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market.market import Market, market
@@ -485,7 +484,7 @@ def test_curves_group_by_object_and_currency_unit_and_are_named_by_first_appeara
     assert view.totals == (pytest.approx(0.0085, **CLOSE), pytest.approx(0.0085, **CLOSE))
     np.testing.assert_allclose(view.columns[1], [-0.0095, 0.018], **TIGHT)
     assert len(aggregate_view(agg, Risk.ALL, Bucket.DAY).labels) == 6  # two cross groups too
-    cents = index(
+    cents = index_on(
         "HNGC",
         "HNG settled in cents",
         futures_schedule(
@@ -495,7 +494,7 @@ def test_curves_group_by_object_and_currency_unit_and_are_named_by_first_appeara
         contract_specifications(
             ("LOT",), numbers(1.0), ("BBL",), numbers(0.0), numbers(0.0), UNITS
         ),
-        holiday_calendar(dates("2027-12-27")),
+        closed_on(dates("2027-12-27")),
         "LOT",
         UNITS,
     )

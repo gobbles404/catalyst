@@ -88,7 +88,7 @@ def terms(
     }
     if settlement == "financial":
         values["payment_day"] = payment
-        values["payment_calendar_key"] = key_of(CL.holiday_calendar)
+        values["payment_holiday_key"] = key_of(CL.holiday_calendar)
     if route == "bilateral":
         values["discount_curve_key"] = "SOFR"
     return a_template(**values)
@@ -395,7 +395,7 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "schedule_method",
         "quantity_per",
         "payment_day",
-        "payment_calendar_key",
+        "payment_holiday_key",
         "settlement_frequency",
         "nearby",
     )
