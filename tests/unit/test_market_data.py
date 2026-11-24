@@ -18,7 +18,6 @@ from catalyst.excel import bridge
 from catalyst.excel.bridge import MISSING, Cells, Handle
 from catalyst.market_data.futures_fixings import FuturesFixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings
-from catalyst.market_data.iferc_fixings import IfercFixings
 from catalyst.market_data.price_vector import PriceVector
 from catalyst.market_data.published_fixings import PublishedFixings
 from catalyst_probes import probe
@@ -437,263 +436,6 @@ def test_an_index_of_another_kind_is_refused_in_the_librarys_words() -> None:
     )
 
 
-# --- _CreateIfercFixings ---------------------------------------------------------
-
-
-# The page's sample as the sheet sends it, Waha IFERC gas: the first four months of 2026 as
-# codes, the newest month in the first row as the desk keeps them, and an illustrative index
-# beside each.
-IFERC_CODES = Cells.from_rows([["J26"], ["H26"], ["G26"], ["F26"]])
-IFERC_PRICES = Cells.from_rows([[1.60], [1.95], [2.10], [1.85]])
-IFERC_HANDLE = re.compile(r"[0-9]+:iferc_fixings:.+:([0-9]+)")
-# The schedule lists the same four months the other way, the oldest first, as a schedule does,
-# with ICE's last trading days and Platts' publication days for them, as serials.
-IFERC_MONTHS = Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]])
-IFERC_PUBLICATION = Cells.from_rows([[46027.0], [46055.0], [46083.0], [46113.0]])
-
-
-@functools.cache
-def the_iferc_index() -> str:
-    """The IFERC index of the four months the codes name, made once."""
-    schedule = bridge.call("_CreateIfercSchedule", [IFERC_MONTHS, IFERC_PUBLICATION])
-    return an_index_of("Waha IFERC", schedule, MISSING)
-
-
-# The market history reads IFERC fixings, but this hidden reader proves on its own that a handle
-# resolves to the fixings the seam kept, the codes and the prices as kept, oldest first.
-@probe
-def ReadIfercFixings(fixings: Handle[IfercFixings]) -> str:
-    return f"{' '.join(fixings.codes)} | {' '.join(repr(float(p)) for p in fixings.prices)}"
-
-
-def iferc(codes: object, prices: object) -> str:
-    text = bridge.call("_CreateIfercFixings", [codes, prices, the_iferc_index()])
-    assert isinstance(text, str) and IFERC_HANDLE.fullmatch(text), text
-    return text
-
-
-# Given newest first, as the desk keeps them, and kept the other way up, each price beside its
-# own code.
-def test_iferc_fixings_are_created_from_two_columns_and_read_back() -> None:
-    made = iferc(IFERC_CODES, IFERC_PRICES)
-    assert bridge.call("ReadIfercFixings", [made]) == "F26 G26 H26 J26 | 1.85 2.1 1.95 1.6"
-    assert made.startswith(f"{PID}:iferc_fixings:Waha IFERC:")  # the index's name, as typed
-
-
-# The same months the other way up, the schedule's own order, are refused at their second row
-# in the library's words, the two months named with the days their indices published.
-def test_iferc_months_given_oldest_first_are_refused_at_their_second_row() -> None:
-    assert bridge.call(
-        "_CreateIfercFixings",
-        [IFERC_MONTHS, Cells.from_rows([[1.85], [2.10], [1.95], [1.60]]), the_iferc_index()],
-    ) == (
-        "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'G26', published 2026-02-"
-        "02, expected a month published before row 1's 'F26', published 2026-01-05"
-    )
-
-
-# A single cell is a column of one, so the fixings of one month need no range.
-def test_two_single_cells_make_the_fixings_of_one_month() -> None:
-    assert bridge.call("ReadIfercFixings", [iferc("F26", 1.85)]) == "F26 | 1.85"
-
-
-@pytest.mark.parametrize(
-    ("codes", "prices", "text"),
-    [
-        (
-            IFERC_CODES,
-            Cells.from_rows([[1.85], [2.10], [1.95]]),
-            "#ERROR _CreateIfercFixings: ValueError: price has 3 prices, expected 4, "
-            "one per contract_code",
-        ),
-        (
-            IFERC_CODES,
-            Cells.from_rows([[1.85], [2.10], [1.95], [1.60], [1.50]]),
-            "#ERROR _CreateIfercFixings: ValueError: price has 5 prices, expected 4, "
-            "one per contract_code",
-        ),
-        (
-            Cells.from_rows([["J26"], ["G26"], ["G26"], ["F26"]]),
-            IFERC_PRICES,
-            "#ERROR _CreateIfercFixings: ValueError: contract_code row 3 is 'G26', "
-            "already given at row 2",
-        ),
-        (
-            IFERC_CODES,
-            Cells.from_rows([[1.60], [None], [2.10], [1.85]]),
-            "#ERROR _CreateIfercFixings: price cell (2, 1) is blank, expected number",
-        ),
-        (
-            IFERC_CODES,
-            Cells.from_rows([[1.60], ["1.95"], [2.10], [1.85]]),
-            "#ERROR _CreateIfercFixings: price cell (2, 1) is text '1.95', expected number",
-        ),
-        (
-            Cells.from_rows([["J26"], [46027.0], ["G26"], ["F26"]]),
-            IFERC_PRICES,
-            "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is number 46027.0, "
-            "expected text",
-        ),
-        (
-            Cells.from_rows([["J26"], [""], ["G26"], ["F26"]]),
-            IFERC_PRICES,
-            "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is empty text, expected text",
-        ),
-        (
-            Cells.from_rows([["F26", "G26"]]),
-            IFERC_PRICES,
-            "#ERROR _CreateIfercFixings: contract_code is 1x2 array, expected column of text",
-        ),
-        (
-            IFERC_CODES,
-            Cells.from_rows([[1.85, 2.10]]),
-            "#ERROR _CreateIfercFixings: price is 1x2 array, expected column of numbers",
-        ),
-        (
-            MISSING,
-            IFERC_PRICES,
-            "#ERROR _CreateIfercFixings: contract_code is missing, expected column of text",
-        ),
-        (
-            IFERC_CODES,
-            MISSING,
-            "#ERROR _CreateIfercFixings: price is missing, expected column of numbers",
-        ),
-        (
-            None,
-            IFERC_PRICES,
-            "#ERROR _CreateIfercFixings: contract_code is blank, expected column of text",
-        ),
-        (
-            IFERC_CODES,
-            None,
-            "#ERROR _CreateIfercFixings: price is blank, expected column of numbers",
-        ),
-        (
-            Cells.from_rows([["F26"], [46027.0]]),
-            Cells.from_rows([[1.85], [None]]),
-            "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is number 46027.0, "
-            "expected text",
-        ),
-    ],
-    ids=[
-        "a price column one row short",
-        "a price column one row long",
-        "a code given twice",
-        "a blank among the prices",
-        "text where a price should be",
-        "a number among the codes",
-        "empty text among the codes",
-        "a row of codes",
-        "a row of prices",
-        "the codes left out",
-        "the prices left out",
-        "a blank cell where the codes should be",
-        "a blank cell where the prices should be",
-        "both columns wrong, the codes named first",
-    ],
-)
-def test_iferc_fixings_that_cannot_be_made_say_why(
-    codes: object, prices: object, text: str
-) -> None:
-    assert bridge.call("_CreateIfercFixings", [codes, prices, the_iferc_index()]) == text
-
-
-# The publication number moves only when an object is stored, so a failed creator leaves no gap,
-# whether the library or the seam refused the call.
-def test_a_failed_iferc_construction_publishes_no_object_and_no_handle() -> None:
-    before = number(iferc(IFERC_CODES, IFERC_PRICES), IFERC_HANDLE)
-    index = the_iferc_index()
-    assert bridge.call("_CreateIfercFixings", [IFERC_CODES, Cells.from_rows([[1.85]]), index]) == (
-        "#ERROR _CreateIfercFixings: ValueError: price has 1 price, expected 4, "
-        "one per contract_code"
-    )
-    twice = Cells.from_rows([["F26"], ["F26"]])
-    assert bridge.call(
-        "_CreateIfercFixings", [twice, Cells.from_rows([[1.85], [2.10]]), index]
-    ) == (
-        "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'F26', "
-        "already given at row 1"
-    )
-    unknown = Cells.from_rows([["F26"], ["K26"]])
-    assert bridge.call(
-        "_CreateIfercFixings", [unknown, Cells.from_rows([[1.85], [2.10]]), index]
-    ) == (
-        "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'K26', "
-        "expected one of the index's months"
-    )
-    oldest_first = Cells.from_rows([["F26"], ["G26"]])
-    assert bridge.call(
-        "_CreateIfercFixings", [oldest_first, Cells.from_rows([[1.85], [2.10]]), index]
-    ) == (
-        "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'G26', published 2026-02-"
-        "02, expected a month published before row 1's 'F26', published 2026-01-05"
-    )
-    assert (
-        bridge.call(
-            "_CreateIfercFixings",
-            [IFERC_CODES, Cells.from_rows([[1.60], [None], [2.10], [1.85]]), index],
-        )
-        == "#ERROR _CreateIfercFixings: price cell (2, 1) is blank, expected number"
-    )
-    assert number(iferc(IFERC_CODES, IFERC_PRICES), IFERC_HANDLE) == before + 1
-
-
-def test_a_handle_of_another_kind_is_not_iferc_fixings() -> None:
-    other = the_fixings(DATES, SETTLES)
-    assert bridge.call("ReadIfercFixings", [other]) == (
-        f"#ERROR ReadIfercFixings: fixings is futures fixings handle {other!r}, "
-        "expected iferc fixings handle"
-    )
-    schedule = cast(
-        str,
-        bridge.call(
-            "_CreateIfercSchedule",
-            [
-                Cells.from_rows([["F26"], ["G26"]]),
-                Cells.from_rows([[46027.0], [46055.0]]),
-            ],
-        ),
-    )
-    assert bridge.call("ReadIfercFixings", [schedule]) == (
-        f"#ERROR ReadIfercFixings: fixings is iferc schedule handle {schedule!r}, "
-        "expected iferc fixings handle"
-    )
-    assert bridge.call("_CreateIfercFixings", [IFERC_CODES, IFERC_PRICES, schedule]) == (
-        f"#ERROR _CreateIfercFixings: index is iferc schedule handle {schedule!r}, "
-        "expected index handle"
-    )
-
-
-# The index by handle: left out, blank, a number, text naming no live object and a handle of
-# another kind fail in the seam's words; an index of another kind and a code the index does not
-# hold, in the library's.
-def test_the_iferc_index_that_cannot_be_taken_says_why() -> None:
-    for wrong, what in (
-        (MISSING, "is missing"),
-        (None, "is blank"),
-        (1.85, "is number 1.85"),
-        ("index:9999999", "is text 'index:9999999' naming no live object"),
-    ):
-        assert bridge.call("_CreateIfercFixings", [IFERC_CODES, IFERC_PRICES, wrong]) == (
-            f"#ERROR _CreateIfercFixings: index {what}, expected index handle"
-        )
-    other = the_fixings(DATES, SETTLES)
-    assert bridge.call("_CreateIfercFixings", [IFERC_CODES, IFERC_PRICES, other]) == (
-        f"#ERROR _CreateIfercFixings: index is futures fixings handle {other!r}, "
-        "expected index handle"
-    )
-    assert bridge.call("_CreateIfercFixings", [IFERC_CODES, IFERC_PRICES, the_index()]) == (
-        "#ERROR _CreateIfercFixings: ValueError: index is a futures index, expected an IFERC index"
-    )
-    assert bridge.call(
-        "_CreateIfercFixings", [IFERC_CODES, IFERC_PRICES, the_gas_daily_index()]
-    ) == (
-        "#ERROR _CreateIfercFixings: ValueError: index is a Gas Daily index, "
-        "expected an IFERC index"
-    )
-
-
 # --- _CreateGasDailyFixings ------------------------------------------------------
 
 
@@ -946,10 +688,6 @@ def test_the_gas_daily_index_that_cannot_be_taken_says_why() -> None:
         "#ERROR _CreateGasDailyFixings: ValueError: index is a futures index, "
         "expected a Gas Daily index"
     )
-    assert bridge.call("_CreateGasDailyFixings", [FLOW_DAYS, MIDPOINTS, the_iferc_index()]) == (
-        "#ERROR _CreateGasDailyFixings: ValueError: index is an IFERC index, "
-        "expected a Gas Daily index"
-    )
 
 
 # --- _CreatePublishedFixings -----------------------------------------------------
@@ -1105,15 +843,11 @@ def test_the_published_index_that_cannot_be_taken_says_why() -> None:
     assert bridge.call("_CreatePublishedFixings", [DATED, PRINT_PRICES, MISSING]) == (
         "#ERROR _CreatePublishedFixings: index is missing, expected index handle"
     )
-    assert bridge.call("_CreatePublishedFixings", [DATED, PRINT_PRICES, the_iferc_index()]) == (
-        "#ERROR _CreatePublishedFixings: ValueError: index is an IFERC index, "
+    assert bridge.call("_CreatePublishedFixings", [DATED, PRINT_PRICES, the_index()]) == (
+        "#ERROR _CreatePublishedFixings: ValueError: index is a futures index, "
         "expected a published index"
     )
     # The other kinds' fixings refuse a published index in turn, each in its own words.
-    assert bridge.call("_CreateIfercFixings", ["U26", 3.0, the_published_index()]) == (
-        "#ERROR _CreateIfercFixings: ValueError: index is a published index, "
-        "expected an IFERC index"
-    )
     assert bridge.call("_CreateGasDailyFixings", [SEP_14, 3.0, the_published_index()]) == (
         "#ERROR _CreateGasDailyFixings: ValueError: index is a published index, "
         "expected a Gas Daily index"
@@ -1247,37 +981,6 @@ def test_a_gas_daily_fixings_spill_fed_back_to_its_creator_makes_equal_fixings()
     )
 
 
-# IFERC fixings spill their months newest first, the direction the creator takes, so the round
-# trip keeps that order and each index beside its own code, while the kept columns, which the
-# hidden reader shows, run the other way: the desk's four months, and a month left out.
-@pytest.mark.parametrize(
-    ("codes", "prices", "kept"),
-    [
-        (
-            ("J26", "H26", "G26", "F26"),
-            (1.60, 1.95, 2.10, 1.85),
-            "F26 G26 H26 J26 | 1.85 2.1 1.95 1.6",
-        ),
-        (("J26", "G26", "F26"), (1.60, 2.10, 1.85), "F26 G26 J26 | 1.85 2.1 1.6"),
-    ],
-    ids=["newest first", "a month left out"],
-)
-def test_an_iferc_fixings_spill_fed_back_to_its_creator_makes_equal_fixings(
-    codes: tuple[str, ...], prices: tuple[float, ...], kept: str
-) -> None:
-    first = iferc(
-        Cells.from_rows([[code] for code in codes]), Cells.from_rows([[p] for p in prices])
-    )
-    spilled = rows(read(first))
-    assert spilled[:2] == [["contract_code", "price"], ["str", "float64"]]
-    assert spilled[2:] == [[code, price] for code, price in zip(codes, prices, strict=True)]
-    second = iferc(*columns(spilled))
-    assert second != first
-    assert rows(read(second)) == spilled
-    assert bridge.call("ReadIfercFixings", [second]) == kept
-    assert bridge.call("ReadIfercFixings", [first]) == kept
-
-
 EPOCH = np.datetime64("1899-12-30")
 # The holiday calendar's days as days, for making runs of business days under the_index.
 CLOSED = EPOCH + np.array(HOLIDAY_SERIALS, dtype=np.int64).astype("timedelta64[D]")
@@ -1326,25 +1029,27 @@ def test_any_gas_daily_series_survives_the_round_trip_with_every_price_beside_it
     )
 
 
-# For any one or more of the index's four months given newest first with no two prices alike:
+# For any one or more of the index's six prints given newest first with no two prices alike:
 # the spill shows the rows as they were given, and its columns handed back to the creator make
-# fixings that keep the same months and prices and spill the same rows.
+# fixings that keep the same prints and prices and spill the same rows.
 @settings(deadline=None, max_examples=50)
-@given(chosen=st.sets(st.integers(0, 3), min_size=1), data=st.data())
-def test_any_iferc_series_survives_the_round_trip_with_every_price_beside_its_code(
+@given(chosen=st.sets(st.integers(0, 5), min_size=1), data=st.data())
+def test_any_published_series_survives_the_round_trip_with_every_price_beside_its_date(
     chosen: set[int], data: st.DataObject
 ) -> None:
-    months = ("F26", "G26", "H26", "J26")  # the schedule's order, oldest first
-    codes = [months[i] for i in sorted(chosen, reverse=True)]
+    prints = (AUG_31, P_SEP_7, SEP_14, SEP_21, SEP_28, OCT_5)  # the schedule's order
+    dated = [prints[i] for i in sorted(chosen, reverse=True)]
     prices = data.draw(
-        st.lists(st.floats(-100, 100), min_size=len(codes), max_size=len(codes), unique=True)
+        st.lists(st.floats(-100, 100), min_size=len(dated), max_size=len(dated), unique=True)
     )
-    first = iferc(Cells.from_rows([[c] for c in codes]), Cells.from_rows([[p] for p in prices]))
+    first = published(Cells.from_rows([[d] for d in dated]), Cells.from_rows([[p] for p in prices]))
     spilled = rows(read(first))
-    assert spilled[2:] == [[c, p] for c, p in zip(codes, prices, strict=True)]
-    second = iferc(*columns(spilled))
+    assert spilled[2:] == [[d, p] for d, p in zip(dated, prices, strict=True)]
+    second = published(*columns(spilled))
     assert rows(read(second)) == spilled
-    assert bridge.call("ReadIfercFixings", [second]) == bridge.call("ReadIfercFixings", [first])
+    assert bridge.call("ReadPublishedFixings", [second]) == bridge.call(
+        "ReadPublishedFixings", [first]
+    )
 
 
 # --- _CreatePriceVector -----------------------------------------------------------

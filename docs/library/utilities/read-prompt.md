@@ -2,7 +2,7 @@
 
 Built in #129.
 
-Reads the prompt of a calendar onto the sheet as text: the code of the contract on the calendar's first unfixed period, which is the contract the first price of a market over that calendar is for, as [_CreateMarket](../market/market.md) has read it since #86. The desk shows it beside each index so that a sheet holding several markets says, in one cell each, which contract each price vector starts at; nothing is made, no handle is published, and the valuation date is the calendar's own. Prompt here means that one contract and nothing more: on a futures calendar the contract prompt on the valuation day, on a Gas Daily calendar the month of the first unfixed flow day and on an IFERC calendar the first month whose index has not published. The code is `src/catalyst/calendar/calendar.py`, where `Calendar.prompt_code` reads it off the calendar's own columns, and `src/catalyst/excel/utilities.py`, the worksheet function.
+Reads the prompt of a calendar onto the sheet as text: the code of the contract on the calendar's first unfixed period, which is the contract the first price of a market over that calendar is for, as [_CreateMarket](../market/market.md) has read it since #86. The desk shows it beside each index so that a sheet holding several markets says, in one cell each, which contract each price vector starts at; nothing is made, no handle is published, and the valuation date is the calendar's own. Prompt here means that one contract and nothing more: on a futures calendar the contract prompt on the valuation day, on a Gas Daily calendar the month of the first unfixed flow day and on a published calendar the month of the first print still to come, which on a monthly index such as Inside FERC's is the first month whose index has not published. The code is `src/catalyst/calendar/calendar.py`, where `Calendar.prompt_code` reads it off the calendar's own columns, and `src/catalyst/excel/utilities.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -46,7 +46,7 @@ Three reads and no array: the row of the first unfixed period, which the calenda
 |---|---|---|
 | futures | the valuation day, since a day is fixed only once it is before the valuation date's day, whatever fraction of the day has elapsed and whether or not the market is open that day | the contract prompt on the valuation day: the expiring contract on its expiry day, the next from the day after; on a weekend or a holiday, the contract that day belongs to, no day skipped |
 | Gas Daily | the day after the valuation day, since a flow day is fixed once its print has preceded it | the month of that day: the month in progress while it has a flow day left, the next month from the month's last day |
-| IFERC | the first month whose publication day is not before the valuation date's day | that month: the month publishing on the valuation day itself, the next from the day after |
+| published | the first print whose date is not before the valuation date's day | the month that print counts toward; on a monthly index the month publishing on the valuation day itself, the next from the day after |
 | any, valued before the calendar begins | the calendar's first period | its first contract, which on a futures calendar is the schedule's second, the first only bounding the calendar |
 
 | Calendar | Valuation date | Schedule | Prompt |
@@ -55,8 +55,10 @@ Three reads and no array: the row of the first unfixed period, which the calenda
 | futures | 23-Jun-2026 | the same | `q26` |
 | Gas Daily | 18-Sep-2026 | U26 covers September, V26 October | `U26` |
 | Gas Daily | 30-Sep-2026 | the same, September's last flow day fixed | `V26` |
-| IFERC | 1-Sep-2026 | U26 publishes 1-Sep, V26 1-Oct | `U26` |
-| IFERC | 2-Sep-2026 | the same | `V26` |
+| published, one print a month | 1-Sep-2026 | U26 publishes 1-Sep, V26 1-Oct | `U26` |
+| published, one print a month | 2-Sep-2026 | the same | `V26` |
+| published, weekly | 28-Sep-2026 | U26's last print is dated 28-Sep, V26's first 5-Oct | `U26` |
+| published, weekly | 29-Sep-2026 | the same | `V26` |
 
 ## Tests
 
@@ -66,7 +68,8 @@ The library's examples are `tests/unit/test_calendar.py` under the prompt code; 
 |---|---|
 | futures: the expiry day and the day after, the expiring contract then the next; a Saturday and a holiday, the contract prompt that day, no day skipped; the last day, the last contract | example |
 | Gas Daily: inside a month, that month; a month's last day, the next month; the day before the last flow day, the last month | example |
-| IFERC: the publication day, the month publishing; the day after, the next month; two months published, the third; the last publication day, the last month | example |
+| published, one print a month: the publication day, the month publishing; the day after, the next month; two months published, the third; the last publication day, the last month | example |
+| published, several prints a month: two of a month's four fixed, that month; a month's last print on its own date, that month still; the day after it, the next month | example |
 | valued before the calendar begins, each kind: its first contract, never the futures schedule's boundary contract | example |
 | the fraction of the valuation day changes the prompt of no kind | example |
 | every period fixed, each kind: refused with the exact message | example |

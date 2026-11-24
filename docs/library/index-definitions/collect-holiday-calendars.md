@@ -75,7 +75,7 @@ Each reader binds its key once, when its object is made, and nothing later looks
 | A futures index | `holiday_key` | [_CreateIndex](index.md) |
 | A date shift | `holiday_key` | [util_ShiftDate](../utilities/shift-date.md), on each call |
 
-Each of the four takes the collection as its last argument. A reader that holds a key must be given it. A collection given where no key selects from it, a physically settled batch or an IFERC index, is read for nothing.
+Each of the four takes the collection as its last argument. A reader that holds a key must be given it. A collection given where no key selects from it, a physically settled batch or a published index, is read for nothing.
 
 The step is one for every reader, `keyed_calendar` in `src/catalyst/index_definitions/holiday_calendars.py`, with `calendar_of` in front of it for the readers that hold at most one key. The key's own form is read first, by `calendar_key`, which a [trade template](../trades/trade-template.md) also reads its key by. Then each name is looked up exactly, case and all, with nothing trimmed or guessed, no fallback and no choice made for a collection of one. A key of several names is united once for each distinct set of names in a batch, so `NYFED+LON` on two thousand rows, or beside `LON+NYFED`, is one calendar.
 

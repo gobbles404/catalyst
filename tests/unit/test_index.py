@@ -25,7 +25,6 @@ from catalyst.index_definitions.holiday_calendars import (
     HolidayCalendars,
     collect_holiday_calendars,
 )
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index, index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.kind import Kind
@@ -62,7 +61,8 @@ FUTURES = futures_schedule(
     ),
     None,
 )
-IFERC = iferc_schedule(("V26", "X26", "Z26"), dates("2026-10-01", "2026-11-02", "2026-12-01"))
+# One print a month, the shape of a monthly index such as Inside FERC's.
+MONTHLY = published_schedule(("V26", "X26", "Z26"), dates("2026-10-01", "2026-11-02", "2026-12-01"))
 GAS_DAILY = gas_daily_schedule(
     ("U26", "V26", "X26"),
     dates("2026-09-01", "2026-10-01", "2026-11-01"),
@@ -111,11 +111,11 @@ def test_the_futures_sample_binds_its_four_objects_and_reads_its_kind_off_the_sc
     assert made.specifications is SPECIFICATIONS
 
 
-def test_the_iferc_and_gas_daily_samples_carry_no_holiday_calendar() -> None:
+def test_the_monthly_and_gas_daily_samples_carry_no_holiday_calendar() -> None:
     monthly = index(
         "Henry Hub IFERC",
         "Henry Hub natural gas - Inside FERC monthly index",
-        IFERC,
+        MONTHLY,
         CONVENTIONS,
         SPECIFICATIONS,
         None,
@@ -124,8 +124,8 @@ def test_the_iferc_and_gas_daily_samples_carry_no_holiday_calendar() -> None:
         CALENDARS,
         WorkCounter(),
     )
-    assert monthly.kind is Kind.IFERC
-    assert monthly.schedule is IFERC and monthly.holiday_calendar is None
+    assert monthly.kind is Kind.PUBLISHED
+    assert monthly.schedule is MONTHLY and monthly.holiday_calendar is None
     daily = index(
         "Henry Hub Gas Daily",
         "Henry Hub natural gas - Platts Gas Daily",
@@ -205,7 +205,7 @@ def test_an_object_that_is_not_a_schedule_is_refused_naming_what_it_is() -> None
                 WorkCounter(),
             )
         assert str(failure.value) == (
-            f"schedule is {what}, expected a futures, IFERC, Gas Daily or published schedule"
+            f"schedule is {what}, expected a futures, Gas Daily or published schedule"
         )
 
 
@@ -230,7 +230,7 @@ def test_a_futures_index_needs_its_holiday_key_and_the_other_two_refuse_one() ->
         index(
             "Henry Hub IFERC",
             "Henry Hub natural gas - Inside FERC monthly index",
-            IFERC,
+            MONTHLY,
             CONVENTIONS,
             SPECIFICATIONS,
             "NYMEX",
@@ -239,7 +239,7 @@ def test_a_futures_index_needs_its_holiday_key_and_the_other_two_refuse_one() ->
             CALENDARS,
             WorkCounter(),
         )
-    assert str(failure.value) == "holiday_key is 'NYMEX', expected none with an IFERC schedule"
+    assert str(failure.value) == "holiday_key is 'NYMEX', expected none with a published schedule"
     with pytest.raises(ValueError) as failure:
         index(
             "Henry Hub Gas Daily",
@@ -317,9 +317,9 @@ def test_a_key_needs_a_collection_that_holds_its_names_exactly() -> None:
 
 
 def test_the_kind_is_read_before_the_key_is_looked_up() -> None:
-    # An IFERC or a Gas Daily index refuses a key whatever it says and whether or not a
+    # A published or a Gas Daily index refuses a key whatever it says and whether or not a
     # collection came with it: nothing is looked up for an index that reads no calendar.
-    for schedule, words in ((IFERC, "an IFERC"), (GAS_DAILY, "a Gas Daily")):
+    for schedule, words in ((MONTHLY, "a published"), (GAS_DAILY, "a Gas Daily")):
         for calendars in (CALENDARS, None):
             with pytest.raises(ValueError) as failure:
                 keyed("NOWHERE", calendars, schedule)
@@ -333,7 +333,7 @@ def test_the_kind_is_read_before_the_key_is_looked_up() -> None:
 
 
 def test_a_collection_nothing_selects_from_is_read_for_nothing() -> None:
-    assert keyed(None, CALENDARS, IFERC).holiday_calendar is None
+    assert keyed(None, CALENDARS, MONTHLY).holiday_calendar is None
     assert keyed(None, None, GAS_DAILY).holiday_calendar is None
 
 
@@ -350,7 +350,7 @@ def test_the_work_of_an_index_is_its_one_key_and_a_unions_own_counts() -> None:
         "holidays_kept": 4,
         "holiday_keys_bound": 1,
     }
-    assert counted(None, IFERC) == {}
+    assert counted(None, MONTHLY) == {}
 
 
 def test_the_schedule_is_checked_before_the_holiday_key() -> None:
@@ -401,7 +401,7 @@ def test_specifications_need_not_answer_to_the_schedules_codes_or_count() -> Non
         index(
             "Henry Hub IFERC",
             "Henry Hub natural gas - Inside FERC monthly index",
-            IFERC,
+            MONTHLY,
             CONVENTIONS,
             three,
             None,
@@ -497,7 +497,7 @@ def test_lot_units_of_the_indexs_measure_pass_and_another_measures_are_refused()
         index(
             "Henry Hub IFERC",
             "Henry Hub natural gas - Inside FERC monthly index",
-            IFERC,
+            MONTHLY,
             volume,
             SPECIFICATIONS,
             "NYMEX",
@@ -556,7 +556,6 @@ def test_any_kind_of_schedule_and_any_name_make_an_index_of_that_kind(
 ) -> None:
     schedule: object = {
         Kind.FUTURES: FUTURES,
-        Kind.IFERC: IFERC,
         Kind.GAS_DAILY: GAS_DAILY,
         Kind.PUBLISHED: PUBLISHED,
     }[kind]

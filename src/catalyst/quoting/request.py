@@ -37,7 +37,6 @@ from catalyst.index_definitions.contract_codes import schedule_months
 from catalyst.index_definitions.date_offsets import Instruction, shift_days
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
-from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.kind import Kind, named
 from catalyst.index_definitions.published_schedule import PublishedSchedule
@@ -386,40 +385,30 @@ def the_curve(
 def _the_published_terms(terms: Terms) -> None:
     """The terms a published index takes, the batch's rules in a quote's words: a financial
     settlement, nothing being delivered against a published price, and the asian method, a
-    month being the average of its prints."""
+    month being the average of its prints, or lastday, a month's one print, which the
+    observations hold to a month that has one."""
     if terms.settlement is Settlement.PHYSICAL:
         raise ValueError(
             "settlement_method is 'physical', expected 'financial' on a published index; "
             "nothing is delivered against a published price"
         )
-    if terms.method is not ScheduleMethod.ASIAN:
+    if terms.method not in (ScheduleMethod.ASIAN, ScheduleMethod.LASTDAY):
         raise ValueError(
-            f"schedule_method is {terms.method.value!r}, expected 'asian' on a published "
-            "index; a published month is the average of its prints"
+            f"schedule_method is {terms.method.value!r}, expected 'asian' or 'lastday' on a "
+            "published index; a published month is the average of its prints, or its one "
+            "print"
         )
 
 
 def the_method(terms: Terms, schedule: TradeSchedule) -> None:
-    """The terms against the index's kind, the batch's rules: on an IFERC index a financial
-    settlement and lastday, the month's index being published once; on a futures index a physical
+    """The terms against the index's kind, the batch's rules: on a futures index a physical
     settlement with lastday alone, the other three methods settling on a price other than the
-    expiry's settle; on a published index a financial settlement and asian, a month being the
-    average of its prints."""
+    expiry's settle; on a published index a financial settlement and asian or lastday, a
+    month being the average of its prints or its one print."""
     method = terms.method
     match schedule:
         case PublishedSchedule():
             _the_published_terms(terms)
-        case IfercSchedule():
-            if terms.settlement is Settlement.PHYSICAL:
-                raise ValueError(
-                    "settlement_method is 'physical', expected 'financial' on an IFERC index; an "
-                    "IFERC basis future is cash settled on its month's published index"
-                )
-            if method is not ScheduleMethod.LASTDAY:
-                raise ValueError(
-                    f"schedule_method is {method.value!r}, expected 'lastday' on an IFERC index; "
-                    "an IFERC month has one index, published once"
-                )
         case FuturesSchedule():
             if terms.settlement is Settlement.FINANCIAL:
                 return
@@ -572,8 +561,8 @@ def the_payments(
     """A financial quote's payment days from its template, the batch's rules: since
     payment-day-date-or-rule.md the template's date on every month, as entered and never rolled,
     or each month's rule applied to its last observation day, the expiry under lastday on a
-    futures index and the publication day on an IFERC one, instruction by instruction on the
-    payment calendar, within the sheet's calendar; either way after each month's last
+    futures index and the last publication date on a published one, instruction by instruction
+    on the payment calendar, within the sheet's calendar; either way after each month's last
     observation, when the month's final price exists, the kernel's own rule for it, so a dated
     template serves any request whose last observation falls before its date; None for a
     physical settlement, which pays on no day. Work: the rule read and its instructions applied

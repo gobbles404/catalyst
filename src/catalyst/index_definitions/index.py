@@ -16,7 +16,6 @@ from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.holiday_calendars import HolidayCalendars, calendar_of
-from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index_conventions import CURRENCY, IndexConventions, a_unit_of
 from catalyst.index_definitions.kind import (
     Kind,
@@ -27,7 +26,7 @@ from catalyst.index_definitions.kind import (
 from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.instrumentation.work_counts import WorkCounter
 
-type Schedule = FuturesSchedule | IfercSchedule | GasDailySchedule | PublishedSchedule
+type Schedule = FuturesSchedule | GasDailySchedule | PublishedSchedule
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,18 +173,13 @@ def _the_reporting_lot(
 @singledispatch
 def _of(schedule: object) -> Kind:
     raise ValueError(
-        f"schedule is {named(schedule)}, expected a futures, IFERC, Gas Daily or published schedule"
+        f"schedule is {named(schedule)}, expected a futures, Gas Daily or published schedule"
     )
 
 
 @_of.register
 def futures_index(schedule: FuturesSchedule) -> Kind:
     return Kind.FUTURES
-
-
-@_of.register
-def iferc_index(schedule: IfercSchedule) -> Kind:
-    return Kind.IFERC
 
 
 @_of.register
@@ -212,7 +206,7 @@ def _the_calendar(
             return with_holiday_calendar(
                 calendar_of("holiday_key", holiday_key, holiday_calendars, counter)
             )
-        case Kind.IFERC | Kind.GAS_DAILY | Kind.PUBLISHED:
+        case Kind.GAS_DAILY | Kind.PUBLISHED:
             without_holiday_key(holiday_key, kind)
             return None
         case _:

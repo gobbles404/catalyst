@@ -3518,7 +3518,8 @@ def test_the_six_day_asian_reports_its_days_month_and_year_and_a_tick_changes_no
 
 
 # --- an IFERC basis future on the sheet, iferc-basis-futures.md -----------------------------
-# The ticket's Waha-like index through the seam: X26, Z26 and F27 with their publication days,
+# The ticket's Waha-like index through the seam, a published index of one print a month: X26,
+# Z26 and F27 with their publication days,
 # dollars an MMBtu, a 2,500 MMBtu LOT and a bare MMBTU, the LOT reported and no pricing calendar;
 # a payment calendar closing New Year's Day; the template cleared, financial, lastday, LOT a
 # month at +2bd from publication since iferc-publication-payment-anchor.md; WAH001, 1 LOT of Z26
@@ -3534,11 +3535,12 @@ WAHA_CORRECTED = {"X26": -0.40, "Z26": -0.10}
 WAHA_ROW: list[object] = [1001.0, serial("2026-11-30"), "Z26", 1.0, -0.5]
 
 
-def an_iferc_index(name: str, months: list[tuple[str, str]], lots: list[tuple[str, float]]) -> str:
-    """An IFERC index through the seam: its months with their publication days, dollars an MMBtu
+def a_monthly_index(name: str, months: list[tuple[str, str]], lots: list[tuple[str, float]]) -> str:
+    """A published index of one print a month through the seam, Inside FERC's shape: its
+    months with their publication days, dollars an MMBtu
     settled in dollars, the specifications given in MMBtu, the first the reporting lot, and no
     pricing calendar."""
-    schedule = ENTRY["_CreateIfercSchedule"](
+    schedule = ENTRY["_CreatePublishedSchedule"](
         rows(*[[code] for code, _ in months]),
         column([serial(published) for _, published in months]),
     )
@@ -3561,12 +3563,15 @@ def an_iferc_index(name: str, months: list[tuple[str, str]], lots: list[tuple[st
     )
 
 
-def an_iferc_history(index: str, as_of: str, indices: dict[str, float]) -> str:
-    """The index's history valued on that day with the months' indices given, newest first as the
-    fixings creator takes them."""
+def a_monthly_history(index: str, as_of: str, indices: dict[str, float]) -> str:
+    """The index's history valued on that day with the months' prices given, each entered by
+    its publication date, newest first as the fixings creator takes them."""
+    published = dict(WAHA_MONTHS)
     codes = list(reversed(indices))
-    fixings = ENTRY["_CreateIfercFixings"](
-        rows(*[[code] for code in codes]), column([indices[code] for code in codes]), index
+    fixings = ENTRY["_CreatePublishedFixings"](
+        column([serial(published[code]) for code in codes]),
+        column([indices[code] for code in codes]),
+        index,
     )
     calendar = ENTRY["_CreateCalendar"](ENTRY["_CreateValuationDate"](serial(as_of), 0.5), index)
     return str(ENTRY["_CreateMarketHistory"](calendar, fixings))
@@ -3574,7 +3579,7 @@ def an_iferc_history(index: str, as_of: str, indices: dict[str, float]) -> str:
 
 @pytest.fixture(scope="module")
 def waha() -> dict[str, Any]:
-    index = an_iferc_index("WAHA", WAHA_MONTHS, [("LOT", 2_500.0), ("MMBTU", 1.0)])
+    index = a_monthly_index("WAHA", WAHA_MONTHS, [("LOT", 2_500.0), ("MMBTU", 1.0)])
     pays = ENTRY["_CreateHolidayCalendar"](a_name(), column([serial("2027-01-01")]))
     fields = {
         "quantity_unit": "LOT",
@@ -3599,7 +3604,7 @@ def waha_state(
     """One state: the history valued on that day with those months' indices, the market quoting
     from the first unfixed month on, the batch prepared and evaluated; the history, the prepared
     and the results handles."""
-    history = an_iferc_history(waha["index"], as_of, indices)
+    history = a_monthly_history(waha["index"], as_of, indices)
     market = a_market(history, "WAHA", *quotes)
     prepared = ENTRY["_PrepareTrades"](waha["trades"], history)
     return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
@@ -3704,7 +3709,7 @@ def test_the_waha_batch_reads_back_its_days_and_a_tick_reuses_its_preparation(
     assert by_header(results, "lot_unit")[0] == WAHA_LOT
 
 
-def test_an_iferc_batch_that_is_not_a_financial_lastday_one_is_refused_when_made(
+def test_a_monthly_batch_takes_a_financial_asian_or_lastday_row_and_refuses_the_rest(
     waha: dict[str, Any],
 ) -> None:
     physical = {
@@ -3718,18 +3723,29 @@ def test_an_iferc_batch_that_is_not_a_financial_lastday_one_is_refused_when_made
     template = templated([*physical], [*physical.values()])
     assert ENTRY["_CreateTrades"](waha["index"], row(*NG_HEADERS), rows(WAHA_ROW), template) == (
         "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
-        "on an IFERC index; an IFERC basis future is cash settled on its month's published index"
+        "on a published index; nothing is delivered against a published price"
     )
     by_row = {key: value for key, value in waha["fields"].items() if key != "schedule_method"}
     template = templated([*by_row], [*by_row.values()])
     assert ENTRY["_CreateTrades"](
         waha["index"],
         row(*NG_HEADERS, "schedule_method"),
-        rows([*WAHA_ROW, "asian"]),
+        rows([*WAHA_ROW, "penultimate"]),
         template,
     ) == (
-        "#ERROR _CreateTrades: ValueError: schedule_method of trade 1001 at row 1 is 'asian', "
-        "expected 'lastday' on an IFERC index; an IFERC month has one index, published once"
+        "#ERROR _CreateTrades: ValueError: schedule_method of trade 1001 at row 1 is "
+        "'penultimate', expected 'asian' or 'lastday' on a published index; a published month "
+        "is the average of its prints, or its one print"
+    )
+    # asian on a month of one print is that print whole: the row books and pays as lastday's.
+    averaged = ENTRY["_CreateTrades"](
+        waha["index"],
+        row(*NG_HEADERS, "schedule_method"),
+        rows([*WAHA_ROW, "asian"]),
+        template,
+    )
+    assert by_header(str(averaged), "payment_date") == by_header(
+        str(waha["trades"]), "payment_date"
     )
 
 

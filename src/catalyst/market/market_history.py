@@ -15,7 +15,6 @@ from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.kind import named
 from catalyst.market_data.futures_fixings import FuturesFixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings
-from catalyst.market_data.iferc_fixings import IfercFixings
 from catalyst.market_data.published_fixings import PublishedFixings
 
 
@@ -29,7 +28,7 @@ class MarketHistory:
     day, a month's index, a flow day's print, a published print's price; since
     nearby-selection.md a futures history has a column more for each further nearby its
     fixings carry, the second nearby's settle in column 1, every one of a contract the schedule
-    lists, and an IFERC, a Gas Daily or a published history is the same record one column wide.
+    lists, and a Gas Daily or a published history is the same record one column wide.
     The rows are exactly the calendar's fixed and priced periods, is_fixed and is_priced both,
     every one and no other, so a period absent from fixed_rows has no price, a futures weekend
     or holiday or a period not yet fixed, and no number stands for absence."""
@@ -106,19 +105,20 @@ def market_history(calendar: Calendar, fixings: object) -> MarketHistory:
 
     The calendar decides the periods and the fixings supply the prices on them. Every fixing is
     on the fixed side, as the calendar decides it for its market: a futures settle before the
-    valuation date's day, a Gas Daily print for a flow day on or before it, an index for a month
-    published before it, a published print dated before it, inside the calendar or out,
-    whatever fraction of the day has elapsed.
+    valuation date's day, a Gas Daily print for a flow day on or before it, a published print
+    dated before it, inside the calendar or out, whatever fraction of the day has elapsed.
     Every fixed and priced period has its fixing, the first and the last as much as the periods
     between, since a period without one is a row the desk did not paste, never a price to carry
     forward or interpolate. No fixing can fall on a day the calendar closes, both having been
-    checked against the index's one holiday calendar, and no IFERC index can name a month the
-    calendar lacks, the fixings' creator having refused any code that is not the index's. A
+    checked against the index's one holiday calendar, and no published fixing can name a print
+    the calendar lacks, the fixings' creator having refused any date that is not one of the
+    index's prints. A
     futures day's settles are of the contracts the schedule lists from that day's prompt on,
     since nearby-selection.md, a settle for a nearby past the schedule's last contract having
     no contract to be the settle of, so the first fixed day with one is refused. Dated
     fixings find their rows by one subtraction from the calendar's first day, and may run past
-    the calendar on either side, allowed and unused; an index finds its row by its code.
+    the calendar on either side, allowed and unused; a published price holds its print's row,
+    found by its date when the fixings were made.
 
     The calendar is kept as it is, its periods, contracts and flags neither copied nor changed,
     and the fixings are left as they were; the rows and the prices are the history's own, the
@@ -132,7 +132,7 @@ def market_history(calendar: Calendar, fixings: object) -> MarketHistory:
 @singledispatch
 def _bind(fixings: object, calendar: Calendar) -> MarketHistory:
     raise ValueError(
-        f"fixings is {named(fixings)}, expected futures, IFERC, Gas Daily or published fixings"
+        f"fixings is {named(fixings)}, expected futures, Gas Daily or published fixings"
     )
 
 
@@ -200,35 +200,6 @@ def gas_daily_history(fixings: GasDailyFixings, calendar: Calendar) -> MarketHis
     rows = offset[inside]
     _every_fixed_day(calendar, rows)
     return _frozen(calendar, rows, fixings.prices[inside][:, None])
-
-
-@_bind.register
-def iferc_history(fixings: IfercFixings, calendar: Calendar) -> MarketHistory:
-    """Two rules by code, every month being priced and every code a month of the index, so of
-    the calendar: every index is for a month already fixed, and every fixed month has its index;
-    the rows come out in the calendar's order whatever order the indices came in."""
-    _over_the_calendars_index(calendar, fixings.index)
-    codes = calendar.index.schedule.codes
-    place = {code: row for row, code in enumerate(codes)}
-    rows = np.array([place[code] for code in fixings.codes], dtype=np.intp)
-    unfixed = ~calendar.is_fixed[rows]
-    if unfixed.any():
-        k = int(rows[unfixed].min())  # the earliest month with an index it should not have
-        raise ValueError(
-            f"fixings contract_code {codes[k]!r} is a month not yet fixed in calendar, "
-            "expected an index for fixed months alone"
-        )
-    covered = np.zeros(calendar.dates.size, dtype=bool)
-    covered[rows] = True
-    missing = calendar.is_fixed & ~covered
-    if missing.any():
-        k = int(missing.argmax())  # the first fixed month without an index
-        raise ValueError(
-            f"fixings has no index for {codes[k]}, "
-            "expected an index for every fixed month in calendar"
-        )
-    order = np.argsort(rows)
-    return _frozen(calendar, rows[order], fixings.prices[order][:, None])
 
 
 @_bind.register

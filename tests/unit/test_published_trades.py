@@ -312,7 +312,10 @@ def test_a_payment_rule_counts_from_the_last_publication_date(
 # --- what a published index refuses, by its field ----------------------------------------------
 
 TRADE = "trade 1001 at row 1"
-AVERAGE = "expected 'asian' on a published index; a published month is the average of its prints"
+AVERAGE = (
+    "expected 'asian' or 'lastday' on a published index; a published month is the average of "
+    "its prints, or its one print"
+)
 
 
 @pytest.mark.parametrize(
@@ -320,7 +323,8 @@ AVERAGE = "expected 'asian' on a published index; a published month is the avera
     [
         (
             {"schedule_method": "lastday"},
-            f"schedule_method of {TRADE} is 'lastday', {AVERAGE}",
+            f"schedule_method of {TRADE} is 'lastday' on U26, a month of 4 prints, expected a "
+            "month of one print; lastday is a month's one print, and asian averages several",
         ),
         (
             {"schedule_method": "penultimate"},
@@ -347,12 +351,41 @@ AVERAGE = "expected 'asian' on a published index; a published month is the avera
             "and a strip settles month by month",
         ),
     ],
-    ids=["lastday", "penultimate", "last3day", "physical", "a later nearby", "onetime"],
+    ids=[
+        "lastday on a month of four prints",
+        "penultimate",
+        "last3day",
+        "physical",
+        "a later nearby",
+        "onetime",
+    ],
 )
 def test_a_field_value_a_published_index_does_not_take_is_refused_by_its_message(
     diesel: dict[str, Any], changed: dict[str, Any], message: str
 ) -> None:
     assert booked(diesel, **changed) == f"#ERROR _CreateTrades: ValueError: {message}"
+
+
+# lastday is a month's one print, the method a monthly index such as Inside FERC's is booked
+# under. August has one print here, dated the 31st: a lastday row on it is the asian row beside
+# it, to the dollar and the gallon, fixed at that print's price from 1 September.
+def test_lastday_takes_a_month_of_one_print_and_is_its_asian_row(diesel: dict[str, Any]) -> None:
+    august = [1003.0, serial("2026-08-20"), "Q26", 40_000.0, 3.10]
+    last = booked(diesel, august, schedule_method="lastday")
+    averaged = booked(diesel, august)
+    assert by_header(last, "payment_date") == [serial("2026-09-07")]
+    assert by_header(averaged, "payment_date") == [serial("2026-09-07")]
+    on_the_1st = valued(state(diesel, last, "2026-09-01", SEPTEMBER))
+    assert on_the_1st == valued(state(diesel, averaged, "2026-09-01", SEPTEMBER))
+    value, cash, delta = on_the_1st
+    assert value == pytest.approx(40_000.0 * (2.95 - 3.10)) and cash == 0.0 and delta == 0.0
+    # A part of the month is refused under lastday, whose one print is the whole month's price.
+    part = by_dates(diesel, "2026-08-24", "2026-08-31", schedule_method="lastday")
+    assert part == (
+        "#ERROR _CreateTrades: ValueError: Q26 of trade 1001 at row 1 is covered from 2026-08-24 "
+        "to 2026-08-31, part of its month, expected the whole month under lastday; under lastday "
+        "a month's one print is the price of the whole month"
+    )
 
 
 # --- a part of a month: a window of dates -------------------------------------------------------
@@ -499,10 +532,16 @@ def test_a_quote_and_the_same_trade_booked_agree(diesel: dict[str, Any]) -> None
     assert valued(state(diesel, booked_balance, "2026-09-16", SEPTEMBER))[0] == pytest.approx(
         0.0, abs=1e-6
     )
-    # A method other than asian is refused in a quote as in a batch.
+    # lastday on a month of four prints is refused in a quote as in a batch, and so is a method
+    # that counts back from an expiry.
     assert ENTRY["_Quote"](market, "U26", a_quote_template(diesel, "lastday"), "flat", none) == (
-        "#ERROR _Quote: ValueError: schedule_method is 'lastday', expected 'asian' on a published "
-        "index; a published month is the average of its prints"
+        "#ERROR _Quote: ValueError: schedule_method of the quote is 'lastday' on U26, a month of "
+        "4 prints, expected a month of one print; lastday is a month's one print, and asian "
+        "averages several"
+    )
+    assert ENTRY["_Quote"](market, "U26", a_quote_template(diesel, "last3day"), "flat", none) == (
+        "#ERROR _Quote: ValueError: schedule_method is 'last3day', expected 'asian' or 'lastday' "
+        "on a published index; a published month is the average of its prints, or its one print"
     )
 
 

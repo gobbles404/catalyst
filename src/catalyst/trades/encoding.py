@@ -30,7 +30,6 @@ from catalyst.calendar.calendar import contract_on, open_days
 from catalyst.globals.unit_conversions import UnitConversions
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
-from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index_conventions import CURRENCY, a_unit_of, listed
 from catalyst.index_definitions.kind import with_holiday_calendar
 from catalyst.index_definitions.published_schedule import PublishedSchedule
@@ -1085,23 +1084,10 @@ def observation_references(
     contract for the day: the prompt's row plus the nearby less one, the prompt itself at 1,
     found afresh for every day so that it moves on the day after an expiry; a nearby the
     schedule lists no contract for on a day is refused by the trade, the day, the day's
-    prompt and the schedule's last contract. On an IFERC index, since #167: the
-    component's own contract, whose index publishes on that very day, else refused, an IFERC
-    month pricing once; no calendar is read, an IFERC index having none."""
+    prompt and the schedule's last contract. On a published index: the month the day's print
+    counts toward, read off the schedule's row for that print, a day that is no print's date
+    refused; no calendar is read, a published index having none."""
     match schedule:
-        case IfercSchedule() as iferc:
-            own_contract = contract[observations.component]
-            published = iferc.publication_date[own_contract]
-            off = published != observations.date
-            if off.any():
-                j = int(off.argmax())
-                raise ValueError(
-                    f"{named(int(observations.component[j]))} observes "
-                    f"{observations.date[j]}, expected {published[j]}, the day "
-                    f"{iferc.codes[int(own_contract[j])]}'s index publishes; an IFERC month "
-                    "prices once, on that day"
-                )
-            return own_contract
         case PublishedSchedule() as published:
             # The month the print counts toward, read off the schedule's row for that print: one
             # search of the schedule's dates, each day given being a print's date, else refused.

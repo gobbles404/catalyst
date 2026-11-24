@@ -19,15 +19,13 @@ from catalyst.index_definitions.contract_specifications import contract_specific
 from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
-from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
-from catalyst.index_definitions.published_schedule import published_schedule
+from catalyst.index_definitions.published_schedule import PublishedSchedule, published_schedule
 from catalyst.market.market import Market, market
 from catalyst.market.market_history import MarketHistory, market_history
 from catalyst.market_data.futures_fixings import futures_fixings
 from catalyst.market_data.gas_daily_fixings import gas_daily_fixings
-from catalyst.market_data.iferc_fixings import iferc_fixings
 from catalyst.market_data.price_vector import PriceVector, price_vector
 from catalyst.market_data.published_fixings import published_fixings
 
@@ -103,13 +101,14 @@ HISTORY = a_history()
 QUOTES = a_vector(72.10, 72.80)
 
 # The schedule pages' samples: three months of Gas Daily, September to November 2026, and three
-# IFERC months, October to December, each published on its first business day.
+# months of a monthly published index, October to December, each month one print, published
+# on its first business day.
 GAS_DAILY_SCHEDULE = gas_daily_schedule(
     ("U26", "V26", "X26"),
     dates("2026-09-01", "2026-10-01", "2026-11-01"),
     dates("2026-09-30", "2026-10-31", "2026-11-30"),
 )
-IFERC_SCHEDULE = iferc_schedule(
+MONTHLY_SCHEDULE = published_schedule(
     ("V26", "X26", "Z26"), dates("2026-10-01", "2026-11-02", "2026-12-01")
 )
 
@@ -129,16 +128,17 @@ def a_gas_daily_history(
     return market_history(made, prints)
 
 
-def an_iferc_history(
-    as_of: str, schedule: IfercSchedule = IFERC_SCHEDULE, fraction: float = 0.5
+def a_monthly_history(
+    as_of: str, schedule: PublishedSchedule = MONTHLY_SCHEDULE, fraction: float = 0.5
 ) -> MarketHistory:
-    """The IFERC history of that calendar, with an index for every month published before the
-    valuation day, 1.80 for the oldest and ten cents more each month, handed to the builder as
-    the desk keeps its months, the newest in the first row, each index beside its own code."""
+    """The history of that calendar of one print a month, with a price for every month
+    published before the valuation day, 1.80 for the oldest and ten cents more each month,
+    handed to the builder as the desk keeps its months, the newest in the first row, each
+    price beside its own publication date."""
     made = calendar(valuation_date(day(as_of), fraction), an_index(schedule, None))
-    codes = tuple(schedule.codes[int(row)] for row in np.flatnonzero(made.is_fixed))
-    prices = 1.8 + np.arange(len(codes), dtype=np.float64) / 10
-    indices = iferc_fixings(codes[::-1], prices[::-1], made.index)
+    fixed = np.flatnonzero(made.is_fixed)
+    prices = 1.8 + np.arange(fixed.size, dtype=np.float64) / 10
+    indices = published_fixings(made.dates[fixed][::-1], prices[::-1], made.index)
     return market_history(made, indices)
 
 
@@ -331,8 +331,8 @@ def test_a_market_that_cannot_be_made_says_why(
         (a_history("2026-07-22"), (72.80,)),
         (a_gas_daily_history("2026-09-10"), (2.95, 3.10, 3.40)),
         (a_gas_daily_history("2026-11-30"), (3.40,)),
-        (an_iferc_history("2026-11-15"), (2.20,)),
-        (an_iferc_history("2026-12-02"), (2.20,)),
+        (a_monthly_history("2026-11-15"), (2.20,)),
+        (a_monthly_history("2026-12-02"), (2.20,)),
     ],
     ids=[
         "the futures sample with its two quotes",
@@ -342,8 +342,8 @@ def test_a_market_that_cannot_be_made_says_why(
         "the futures sample valued after its calendar",
         "the Gas Daily sample with its three quotes",
         "the Gas Daily sample on its last flow day",
-        "the IFERC sample with its one quote",
-        "the IFERC sample after its last month published",
+        "the monthly sample with its one quote",
+        "the monthly sample after its last month published",
     ],
 )
 @pytest.mark.parametrize(
@@ -365,7 +365,7 @@ def test_a_vector_named_for_another_index_is_refused_first(
 # share the name sample, and a vector named sample serves each, given its count of quotes.
 def test_two_indices_of_one_name_take_a_vector_of_that_name() -> None:
     daily = a_gas_daily_history("2026-09-10")
-    monthly = an_iferc_history("2026-11-15")
+    monthly = a_monthly_history("2026-11-15")
     assert HISTORY.calendar.index is not daily.calendar.index
     assert daily.calendar.index is not monthly.calendar.index
     assert {h.calendar.index.name for h in (HISTORY, daily, monthly)} == {"sample"}
@@ -380,15 +380,15 @@ def test_two_indices_of_one_name_take_a_vector_of_that_name() -> None:
 
 # A calendar fixed through its last period has nothing to quote, whatever its kind: the futures
 # sample valued after 21 July, the Gas Daily sample valued on 30 November, its last flow day,
-# or after it, and the IFERC sample valued after Z26 publishes on 1 December.
+# or after it, and the monthly sample valued after Z26 publishes on 1 December.
 def test_a_history_with_no_unfixed_period_has_no_market() -> None:
     for history in (
         a_history("2026-07-22"),
         a_history("2026-08-01"),
         a_gas_daily_history("2026-11-30"),
         a_gas_daily_history("2026-12-15"),
-        an_iferc_history("2026-12-02"),
-        an_iferc_history("2027-01-01"),
+        a_monthly_history("2026-12-02"),
+        a_monthly_history("2027-01-01"),
     ):
         assert history.calendar.is_fixed.all()
         for quotes in ((), (72.80,), (1.0, 2.0, 3.0)):
@@ -416,8 +416,8 @@ def test_the_calendars_prompt_code_is_the_markets_first_contract() -> None:
         (a_history("2026-06-23"), a_vector(72.80)),
         (a_gas_daily_history("2026-09-18"), a_vector(2.95, 3.10, 3.40, name="sample")),
         (a_gas_daily_history("2026-09-30"), a_vector(3.10, 3.40, name="sample")),
-        (an_iferc_history("2026-11-15"), a_vector(2.20, name="sample")),
-        (an_iferc_history("2026-09-15"), a_vector(1.9, 2.0, 2.2, name="sample")),
+        (a_monthly_history("2026-11-15"), a_vector(2.20, name="sample")),
+        (a_monthly_history("2026-09-15"), a_vector(1.9, 2.0, 2.2, name="sample")),
     ):
         made = market(history, quotes)
         codes = history.calendar.index.schedule.codes
@@ -430,7 +430,7 @@ def test_the_calendars_prompt_code_is_the_markets_first_contract() -> None:
 def test_for_any_history_the_prompt_code_names_the_first_contract_quoted(
     data: st.DataObject,
 ) -> None:
-    history = data.draw(st.sampled_from((any_history, any_gas_daily_history, any_iferc_history)))(
+    history = data.draw(st.sampled_from((any_history, any_gas_daily_history, any_monthly_history)))(
         data
     )
     calendar = history.calendar
@@ -524,17 +524,17 @@ def test_a_gas_daily_calendar_of_one_month_takes_one_quote() -> None:
     assert whole.first_contract == 0
 
 
-# --- an IFERC market -----------------------------------------------------------
+# --- a market of one print a month -----------------------------------------------
 
 
 # The page's sample: valued on 15 November 2026, October and November published, December not:
 # one quote, December's.
-def test_the_iferc_sample_quotes_the_unpublished_month() -> None:
-    history = an_iferc_history("2026-11-15")
+def test_the_monthly_sample_quotes_the_unpublished_month() -> None:
+    history = a_monthly_history("2026-11-15")
     assert history.fixed_rows.tolist() == [0, 1]
     made = market(history, a_vector(2.20))
     assert made.first_contract == 2
-    assert IFERC_SCHEDULE.codes[made.first_contract] == "Z26"
+    assert MONTHLY_SCHEDULE.codes[made.first_contract] == "Z26"
     with pytest.raises(ValueError) as failure:
         market(history, a_vector(2.10, 2.20))
     assert str(failure.value) == (
@@ -543,13 +543,15 @@ def test_the_iferc_sample_quotes_the_unpublished_month() -> None:
 
 
 # The desk keeps its months as it keeps its days, the newest in the first row, and the creator
-# keeps them the other way up, each index beside its own code: the history prices the fixed
+# keeps them the other way up, each price on its own print: the history prices the fixed
 # months from them in the calendar's order, and a market over it the unpublished month from
 # the vector.
-def test_iferc_months_given_newest_first_price_the_history_and_the_market() -> None:
-    made = calendar(valuation_date(day("2026-11-15"), 0.5), an_index(IFERC_SCHEDULE, None))
-    indices = iferc_fixings(("X26", "V26"), np.array([2.10, 1.85]), made.index)
-    assert indices.codes == ("V26", "X26") and indices.prices.tolist() == [1.85, 2.10]
+def test_months_given_newest_first_price_the_history_and_the_market() -> None:
+    made = calendar(valuation_date(day("2026-11-15"), 0.5), an_index(MONTHLY_SCHEDULE, None))
+    indices = published_fixings(
+        dates("2026-11-02", "2026-10-01"), np.array([2.10, 1.85]), made.index
+    )
+    assert indices.rows.tolist() == [0, 1] and indices.prices.tolist() == [1.85, 2.10]
     history = market_history(made, indices)
     assert history.fixed_rows.tolist() == [0, 1]
     assert history.fixing_prices[:, 0].tolist() == [1.85, 2.10]
@@ -582,10 +584,10 @@ def test_the_first_unpublished_month_is_the_first_contract_quoted(
     as_of: str, first_contract: int, quotes: int
 ) -> None:
     for fraction in (0.0, 0.5, 1.0):
-        history = an_iferc_history(as_of, fraction=fraction)
+        history = a_monthly_history(as_of, fraction=fraction)
         made = market(history, a_vector(*(2.0 + i for i in range(quotes))))
         assert made.first_contract == first_contract
-        assert len(IFERC_SCHEDULE.codes) - first_contract == quotes
+        assert len(MONTHLY_SCHEDULE.codes) - first_contract == quotes
 
 
 # --- a published market ----------------------------------------------------------
@@ -793,10 +795,10 @@ def any_gas_daily_history(data: st.DataObject) -> MarketHistory:
     return market_history(made, prints)
 
 
-def any_iferc_history(data: st.DataObject) -> MarketHistory:
-    """An IFERC history of one to eight months publishing up to 60 days apart, valued on any day
-    from ten days before the first publication day to the last one, with an index for every
-    month published before it."""
+def any_monthly_history(data: st.DataObject) -> MarketHistory:
+    """A history of one to eight months of one print each, publishing up to 60 days apart,
+    valued on any day from ten days before the first publication day to the last one, with a
+    price for every month published before it."""
     count = data.draw(st.integers(1, 8))
     gaps = np.array(
         data.draw(st.lists(st.integers(1, 60), min_size=count, max_size=count)), dtype=np.int64
@@ -806,12 +808,12 @@ def any_iferc_history(data: st.DataObject) -> MarketHistory:
     )
     published = start + np.cumsum(gaps).astype("timedelta64[D]")
     codes = tuple(f"c{i}" for i in range(count))
-    schedule = iferc_schedule(codes, published)
+    schedule = published_schedule(codes, published)
     as_of = published[0] + np.timedelta64(data.draw(st.integers(-10, int(gaps[1:].sum()))), "D")
     made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     fixed = np.flatnonzero(made.is_fixed)[::-1]  # the newest month first, as the desk keeps them
-    indices = iferc_fixings(
-        tuple(codes[int(i)] for i in fixed),
+    indices = published_fixings(
+        published[fixed],
         100.0 + fixed.astype(np.float64),
         made.index,
     )
@@ -847,7 +849,7 @@ def test_every_unfixed_period_of_the_other_two_kinds_has_its_contracts_quote(
     data: st.DataObject,
 ) -> None:
     history = data.draw(
-        st.sampled_from((any_gas_daily_history, any_iferc_history, any_published_history))
+        st.sampled_from((any_gas_daily_history, any_monthly_history, any_published_history))
     )(data)
     made = history.calendar
     assert not made.is_fixed.all()
@@ -894,9 +896,9 @@ def rows_of(*contracts: int) -> NDArray[np.intp]:
     [
         (a_history("2026-05-26", schedule=LONG_SCHEDULE), 2, 4),
         (a_gas_daily_history("2026-09-25"), 0, 3),
-        (an_iferc_history("2026-09-15"), 0, 3),
+        (a_monthly_history("2026-09-15"), 0, 3),
     ],
-    ids=["futures", "Gas Daily", "IFERC"],
+    ids=["futures", "Gas Daily", "monthly"],
 )
 def test_a_vector_may_stop_at_any_contract_from_the_first_required_through_the_last(
     history: MarketHistory, first: int, remaining: int
@@ -922,17 +924,18 @@ def test_a_vector_may_stop_at_any_contract_from_the_first_required_through_the_l
 MONTH_CODES = "FGHJKMNQUVXZ"
 
 
-def a_monthly_iferc_history(first_year: int, last_year: int, as_of: str) -> MarketHistory:
-    """An IFERC history of every month from January of the first year through December of the
-    last, coded F23 to Z30 as the desk codes months, each published on its first day."""
+def a_history_of_months(first_year: int, last_year: int, as_of: str) -> MarketHistory:
+    """A history of one print a month, every month from January of the first year through
+    December of the last, coded F23 to Z30 as the desk codes months, each published on its
+    first day."""
     months: NDArray[np.datetime64] = np.arange(
         f"{first_year}-01", f"{last_year + 1}-01", dtype="datetime64[M]"
     ).astype("datetime64[D]")
     codes = tuple(
         f"{MONTH_CODES[i % 12]}{(first_year + i // 12) % 100}" for i in range(months.size)
     )
-    schedule = iferc_schedule(codes, months)
-    return an_iferc_history(as_of, schedule)
+    schedule = published_schedule(codes, months)
+    return a_monthly_history(as_of, schedule)
 
 
 # The ticket's example: a schedule from F23 through Z30, the calendar's first required contract
@@ -940,7 +943,7 @@ def a_monthly_iferc_history(first_year: int, last_year: int, as_of: str) -> Mark
 # ends at Z28, and F29 is refused by name. The whole remaining schedule is forty-nine contracts,
 # taken too, and a fiftieth price is past the schedule.
 def test_a_schedule_through_z30_takes_prices_through_z28() -> None:
-    history = a_monthly_iferc_history(2023, 2030, "2026-11-15")
+    history = a_history_of_months(2023, 2030, "2026-11-15")
     codes = history.calendar.index.schedule.codes
     assert (codes[0], codes[-1], len(codes)) == ("F23", "Z30", 96)
     made = market(history, a_vector(*(2.0 + i / 100 for i in range(25))))
@@ -958,7 +961,7 @@ def test_a_schedule_through_z30_takes_prices_through_z28() -> None:
     assert str(failure.value) == (
         "price_vector has 50 prices, expected at most 49, one per contract from 'Z26' through 'Z30'"
     )
-    ending_z28 = a_monthly_iferc_history(2023, 2028, "2026-11-15")
+    ending_z28 = a_history_of_months(2023, 2028, "2026-11-15")
     with pytest.raises(ValueError) as failure:
         market(ending_z28, a_vector(*(2.0 + i / 100 for i in range(26))))
     assert str(failure.value) == (
@@ -1037,7 +1040,7 @@ def test_the_coverage_rule_is_the_same_on_every_kind_and_for_a_whole_vector() ->
     assert str(failure.value) == (
         "requested contract 'U26' is before live-price coverage starting at 'V26'"
     )
-    monthly = market(an_iferc_history("2026-10-02"), a_vector(2.10))  # November alone
+    monthly = market(a_monthly_history("2026-10-02"), a_vector(2.10))  # November alone
     assert monthly.live_prices(rows_of(1)).tolist() == [2.10]
     with pytest.raises(ValueError) as failure:
         monthly.live_prices(rows_of(2))
@@ -1144,7 +1147,7 @@ def test_a_vector_left_unchanged_through_a_roll_is_read_one_contract_later() -> 
 def test_any_count_of_quotes_from_one_to_the_remaining_contracts_is_a_market(
     data: st.DataObject,
 ) -> None:
-    history = data.draw(st.sampled_from((any_history, any_gas_daily_history, any_iferc_history)))(
+    history = data.draw(st.sampled_from((any_history, any_gas_daily_history, any_monthly_history)))(
         data
     )
     made = history.calendar

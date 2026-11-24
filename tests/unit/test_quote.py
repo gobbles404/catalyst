@@ -1,8 +1,8 @@
 """The quote: one whole-period indicative fixed price for a contract or strip on one market from a
 quote template's static terms, template-based-quoting.md's worked acceptance by hand: the cleared
-and bilateral strip, the key and its curve, fixings and methods, an IFERC month, CAL27 in June27,
-the rules of the terms, the collection, the period and the market, an equivalent trade booked at
-the quote marking zero, and the worksheet function through the seam.
+and bilateral strip, the key and its curve, fixings and methods, a month of one print, CAL27 in
+June27, the rules of the terms, the collection, the period and the market, an equivalent trade
+booked at the quote marking zero, and the worksheet function through the seam.
 docs/library/quoting/quote.md is the page."""
 
 import re
@@ -12,6 +12,7 @@ from types import MappingProxyType
 import numpy as np
 import pytest
 from holiday_fixtures import a_name, closed_on, index_on
+from published_fixtures import fixings_by_code
 from test_bilateral_kernel import CLOSE, curve_of, curve_set
 from test_create_trades import bound_calendar, key_of, seam_key, with_calendars
 from test_market import a_gas_daily_history, a_published_history
@@ -43,17 +44,16 @@ from catalyst.globals.unit_conversions import UNITS
 from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.periods import end_date, start_date
+from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT
 from catalyst.instruments.fields import DatesOrTexts
 from catalyst.market.market import Market
 from catalyst.market.market_history import MarketHistory, market_history
 from catalyst.market_data.futures_fixings import futures_fixings
-from catalyst.market_data.iferc_fixings import iferc_fixings
 from catalyst.quoting.quote import quote
 from catalyst.quoting.template import QuoteTemplate
 from catalyst.trades.encoding import encoded
@@ -404,11 +404,12 @@ def test_the_expiry_based_methods_by_hand_with_a_holiday_before_the_expiry() -> 
     assert quote_on(m, "F27-G27", financial(method="lastday")) == pytest.approx(36.5, **CLOSE)
 
 
-# A Waha-like IFERC index: three months published on their first business days.
+# A Waha-like published index of one print a month, Inside FERC's shape: three months
+# published on their first business days.
 WAHA = index_on(
     "WAHA",
     "Waha basis - ICE",
-    iferc_schedule(("X26", "Z26", "F27"), dates("2026-11-02", "2026-12-01", "2027-01-04")),
+    published_schedule(("X26", "Z26", "F27"), dates("2026-11-02", "2026-12-01", "2027-01-04")),
     index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("LOT",), numbers(2500.0), ("MMBTU",), numbers(0.0), numbers(0.0), UNITS
@@ -419,9 +420,9 @@ WAHA = index_on(
 )
 
 
-def test_an_iferc_month_observes_its_publication_day_and_pays_from_it() -> None:
+def test_a_month_of_one_print_observes_its_publication_day_and_pays_from_it() -> None:
     cal = calendar(valuation_date(day("2026-11-15"), 0.5), WAHA)
-    m = quoted(market_history(cal, iferc_fixings(("X26",), numbers(0.5), WAHA)), -0.4, -0.3)
+    m = quoted(market_history(cal, fixings_by_code(("X26",), numbers(0.5), WAHA)), -0.4, -0.3)
     waha = financial(method="lastday", lag="+2bd")
     assert quote_on(m, "Z26", waha) == -0.4
     counts = counts_of(m, "Z26", waha)
@@ -438,19 +439,14 @@ def test_an_iferc_month_observes_its_publication_day_and_pays_from_it() -> None:
     keyed = bilateral(method="lastday", lag="+2bd")
     assert quote_on(m, "X26-Z26", keyed, rates) == pytest.approx((0.5 - 0.4 * 0.99) / 1.99, **CLOSE)
     assert counts_of(m, "X26-Z26", keyed, rates)["payment_factors_read"] == 1
-    refused(
-        m,
-        "Z26",
-        financial(method="asian", lag="+2bd"),
-        "schedule_method is 'asian', expected 'lastday' on an IFERC index; an IFERC month has one "
-        "index, published once",
-    )
+    # asian on a month of one print is that print whole, the quote lastday gives.
+    assert quote_on(m, "Z26", financial(method="asian", lag="+2bd")) == -0.4
     refused(
         m,
         "Z26",
         physical(),
-        "settlement_method is 'physical', expected 'financial' on an IFERC index; an IFERC basis "
-        "future is cash settled on its month's published index",
+        "settlement_method is 'physical', expected 'financial' on a published index; nothing is "
+        "delivered against a published price",
     )
 
 
@@ -796,16 +792,16 @@ def test_the_period_and_the_market_refuse_what_they_cannot_price() -> None:
     # A Gas Daily index has no fixed_float and so no quote.
     with pytest.raises(
         ValueError,
-        match=r"^index is .*, expected a futures, IFERC or published index for a fixed_float$",
+        match=r"^index is .*, expected a futures or a published index for a fixed_float$",
     ):
         quote_on(quoted(a_gas_daily_history("2026-10-15"), 2.9), "V26", financial())
-    # A published index takes the asian method alone, in a quote as in a batch.
+    # lastday on a published month of four prints is refused, in a quote as in a batch.
     refused(
         quoted(a_published_history("2026-09-16"), 3.5, 3.65),
         "U26",
         financial(method="lastday"),
-        "schedule_method is 'lastday', expected 'asian' on a published index; a published month "
-        "is the average of its prints",
+        "schedule_method of the quote is 'lastday' on U26, a month of 4 prints, expected a "
+        "month of one print; lastday is a month's one print, and asian averages several",
     )
 
 
@@ -1013,16 +1009,18 @@ def test_a_balance_is_refused_as_a_dated_period_is() -> None:
             "to Friday of the days it covers the index's market is open on; the asian method "
             "averages the pricing days a component covers",
         )
-    # An IFERC month is one price for the whole month: its balance in progress is refused.
+    # Under lastday a month's one print is the whole month's price: its balance in progress
+    # is refused.
     cal = calendar(valuation_date(day("2026-11-15"), 0.5), WAHA)
-    waha = quoted(market_history(cal, iferc_fixings(("X26",), numbers(0.5), WAHA)), -0.4, -0.3)
+    waha = quoted(market_history(cal, fixings_by_code(("X26",), numbers(0.5), WAHA)), -0.4, -0.3)
     assert quote_on(waha, "BALZ26", financial(method="lastday", lag="+2bd")) == -0.4
     refused(
         waha,
         "BALX26",
         financial(method="lastday", lag="+2bd"),
         "X26 of the quote is covered from 2026-11-15 to 2026-11-30, part of its month, expected "
-        "the whole month under lastday; an IFERC month's index is one price for the whole month",
+        "the whole month under lastday; under lastday a month's one print is the price of the "
+        "whole month",
     )
 
 

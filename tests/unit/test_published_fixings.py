@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 
 from catalyst.globals.unit_conversions import UNITS
 from catalyst.index_definitions.contract_specifications import contract_specifications
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
+from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.published_schedule import published_schedule
@@ -86,10 +86,13 @@ def test_no_rows_are_fixings_of_no_print() -> None:
 
 
 def test_an_index_of_another_kind_is_refused_first() -> None:
-    monthly = an_index(iferc_schedule(("U26",), dates("2026-09-01")), "Henry Hub IFERC")
+    daily = an_index(
+        gas_daily_schedule(("U26",), dates("2026-09-01"), dates("2026-09-30")),
+        "Henry Hub Gas Daily",
+    )
     with pytest.raises(ValueError) as failure:
-        published_fixings(DATED, PRICES[:2], monthly)
-    assert str(failure.value) == "index is an IFERC index, expected a published index"
+        published_fixings(DATED, PRICES[:2], daily)
+    assert str(failure.value) == "index is a Gas Daily index, expected a published index"
 
 
 @pytest.mark.parametrize(

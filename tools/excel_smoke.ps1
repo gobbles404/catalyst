@@ -225,7 +225,7 @@ $formulas = [ordered]@{
     "=_CreateContractSpecifications(EI1:EM1,EI11:EM11)" = "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', expected a VOLUME, MASS or ENERGY unit"
     '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,EN12,"AM1",,ZU1)' = "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     # The index: a creator over a name, the futures schedule in AI1, the conventions in AP1, the
-    # specifications in BY1 and the holiday calendar in AM1, and over the IFERC schedule in DE1
+    # specifications in BY1 and the holiday calendar in AM1, and over the monthly published schedule in DE1
     # and the Gas Daily schedule in DK1 without one, each read back through util_ReadHandle as one
     # row; the futures schedule without its holiday calendar, the Gas Daily schedule with one and a
     # holiday calendar where the schedule should be, the library's words; the specifications left
@@ -241,7 +241,7 @@ $formulas = [ordered]@{
     '=MID(CV1,FIND(":",CV1)+1,29)' = "price_vector:Henry Hub NYMEX:"
     '=MID(CW8,FIND(":",CW8)+1,19)' = "price_vector:Brent:"
     '=MID(CW1,FIND(":",CW1)+1,23)' = "market:Henry Hub NYMEX:"
-    '=MID(DW3,FIND(":",DW3)+1,30)' = "iferc_fixings:Henry Hub IFERC:"
+    '=MID(DW3,FIND(":",DW3)+1,34)' = "published_fixings:Henry Hub IFERC:"
     '=MID(DU1,FIND(":",DU1)+1,38)' = "gas_daily_fixings:Henry Hub Gas Daily:"
     '=ISNUMBER(--MID(AI1,FIND(":",AI1)+18,20))' = "TRUE"
     '=ISNUMBER(--MID(EB1,FIND(":",EB1)+23,20))' = "TRUE"
@@ -271,7 +271,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EB1),3,11)" = "1000"
     "=COLUMNS(util_ReadHandle(EB1))"   = "11"
     "=INDEX(util_ReadHandle(EB2),3,2)" = "Henry Hub natural gas - Inside FERC monthly index"
-    "=INDEX(util_ReadHandle(EB2),3,3)" = "IFERC"
+    "=INDEX(util_ReadHandle(EB2),3,3)" = "published"
     "=INDEX(util_ReadHandle(EB2),3,6)" = "FALSE"
     "=INDEX(util_ReadHandle(EB2),3,7)" = "unset"
     "=COLUMNS(util_ReadHandle(EB2))"   = "7"
@@ -279,7 +279,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EB3),3,4)" = "3"
     '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1)' = "#ERROR _CreateIndex: ValueError: holiday_key is missing, expected a holiday calendar's key with a futures schedule"
     '=_CreateIndex(EC4,"Henry Hub natural gas - Platts Gas Daily",DK1,AP1,BY1,"AM1",,ZU1)' = "#ERROR _CreateIndex: ValueError: holiday_key is 'AM1', expected none with a Gas Daily schedule"
-    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AM1,AP1,BY1)' = "#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC, Gas Daily or published schedule"
+    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AM1,AP1,BY1)' = "#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, Gas Daily or published schedule"
     '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1)' = "#ERROR _CreateIndex: contract_specifications is missing, expected contract specifications handle"
     '=_CreateIndex(C2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,"AM1",,ZU1)' = "#ERROR _CreateIndex: name is blank, expected text"
     '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,"AM1","LOT",ZU1)' = "#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the specifications: 'lots', 'gal'"
@@ -412,39 +412,10 @@ $formulas = [ordered]@{
     '=_QuoteByDates(XV17,XS34,XT34,XV51,"flat")' = "82.5"
     '=_Quote(XV17,"N26",XV53,"flat")'          = "#ERROR _Quote: ValueError: nearby of the quote is 2, expected 1 under schedule_method = lastday; the expiry-based methods take their own contract's days, and a later nearby is priced under asian"
     '=_QuoteByDates(XV17,XS34,XT34,XV52,"flat")' = "80.5"
-    # The IFERC fixings: a creator over a column of contract codes, the newest month first as the
-    # creator requires, a column of indices and the index in EE2, whose schedule holds those four
-    # months the other way up, read back through util_ReadHandle newest first; the creator again
-    # over the two columns of that spill, in BQ2, whose own spill reads the same cell for cell; a
-    # price column one row short, a code given twice, a code the index does not hold, the four
-    # months oldest first, the schedule's own column, and a futures index where the IFERC index
-    # should be, the library's words; a blank among the prices, a number among the codes, the
-    # prices left out, the index left out and a row where a column is expected, the seam's.
-    '=MID(BQ1,FIND(":",BQ1)+1,14)' = "iferc_fixings:"
-    "=INDEX(util_ReadHandle(BQ1),1,1)" = "contract_code"
-    "=INDEX(util_ReadHandle(BQ1),2,2)" = "float64"
-    "=INDEX(util_ReadHandle(BQ1),3,1)" = "J26"
-    "=INDEX(util_ReadHandle(BQ1),3,2)" = "1.6"
-    "=INDEX(util_ReadHandle(BQ1),6,1)" = "F26"
-    "=INDEX(util_ReadHandle(BQ1),6,2)" = "1.85"
-    "=ROWS(util_ReadHandle(BQ1))"      = "6"
-    "=COLUMNS(util_ReadHandle(BQ1))"   = "2"
-    '=MID(BQ2,FIND(":",BQ2)+1,14)' = "iferc_fixings:"
-    "=AND(util_ReadHandle(BQ2)=util_ReadHandle(BQ1))" = "TRUE"
-    "=_CreateIfercFixings(BO2:BO5,BP2:BP4,EE2)" = "#ERROR _CreateIfercFixings: ValueError: price has 3 prices, expected 4, one per contract_code"
-    "=_CreateIfercFixings(BR2:BR3,BP2:BP3,EE2)" = "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'F26', already given at row 1"
-    "=_CreateIfercFixings(BV2:BV5,BP2:BP5,EE2)" = "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'G26', published 2026-02-02, expected a month published before row 1's 'F26', published 2026-01-05"
-    "=_CreateIfercFixings(BO2:BO3,BT2:BT3,EE2)" = "#ERROR _CreateIfercFixings: price cell (2, 1) is blank, expected number"
-    "=_CreateIfercFixings(BS2:BS3,BP2:BP3,EE2)" = "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is number 46023.0, expected text"
-    "=_CreateIfercFixings(BO2:BO5)" = "#ERROR _CreateIfercFixings: price is missing, expected column of numbers"
-    "=_CreateIfercFixings(BO2:BO5,BP2:BQ2,EE2)" = "#ERROR _CreateIfercFixings: price is 1x2 array, expected column of numbers"
-    "=_CreateIfercFixings(BO2:BO5,BP2:BP5)" = "#ERROR _CreateIfercFixings: index is missing, expected index handle"
-    "=_CreateIfercFixings(BO2:BO5,BP2:BP5,EB1)" = "#ERROR _CreateIfercFixings: ValueError: index is a futures index, expected an IFERC index"
-    "=_CreateIfercFixings(DX2:DX3,DY2:DY3,EE2)" = "#ERROR _CreateIfercFixings: ValueError: contract_code row 1 is 'X26', expected one of the index's months"
     # The calendar: a creator over the valuation date in AA2, the futures schedule in AI1 and the
     # holiday calendar in AM1, read back through util_ReadHandle, every day from 20 May to 20
     # October 2026 with the contract on it, whether it prices and whether it has fixed; one over
-    # the Gas Daily schedule in DK1 and one over the IFERC schedule in DE1, the holiday calendar
+    # the Gas Daily schedule in DK1 and one over the monthly published schedule in DE1, the holiday calendar
     # left out; a schedule of one contract, a code given twice, expiries backwards, a span no sheet
     # could show, a Gas Daily gap, the holiday calendar left out with a futures schedule and given
     # with a Gas Daily one, and a holiday calendar where the schedule should be, the library's
@@ -483,8 +454,9 @@ $formulas = [ordered]@{
     # schedule's own spelling. V26 on the six-contract futures calendar in AR1, valued 11-Sep-2026,
     # the contract prompt that day; n26 on CT5, the two-contract calendar valued 26-May; q26 on
     # CW4, valued before it begins, the first contract it represents; U26 on the Gas Daily
-    # calendar in AR6 and on DW6, valued inside September; V26 on the IFERC calendar in AR7,
-    # before any month published, and Z26 on DW2, valued 15-Nov; the IFERC calendar in EA6, every
+    # calendar in AR6 and on DW6, valued inside September; V26 on the monthly published calendar
+    # in AR7, before any month published, and Z26 on DW2, valued 15-Nov; the monthly calendar in
+    # EA6, every
     # month published, has none, the library's words; the calendar left out, blank or a number,
     # the seam's.
     "=util_ReadPrompt(AR1)" = "V26"
@@ -807,7 +779,8 @@ $formulas = [ordered]@{
     # row of the spill; the name in another case and a value against its field's rule, a fraction
     # of a lot among them, the library's words, and a header row of another width, the seam's; a
     # template field repeated in the ticket, a code the schedule lacks, a fraction of a lot and an
-    # IFERC index, the library's words, and a template handle naming nothing, the seam's.
+    # index made without a reporting lot, the library's words, and a template handle naming
+    # nothing, the seam's.
     '=MID(EW3,FIND(":",EW3)+1,15)' = "trade_template:"
     '=MID(EW8,FIND(":",EW8)+1,23)' = "trades:Henry Hub NYMEX:"
     "=INDEX(util_ReadHandle(EW3),1,1)" = "instrument"
@@ -1332,7 +1305,8 @@ $formulas = [ordered]@{
     '=_ReportRisk(MY8,"delta")'             = "#ERROR _ReportRisk: bucket is missing, expected text"
     "=_ReportRisk(MY8)"                     = "#ERROR _ReportRisk: risk is missing, expected text"
     '=_ReportRisk(C2,"delta","day")'        = "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results or cashflow results handle"
-    # IFERC basis futures, iferc-basis-futures.md: the Waha-like index in NH5, X26, Z26 and F27
+    # IFERC basis futures, iferc-basis-futures.md: the Waha-like index in NH5, a published index
+    # of one print a month, its fixings typed by publication date, X26, Z26 and F27
     # published 2 November, 1 December and 4 January, 46328, 46357 and 46391, dollars an MMBtu, a
     # 2,500 MMBtu LOT and a bare MMBTU, the LOT reported, no pricing calendar; the template in NR3
     # cleared, financial, lastday, LOT a month at +2bd from publication on the calendar in NK2
@@ -1342,7 +1316,7 @@ $formulas = [ordered]@{
     # 46359, 2,500 of live coefficient; a tick to -0.25 in OC16, 625 over the same preparation; on
     # the 2nd in OE8, the index printed at -0.20, 750 of mark, fixed and unpaid, no lot; on the 3rd
     # in OG8, 750 of cash, settled. The delta by day one row, 1 December, a lot and then zero, the
-    # month from the same day; a physical template and an asian row refused by name.
+    # month from the same day; a physical template and a penultimate row refused by name.
     "=INDEX(util_ReadHandle(NR6),1,14)"  = "payment_date"
     "=INDEX(util_ReadHandle(NR6),3,14)"  = "46359"
     "=INDEX(util_ReadHandle(NR6),3,5)"   = "lastday"
@@ -1373,8 +1347,8 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(OC8,"nominal_delta","day"),5,2)'  = "1"
     '=INDEX(_ReportRisk(OE8,"nominal_delta","day"),5,2)'  = "0"
     '=INDEX(_ReportRisk(OE8,"nominal_delta","month"),5,1)' = "46357"
-    "=_CreateTrades(NH5,IS1:IW1,NR5:NV5,NR9,ZU1)"      = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' on an IFERC index; an IFERC basis future is cash settled on its month's published index"
-    "=_CreateTrades(NH5,NR11:NW11,NR12:NW12,NR16,ZU1)" = "#ERROR _CreateTrades: ValueError: schedule_method of trade 1001 at row 1 is 'asian', expected 'lastday' on an IFERC index; an IFERC month has one index, published once"
+    "=_CreateTrades(NH5,IS1:IW1,NR5:NV5,NR9,ZU1)"      = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' on a published index; nothing is delivered against a published price"
+    "=_CreateTrades(NH5,NR11:NW11,NR12:NW12,NR16,ZU1)" = "#ERROR _CreateTrades: ValueError: schedule_method of trade 1001 at row 1 is 'penultimate', expected 'asian' or 'lastday' on a published index; a published month is the average of its prints, or its one print"
     # Numeric trade IDs, numeric-trade-ids.md: trade_id is a number, a whole one of at most 15
     # digits, the source system's deal number typed as Excel keeps it; the instrument shows the
     # type and the rule; a ticket in OJ2:ON3 books 999999999999999 and a formula cell =123456 on
@@ -1601,10 +1575,11 @@ $formulas = [ordered]@{
     "=_CreateMarketHistory(CT11,CT6)" = "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, 'Henry Hub NYMEX', expected the calendar's, 'Henry Hub NYMEX'"
     "=_CreateMarketHistory(CT5)" = "#ERROR _CreateMarketHistory: fixings is missing, expected a handle"
     # The market history over the other two calendars: the Gas Daily history in DU2 read back,
-    # every flow day through the valuation day priced and the next unfixed, and the IFERC history
-    # in DW4, one row per month, the two published months priced in the calendar's order, the
-    # indices given newest first, and December unfixed; a print for the day after the valuation
-    # day, IFERC fixings over another index than the Gas Daily calendar's and a history where the
+    # every flow day through the valuation day priced and the next unfixed, and the monthly
+    # published history in DW4, one row per month, the two published months priced in the
+    # calendar's order, their prices given by date newest first, and December unfixed; a print
+    # for the day after the valuation day, the monthly fixings over another index than the Gas
+    # Daily calendar's and a history where the
     # fixings should be, the library's words.
     '=MID(DU2,FIND(":",DU2)+1,15)' = "market_history:"
     "=ROWS(util_ReadHandle(DU2))"      = "93"
@@ -1618,7 +1593,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(DW4),5,5)" = "unfixed"
     "=_CreateMarketHistory(DW6,DU1)" = "#ERROR _CreateMarketHistory: ValueError: fixings flow_date 2026-09-11 is after valuation date 2026-09-10, expected flow days on or before the valuation date"
     "=_CreateMarketHistory(AR6,DW3)" = "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, 'Henry Hub IFERC', expected the calendar's, 'Henry Hub Gas Daily'"
-    "=_CreateMarketHistory(CT5,CT7)" = "#ERROR _CreateMarketHistory: ValueError: fixings is a market history, expected futures, IFERC, Gas Daily or published fixings"
+    "=_CreateMarketHistory(CT5,CT7)" = "#ERROR _CreateMarketHistory: ValueError: fixings is a market history, expected futures, Gas Daily or published fixings"
     # The price vector: a creator over one column of prices, read back through util_ReadHandle
     # under its header and type, a zero and a negative price kept in their places, and one over
     # a single cell; a row where a column is expected, the header taken with the prices, numeric
@@ -1668,10 +1643,10 @@ $formulas = [ordered]@{
     "=_CreateMarket(CT7)" = "#ERROR _CreateMarket: price_vector is missing, expected price vector handle"
     # The market over the other two histories, and a futures history valued before its calendar:
     # the Gas Daily market in EA2 read back, the valuation day's print, the balance-of-month quote
-    # the day after, October's quote on its first day and November's on the last; the IFERC market
-    # in EA4, October's index and December's quote; the market in CW6 over the history in CW5,
+    # the day after, October's quote on its first day and November's on the last; the monthly
+    # published market in EA4, October's price and December's quote; the market in CW6 over the history in CW5,
     # valued on 26-May before its calendar begins on 23-Jun, its one quote on the calendar's
-    # first day; the IFERC vector given with the Gas Daily history, named for the other index,
+    # first day; the monthly vector given with the Gas Daily history, named for the other index,
     # and a history with no unfixed period, the library's words. Then a vector that stops before
     # the schedule does: the Gas Daily market in EA10, over the history in DU2 with one quote of
     # the three months, read back through September's last day, the valuation day's print kept,
@@ -1698,14 +1673,12 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EA10),32,2)" = "U26"
     "=INDEX(util_ReadHandle(EA10),32,5)" = "2.2"
     "=_CreateMarket(DU2,EA11)" = "#ERROR _CreateMarket: ValueError: price_vector has 4 prices, expected at most 3, one per contract from 'U26' through 'X26'"
-    # The IFERC schedule: a creator over three contract months, their codes and the day each
-    # month's index is published, in DA and DC, and over the first row alone, read back through
-    # util_ReadHandle, two columns since iferc-publication-payment-anchor.md; a publication column
-    # one row long and one row short, the library's words; a blank among the publication dates, a
-    # number among the codes, the publication dates left out and a row where a column is
-    # expected, the seam's.
-    '=MID(DE1,FIND(":",DE1)+1,15)' = "iferc_schedule:"
-    '=MID(DE2,FIND(":",DE2)+1,15)' = "iferc_schedule:"
+    # A published schedule of one print a month, the shape of a monthly index such as Inside
+    # FERC's: a creator over three contract months, their codes and the day each month's index
+    # is published, in DA and DC, and over the first row alone, read back through
+    # util_ReadHandle. What the creator refuses is with the published schedule below.
+    '=MID(DE1,FIND(":",DE1)+1,19)' = "published_schedule:"
+    '=MID(DE2,FIND(":",DE2)+1,19)' = "published_schedule:"
     "=INDEX(util_ReadHandle(DE1),1,1)" = "contract_code"
     "=INDEX(util_ReadHandle(DE1),1,2)" = "publication_date"
     "=INDEX(util_ReadHandle(DE1),2,2)" = "datetime64[D]"
@@ -1714,12 +1687,6 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(DE1),5,2)" = "46357"
     "=COLUMNS(util_ReadHandle(DE1))"   = "2"
     "=ROWS(util_ReadHandle(DE2))"      = "3"
-    "=_CreateIfercSchedule(DA2:DA4,DC2:DC5)" = "#ERROR _CreateIfercSchedule: ValueError: publication_date has 4 dates, expected 3, one per contract_code"
-    "=_CreateIfercSchedule(DA2:DA4,DC2:DC3)" = "#ERROR _CreateIfercSchedule: ValueError: publication_date has 2 dates, expected 3, one per contract_code"
-    "=_CreateIfercSchedule(DA2:DA4,DD2:DD4)" = "#ERROR _CreateIfercSchedule: publication_date cell (2, 1) is blank, expected date"
-    "=_CreateIfercSchedule(DA6:DA7,DC2:DC3)" = "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is number 46023.0, expected text"
-    "=_CreateIfercSchedule(DA2:DA4)" = "#ERROR _CreateIfercSchedule: publication_date is missing, expected column of dates"
-    "=_CreateIfercSchedule(DA2:DA4,DC2:DD2)" = "#ERROR _CreateIfercSchedule: publication_date is 1x2 array, expected column of dates"
     # The published schedule: a creator over six prints of three months, the code of the month
     # each counts toward and its date, in AAA and AAB, and over one print alone, read back through
     # util_ReadHandle a row per print, the creator's own form. A publication column one row short,
@@ -1772,7 +1739,7 @@ $formulas = [ordered]@{
     # The published fixings: a creator over the prices of the three prints dated before 16
     # September, newest first, in AAJ and AAK, and the index in AAH3, read back through
     # util_ReadHandle in the creator's own form. A price column one row short, a series oldest
-    # first, the day a price was released where its date should be and an IFERC index, the
+    # first, the day a price was released where its date should be and a Gas Daily index, the
     # library's words; the index left out, the seam's.
     '=MID(AAL1,FIND(":",AAL1)+1,29)' = "published_fixings:DOE Diesel:"
     "=INDEX(util_ReadHandle(AAL1),1,1)" = "publication_date"
@@ -1784,7 +1751,7 @@ $formulas = [ordered]@{
     "=_CreatePublishedFixings(AAJ2:AAJ4,AAK2:AAK3,AAH3)" = "#ERROR _CreatePublishedFixings: ValueError: price has 2 prices, expected 3, one per publication_date"
     "=_CreatePublishedFixings(AAB2:AAB4,AAK2:AAK4,AAH3)" = "#ERROR _CreatePublishedFixings: ValueError: publication_date row 2 is 2026-09-07, expected a date before row 1's 2026-08-31"
     "=_CreatePublishedFixings(AAJ6:AAJ7,AAK2:AAK3,AAH3)" = "#ERROR _CreatePublishedFixings: ValueError: publication_date row 1 is 2026-09-15, expected the publication date of one of the index's prints"
-    "=_CreatePublishedFixings(AAJ2:AAJ4,AAK2:AAK4,EB2)"  = "#ERROR _CreatePublishedFixings: ValueError: index is an IFERC index, expected a published index"
+    "=_CreatePublishedFixings(AAJ2:AAJ4,AAK2:AAK4,EB3)"  = "#ERROR _CreatePublishedFixings: ValueError: index is a Gas Daily index, expected a published index"
     "=_CreatePublishedFixings(AAJ2:AAJ4,AAK2:AAK4)"      = "#ERROR _CreatePublishedFixings: index is missing, expected index handle"
     # The published history in AAL2, the calendar of AAH5 with the fixings of AAL1: each fixed
     # print's price and unfixed on the three still to come. The market in AAL4 over it, with the
@@ -1832,7 +1799,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(AAP20,"nominal_delta","year"),4,2)' = "20000"
     "=INDEX(_ReportValues(AAP27),3,1)"   = "11000"
     '=INDEX(_ReportRisk(AAP27,"nominal_delta","year"),4,2)' = "30000"
-    "=_CreateTrades(AAP3,IS1:IW1,AAR5:AAV5,AAP29,ZU1)" = "#ERROR _CreateTrades: ValueError: schedule_method of trade 1001 at row 1 is 'lastday', expected 'asian' on a published index; a published month is the average of its prints"
+    "=_CreateTrades(AAP3,IS1:IW1,AAR5:AAV5,AAP29,ZU1)" = "#ERROR _CreateTrades: ValueError: schedule_method of trade 1001 at row 1 is 'lastday' on U26, a month of 4 prints, expected a month of one print; lastday is a month's one print, and asian averages several"
     # A part of a month on a published index is a window of dates, holding the prints dated in
     # it. The balance of September from the 16th, booked by two dates in AAP32 and valued on the
     # 16th in AAP34: the prints dated the 21st and the 28th, 20,000 gallons on each, worth 16,000.
@@ -1846,7 +1813,7 @@ $formulas = [ordered]@{
     '=_Quote(AAP11,"U26",AAP39,"flat")'    = "3.3"
     '=_Quote(AAP11,"BALU26",AAP39,"flat")' = "3.5"
     '=_QuoteByDates(AAP11,DATE(2026,9,16),DATE(2026,9,30),AAP39,"ftc")' = "3.5"
-    '=_Quote(AAP11,"U26",AAP41,"flat")'    = "#ERROR _Quote: ValueError: schedule_method is 'lastday', expected 'asian' on a published index; a published month is the average of its prints"
+    '=_Quote(AAP11,"U26",AAP41,"flat")'    = "#ERROR _Quote: ValueError: schedule_method of the quote is 'lastday' on U26, a month of 4 prints, expected a month of one print; lastday is a month's one print, and asian averages several"
     # The Gas Daily schedule: a creator over three contract months, their codes and the first and
     # last day of gas of each, in DG to DI, and over the first row alone, read back through
     # util_ReadHandle; a first-date column one row long and a last-date column one row short, the
@@ -1872,7 +1839,7 @@ $formulas = [ordered]@{
     # the midpoint printed for each, in DM and DN, with the Gas Daily index in EB3, and over the
     # first row alone, read back through util_ReadHandle in the order given; the creator again
     # over the two columns of that spill, in DR3, whose own spill reads the same cell for cell; a
-    # price column one row short, a day skipped, a series pasted oldest first and an IFERC index
+    # price column one row short, a day skipped, a series pasted oldest first and a published index
     # where the Gas Daily index should be, the library's words; a blank among the prices, text
     # among the days, the prices left out and the index left out, the seam's.
     '=MID(DR1,FIND(":",DR1)+1,18)' = "gas_daily_fixings:"
@@ -1896,7 +1863,7 @@ $formulas = [ordered]@{
     "=_CreateGasDailyFixings(DP5:DP6,DN2:DN3,EB3)" = "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is text 'x', expected date"
     "=_CreateGasDailyFixings(DM2:DM7)" = "#ERROR _CreateGasDailyFixings: price is missing, expected column of numbers"
     "=_CreateGasDailyFixings(DM2:DM7,DN2:DN7)" = "#ERROR _CreateGasDailyFixings: index is missing, expected index handle"
-    "=_CreateGasDailyFixings(DM2:DM7,DN2:DN7,EB2)" = "#ERROR _CreateGasDailyFixings: ValueError: index is an IFERC index, expected a Gas Daily index"
+    "=_CreateGasDailyFixings(DM2:DM7,DN2:DN7,EB2)" = "#ERROR _CreateGasDailyFixings: ValueError: index is a published index, expected a Gas Daily index"
     # Contract codes and dates on one ticket, contract-codes-and-dates.md: the ticket in PV1:QC4
     # over the BBL_ASIAN index in PD6 under the asian template in PN3, three rows on one ticket
     # with all three period columns, V26 with formula-empty dates, V26 beside 12 to 31 October and
@@ -2535,7 +2502,7 @@ $formulas = [ordered]@{
     '=LEFT(_Quote(VA7,"F27-G27",VF3,VN6),39)' = "#ERROR _Quote: ValueError: pricing is '"
     '=RIGHT(_Quote(VA7,"F27-G27",VF3,VN6),23)' = "', expected flat or ftc"
     # A pair of indexes, two-index-fixed-float.md and two-index-one-price.md: A a futures index and
-    # B an IFERC index over one NYMEX NG specification, booked as one row of G27 for one lot at the
+    # B a monthly published index over one NYMEX NG specification, booked as one row of G27 for one lot at the
     # outright 3.00 in WJ22 over the column WJ5:WJ6, prepared in WJ23 over the histories WJ13:WJ14
     # and valued in WJ24 over the markets WJ17:WK17, a row, on SOFR at 0.95: the ticket's hand
     # table, 950 of mark and -0.095 of DV01, the risk report two commodity groups and one DV01
@@ -3440,7 +3407,7 @@ $cells = [ordered]@{
     "NH1" = "X26"; "NJ1" = "2-Nov-2026"
     "NH2" = "Z26"; "NJ2" = "1-Dec-2026"
     "NH3" = "F27"; "NJ3" = "4-Jan-2027"
-    "NH4" = "=_CreateIfercSchedule(NH1:NH3,NJ1:NJ3)"
+    "NH4" = "=_CreatePublishedSchedule(NH1:NH3,NJ1:NJ3)"
     "NK1" = "1-Jan-2027"
     "NK2" = '=_CreateHolidayCalendar("NK2",NK1)'
     "NL1" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
@@ -3455,16 +3422,16 @@ $cells = [ordered]@{
     "NR8" = "LOT"; "NS8" = "month"; "NT8" = "lastday"; "NU8" = "cleared"; "NV8" = "physical"; "NW8" = "ICE Clear Europe"; "NZ8" = "monthly"
     "NR9" = '=_CreateTradeTemplate("fixed_float",HSTACK(IJ1:IO1,IR1,"nearby"),HSTACK(NR8:NW8,NZ8,1))'
     "NR11" = "trade_id"; "NS11" = "trade_date"; "NT11" = "contract_code"; "NU11" = "quantity"; "NV11" = "fixed_price"; "NW11" = "schedule_method"
-    "NR12" = "1001"; "NS12" = "30-Nov-2026"; "NT12" = "Z26"; "NU12" = "1"; "NV12" = "-0.5"; "NW12" = "asian"
+    "NR12" = "1001"; "NS12" = "30-Nov-2026"; "NT12" = "Z26"; "NU12" = "1"; "NV12" = "-0.5"; "NW12" = "penultimate"
     "NR14" = "quantity_unit"; "NS14" = "quantity_per"; "NT14" = "route"; "NU14" = "settlement_method"; "NV14" = "clearing_house"; "NW14" = "payment_day"; "NX14" = "payment_holiday_key"; "NY14" = "settlement_frequency"
     "NR15" = "LOT"; "NS15" = "month"; "NT15" = "cleared"; "NU15" = "financial"; "NV15" = "ICE Clear Europe"; "NW15" = "+2bd"; "NX15" = "NK2"; "NY15" = "monthly"
     "NR16" = '=_CreateTradeTemplate("fixed_float",HSTACK(NR14:NY14,"nearby"),HSTACK(NR15:NY15,1))'
-    "OA1" = "Z26"; "OB1" = "-0.2"
-    "OA2" = "X26"; "OB2" = "-0.4"
+    "OA1" = "1-Dec-2026"; "OB1" = "-0.2"
+    "OA2" = "2-Nov-2026"; "OB2" = "-0.4"
     "OC1" = "1-Dec-2026"
     "OC2" = "=_CreateValuationDate(OC1,0.5)"
     "OC3" = "=_CreateCalendar(OC2,NH5)"
-    "OC4" = "=_CreateIfercFixings(OA2,OB2,NH5)"
+    "OC4" = "=_CreatePublishedFixings(OA2,OB2,NH5)"
     "OC5" = "=_CreateMarketHistory(OC3,OC4)"
     "OC10" = "-0.3"; "OC11" = "-0.1"
     "OC6" = '=_CreatePriceVector("WAHA",OC10:OC11)'
@@ -3478,7 +3445,7 @@ $cells = [ordered]@{
     "OE1" = "2-Dec-2026"
     "OE2" = "=_CreateValuationDate(OE1,0.5)"
     "OE3" = "=_CreateCalendar(OE2,NH5)"
-    "OE4" = "=_CreateIfercFixings(OA1:OA2,OB1:OB2,NH5)"
+    "OE4" = "=_CreatePublishedFixings(OA1:OA2,OB1:OB2,NH5)"
     "OE5" = "=_CreateMarketHistory(OE3,OE4)"
     "OE10" = "-0.1"
     "OE6" = '=_CreatePriceVector("WAHA",OE10)'
@@ -3488,7 +3455,7 @@ $cells = [ordered]@{
     "OG1" = "3-Dec-2026"
     "OG2" = "=_CreateValuationDate(OG1,0.5)"
     "OG3" = "=_CreateCalendar(OG2,NH5)"
-    "OG4" = "=_CreateIfercFixings(OA1:OA2,OB1:OB2,NH5)"
+    "OG4" = "=_CreatePublishedFixings(OA1:OA2,OB1:OB2,NH5)"
     "OG5" = "=_CreateMarketHistory(OG3,OG4)"
     "OG10" = "-0.1"
     "OG6" = '=_CreatePriceVector("WAHA",OG10)'
@@ -3702,22 +3669,6 @@ $cells = [ordered]@{
     "BK1" = "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5,EB1)"
     "BK2" = "=_CreateFuturesFixings(BI2,BJ2,EB1)"
     "BK3" = "=_CreateFuturesFixings(INDEX(util_ReadHandle(BK1),{3;4;5;6},1),INDEX(util_ReadHandle(BK1),{3;4;5;6},2),EB1)"
-    # IFERC fixings: four contract months of Waha, April back to January 2026, the newest first
-    # as the desk keeps them, and an illustrative index beside each; the same four months the
-    # other way up, January first, for their schedule and as the series the creator refuses; a
-    # pair of codes with one given twice; a
-    # code over a number; the first price over a blank; one creator cell over the four months and
-    # their index in EE2; and the creator once more over the two columns of BQ1's spill.
-    "BO2" = "J26"; "BP2" = "1.6"
-    "BO3" = "H26"; "BP3" = "1.95"
-    "BO4" = "G26"; "BP4" = "2.1"
-    "BO5" = "F26"; "BP5" = "1.85"
-    "BV2" = "F26"; "BV3" = "G26"; "BV4" = "H26"; "BV5" = "J26"
-    "BR2" = "F26"; "BR3" = "F26"
-    "BS2" = "F26"; "BS3" = "46023"
-    "BT2" = "1.85"
-    "BQ1" = "=_CreateIfercFixings(BO2:BO5,BP2:BP5,EE2)"
-    "BQ2" = "=_CreateIfercFixings(INDEX(util_ReadHandle(BQ1),{3;4;5;6},1),INDEX(util_ReadHandle(BQ1),{3;4;5;6},2),EE2)"
     # The calendar: one creator cell over the valuation date and the futures index in EB1, which
     # holds the six-contract schedule and the holiday calendar the sheet already holds; then a
     # schedule of one contract, one whose code is given twice, one whose expiries run backwards
@@ -3773,17 +3724,14 @@ $cells = [ordered]@{
     "CW7" = "=_CreateFuturesFixings(CQ2:CQ5,CR2:CR5,ED3)"
     "CW5" = "=_CreateMarketHistory(CW4,CW7)"
     "CW6" = "=_CreateMarket(CW5,CW2)"
-    # The IFERC schedule: three contract months of the Waha basis and the day each month's index
-    # is published, a fourth publication date for a column one row long, a copy of the publication
-    # column with a blank, a code over a number, and two creator cells, over the three rows and
-    # over the first row alone.
-    "DA2" = "V26"; "DC2" = "1-Oct-2026"; "DD2" = "1-Oct-2026"
+    # A published schedule of one print a month: three contract months of the Waha basis and the
+    # day each month's index is published, and two creator cells, over the three rows and over
+    # the first row alone.
+    "DA2" = "V26"; "DC2" = "1-Oct-2026"
     "DA3" = "X26"; "DC3" = "2-Nov-2026"
-    "DA4" = "Z26"; "DC4" = "1-Dec-2026"; "DD4" = "1-Dec-2026"
-    "DC5" = "4-Jan-2027"
-    "DA6" = "V26"; "DA7" = "46023"
-    "DE1" = "=_CreateIfercSchedule(DA2:DA4,DC2:DC4)"
-    "DE2" = "=_CreateIfercSchedule(DA2,DC2)"
+    "DA4" = "Z26"; "DC4" = "1-Dec-2026"
+    "DE1" = "=_CreatePublishedSchedule(DA2:DA4,DC2:DC4)"
+    "DE2" = "=_CreatePublishedSchedule(DA2,DC2)"
     # The published schedule: six weekly prints of three months, the last of August, the four
     # Mondays of September 2026 and the first of October, the code of its month beside each date;
     # a copy of the first dates with a blank, codes whose month returns after another began, dates
@@ -3906,8 +3854,8 @@ $cells = [ordered]@{
     # The market history over the other two calendars: eleven flow days of Henry Hub, 11 back to
     # 1 September 2026, and the midpoint printed for each, so that the Gas Daily calendar in AR6,
     # valued on the 11th, has a print on every fixed day; a valuation date of 15-Nov-2026, the
-    # IFERC calendar over DE1 valued on it, October and November published and December not, and
-    # the two months' indices, November's first; and a Gas Daily calendar valued on the 10th, for
+    # monthly published calendar over DE1 valued on it, October and November published and
+    # December not, and the two months' prices by publication date, November's first; and a Gas Daily calendar valued on the 10th, for
     # the print of the 11th to be refused.
     "DS2" = "11-Sep-2026"; "DT2" = "3"
     "DS3" = "10-Sep-2026"; "DT3" = "2.95"
@@ -3925,9 +3873,9 @@ $cells = [ordered]@{
     "DV2" = "15-Nov-2026"
     "DW1" = "=_CreateValuationDate(DV2,0.5)"
     "DW2" = "=_CreateCalendar(DW1,EB2)"
-    "DX2" = "X26"; "DY2" = "2.1"
-    "DX3" = "V26"; "DY3" = "1.85"
-    "DW3" = "=_CreateIfercFixings(DX2:DX3,DY2:DY3,EB2)"
+    "DX2" = "2-Nov-2026"; "DY2" = "2.1"
+    "DX3" = "1-Oct-2026"; "DY3" = "1.85"
+    "DW3" = "=_CreatePublishedFixings(DX2:DX3,DY2:DY3,EB2)"
     "DW4" = "=_CreateMarketHistory(DW2,DW3)"
     "DV5" = "10-Sep-2026"
     "DW5" = "=_CreateValuationDate(DV5,0.5)"
@@ -3935,11 +3883,11 @@ $cells = [ordered]@{
     # The market over the other two histories: a vector of three quotes, the balance of
     # September, October and November, named for the Gas Daily index, and the Gas Daily market
     # of the history in DU2, valued on 11-Sep-2026; a vector of one quote, December's, named for
-    # the IFERC index, and the IFERC market of the history in DW4, valued on 15-Nov-2026; the
+    # the monthly index, and the monthly market of the history in DW4, valued on 15-Nov-2026; the
     # same quote named for the Gas Daily index, one quote of the three months, and its market
     # in EA10, a vector that stops before the schedule does; four quotes named for the Gas Daily
-    # index, one past its schedule, for the market to refuse by count; and the IFERC calendar
-    # over DE1 valued on 15-Dec-2026 with all three indices, a history with no unfixed period,
+    # index, one past its schedule, for the market to refuse by count; and the monthly calendar
+    # over DE1 valued on 15-Dec-2026 with all three prices, a history with no unfixed period,
     # for the market to refuse.
     "DZ2" = "2.95"; "DZ3" = "3.1"; "DZ4" = "3.4"
     "EA1" = "=_CreatePriceVector(EC4,DZ2:DZ4)"
@@ -3953,13 +3901,13 @@ $cells = [ordered]@{
     "DZ8" = "15-Dec-2026"
     "EA5" = "=_CreateValuationDate(DZ8,0.5)"
     "EA6" = "=_CreateCalendar(EA5,EB2)"
-    "DX5" = "Z26"; "DY5" = "2.2"
-    "DX6" = "X26"; "DY6" = "2.1"
-    "DX7" = "V26"; "DY7" = "1.85"
-    "EA7" = "=_CreateIfercFixings(DX5:DX7,DY5:DY7,EB2)"
+    "DX5" = "1-Dec-2026"; "DY5" = "2.2"
+    "DX6" = "2-Nov-2026"; "DY6" = "2.1"
+    "DX7" = "1-Oct-2026"; "DY7" = "1.85"
+    "EA7" = "=_CreatePublishedFixings(DX5:DX7,DY5:DY7,EB2)"
     "EA8" = "=_CreateMarketHistory(EA6,EA7)"
     # The index: three names, and creator cells over the futures schedule in AI1 with the holiday
-    # calendar in AM1, the IFERC schedule in DE1 and the Gas Daily schedule in DK1, each with the
+    # calendar in AM1, the monthly published schedule in DE1 and the Gas Daily schedule in DK1, each with the
     # conventions in AP1 and the specifications in BY1.
     "EC2" = "Henry Hub NYMEX"; "EC3" = "Henry Hub IFERC"; "EC4" = "Henry Hub Gas Daily"
     "EB1" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,"AM1","lots",ZU1)'
@@ -3988,16 +3936,6 @@ $cells = [ordered]@{
     "PB1" = "25-Dec-2026"
     "PB2" = '=_CreateHolidayCalendar("PB2",PB1)'
     "PB3" = "12-Aug-2026"; "PB4" = "30-Jan-2026"; "PB5" = "31-Jan-2028"
-    # The IFERC index the fixings in BQ1 take: a schedule of their four months, January first as
-    # a schedule runs, the codes in BV and Platts' publication days beside them, and an index
-    # over it.
-    "EC5" = "Waha IFERC"
-    "EG2" = "5-Jan-2026"
-    "EG3" = "2-Feb-2026"
-    "EG4" = "2-Mar-2026"
-    "EG5" = "1-Apr-2026"
-    "EE1" = "=_CreateIfercSchedule(BV2:BV5,EG2:EG5)"
-    "EE2" = '=_CreateIndex(EC5,"Waha basis - Inside FERC monthly index",EE1,AP1,BY1)'
     # Contract codes and dates on one ticket, contract-codes-and-dates.md: the synthetic BBL_ASIAN
     # index of U26, V26, X26 and Z26 expiring 29-Sep-2026, 30-Oct-2026, 30-Nov-2026 and 31-Dec-2026
     # in PD1:PE4 and its schedule in PD5, so that V26 prices every October pricing day, a calendar
@@ -4421,9 +4359,9 @@ $cells = [ordered]@{
     "VP2" = '=_Quote(VA7,"F27-G27",VF7,"flat")'
     "VP3" = '=_Quote(VA7,"F27",VF3,"flat",VN6)'
     # The pair, two-index-fixed-float.md: A's futures schedule in WA1:WB3 with 1 January 2027 closed,
-    # B's IFERC schedule in WA5:WB9, the NYMEX NG specification in WD1:WH2 shared by the two
+    # B's published schedule of one print a month in WA5:WB9, the NYMEX NG specification in WD1:WH2 shared by the two
     # indexes, A in WJ5 and B in WJ6, a column; the valuation day 4 January 2027 in WA11, A's two
-    # December settles in WA12:WB13 and B's Z26 index in WA14:WB14, the two histories in WJ13:WJ14
+    # December settles in WA12:WB13 and B's Z26 index by its publication date in WA14:WB14, the two histories in WJ13:WJ14
     # with a copy B first in WK13:WK14 and a copy of A's twice in WK15:WK16; the vectors over
     # WA15:WA16 and WB15:WB17, the markets in WJ17:WJ18 with B beside A in WK17 and B first in
     # WK18:WK19; SOFR in WJ19 and its collection in WJ20; the template over WL1:WV2 with the second
@@ -4445,7 +4383,7 @@ $cells = [ordered]@{
     "WA11" = "4-Jan-2027"
     "WA12" = "31-Dec-2026"; "WB12" = "3.6"
     "WA13" = "30-Dec-2026"; "WB13" = "3.58"
-    "WA14" = "Z26"; "WB14" = "-0.3"
+    "WA14" = "1-Dec-2026"; "WB14" = "-0.3"
     "WA15" = "3.5"; "WA16" = "3.6"
     "WB15" = "-0.38"; "WB16" = "-0.4"; "WB17" = "-0.42"
     "WD4" = "date"; "WE4" = "discount_factor"
@@ -4456,14 +4394,14 @@ $cells = [ordered]@{
     "WJ3" = '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     "WJ4" = "=_CreateContractSpecifications(WD1:WH1,WD2:WH2)"
     "WJ5" = '=_CreateIndex("A","Pair leg A, a futures index",WJ1,WJ3,WJ4,"WJ2","NYMEX NG",ZU1)'
-    "WJ6" = '=_CreateIndex("B","Pair leg B, an IFERC index",WJ7,WJ3,WJ4,,"NYMEX NG")'
-    "WJ7" = "=_CreateIfercSchedule(WA5:WA9,WB5:WB9)"
+    "WJ6" = '=_CreateIndex("B","Pair leg B, a monthly published index",WJ7,WJ3,WJ4,,"NYMEX NG")'
+    "WJ7" = "=_CreatePublishedSchedule(WA5:WA9,WB5:WB9)"
     "WK5" = "=WJ6"; "WK6" = "=WJ5"
     "WJ8" = "=_CreateValuationDate(WA11,0.5)"
     "WJ9" = "=_CreateCalendar(WJ8,WJ5)"
     "WJ10" = "=_CreateCalendar(WJ8,WJ6)"
     "WJ11" = "=_CreateFuturesFixings(WA12:WA13,WB12:WB13,WJ5)"
-    "WJ12" = "=_CreateIfercFixings(WA14,WB14,WJ6)"
+    "WJ12" = "=_CreatePublishedFixings(WA14,WB14,WJ6)"
     "WJ13" = "=_CreateMarketHistory(WJ9,WJ11)"
     "WJ14" = "=_CreateMarketHistory(WJ10,WJ12)"
     "WK13" = "=WJ14"; "WK14" = "=WJ13"; "WK15" = "=WJ13"; "WK16" = "=WJ13"

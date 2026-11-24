@@ -13,9 +13,9 @@ from catalyst.globals.unit_conversions import UNITS
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.market_data.gas_daily_fixings import gas_daily_fixings
 
 EPOCH = np.datetime64("1899-12-30")
@@ -37,7 +37,7 @@ SPECIFICATIONS = contract_specifications(
 
 def an_index(schedule: object, name: str = "Henry Hub Gas Daily") -> Index:
     """The index of that schedule with one set of conventions and specifications throughout,
-    since nothing here reads either, and no holiday calendar, as an IFERC or a Gas Daily index
+    since nothing here reads either, and no holiday calendar, as a published or a Gas Daily index
     has none."""
     return index_on(name, f"{name} index", schedule, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
 
@@ -58,7 +58,7 @@ FUTURES_INDEX = index_on(
     None,
     UNITS,
 )
-IFERC_INDEX = an_index(iferc_schedule(("F26",), dates("2026-01-05")), "Waha IFERC")
+MONTHLY_INDEX = an_index(published_schedule(("F26",), dates("2026-01-05")), "Waha IFERC")
 
 
 # --- what is kept -------------------------------------------------------------
@@ -136,7 +136,7 @@ def test_a_series_of_no_rows_is_fixings_of_no_rows() -> None:
 
 # The kind is the first rule: a count the columns would refuse is not reached.
 def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() -> None:
-    for other, what in ((FUTURES_INDEX, "a futures index"), (IFERC_INDEX, "an IFERC index")):
+    for other, what in ((FUTURES_INDEX, "a futures index"), (MONTHLY_INDEX, "a published index")):
         with pytest.raises(ValueError) as failure:
             gas_daily_fixings(DAYS, PRICES[:5], other)
         assert str(failure.value) == f"index is {what}, expected a Gas Daily index"

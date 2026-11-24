@@ -37,7 +37,6 @@ from catalyst.index_definitions.holiday_calendars import (
     keyed_calendar,
     no_collection,
 )
-from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
@@ -73,7 +72,6 @@ from catalyst.trades.terms import (
     marketing_reserves,
     month_bounds,
     named_trade,
-    pair_kinds,
     payments_after_observations,
     price_words,
     reporting_lot_of,
@@ -183,7 +181,7 @@ def resolved(
     the first bad row named, and none at all when neither supplies the field. The
     trade IDs, since #168, are whole numbers of at most 15 digits, the template's one read when
     the template was made and the ticket's column read here, the first bad row named. The
-    index is a futures index or, since #167, an IFERC index, a Gas Daily one refused by name,
+    index is a futures index or a published index, a Gas Daily one refused by name,
     made with a reporting lot, the specification the batch's delta is counted in lots of, and
     every code of its schedule is read for its month, the rows the
     ticket does not use included, a label that is no contract code and two rows for one month
@@ -216,8 +214,9 @@ def resolved(
     under last3day, a third each, the three refusing a component that covers a part of its
     month by its contract, its trade and its days, and every pricing day of the days it covers
     under asian, an equal share each, a partial month's share of them, a part with none refused
-    the same way; on an IFERC index, since #167, the month's index on its publication day under
-    lastday, the one method it takes, the first row of another refused by its method and row.
+    the same way; on a published index the prints its period covers under asian, an equal
+    share each, or under lastday the one print of a whole month that has one, the first row
+    of another method refused by its method and row.
     For a financial settlement, since payment-day-date-or-rule.md each row's payment_day is a
     date or a rule: a date is the row's one payment day, every component of the row paying on it
     as entered, the first row whose date is on or before the row's last observation refused by
@@ -328,7 +327,6 @@ def resolved(
     schedules = [(months, _schedule_of(index, paired))]
     second = None
     if paired:
-        pair_kinds(index, indexes[1])
         second = _the_second_schedule(indexes[1], counter)
         schedules.append((second[1], _schedule_of(indexes[1], True)))
     periods = _the_periods(fields, tuple(schedules), onetime_rows, contract_days(schedule))
@@ -352,9 +350,9 @@ def resolved(
         booked=booked,
     )
     # One anchor for every index since iferc-publication-payment-anchor.md, each component's
-    # last observation day, the expiry under lastday on a futures index and the publication day
-    # on an IFERC one, handed over as a temporary, not held across the kernel's copies below;
-    # with two legs the later of the two, the one day both pay from.
+    # last observation day, the expiry under lastday on a futures index and the last
+    # publication date on a published one, handed over as a temporary, not held across the
+    # kernel's copies below; with two legs the later of the two, the one day both pay from.
     legs: tuple[Observations, ...] = (observations,)
     second_leg = None
     if second is not None:
@@ -842,21 +840,20 @@ def resolve_periods(
 
 
 def contract_days(schedule: TradeSchedule) -> NDArray[np.datetime64]:
-    """The day each contract of the schedule prices on last: a futures contract's expiry, an IFERC
-    month's publication day; what a onetime window's contract is found by, since the review of
-    onetime-averaging.md's third slice, the first contract pricing on or after the window's first
-    day, as the calendar gives a day its contract, window_rows' search key for a booking and
-    since dated-quotes.md for a quote. An IFERC schedule's days are never searched, a window on
-    an IFERC index being refused by the frequency's rules first."""
+    """The day each contract of the schedule prices on last: a futures contract's expiry, a
+    published month's last publication date; what a onetime window's contract is found by, since
+    the review of onetime-averaging.md's third slice, the first contract pricing on or after the
+    window's first day, as the calendar gives a day its contract, window_rows' search key for a
+    booking and since dated-quotes.md for a quote. A published schedule's days are never
+    searched, a onetime window on a published index being refused by the frequency's rules
+    first."""
     match schedule:
         case FuturesSchedule():
             return schedule.future_expiry
-        case IfercSchedule():
-            return schedule.publication_date
         case PublishedSchedule():
             # The date of each month's last print, one search of the column that says each
-            # print's month; never searched in turn, a window on a published index being refused
-            # by the frequency's rules first, as on an IFERC one.
+            # print's month; never searched in turn, a onetime window on a published index
+            # being refused by the frequency's rules first.
             months = np.arange(len(schedule.codes), dtype=np.intp)
             last = np.searchsorted(schedule.contract, months, side="right") - 1
             return schedule.publication_date[last]
@@ -943,7 +940,7 @@ def _the_leg_fields(fields: _Fields, paired: bool) -> None:
 
 def _the_second_schedule(index: Index, counter: WorkCounter) -> tuple[Index, NDArray[np.int64]]:
     """The second index and its schedule's months, since two-index-fixed-float.md, read before
-    the rows' periods are resolved against it: a futures or an IFERC index made with a reporting
+    the rows' periods are resolved against it: a futures or a published index made with a reporting
     lot, every code of its schedule read for its month, reported to the counter."""
     schedule = trade_schedule_of(index)
     reporting_lot_of(index)
@@ -999,9 +996,9 @@ def _the_payments(
 ) -> PaymentTerms | None:
     """The payment terms over the legs' anchors: one anchor for every index since
     iferc-publication-payment-anchor.md, each component's last observation day, the expiry under
-    lastday on a futures index and the publication day on an IFERC one, and with two legs the
-    later of the two since two-index-fixed-float.md, the one day both legs pay from; handed over
-    as a temporary, not held across the kernel's copies."""
+    lastday on a futures index and the last publication date on a published one, and with two
+    legs the later of the two since two-index-fixed-float.md, the one day both legs pay from;
+    handed over as a temporary, not held across the kernel's copies."""
     anchors = last_days(legs[0], occurrence.size)
     for observations in legs[1:]:
         anchors = np.maximum(anchors, last_days(observations, occurrence.size))
@@ -1068,7 +1065,7 @@ def _the_payment_terms(
     that entered a rule has it applied to each of its components' anchors instruction by
     instruction, since #181: the anchor its last observation day on every index, the one day under
     lastday and penultimate, the third under last3day and the month's last pricing day under asian
-    on a futures index, and on an IFERC index the month's publication day, since
+    on a futures index, and on a published index the last publication date its period covers,
     iferc-publication-payment-anchor.md; business days on that calendar, Monday to Friday less
     its holidays, the anchor rolled back to the last eligible day on or before it first, so that a
     day the calendar closes is not itself counted, calendar days and month ends whatever the

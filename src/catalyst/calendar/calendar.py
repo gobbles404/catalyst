@@ -2,10 +2,9 @@
 belongs to, whether it prices and whether it is on the fixed side of the valuation date. A
 futures index gives every day from the day after its first contract expires to the day its last
 expires, the prompt future on each; a Gas Daily index every flow day from its first month's
-first day to its last month's last, the month on each; an IFERC index one row per month,
-dated by the day its index is published; and a published index one row per print, dated by its
-publication date, on the month it counts toward. docs/library/calendar/calendar.md is the
-page."""
+first day to its last month's last, the month on each; and a published index one row per print,
+dated by its publication date, on the month it counts toward.
+docs/library/calendar/calendar.md is the page."""
 
 from dataclasses import dataclass
 from typing import assert_never, cast
@@ -18,7 +17,6 @@ from catalyst.globals.valuation_date import ValuationDate
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
-from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.kind import Kind, with_holiday_calendar
 from catalyst.index_definitions.published_schedule import PublishedSchedule
@@ -28,13 +26,13 @@ from catalyst.index_definitions.published_schedule import PublishedSchedule
 class Calendar:
     """The valuation date and the index the calendar was built from, kept by reference, and
     four columns aligned by position, all read-only: dates[i] is one period's day, the calendar
-    day itself on a futures or a Gas Daily calendar, the publication day on an IFERC one and a
+    day itself on a futures or a Gas Daily calendar, and a
     print's publication date on a published one; contract[i] the row of the schedule's codes
     whose contract the period belongs to, the prompt future, never row 0, on a futures calendar
     and the month otherwise; is_priced[i] whether the period has a price of its own, Monday to
     Friday and not a holiday on a futures calendar and every row on the others; and is_fixed[i]
     whether the period is on the fixed side of the valuation date, a futures day before it, a
-    Gas Daily flow day on or before it, an IFERC month published before it, a published print
+    Gas Daily flow day on or before it, a published print
     dated before it. The kind, the schedule and the holiday calendar are the index's,
     read through it and held nowhere else; the contract's code is the schedule's, read through
     the row. And one number, first_unfixed: the row of the first period not yet fixed, which is
@@ -58,8 +56,7 @@ class Calendar:
         contract prompt on the valuation day, the expiring contract on its expiry day and the
         next from the day after, a weekend or a holiday moving nothing; on a Gas Daily calendar
         the month of the day after the valuation day, so the next month from the month's last
-        day; on an IFERC calendar the first month whose index has not published, the month
-        itself on its publication day; on a published calendar the month of the first print
+        day; on a published calendar the month of the first print
         dated on or after the valuation day. Valued before the calendar begins, it is the first
         contract the calendar represents, which on a futures calendar is the schedule's second,
         the first only bounding the calendar. A calendar whose every period has fixed has no
@@ -90,8 +87,6 @@ def calendar(valuation_date: ValuationDate, index: Index) -> Calendar:
             return _gas_daily_calendar(
                 valuation_date, index, cast(GasDailySchedule, index.schedule)
             )
-        case Kind.IFERC:
-            return _iferc_calendar(valuation_date, index, cast(IfercSchedule, index.schedule))
         case Kind.PUBLISHED:
             return _published_calendar(
                 valuation_date, index, cast(PublishedSchedule, index.schedule)
@@ -219,36 +214,6 @@ def _gas_daily_calendar(
     return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
 
 
-def _iferc_calendar(
-    valuation_date: ValuationDate, index: Index, schedule: IfercSchedule
-) -> Calendar:
-    """One row per contract month, dated by the day its index is published; one month is a
-    calendar.
-
-    Each code is given once, and each month's index is published after the month above's, in
-    the order given; nothing is sorted. The columns: the publication days as given, copied so
-    the calendar owns them; the contract each month's own row; priced throughout, since an
-    index is a price for its whole month; and fixed when the publication day is before the
-    valuation date's day, since the index prints during that day, one comparison.
-    """
-    codes = schedule.codes
-    published = schedule.publication_date
-    _at_least_one(codes)
-    _each_code_once(codes)
-    unordered = published[1:] <= published[:-1]
-    if unordered.any():
-        k = int(unordered.argmax())  # published[k + 1] is the first day not after the one before
-        raise ValueError(
-            f"publication_date row {k + 2} is {published[k + 1]}, "
-            f"expected a date after row {k + 1}'s {published[k]}"
-        )
-    dates = np.array(published, dtype="datetime64[D]")
-    contract = np.arange(dates.size, dtype=np.intp)
-    is_priced = np.ones(dates.size, dtype=bool)
-    is_fixed = dates < valuation_date.as_of
-    return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
-
-
 def _published_calendar(
     valuation_date: ValuationDate, index: Index, schedule: PublishedSchedule
 ) -> Calendar:
@@ -260,8 +225,8 @@ def _published_calendar(
     the one rule left is a print to make a row of. The columns: the publication dates and each
     print's month, the schedule's own two arrays, read-only already and held as they are, so a
     calendar adds no copy of either; priced throughout, since every print is a price; and fixed
-    when the publication date is before the valuation date's day, one comparison, the rule an
-    IFERC month has, so that Monday's price is fixed from Tuesday. Whether the publisher has
+    when the publication date is before the valuation date's day, one comparison, so that
+    Monday's price is fixed from Tuesday. Whether the publisher has
     released a fixed print's price yet is no fact of the calendar's: the history asks a price of
     every fixed print, and the sheet supplies it.
     """

@@ -97,10 +97,10 @@ def market(market_history: MarketHistory, price_vector: PriceVector) -> Market:
     no count, no search, and no array made, whatever the calendar's length and the vector's.
     On a futures calendar that period is the valuation day and its contract the prompt; on a
     Gas Daily calendar the day after the valuation day, so the first quote is the balance of
-    that month; on an IFERC calendar the first month whose index has not published; on a
-    published calendar the first print dated on or after the valuation day, so the first quote
-    is the price of each print still to come in that print's month. The two objects are kept
-    as they are.
+    that month; on a published calendar the first print dated on or after the valuation day,
+    so the first quote is the price of each print still to come in that print's month, on a
+    calendar of one print a month the first month whose index has not published. The two
+    objects are kept as they are.
     """
     calendar = market_history.calendar
     if price_vector.index_name != calendar.index.name:

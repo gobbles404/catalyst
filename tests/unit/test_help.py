@@ -325,28 +325,6 @@ def test_the_holiday_calendar_creator_explains_itself() -> None:
     ]
 
 
-def test_the_iferc_schedule_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["_CreateIfercSchedule"]
-    assert not hidden
-    assert description == (
-        "Creates an IFERC schedule from the contract months of one index and the day each "
-        "month's index is published, and shows its handle, the text other formulas take as the "
-        "schedule."
-    )
-    assert arguments == [
-        (
-            "contract_code",
-            "The column of contract codes, such as A2:A4 holding V26 to Z26, one per contract "
-            "month.",
-        ),
-        (
-            "publication_date",
-            "The column of dates the index is published, beside the codes, such as B2:B4, one "
-            "per code, the day each month is observed and the day its payment counts from.",
-        ),
-    ]
-
-
 def test_the_gas_daily_schedule_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateGasDailySchedule"]
     assert not hidden
@@ -477,33 +455,6 @@ def test_the_futures_fixings_creator_explains_itself() -> None:
     ]
 
 
-def test_the_iferc_fixings_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["_CreateIfercFixings"]
-    assert not hidden
-    assert description == (
-        "Creates the IFERC fixings of one index from the contract months whose index has been "
-        "published, newest first, and the index printed for each, checked against the months of "
-        "its index, and shows its handle, the text other formulas take as the fixings."
-    )
-    assert arguments == [
-        (
-            "contract_code",
-            "The column of contract codes, newest first, such as A2:A5 holding J26 down to F26, "
-            "one per month published.",
-        ),
-        (
-            "price",
-            "The column of published indices beside the codes, such as B2:B5, one per code.",
-        ),
-        (
-            "index",
-            "The index handle: the cell showing _CreateIndex's result, such as F3, or a name for "
-            "it; an IFERC index, whose months the codes are checked against and whose schedule "
-            "says the day each printed.",
-        ),
-    ]
-
-
 def test_the_gas_daily_fixings_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateGasDailyFixings"]
     assert not hidden
@@ -617,8 +568,8 @@ def test_the_index_creator_explains_itself() -> None:
         ),
         (
             "schedule",
-            "The index's schedule handle, futures, IFERC, Gas Daily or published: the cell "
-            "showing its creator's result, such as B2, or a name for it.",
+            "The index's schedule handle, futures, Gas Daily or published: the cell showing its "
+            "creator's result, such as B2, or a name for it.",
         ),
         (
             "index_conventions",

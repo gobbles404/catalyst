@@ -5,8 +5,9 @@ to its own leg's slots; a tick reads each leg's live references off its own mark
 distinct factor once, serving both legs, and makes eight reductions a leg and four for the
 trade. The peak of memory a pair holds at each step is at most twice a leg's, to the slack the
 seam allows. The pair is the unit tests' synthetic A and B, made here again since a performance
-test imports no unit test: A a futures index with a 10,000 MMBTU lot, B an IFERC index with a
-2,500 MMBTU one, each defining one MMBTU per entered unit."""
+test imports no unit test: A a futures index with a 10,000 MMBTU lot, B a published index of
+one print a month, Inside FERC's shape, with a 2,500 MMBTU one, each defining one MMBTU per
+entered unit."""
 
 from collections.abc import Callable, Mapping
 
@@ -25,17 +26,17 @@ from catalyst.index_definitions.contract_specifications import contract_specific
 from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from catalyst.index_definitions.holiday_calendar import holiday_calendar
 from catalyst.index_definitions.holiday_calendars import collect_holiday_calendars
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.instrumentation.work_counts import WorkCounter, WorkCounts
 from catalyst.instruments.definitions import FIXED_FLOAT, FieldType, Instrument
 from catalyst.instruments.fields import DatesOrTexts, FieldValues
 from catalyst.market.market import Market, market
 from catalyst.market.market_history import MarketHistory, market_history
 from catalyst.market_data.futures_fixings import futures_fixings
-from catalyst.market_data.iferc_fixings import iferc_fixings
 from catalyst.market_data.price_vector import price_vector
+from catalyst.market_data.published_fixings import published_fixings
 from catalyst.trades.aggregation import aggregate_results
 from catalyst.trades.evaluation import trade_results
 from catalyst.trades.preparation import prepared_trades
@@ -79,12 +80,12 @@ def futures_index() -> Index:
     )
 
 
-def iferc_index() -> Index:
+def monthly_index() -> Index:
     sizes = numbers(2_500.0, 1.0)
     return index_on(
         "B",
         "Index B",
-        iferc_schedule(
+        published_schedule(
             ("Z26", "F27", "G27", "H27", "J27"),
             dates("2026-12-01", "2027-01-04", "2027-02-01", "2027-03-01", "2027-04-01"),
         ),
@@ -99,7 +100,7 @@ def iferc_index() -> Index:
 
 
 A = futures_index()
-B = iferc_index()
+B = monthly_index()
 SOFR = discount_curve("SOFR", dates(AS_OF, PAY), numbers(1.0, 0.95))
 # The payment calendar, weekends alone, under its name, and the collection a batch selects
 # it from by key, payment-calendar-keys.md: made once, outside every measured call.
@@ -187,7 +188,7 @@ def history_a() -> MarketHistory:
 def history_b() -> MarketHistory:
     """B's history on the day: Z26 published at -0.30, F27 publishing today and live."""
     cal = calendar(valuation_date(np.datetime64(AS_OF, "D"), 0.5), B)
-    return market_history(cal, iferc_fixings(("Z26",), numbers(-0.30), B))
+    return market_history(cal, published_fixings(dates("2026-12-01"), numbers(-0.30), B))
 
 
 def quoted(history: MarketHistory, *quotes: float) -> Market:

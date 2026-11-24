@@ -17,7 +17,6 @@ from numpy.typing import NDArray
 from catalyst.calendar.calendar import Calendar
 from catalyst.globals.payments import compensated, time_fractions
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
-from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index_conventions import IndexConventions
 from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.instrumentation.work_counts import WorkCounter
@@ -179,10 +178,9 @@ def calendar_rows(
     template-based-quoting.md for a quote's observations alike, named(i) the words a refusal
     gives the i-th day. On a futures schedule the day's offset from the calendar's first day, one
     subtraction, a day before it refused by name: the first contract only bounds the calendar
-    and nothing prices its days. On an IFERC schedule, since #167, the row whose publication day
-    is the day given, one searchsorted over the calendar's days, every day given being a
-    publication day by the encoding's rule and the first month a month like any other, nothing
-    bounding it."""
+    and nothing prices its days. On a published schedule the row whose publication date is the
+    day given, one searchsorted over the calendar's days, every day given being a print's date
+    by the encoding's rule and the first print a print like any other, nothing bounding it."""
     match schedule:
         case FuturesSchedule():
             rows = (days - calendar.dates[0]).astype(np.intp)
@@ -194,8 +192,6 @@ def calendar_rows(
                     "bounds the calendar and nothing prices its days"
                 )
             return rows
-        case IfercSchedule():
-            return np.searchsorted(calendar.dates, days).astype(np.intp)
         case PublishedSchedule():
             # The row whose publication date is the day given: a published calendar's rows are
             # its schedule's prints, and every day given is a print's date by the encoding's rule.
@@ -419,13 +415,13 @@ def prepared_trades(
     only where a payment or a total is formed, with Neumaier's compensation. On a
     futures index each slot's day is a day of the calendar, which runs from the day after the
     schedule's first expiry to its last: the first contract only bounds the calendar, so a slot
-    on or before its expiry is refused by name, nothing ever pricing it. On an IFERC index,
-    since #167, each slot's
-    day is a month's publication day and its row that month's, found by one search, the first
-    month a month like any other. A slot has fixed when the calendar marks its day fixed, which
-    is the day after it at the earliest, an observation staying live on its own day as the
-    calendar's rule says. A physical fixed_float whose contract has expired, its expiry day marked
-    fixed, is settled where the batch holds no position on it, since expired-physical-cash.md:
+    on or before its expiry is refused by name, nothing ever pricing it. On a published index
+    each slot's day is a print's publication date and its row that print's, found by one
+    search, the first print a print like any other. A slot has fixed when the calendar marks its
+    day fixed, which is the day after it at the earliest, an observation staying live on its own
+    day as the calendar's rule says. A physical fixed_float whose contract has expired, its
+    expiry day marked fixed, is settled where the batch holds no position on it, since
+    expired-physical-cash.md:
     the encoding's flag, the whole counts of each quantity unit on the contract adding to exactly
     zero, and the group's fixed legs alone are its cash, the final price multiplying a quantity
     of zero and entering nothing. Where a count is left it is refused, naming the contract, its
@@ -479,8 +475,8 @@ def prepared_trades(
     ]
     fixed = [history.calendar.is_fixed[rows] for rows, history in zip(placed, matched, strict=True)]
     if encoded.payment_date is None:
-        # A physical batch is a futures batch on one leg: the kernel refuses a physical IFERC one
-        # and a physical pair. Since expired-physical-cash.md a contract past its expiry is
+        # A physical batch is a futures batch on one leg: the kernel refuses a physical published
+        # one and a physical pair. Since expired-physical-cash.md a contract past its expiry is
         # settled where the batch holds no position on it and refused where it holds one.
         leg = legs[0]
         closed = cast(NDArray[np.bool_], encoded.closed)  # physical: a flag per group

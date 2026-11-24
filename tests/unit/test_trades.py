@@ -17,6 +17,7 @@ from holiday_fixtures import closed_on, index_on
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
+from published_fixtures import fixings_by_code
 
 from catalyst.calendar.calendar import calendar
 from catalyst.globals.unit_conversions import UNITS
@@ -26,7 +27,6 @@ from catalyst.index_definitions.contract_specifications import contract_specific
 from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.kind import Kind
@@ -37,7 +37,6 @@ from catalyst.instruments.fields import DatesOrTexts
 from catalyst.market.market import Market, market
 from catalyst.market.market_history import MarketHistory, market_history
 from catalyst.market_data.futures_fixings import futures_fixings
-from catalyst.market_data.iferc_fixings import iferc_fixings
 from catalyst.market_data.price_vector import price_vector
 from catalyst.trades.encoding import Encoded, encoded
 from catalyst.trades.evaluation import trade_results
@@ -356,8 +355,7 @@ PUBLISHED = index_on(
     [
         (
             {"ix": GAS_DAILY},
-            "index is a Gas Daily index, expected a futures, IFERC or published index for a "
-            "fixed_float",
+            "index is a Gas Daily index, expected a futures or a published index for a fixed_float",
         ),
         (
             {"ix": PUBLISHED},
@@ -365,18 +363,24 @@ PUBLISHED = index_on(
             "is delivered against a published price",
         ),
         (
-            {"ix": PUBLISHED, "settlement": Settlement.FINANCIAL},
-            "schedule_method of trade 1001 at row 1 is 'lastday', expected 'asian' on a published "
-            "index; a published month is the average of its prints",
+            {
+                "ix": PUBLISHED,
+                "settlement": Settlement.FINANCIAL,
+                "schedule_method": rows(1, 1, 1, 1, 1),
+            },
+            "schedule_method of trade 1001 at row 1 is 'penultimate', expected 'asian' or "
+            "'lastday' on a published index; a published month is the average of its prints, or "
+            "its one print",
         ),
         (
             {
                 "ix": PUBLISHED,
                 "settlement": Settlement.FINANCIAL,
-                "schedule_method": rows(3, 3, 0, 3, 3),
+                "schedule_method": rows(3, 0, 2, 3, 1),
             },
-            "schedule_method of trade 1003 at row 3 is 'lastday', expected 'asian' on a published "
-            "index; a published month is the average of its prints",
+            "schedule_method of trade 1003 at row 3 is 'last3day', expected 'asian' or 'lastday' "
+            "on a published index; a published month is the average of its prints, or its one "
+            "print",
         ),
         (
             {"specification": spec(5, 1)},
@@ -4968,11 +4972,13 @@ def test_the_frequency_is_kept_and_its_rules_name_the_first_row_that_breaks_them
     period = one_choice(BASES, QuantityPer.PERIOD, 1)
     asian = one_choice(METHODS, ScheduleMethod.ASIAN, 1)
     with pytest.raises(ValueError) as refused:
-        frequency_rules(onetime, period, asian, Settlement.FINANCIAL, Kind.IFERC, False, unlabeled)
+        frequency_rules(
+            onetime, period, asian, Settlement.FINANCIAL, Kind.PUBLISHED, False, unlabeled
+        )
     assert str(refused.value) == (
-        "settlement_frequency of trade at row 1 is 'onetime', expected 'monthly' on an IFERC "
-        "index; an IFERC month has one index, published once, and a onetime period averages the "
-        "pricing days of a futures index"
+        "settlement_frequency of trade at row 1 is 'onetime', expected 'monthly' on a published "
+        "index; one average across months would weight each month by its number of prints, and "
+        "a strip settles month by month"
     )
     with pytest.raises(ValueError) as refused:
         frequency_rules(onetime, period, asian, Settlement.FINANCIAL, Kind.FUTURES, True, unlabeled)
@@ -5409,13 +5415,13 @@ def test_a_days_lots_past_the_largest_number_are_refused_by_their_day() -> None:
 # --- an IFERC basis future, iferc-basis-futures.md ------------------------------------------
 # The ticket's synthetic Waha-like index: three months, X26, Z26 and F27, each index published on
 # the first business day of its month, dollars an MMBtu settled in dollars, a 2,500 MMBtu LOT and
-# a bare MMBTU, the LOT reported, and no pricing calendar, an IFERC index having none; the payment
-# calendar closes New Year's Day. WAH001, 1 LOT of Z26 at -0.50: 2,500 MMBtu of exposure and a
-# fixed leg of 1,250, so an amount of 1,250 + 2,500 times the basis, observed once, on 1 December,
-# the day Z26's index publishes, and paid 3 December, two business days after it,
+# a bare MMBTU, the LOT reported, and no pricing calendar, a published index having none; the
+# payment calendar closes New Year's Day. WAH001, 1 LOT of Z26 at -0.50: 2,500 MMBtu of exposure
+# and a fixed leg of 1,250, so an amount of 1,250 + 2,500 times the basis, observed once, on
+# 1 December, the day Z26's index publishes, and paid 3 December, two business days after it,
 # iferc-publication-payment-anchor.md.
 
-WAHA_SCHEDULE = iferc_schedule(
+WAHA_SCHEDULE = published_schedule(
     ("X26", "Z26", "F27"), dates("2026-11-02", "2026-12-01", "2027-01-04")
 )
 WAHA = index_on(
@@ -5519,7 +5525,7 @@ def waha_history(as_of: str, indices: dict[str, float], ix: Index = WAHA) -> Mar
     desk keeps them; every month published before the day is among them, the history's own rule."""
     cal = calendar(valuation_date(day(as_of), 0.5), ix)
     codes = tuple(reversed(indices))
-    return market_history(cal, iferc_fixings(codes, numbers(*(indices[c] for c in codes)), ix))
+    return market_history(cal, fixings_by_code(codes, numbers(*(indices[c] for c in codes)), ix))
 
 
 def waha_valued(
@@ -5537,7 +5543,7 @@ def waha_valued(
 
 
 def test_an_iferc_future_observes_its_months_index_once_on_its_publication_day() -> None:
-    # The terms hold the IFERC schedule as the kind rule found it; the one observation is Z26's
+    # The terms hold the published schedule as the kind rule found it; the one observation is Z26's
     # publication day with the whole weight, no pricing calendar read; the encoding converts the
     # lot once, 2,500 MMBtu and a fixed leg of 1,250, one slot on 1 December referencing Z26, one
     # group paying 3 December, and the day, month and year axes that one day.
@@ -5761,7 +5767,8 @@ def test_the_first_iferc_month_is_a_month_to_trade_and_the_existing_refusals_hol
     with pytest.raises(ValueError) as missing:
         waha_history("2026-11-03", {})
     assert str(missing.value) == (
-        "fixings has no index for X26, expected an index for every fixed month in calendar"
+        "fixings has no price for the print dated 2026-11-02, expected a price for every fixed "
+        "print in calendar, a stand-in where its publisher has not released it"
     )
     twin = index_on(
         "WAHA",
@@ -5803,19 +5810,17 @@ def test_a_payment_on_the_publication_day_is_refused_when_the_iferc_batch_is_enc
     )
 
 
-def test_an_iferc_index_takes_a_financial_lastday_future_alone_and_says_so() -> None:
+def test_a_monthly_published_index_takes_a_financial_asian_or_lastday_future_and_says_so() -> None:
     with pytest.raises(ValueError) as physical:
         waha_terms(settlement=Settlement.PHYSICAL)
     assert str(physical.value) == (
-        "settlement_method is 'physical', expected 'financial' on an IFERC index; an IFERC basis "
-        "future is cash settled on its month's published index"
+        "settlement_method is 'physical', expected 'financial' on a published index; nothing is "
+        "delivered against a published price"
     )
-    with pytest.raises(ValueError) as asian:
-        waha_terms(methods=(ScheduleMethod.ASIAN,))
-    assert str(asian.value) == (
-        "schedule_method of trade 1001 at row 1 is 'asian', expected 'lastday' on an IFERC "
-        "index; an IFERC month has one index, published once"
-    )
+    # asian on a month of one print is that print whole, the observation lastday takes.
+    averaged = observed_of(waha_terms(methods=(ScheduleMethod.ASIAN,)))
+    np.testing.assert_array_equal(averaged.date, dates("2026-12-01"))
+    np.testing.assert_array_equal(averaged.weight, [1.0])
     with pytest.raises(ValueError) as second:
         waha_terms(
             quantities=(1.0, 1.0),
@@ -5823,8 +5828,8 @@ def test_an_iferc_index_takes_a_financial_lastday_future_alone_and_says_so() -> 
             methods=(ScheduleMethod.LASTDAY, ScheduleMethod.PENULTIMATE),
         )
     assert str(second.value) == (
-        "schedule_method of trade 1002 at row 2 is 'penultimate', expected 'lastday' on an "
-        "IFERC index; an IFERC month has one index, published once"
+        "schedule_method of trade 1002 at row 2 is 'penultimate', expected 'asian' or 'lastday' "
+        "on a published index; a published month is the average of its prints, or its one print"
     )
     # The observations builder says the same of a method on bare arrays, and a part of a month
     # under lastday is refused as the whole month's one price.
@@ -5832,24 +5837,24 @@ def test_an_iferc_index_takes_a_financial_lastday_future_alone_and_says_so() -> 
     with pytest.raises(ValueError) as bare:
         observed(by(ScheduleMethod.LAST3DAY, 1), WAHA, rows(1), start, end, unlabeled)
     assert str(bare.value) == (
-        "schedule_method of trade at row 1 is 'last3day', expected 'lastday' on an IFERC index; "
-        "an IFERC month has one index, published once"
+        "schedule_method of trade at row 1 is 'last3day', expected 'asian' or 'lastday' on a "
+        "published index; a published month is the average of its prints, or its one print"
     )
     half = waha_terms(periods=(("2026-12-01", "2026-12-15"),))
     with pytest.raises(ValueError) as part:
         observed_of(half)
     assert str(part.value) == (
         "Z26 of trade 1001 at row 1 is covered from 2026-12-01 to 2026-12-15, part of its "
-        "month, expected the whole month under lastday; an IFERC month's index is one price for "
-        "the whole month"
+        "month, expected the whole month under lastday; under lastday a month's one print is the "
+        "price of the whole month"
     )
-    # An observation on any day but the month's publication day is refused when encoded.
+    # An observation on a day that is no print's date is refused when encoded.
     off = observations(rows(0), dates("2026-12-02"), numbers(1.0), 1)
     with pytest.raises(ValueError) as wrong_day:
         encoded(waha_terms(), (off,), UNITS, WorkCounter())
     assert str(wrong_day.value) == (
-        "trade 1001 at row 1 observes 2026-12-02, expected 2026-12-01, the day Z26's index "
-        "publishes; an IFERC month prices once, on that day"
+        "trade 1001 at row 1 observes 2026-12-02, expected the publication date of one of the "
+        "index's prints; a published index prices on its prints alone"
     )
 
 

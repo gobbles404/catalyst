@@ -405,7 +405,7 @@ def test_a_later_nearby_is_refused_by_name_where_it_is_not_priced() -> None:
         "physical position delivers its own contract, and a later nearby is cash settled on its "
         "average"
     )
-    # An IFERC index and a pair, the kernel's rule over the occurrences: the first later nearby
+    # A published index and a pair, the kernel's rule over the occurrences: the first later nearby
     # named, and every row at 1 standing under any terms.
     later = np.array([1, 2], dtype=np.intp)
     asian = one_choice(METHODS, ScheduleMethod.ASIAN, 2)
@@ -414,10 +414,10 @@ def test_a_later_nearby_is_refused_by_name_where_it_is_not_priced() -> None:
         return f"trade at row {k + 1}"
 
     with pytest.raises(ValueError) as refusal:
-        nearby_rules(later, asian, Settlement.FINANCIAL, Kind.IFERC, False, named)
+        nearby_rules(later, asian, Settlement.FINANCIAL, Kind.PUBLISHED, False, named)
     assert str(refusal.value) == (
-        "nearby of trade at row 2 is 2, expected 1 on an IFERC index; an IFERC month has one "
-        "index, published once, and no contract after the prompt to count"
+        "nearby of trade at row 2 is 2, expected 1 on a published index; a print counts toward "
+        "its own month, and there is no contract to roll"
     )
     with pytest.raises(ValueError) as refusal:
         nearby_rules(later, asian, Settlement.FINANCIAL, Kind.FUTURES, True, named)
@@ -426,7 +426,9 @@ def test_a_later_nearby_is_refused_by_name_where_it_is_not_priced() -> None:
         "not built"
     )
     lastday = one_choice(METHODS, ScheduleMethod.LASTDAY, 2)
-    nearby_rules(np.ones(2, dtype=np.intp), lastday, Settlement.PHYSICAL, Kind.IFERC, True, named)
+    nearby_rules(
+        np.ones(2, dtype=np.intp), lastday, Settlement.PHYSICAL, Kind.PUBLISHED, True, named
+    )
 
 
 def test_a_quote_template_is_required_to_hold_the_field() -> None:

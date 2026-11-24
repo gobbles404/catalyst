@@ -313,24 +313,12 @@ def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
     )
 
 
-def iferc_columns(contracts: int) -> tuple[Cells, Cells]:
-    """Codes and the day each month's index is published, for that many contract months, as the
-    sheet sends them: the codes and the third date column of schedule_columns."""
+def monthly_columns(contracts: int) -> tuple[Cells, Cells]:
+    """Codes and the day each month's one print is published, for that many contract months, as
+    the sheet sends them: the codes and the third date column of schedule_columns, a published
+    schedule of one print a month."""
     codes, _, _, publications = schedule_columns(contracts)
     return codes, publications
-
-
-# An IFERC schedule keeps a copy of its one date column, 8 bytes per contract month, and on the
-# way pays the column's conversion to days and its look, as a schedule without options does:
-# measured ALLOC_ONE bytes at 120 contract months on 2026-10-18, about 17 bytes per month on top
-# of a creator's small objects, which twice the slack covers.
-def test_an_iferc_schedule_keeps_a_copy_of_its_date_column() -> None:
-    contracts = 120
-    codes, publications = iferc_columns(contracts)
-    assert (
-        least_peak(lambda: ENTRY["_CreateIfercSchedule"](codes, publications))
-        <= 17 * contracts + 2 * SLACK
-    )
 
 
 def gas_daily_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
@@ -341,9 +329,9 @@ def gas_daily_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
     return codes, first, last
 
 
-# A Gas Daily schedule keeps a copy of each of its two date columns, as the IFERC schedule does:
-# measured 4,928 bytes at 120 contract months on 2026-09-24 and 39,516 at 1,200, the IFERC
-# schedule's figures to the byte, under the same ceiling.
+# A Gas Daily schedule keeps a copy of each of its two date columns, as a futures schedule with
+# options does: measured 4,928 bytes at 120 contract months on 2026-09-24 and 39,516 at 1,200,
+# that schedule's figures to the byte, under the same ceiling.
 def test_a_gas_daily_schedule_keeps_a_copy_of_each_date_column() -> None:
     contracts = 120
     codes, first, last = gas_daily_columns(contracts)
@@ -363,17 +351,31 @@ def published_columns(months: int, prints: int = 4) -> tuple[Cells, Cells]:
 
 
 # A published schedule keeps two arrays a print long, its copy of the dates and each print's
-# month, 16 bytes a print, and on the way pays the date column's conversion and its look as the
-# IFERC schedule does, the codes as one column to compare, let go before the two kept arrays are
+# month, 16 bytes a print, and on the way pays the date column's conversion and its look as a
+# futures schedule does, the codes as one column to compare, let go before the two kept arrays are
 # made, and a flag per row: measured 19,806 bytes at 480 prints on 2026-11-24, 41 a print, and
-# 183,966 at 4,800, 38 a print, 5 above the IFERC schedule's 33 a month at that length for the
-# second array kept. It grows by the print and never by a print's place in its month.
+# 183,966 at 4,800, 38 a print. It grows by the print and never by a print's place in its
+# month.
 def test_a_published_schedule_keeps_its_dates_and_each_prints_month() -> None:
     months = 120
     codes, dates = published_columns(months)
     assert (
         least_peak(lambda: ENTRY["_CreatePublishedSchedule"](codes, dates))
         <= 42 * 4 * months + 2 * SLACK
+    )
+
+
+# One print a month, the shape of a monthly index such as Inside FERC's: every row its own
+# month, so the months' codes, their rows and the set they are looked at through are each as
+# long as the schedule, where the weekly schedule's are a quarter of its rows. Measured 14,200
+# bytes at 120 months on 2026-11-24 and 71,948 at 1,200, 118 and 60 bytes a month, which 60 a
+# month covers with eight times the slack.
+def test_a_published_schedule_of_one_print_a_month_pays_for_a_set_of_its_months() -> None:
+    months = 120
+    codes, dates = monthly_columns(months)
+    assert (
+        least_peak(lambda: ENTRY["_CreatePublishedSchedule"](codes, dates))
+        <= 60 * months + 8 * SLACK
     )
 
 
@@ -643,12 +645,8 @@ def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:
 # A Gas Daily calendar keeps the futures calendar's four columns, 18 bytes per day, and pays the
 # arange, the searchsorted and the flags' temporaries the same way, less a business-day look:
 # measured 7,969 bytes at 365 days on 2026-09-25, about 22 bytes per day, and 67,351 at 3,653,
-# 18 bytes per day, which the futures calendar's 25 per day covers. An IFERC calendar keeps one
-# row per month, its copy of the publication days and its rows, and pays one look, the flags
-# and the set its codes are checked through, most of the peak at a small count: measured
-# 10,504 bytes at 120 months and 41,224 at 1,200, 34 bytes per month, which 80 per month covers
-# with twice the slack, as the IFERC fixings' set does.
-def test_the_other_two_calendars_keep_four_columns_per_period() -> None:
+# 18 bytes per day, which the futures calendar's 25 per day covers.
+def test_a_gas_daily_calendar_keeps_four_columns_per_period() -> None:
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     gas_daily = ENTRY["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
     gas_daily_index = an_index(gas_daily)
@@ -656,18 +654,12 @@ def test_the_other_two_calendars_keep_four_columns_per_period() -> None:
         least_peak(lambda: ENTRY["_CreateCalendar"](valuation, gas_daily_index))
         <= 25 * 365 + 2 * SLACK
     )
-    iferc = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
-    iferc_index = an_index(iferc)
-    assert (
-        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, iferc_index)) <= 80 * 120 + 2 * SLACK
-    )
 
 
 # A published calendar makes two flags a print long and nothing else: its dates and each
 # print's month are the schedule's own read-only arrays, held and not copied, and no code is
 # looked at, the schedule's order having been checked when the schedule was made. Measured
-# 1,576 bytes at 480 prints on 2026-11-24 and 10,216 at 4,800, 2 bytes a print, against the
-# 10,504 an IFERC calendar of 120 months pays for its copy, its rows and its set of codes.
+# 1,576 bytes at 480 prints on 2026-11-24 and 10,216 at 4,800, 2 bytes a print.
 def test_a_published_calendar_makes_two_flags_a_print_and_copies_no_column() -> None:
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     months = 120
@@ -766,15 +758,15 @@ def gas_daily_history_sources() -> tuple[object, object]:
     return made, fixings
 
 
-def iferc_history_sources() -> tuple[object, object]:
-    """The two handles an IFERC history takes: the calendar of the ten years of months
-    iferc_columns lays out, valued after the last month's publication day so that every month
-    has fixed, and an index for each of them."""
+def monthly_history_sources() -> tuple[object, object]:
+    """The two handles a history of one print a month takes: the calendar of the ten years of
+    months monthly_columns lays out, valued after the last month's publication day so that
+    every month has fixed, and a price for each of them."""
     valuation = ENTRY["_CreateValuationDate"](49740.0, 0.5)
-    schedule = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
+    schedule = ENTRY["_CreatePublishedSchedule"](*monthly_columns(120))
     index = an_index(schedule)
     made = ENTRY["_CreateCalendar"](valuation, index)
-    fixings = ENTRY["_CreateIfercFixings"](*iferc_fixing_columns(120), index)
+    fixings = ENTRY["_CreatePublishedFixings"](*monthly_fixing_columns(120), index)
     return made, fixings
 
 
@@ -782,20 +774,20 @@ def iferc_history_sources() -> tuple[object, object]:
 # calendar through the valuation day is fixed, so it pays per day what the futures history pays
 # per fixing, the print's row and its inside mask, the days covered, the flags combined and the
 # copied prices: measured 7,404 bytes at 365 days with 254 prints on 2026-09-25, and 95,752 at
-# 3,652 days all fixed, 26 bytes per day, which 30 per day covers with twice the slack. An IFERC
-# history keeps two columns per month and pays the dict its codes are found through, the rows,
-# the two looks and the argsort, most of the peak at a small count: measured 12,544 bytes at 120
-# months and 105,204 at 1,200, 88 bytes per month, which 100 per month covers. Reading either
-# back pays the reader's rectangle as the futures history's does: measured 51,332 at 365 days
-# and 480,153 at 3,652, 26 bytes per cell; 19,091 at 120 months, 32 bytes per cell at that
-# count, and 158,941 at 1,200, 26 per cell.
+# 3,652 days all fixed, 26 bytes per day, which 30 per day covers with twice the slack. A
+# published history of one print a month holds the fixings' own two columns and makes one flag
+# a price: measured 368 bytes at 120 months on 2026-11-24 and 1,448 at 1,200, a byte a month,
+# far under the 100 per month the ceiling allows. Reading either back pays the reader's
+# rectangle as the futures history's does: measured 51,332 at 365 days and 480,153 at 3,652, 26
+# bytes per cell; 19,291 at 120 months, 32 bytes per cell at that count, and 158,901 at 1,200,
+# 26 per cell.
 def test_the_other_two_histories_keep_two_short_columns_and_their_readers_pay_per_cell() -> None:
     days, months = 365, 120
     made, prints = gas_daily_history_sources()
     assert least_peak(lambda: ENTRY["_CreateMarketHistory"](made, prints)) <= 30 * days + 2 * SLACK
     daily = ENTRY["_CreateMarketHistory"](made, prints)
     assert least_peak(lambda: ENTRY["util_ReadHandle"](daily)) <= 30 * 5 * days + 2 * SLACK
-    calendar, indices = iferc_history_sources()
+    calendar, indices = monthly_history_sources()
     assert (
         least_peak(lambda: ENTRY["_CreateMarketHistory"](calendar, indices))
         <= 100 * months + 2 * SLACK
@@ -804,35 +796,14 @@ def test_the_other_two_histories_keep_two_short_columns_and_their_readers_pay_pe
     assert least_peak(lambda: ENTRY["util_ReadHandle"](monthly)) <= 35 * 5 * months + 2 * SLACK
 
 
-def iferc_fixing_columns(count: int) -> tuple[Cells, Cells]:
-    """That many contract months' indices as the sheet sends them, the newest month in the first
-    row: the codes of schedule_columns from the last back to the first, since the schedule's
-    publication days increase down the column, and a price beside each."""
+def monthly_fixing_columns(count: int) -> tuple[Cells, Cells]:
+    """That many months' prices as the sheet sends them, the newest month in the first row:
+    the publication dates of monthly_columns from the last back to the first, and a price
+    beside each."""
     newest_first = range(count - 1, -1, -1)
     return (
-        Cells.from_rows([[f"c{i}"] for i in newest_first]),
+        Cells.from_rows([[46162.0 + 30 * i] for i in newest_first]),
         Cells.from_rows([[2.0 + i / 100] for i in newest_first]),
-    )
-
-
-# IFERC fixings keep the codes as a tuple the other way up and a copy of the price column, 8
-# bytes per month each, and on the way pay the set of the index's months the codes are struck
-# off, one set checking membership and repeats alike, then the dict of the months' rows, the
-# rows of the codes' months as a list and an array, the publication days gathered through it
-# and the mask of the look at their order: measured 10,600 bytes at 120 months on 2026-09-24
-# with the set alone, and 15,191 on 2026-10-06 with the order rule of #147, about 127 bytes per
-# month at that size on top of a creator's small objects, which 120 per month covers with twice
-# the slack; 42,888 at 1,200 before and 115,931 after, 97 bytes per month, the dict and the set
-# growing slower than the count. Reading the fixings back was 6,197 bytes at 120 months before
-# and after, the tuple turned over costing nothing the reader's own temporaries did not already
-# reach.
-def test_iferc_fixings_keep_a_copy_of_their_prices_and_the_codes_the_other_way_up() -> None:
-    count = 120
-    codes, prices = iferc_fixing_columns(count)
-    index = an_index(ENTRY["_CreateIfercSchedule"](*iferc_columns(count)))
-    assert (
-        least_peak(lambda: ENTRY["_CreateIfercFixings"](codes, prices, index))
-        <= 120 * count + 2 * SLACK
     )
 
 
@@ -939,16 +910,16 @@ def gas_daily_market_sources() -> tuple[object, object]:
     )
 
 
-def iferc_market_sources(months: int = 120) -> tuple[object, object]:
-    """The two handles an IFERC market takes: the calendar of that many months as iferc_columns
-    lays them out, ten years unless more are asked for, valued on 11 September 2026 with four
-    months published and an index for each, and a vector of one quote per month still to
-    publish, 116 over the ten years."""
+def monthly_market_sources(months: int = 120) -> tuple[object, object]:
+    """The two handles a market of one print a month takes: the calendar of that many months as
+    monthly_columns lays them out, ten years unless more are asked for, valued on 11 September
+    2026 with four months published and a price for each, and a vector of one quote per month
+    still to publish, 116 over the ten years."""
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
-    schedule = ENTRY["_CreateIfercSchedule"](*iferc_columns(months))
+    schedule = ENTRY["_CreatePublishedSchedule"](*monthly_columns(months))
     index = an_index(schedule)
     made = ENTRY["_CreateCalendar"](valuation, index)
-    fixings = ENTRY["_CreateIfercFixings"](*iferc_fixing_columns(4), index)
+    fixings = ENTRY["_CreatePublishedFixings"](*monthly_fixing_columns(4), index)
     history = ENTRY["_CreateMarketHistory"](made, fixings)
     return history, ENTRY["_CreatePriceVector"](
         "sample", Cells.from_rows([[2.0 + i] for i in range(months - 4)])
@@ -959,8 +930,8 @@ def iferc_market_sources(months: int = 120) -> tuple[object, object]:
 # years of months with 116, the row of the first unfixed period read off the calendar.
 @pytest.mark.parametrize(
     "sources",
-    [gas_daily_market_sources, iferc_market_sources],
-    ids=["a Gas Daily market", "an IFERC market"],
+    [gas_daily_market_sources, monthly_market_sources],
+    ids=["a Gas Daily market", "a market of one print a month"],
 )
 def test_a_market_over_the_other_two_calendars_keeps_the_same_record(
     sources: Callable[[], tuple[object, object]],
@@ -972,17 +943,18 @@ def test_a_market_over_the_other_two_calendars_keeps_the_same_record(
 # Reading a market back pays the calendar's table and then the fifth column through the
 # history's helper, with the live rows, their prompts and their quotes on top: measured 50,931
 # bytes at 360 days on 2026-09-19, about 28 bytes per cell, and 501,307 at 3,600. A Gas Daily
-# market reads back the same way, 48,612 bytes at 365 days on 2026-09-25, 27 per cell, and an
-# IFERC market 20,163 at 120 months, 34 bytes per cell at that small count. Measured again on
-# 2026-10-02, when the reader began to stop at the last row the quotes cover: 50,789, 501,165,
-# 48,468 and 20,107, each 80 bytes above the build before it, 48 for IFERC, none of it per row.
+# market reads back the same way, 48,612 bytes at 365 days on 2026-09-25, 27 per cell. Measured
+# again on 2026-10-02, when the reader began to stop at the last row the quotes cover: 50,789,
+# 501,165 and 48,468, each 80 bytes above the build before it, none of it per row. A published
+# market of one print a month reads back in 20,363 bytes at 120 months, measured on 2026-11-24,
+# 34 bytes per cell at that small count.
 def test_reading_a_market_back_pays_per_cell() -> None:
     days, months = 360, 120
     made = ENTRY["_CreateMarket"](*market_sources(13, 30))
     assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 30 * 5 * days + 2 * SLACK
     daily = ENTRY["_CreateMarket"](*gas_daily_market_sources())
     assert least_peak(lambda: ENTRY["util_ReadHandle"](daily)) <= 30 * 5 * 365 + 2 * SLACK
-    monthly = ENTRY["_CreateMarket"](*iferc_market_sources())
+    monthly = ENTRY["_CreateMarket"](*monthly_market_sources())
     assert least_peak(lambda: ENTRY["util_ReadHandle"](monthly)) <= 35 * 5 * months + 2 * SLACK
 
 
@@ -1001,10 +973,10 @@ def a_short_vector(quotes: int) -> object:
 # schedule, eight bytes a month, would stand above the ceiling. Measured on 2026-10-02: one
 # quote over a hundred years of days, 120 rows covered of 36,000, reads back in 17,907
 # bytes, the same to the byte as over one year of days; a Gas Daily market with the balance of
-# September alone, 273 rows of 365, in 36,094; an IFERC market with one quote over a
-# hundred years of months, 5 rows of 1,200, in 4,922, most of it the reader's fixed
-# cost; and one with 56 quotes of 116, 60 rows of 120, in 12,247, 41 bytes per
-# cell at that small count, where the whole takes 20,107.
+# September alone, 273 rows of 365, in 36,094. Measured on 2026-11-24: a published market of
+# one print a month with one quote over a hundred years of months, 5 rows of 1,200, in 5,178,
+# most of it the reader's fixed cost; and one with 56 quotes of 116, 60 rows of 120, in 12,503,
+# 42 bytes per cell at that small count, where the whole takes 20,363.
 def test_a_market_stopping_early_is_read_back_for_the_rows_it_covers() -> None:
     covered = 120  # the days from 20 May 2026 through the first quoted contract's expiry
     quote = a_short_vector(1)
@@ -1019,11 +991,11 @@ def test_a_market_stopping_early_is_read_back_for_the_rows_it_covers() -> None:
     gas_daily, _ = gas_daily_market_sources()
     balance = ENTRY["_CreateMarket"](gas_daily, quote)
     assert least_peak(lambda: ENTRY["util_ReadHandle"](balance)) <= 30 * 5 * 273 + 2 * SLACK
-    months, _ = iferc_market_sources(1200)
+    months, _ = monthly_market_sources(1200)
     one_month = ENTRY["_CreateMarket"](months, quote)
     assert least_peak(lambda: ENTRY["util_ReadHandle"](one_month)) <= 6 * SLACK
-    iferc, _ = iferc_market_sources()
-    half = ENTRY["_CreateMarket"](iferc, a_short_vector(56))
+    monthly, _ = monthly_market_sources()
+    half = ENTRY["_CreateMarket"](monthly, a_short_vector(56))
     assert least_peak(lambda: ENTRY["util_ReadHandle"](half)) <= 40 * 5 * 60 + 2 * SLACK
 
 

@@ -317,11 +317,11 @@ def test_a_handle_of_another_kind_in_either_slot_is_refused_by_name() -> None:
     # which names what it is.
     assert bridge.call("_CreateMarketHistory", [calendar, calendar]) == (
         "#ERROR _CreateMarketHistory: ValueError: fixings is a calendar, "
-        "expected futures, IFERC, Gas Daily or published fixings"
+        "expected futures, Gas Daily or published fixings"
     )
     assert bridge.call("_CreateMarketHistory", [calendar, made]) == (
         "#ERROR _CreateMarketHistory: ValueError: fixings is a market history, "
-        "expected futures, IFERC, Gas Daily or published fixings"
+        "expected futures, Gas Daily or published fixings"
     )
 
 
@@ -730,8 +730,8 @@ def test_a_dead_market_handle_cannot_be_read() -> None:
 
 # --- the two other histories through the seam ---------------------------------------------
 
-# Serials for the schedule pages' samples: the Gas Daily months' first and last days, the IFERC
-# months' last trading and publication days, and the valuation dates 25 September and 15
+# Serials for the schedule pages' samples: the Gas Daily months' first and last days, the monthly
+# published index's last trading and publication days, and the valuation dates 25 September and 15
 # November 2026.
 SEP_1, SEP_25, SEP_30, OCT_1, OCT_31 = 46266.0, 46290.0, 46295.0, 46296.0, 46326.0
 NOV_1, NOV_30, OCT_30, NOV_2, NOV_15, DEC_1 = 46327.0, 46356.0, 46325.0, 46328.0, 46341.0, 46357.0
@@ -765,26 +765,31 @@ def prints_through(first: float, last: float) -> str:
 
 
 @functools.cache
-def the_iferc_index() -> str:
-    """The IFERC index of the schedule page's three months, made once."""
+def the_monthly_index() -> str:
+    """The published index of three months of one print each, Inside FERC's monthly index,
+    made once."""
     schedule = bridge.call(
-        "_CreateIfercSchedule",
+        "_CreatePublishedSchedule",
         [column("V26", "X26", "Z26"), column(OCT_1, NOV_2, DEC_1)],
     )
     return an_index(schedule, MISSING, "Henry Hub IFERC")
 
 
-def an_iferc_calendar(as_of: float = NOV_15) -> str:
-    text = bridge.call("_CreateCalendar", [a_valuation(as_of), the_iferc_index()])
+def a_monthly_calendar(as_of: float = NOV_15) -> str:
+    text = bridge.call("_CreateCalendar", [a_valuation(as_of), the_monthly_index()])
     assert isinstance(text, str) and text.startswith(f"{PID}:calendar:"), text
     return text
 
 
+PUBLISHED_ON = {"V26": OCT_1, "X26": NOV_2, "Z26": DEC_1}
+
+
 def indices_for(*pairs: tuple[str, float]) -> str:
-    codes = column(*(code for code, _ in pairs))
+    """The monthly index's fixings for those months, each entered by its publication date."""
+    published = column(*(PUBLISHED_ON[code] for code, _ in pairs))
     prices = column(*(price for _, price in pairs))
-    text = bridge.call("_CreateIfercFixings", [codes, prices, the_iferc_index()])
-    assert isinstance(text, str) and text.startswith(f"{PID}:iferc_fixings:"), text
+    text = bridge.call("_CreatePublishedFixings", [published, prices, the_monthly_index()])
+    assert isinstance(text, str) and text.startswith(f"{PID}:published_fixings:"), text
     return text
 
 
@@ -806,9 +811,9 @@ def test_a_gas_daily_history_is_created_from_two_handles_and_read_back_day_by_da
     assert (kinds[2:27, 4] == NUMBER_CODE).all() and (kinds[27:, 4] == TEXT_CODE).all()
 
 
-def test_an_iferc_history_is_created_from_two_handles_and_read_back_month_by_month() -> None:
+def test_a_monthly_history_is_created_from_two_handles_and_read_back_month_by_month() -> None:
     made = bridge.call(
-        "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
+        "_CreateMarketHistory", [a_monthly_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
     )
     assert isinstance(made, str) and HANDLE.fullmatch(made), made
     assert rows(read(made)) == [
@@ -824,22 +829,22 @@ def test_an_iferc_history_is_created_from_two_handles_and_read_back_month_by_mon
 
 def test_fixings_over_another_index_are_refused_through_the_seam() -> None:
     futures, gas_daily = the_fixings(), prints_through(SEP_1, SEP_25)
-    iferc = indices_for(("V26", 1.85))
+    monthly = indices_for(("V26", 1.85))
     assert bridge.call("_CreateMarketHistory", [a_calendar(), gas_daily]) == (
         "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, "
         "'Henry Hub Gas Daily', expected the calendar's, 'WTI NYMEX'"
     )
-    assert bridge.call("_CreateMarketHistory", [a_gas_daily_calendar(), iferc]) == (
+    assert bridge.call("_CreateMarketHistory", [a_gas_daily_calendar(), monthly]) == (
         "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, "
         "'Henry Hub IFERC', expected the calendar's, 'Henry Hub Gas Daily'"
     )
-    assert bridge.call("_CreateMarketHistory", [an_iferc_calendar(), futures]) == (
+    assert bridge.call("_CreateMarketHistory", [a_monthly_calendar(), futures]) == (
         "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, "
         "'WTI NYMEX', expected the calendar's, 'Henry Hub IFERC'"
     )
     assert bridge.call("_CreateMarketHistory", [a_calendar(), a_holiday_calendar(MAY_25)]) == (
         "#ERROR _CreateMarketHistory: ValueError: fixings is a holiday calendar, "
-        "expected futures, IFERC, Gas Daily or published fixings"
+        "expected futures, Gas Daily or published fixings"
     )
 
 
@@ -858,16 +863,18 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words() -> None:
     )
     assert bridge.call(
         "_CreateMarketHistory",
-        [an_iferc_calendar(), indices_for(("Z26", 2.2), ("X26", 2.10), ("V26", 1.85))],
+        [a_monthly_calendar(), indices_for(("Z26", 2.2), ("X26", 2.10), ("V26", 1.85))],
     ) == (
-        "#ERROR _CreateMarketHistory: ValueError: fixings contract_code 'Z26' is a month not "
-        "yet fixed in calendar, expected an index for fixed months alone"
+        "#ERROR _CreateMarketHistory: ValueError: fixings publication_date 2026-12-01 is a "
+        "print not yet fixed in calendar, expected a price for fixed prints alone; a print is "
+        "fixed from the day after its date"
     )
     assert bridge.call(
-        "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("V26", 1.85))]
+        "_CreateMarketHistory", [a_monthly_calendar(), indices_for(("V26", 1.85))]
     ) == (
-        "#ERROR _CreateMarketHistory: ValueError: fixings has no index for X26, "
-        "expected an index for every fixed month in calendar"
+        "#ERROR _CreateMarketHistory: ValueError: fixings has no price for the print dated "
+        "2026-11-02, expected a price for every fixed print in calendar, a stand-in where its "
+        "publisher has not released it"
     )
 
 
@@ -905,9 +912,9 @@ def test_a_gas_daily_market_is_created_from_two_handles_and_read_back_day_by_day
     assert "unfixed" not in {row[4] for row in shown[2:]}
 
 
-def test_an_iferc_market_is_created_from_two_handles_and_read_back_month_by_month() -> None:
+def test_a_monthly_market_is_created_from_two_handles_and_read_back_month_by_month() -> None:
     history = bridge.call(
-        "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
+        "_CreateMarketHistory", [a_monthly_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
     )
     made = a_market(cast(str, history), a_vector(2.20, name="Henry Hub IFERC"))
     assert cast(str, history).startswith(f"{PID}:market_history:Henry Hub IFERC:")
@@ -945,14 +952,14 @@ def test_a_gas_daily_market_is_read_back_through_the_last_month_quoted() -> None
     assert {row[1] for row in two[2:]} == {"U26", "V26"}
 
 
-# The IFERC sample valued on 2 October, October's index published and two months to come, with
+# The monthly sample valued on 2 October, October's price published and two months to come, with
 # November's quote alone: one row per month through November, and December is not a row; with
 # both quotes December is the last.
-def test_an_iferc_market_is_read_back_through_the_last_month_quoted() -> None:
+def test_a_monthly_market_is_read_back_through_the_last_month_quoted() -> None:
     history = cast(
         str,
         bridge.call(
-            "_CreateMarketHistory", [an_iferc_calendar(OCT_1 + 1), indices_for(("V26", 1.85))]
+            "_CreateMarketHistory", [a_monthly_calendar(OCT_1 + 1), indices_for(("V26", 1.85))]
         ),
     )
     made = a_market(history, a_vector(2.10, name="Henry Hub IFERC"))
@@ -994,13 +1001,16 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words_for_the_mar
         "#ERROR _CreateMarket: ValueError: market_history has no unfixed period, "
         "expected at least one to quote"
     )
-    iferc = cast(
+    monthly = cast(
         str,
         bridge.call(
-            "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
+            "_CreateMarketHistory",
+            [a_monthly_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))],
         ),
     )
-    assert bridge.call("_CreateMarket", [iferc, a_vector(2.10, 2.20, name="Henry Hub IFERC")]) == (
+    assert bridge.call(
+        "_CreateMarket", [monthly, a_vector(2.10, 2.20, name="Henry Hub IFERC")]
+    ) == (
         "#ERROR _CreateMarket: ValueError: price_vector has 2 prices, expected at most 1, "
         "one per contract from 'Z26' through 'Z26'"
     )
@@ -1009,7 +1019,7 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words_for_the_mar
         bridge.call(
             "_CreateMarketHistory",
             [
-                an_iferc_calendar(DEC_1 + 14),
+                a_monthly_calendar(DEC_1 + 14),
                 indices_for(("Z26", 2.2), ("X26", 2.10), ("V26", 1.85)),
             ],
         ),
@@ -1036,15 +1046,15 @@ def test_a_vector_named_for_another_index_reaches_the_sheet_in_the_librarys_word
     gas_daily = bridge.call(
         "_CreateMarketHistory", [a_gas_daily_calendar(), prints_through(SEP_1, SEP_25)]
     )
-    iferc = bridge.call(
-        "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
+    monthly = bridge.call(
+        "_CreateMarketHistory", [a_monthly_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
     )
     assert bridge.call("_CreateMarket", [gas_daily, a_vector(2.20, name="Henry Hub IFERC")]) == (
         "#ERROR _CreateMarket: ValueError: price_vector names index 'Henry Hub IFERC', "
         "expected market_history's index 'Henry Hub Gas Daily'"
     )
     assert bridge.call(
-        "_CreateMarket", [iferc, a_vector(2.95, 3.10, 3.40, name="Henry Hub Gas Daily")]
+        "_CreateMarket", [monthly, a_vector(2.95, 3.10, 3.40, name="Henry Hub Gas Daily")]
     ) == (
         "#ERROR _CreateMarket: ValueError: price_vector names index 'Henry Hub Gas Daily', "
         "expected market_history's index 'Henry Hub IFERC'"
@@ -1177,6 +1187,6 @@ def test_published_fixings_of_another_index_and_of_another_kind_are_refused() ->
         "expected the calendar's, 'WTI NYMEX'"
     )
     assert bridge.call("_CreateMarketHistory", [a_diesel_calendar(), a_diesel_calendar()]) == (
-        "#ERROR _CreateMarketHistory: ValueError: fixings is a calendar, expected futures, IFERC, "
+        "#ERROR _CreateMarketHistory: ValueError: fixings is a calendar, expected futures, "
         "Gas Daily or published fixings"
     )

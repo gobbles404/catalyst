@@ -66,7 +66,6 @@ from catalyst.market.market import Market
 from catalyst.market.market_history import MarketHistory
 from catalyst.market_data.futures_fixings import FuturesFixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings
-from catalyst.market_data.iferc_fixings import IfercFixings
 from catalyst.market_data.price_vector import PriceVector
 from catalyst.market_data.published_fixings import PublishedFixings
 from catalyst.quoting.rfq import Rfq
@@ -1484,7 +1483,6 @@ _NAMED: Final[dict[type[object], str]] = {
     Index: "name",
     Calendar: "index.name",
     FuturesFixings: "index.name",
-    IfercFixings: "index.name",
     GasDailyFixings: "index.name",
     PublishedFixings: "index.name",
     MarketHistory: "calendar.index.name",

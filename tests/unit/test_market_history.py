@@ -16,14 +16,12 @@ from catalyst.index_definitions.contract_specifications import contract_specific
 from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.market.market_history import MarketHistory, market_history
 from catalyst.market_data.futures_fixings import FuturesFixings, futures_fixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings, gas_daily_fixings
-from catalyst.market_data.iferc_fixings import IfercFixings, iferc_fixings
 from catalyst.market_data.published_fixings import PublishedFixings, published_fixings
 
 
@@ -563,103 +561,6 @@ def test_a_gas_daily_history_that_cannot_be_made_says_why(
     assert str(failure.value) == message
 
 
-# --- an IFERC calendar and its indices ----------------------------------------------------
-
-
-IFERC_SCHEDULE = iferc_schedule(
-    ("V26", "X26", "Z26"), dates("2026-10-01", "2026-11-02", "2026-12-01")
-)
-
-
-IFERC_INDEX = an_index(IFERC_SCHEDULE, None, "Henry Hub IFERC")
-
-
-def an_iferc_calendar(as_of: str = "2026-11-15") -> Calendar:
-    """The IFERC index's calendar, the schedule page's three months, valued on the given day."""
-    return calendar(valuation_date(day(as_of), 0.5), IFERC_INDEX)
-
-
-def indices_for(*pairs: tuple[str, float], over: Index = IFERC_INDEX) -> IfercFixings:
-    codes = tuple(code for code, _ in pairs)
-    prices = np.array([price for _, price in pairs], dtype=np.float64)
-    return iferc_fixings(codes, prices, over)
-
-
-IFERC = an_iferc_calendar()
-
-
-# The page's sample, the months as the desk keeps them, the newest in the first row, and
-# kept oldest first by their creator: the history's rows and prices run in the calendar's
-# order, October then November.
-def test_the_iferc_sample_prices_the_published_months_and_no_other() -> None:
-    made = market_history(IFERC, indices_for(("X26", 2.10), ("V26", 1.85)))
-    assert made.calendar is IFERC
-    assert made.fixed_rows.tolist() == [0, 1]
-    assert made.fixing_prices[:, 0].tolist() == [1.85, 2.10]
-
-
-def test_an_iferc_calendar_of_one_month_and_one_with_nothing_published() -> None:
-    october = an_index(iferc_schedule(("V26",), dates("2026-10-01")), None)
-    one = calendar(valuation_date(day("2026-11-15"), 0.5), october)
-    made = market_history(one, indices_for(("V26", 1.85), over=october))
-    assert made.fixed_rows.tolist() == [0] and made.fixing_prices[:, 0].tolist() == [1.85]
-    nothing = market_history(
-        an_iferc_calendar("2026-09-15"),
-        iferc_fixings((), np.array([], dtype=np.float64), IFERC_INDEX),
-    )
-    assert nothing.fixed_rows.size == 0 and nothing.fixing_prices.size == 0
-
-
-def test_an_index_for_the_month_published_on_the_valuation_day_is_refused() -> None:
-    with pytest.raises(ValueError) as failure:
-        market_history(an_iferc_calendar("2026-11-02"), indices_for(("X26", 2.10), ("V26", 1.85)))
-    assert str(failure.value) == (
-        "fixings contract_code 'X26' is a month not yet fixed in calendar, "
-        "expected an index for fixed months alone"
-    )
-    the_day_after = market_history(
-        an_iferc_calendar("2026-11-03"), indices_for(("X26", 2.10), ("V26", 1.85))
-    )
-    assert the_day_after.fixed_rows.tolist() == [0, 1]
-
-
-@pytest.mark.parametrize(
-    ("pairs", "message"),
-    [
-        (
-            (("Z26", 2.20), ("X26", 2.10), ("V26", 1.85)),
-            "fixings contract_code 'Z26' is a month not yet fixed in calendar, "
-            "expected an index for fixed months alone",
-        ),
-        (
-            (("V26", 1.85),),
-            "fixings has no index for X26, expected an index for every fixed month in calendar",
-        ),
-        (
-            (("X26", 2.10),),
-            "fixings has no index for V26, expected an index for every fixed month in calendar",
-        ),
-        (
-            (("Z26", 2.20), ("V26", 1.85)),
-            "fixings contract_code 'Z26' is a month not yet fixed in calendar, "
-            "expected an index for fixed months alone",
-        ),
-    ],
-    ids=[
-        "an index for a month not yet fixed",
-        "the second fixed month without an index",
-        "the first fixed month without an index",
-        "the fixed months are checked before the missing ones",
-    ],
-)
-def test_an_iferc_history_that_cannot_be_made_says_why(
-    pairs: tuple[tuple[str, float], ...], message: str
-) -> None:
-    with pytest.raises(ValueError) as failure:
-        market_history(IFERC, indices_for(*pairs))
-    assert str(failure.value) == message
-
-
 # --- a published calendar and its prints' prices -------------------------------------------
 
 
@@ -856,16 +757,16 @@ def test_a_late_fixing_is_named_by_the_earliest_date_whichever_row_it_was_given_
 
 def test_fixings_over_another_index_are_refused_naming_both() -> None:
     gas_daily = prints_on("2026-09-01", "2026-09-25")
-    iferc = indices_for(("V26", 1.85))
+    published = priced_on(*THREE_PRICES)
     same_name = an_index(SCHEDULE, CLOSED_MAY_25)
     other_name = an_index(SCHEDULE, CLOSED_MAY_25, "Brent ICE")
     for made, fixings, arrived, expected in (
         (CALENDAR, gas_daily, "Henry Hub Gas Daily", "WTI NYMEX"),
-        (CALENDAR, iferc, "Henry Hub IFERC", "WTI NYMEX"),
+        (CALENDAR, published, "DOE Diesel", "WTI NYMEX"),
         (GAS_DAILY, FIXINGS, "WTI NYMEX", "Henry Hub Gas Daily"),
-        (GAS_DAILY, iferc, "Henry Hub IFERC", "Henry Hub Gas Daily"),
-        (IFERC, FIXINGS, "WTI NYMEX", "Henry Hub IFERC"),
-        (IFERC, gas_daily, "Henry Hub Gas Daily", "Henry Hub IFERC"),
+        (GAS_DAILY, published, "DOE Diesel", "Henry Hub Gas Daily"),
+        (PUBLISHED, FIXINGS, "WTI NYMEX", "DOE Diesel"),
+        (PUBLISHED, gas_daily, "Henry Hub Gas Daily", "DOE Diesel"),
         (
             CALENDAR,
             fixings_on("2026-05-20", "2026-05-21", "2026-05-22", over=other_name),
@@ -931,7 +832,7 @@ def test_an_object_that_is_not_fixings_is_refused_naming_what_it_is() -> None:
         with pytest.raises(ValueError) as failure:
             market_history(CALENDAR, wrong)
         assert str(failure.value) == (
-            f"fixings is {what}, expected futures, IFERC, Gas Daily or published fixings"
+            f"fixings is {what}, expected futures, Gas Daily or published fixings"
         )
 
 
@@ -973,7 +874,7 @@ def test_every_fixed_flow_day_takes_its_own_print_and_no_other_day_takes_one(
 
 @settings(deadline=None)
 @given(data=st.data())
-def test_every_fixed_month_takes_its_own_index_in_the_calendars_order(
+def test_every_fixed_month_of_one_print_takes_its_own_price_in_the_calendars_order(
     data: st.DataObject,
 ) -> None:
     count = data.draw(st.integers(1, 8))
@@ -985,13 +886,13 @@ def test_every_fixed_month_takes_its_own_index_in_the_calendars_order(
     )
     published = start + np.cumsum(gaps).astype("timedelta64[D]")
     codes = tuple(f"c{i}" for i in range(count))
-    schedule = iferc_schedule(codes, published)
+    schedule = published_schedule(codes, published)
     as_of = start + np.timedelta64(data.draw(st.integers(-10, int(gaps.sum()) + 10)), "D")
     made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     fixed = np.flatnonzero(made.is_fixed).tolist()
     newest_first = fixed[::-1]  # as the desk keeps them, the one order the creator takes
-    fixings = iferc_fixings(
-        tuple(codes[i] for i in newest_first),
+    fixings = published_fixings(
+        published[newest_first],
         np.array([100.0 + i for i in newest_first], dtype=np.float64),
         made.index,
     )

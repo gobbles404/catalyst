@@ -16,13 +16,11 @@ from catalyst.excel.bridge import (
     Handle,
     NumberArray,
     NumberColumn,
-    TextColumn,
     excel_function,
 )
 from catalyst.index_definitions.index import Index
 from catalyst.market_data.futures_fixings import FuturesFixings, futures_fixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings, gas_daily_fixings
-from catalyst.market_data.iferc_fixings import IfercFixings, iferc_fixings
 from catalyst.market_data.price_vector import PriceVector, price_vector
 from catalyst.market_data.published_fixings import PublishedFixings, published_fixings
 
@@ -31,7 +29,6 @@ from catalyst.market_data.published_fixings import PublishedFixings, published_f
 __all__ = [
     "_CreateFuturesFixings",
     "_CreateGasDailyFixings",
-    "_CreateIfercFixings",
     "_CreatePriceVector",
     "_CreatePublishedFixings",
 ]
@@ -59,30 +56,6 @@ def _CreateFuturesFixings(
     column for each nearby contract, checked against the holiday calendar of its index, and
     shows its handle, the text other formulas take as the fixings."""
     return futures_fixings(date, settle, index)
-
-
-@excel_function
-def _CreateIfercFixings(
-    contract_code: Annotated[
-        TextColumn,
-        "The column of contract codes, newest first, such as A2:A5 holding J26 down to F26, "
-        "one per month published.",
-    ],
-    price: Annotated[
-        NumberColumn,
-        "The column of published indices beside the codes, such as B2:B5, one per code.",
-    ],
-    index: Annotated[
-        Handle[Index],
-        "The index handle: the cell showing _CreateIndex's result, such as F3, or a name for "
-        "it; an IFERC index, whose months the codes are checked against and whose schedule says "
-        "the day each printed.",
-    ],
-) -> Handle[IfercFixings]:
-    """Creates the IFERC fixings of one index from the contract months whose index has been
-    published, newest first, and the index printed for each, checked against the months of its
-    index, and shows its handle, the text other formulas take as the fixings."""
-    return iferc_fixings(contract_code, price, index)
 
 
 @excel_function

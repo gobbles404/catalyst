@@ -56,8 +56,9 @@ def quote(
     months and _QuoteByDates prices a window, and its basis month or calday, the kernel's rule;
     the collection is supplied for a bilateral quote and left out for a cleared one, under
     either pricing, the key bound to the curve of that exact name and the curve starting on the
-    valuation day; the market's index takes the terms, a futures index the four methods and an
-    IFERC index lastday with a financial settlement, a physical settlement lastday alone; the
+    valuation day; the market's index takes the terms, a futures index the four methods and a
+    published index asian, or lastday on a month of one print, with a financial settlement, a
+    physical settlement lastday alone; the
     period, a label or since balance-of-period-quotes.md the balance of one from the valuation
     day, every month of it a contract of the schedule; the observations and their pricing
     contracts by the pipeline's rules; a financial quote's payments, the template's date on

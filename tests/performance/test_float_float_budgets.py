@@ -6,7 +6,7 @@ the pair's functions, its own rules and, since float-float-units.md, the handful
 its spread price's unit and makes that unit's coefficient at creation, the same at one row and
 at many; after creation the pair's functions and numpy calls and none more; and it holds a
 pair's memory at each step to the slack the seam allows. The indexes and the rows are the pair
-budgets' own: A a futures index, B an IFERC one."""
+budgets' own: A a futures index, B a published one of one print a month."""
 
 from collections.abc import Callable, Mapping
 

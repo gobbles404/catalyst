@@ -308,8 +308,8 @@ def test_a_dead_calendar_handle_cannot_be_read() -> None:
 
 # Serials for the two schedule pages' samples: 1 September, 30 September, 1 October, 31 October,
 # 1 November and 30 November 2026 for the Gas Daily months; the last trading and publication
-# days of the IFERC months, 30 September and 1 October, 30 October and 2 November, 30 November
-# and 1 December 2026; and the valuation dates 25 September and 15 November 2026.
+# days of a monthly published index, 30 September and 1 October, 30 October and 2 November,
+# 30 November and 1 December 2026; and the valuation dates 25 September and 15 November 2026.
 SEP_1, SEP_30, OCT_1, OCT_31, NOV_1, NOV_30 = 46266.0, 46295.0, 46296.0, 46326.0, 46327.0, 46356.0
 OCT_30, NOV_2, DEC_1 = 46325.0, 46328.0, 46357.0
 SEP_25, NOV_15 = 46290.0, 46341.0
@@ -324,12 +324,12 @@ def a_gas_daily_schedule() -> str:
     return text
 
 
-def an_iferc_schedule() -> str:
+def a_monthly_schedule() -> str:
     text = bridge.call(
-        "_CreateIfercSchedule",
+        "_CreatePublishedSchedule",
         [column("V26", "X26", "Z26"), column(OCT_1, NOV_2, DEC_1)],
     )
-    assert isinstance(text, str) and text.startswith(f"{PID}:iferc_schedule:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:published_schedule:"), text
     return text
 
 
@@ -337,8 +337,8 @@ def a_gas_daily_calendar() -> str:
     return a_calendar(a_valuation(SEP_25), an_index(a_gas_daily_schedule()))
 
 
-def an_iferc_calendar() -> str:
-    return a_calendar(a_valuation(NOV_15), an_index(an_iferc_schedule()))
+def a_monthly_calendar() -> str:
+    return a_calendar(a_valuation(NOV_15), an_index(a_monthly_schedule()))
 
 
 def test_a_gas_daily_calendar_is_created_from_two_handles_and_read_back_day_by_day() -> None:
@@ -354,8 +354,8 @@ def test_a_gas_daily_calendar_is_created_from_two_handles_and_read_back_day_by_d
     assert [row[0] for row in shown[2:]] == [SEP_1 + i for i in range(91)]
 
 
-def test_an_iferc_calendar_is_created_from_two_handles_and_read_back_month_by_month() -> None:
-    assert rows(read(an_iferc_calendar())) == [
+def test_a_monthly_calendar_is_created_from_two_handles_and_read_back_month_by_month() -> None:
+    assert rows(read(a_monthly_calendar())) == [
         HEADERS,
         TYPES,
         [OCT_1, "V26", 1.0, 1.0],
@@ -365,7 +365,7 @@ def test_an_iferc_calendar_is_created_from_two_handles_and_read_back_month_by_mo
 
 
 def test_the_flags_of_the_two_other_kinds_reach_the_sheet_as_booleans() -> None:
-    for made in (a_gas_daily_calendar(), an_iferc_calendar()):
+    for made in (a_gas_daily_calendar(), a_monthly_calendar()):
         kinds, _, _ = read(made)
         assert (kinds[:2] == TEXT_CODE).all()
         assert (kinds[2:, 0] == NUMBER_CODE).all()
@@ -373,7 +373,7 @@ def test_the_flags_of_the_two_other_kinds_reach_the_sheet_as_booleans() -> None:
         assert (kinds[2:, 2:] == BOOLEAN_CODE).all()
 
 
-def test_a_gas_daily_gap_and_iferc_months_out_of_order_are_refused_in_the_librarys_words() -> None:
+def test_a_gas_daily_gap_is_refused_in_the_librarys_words() -> None:
     gapped = bridge.call(
         "_CreateGasDailySchedule",
         [column("U26", "V26"), column(SEP_1, OCT_1 + 1), column(SEP_30, OCT_31)],
@@ -381,14 +381,6 @@ def test_a_gas_daily_gap_and_iferc_months_out_of_order_are_refused_in_the_librar
     assert bridge.call("_CreateCalendar", [a_valuation(SEP_25), an_index(gapped)]) == (
         "#ERROR _CreateCalendar: ValueError: first_date row 2 is 2026-10-02, "
         "expected 2026-10-01, the day after row 1's last_date 2026-09-30"
-    )
-    backwards = bridge.call(
-        "_CreateIfercSchedule",
-        [column("X26", "V26"), column(NOV_2, OCT_1)],
-    )
-    assert bridge.call("_CreateCalendar", [a_valuation(NOV_15), an_index(backwards)]) == (
-        "#ERROR _CreateCalendar: ValueError: publication_date row 2 is 2026-10-01, "
-        "expected a date after row 1's 2026-11-02"
     )
 
 
