@@ -289,7 +289,7 @@ def on_the_sheet() -> tuple[object, object, object, object, object]:
         column(serial("2026-12-15"), serial("2027-01-29"), serial("2027-02-26")),
         bridge.MISSING,
     )
-    holidays = PATH["_CreateHolidayCalendar"](column(serial("2027-01-01")))
+    holidays = PATH["_CreateHolidayCalendar"](column(serial("2027-01-01")), bridge.MISSING)
     conventions = PATH["_CreateIndexConventions"]("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL")
     specifications = PATH["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
@@ -306,7 +306,7 @@ def on_the_sheet() -> tuple[object, object, object, object, object]:
     )
     history = PATH["_CreateMarketHistory"](PATH["_CreateCalendar"](date, ix), fixings)
     market = PATH["_CreateMarket"](history, PATH["_CreatePriceVector"]("SEAM", column(1.0, 1.2)))
-    weekends = PATH["_CreateHolidayCalendar"](column(serial("2030-01-01")))
+    weekends = PATH["_CreateHolidayCalendar"](column(serial("2030-01-01")), bridge.MISSING)
     template = PATH["_CreateQuoteTemplate"](
         "fixed_float",
         row(

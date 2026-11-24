@@ -51,7 +51,7 @@ def sheet() -> dict[str, Any]:
         column([serial(d) for d in EXPIRIES]),
         bridge.MISSING,
     )
-    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]))
+    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]), bridge.MISSING)
     conventions = PATH["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specifications = PATH["_CreateContractSpecifications"](
         Cells.from_rows(
@@ -133,7 +133,7 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
     """The sheet's batch made bilateral, since #177: the same fields with a counterparty for the
     clearing house and the route bilateral, and a curve anchored on the valuation day running to
     the end of 2028 at 0.9, past every payment."""
-    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]))
+    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]), bridge.MISSING)
     fields = [
         "quantity_unit",
         "quantity_per",
@@ -661,7 +661,7 @@ def test_a_collection_allocates_by_the_saved_entries_and_its_report_by_the_recta
 def test_a_combined_payment_calendar_adds_no_work_after_creation(
     call_profile: CallProfile, sheet: dict[str, Any]
 ) -> None:
-    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]))
+    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]), bridge.MISSING)
     combined = str(PATH["_CombineHolidayCalendars"](Cells.from_rows([[holidays], [holidays]])))
     fields = Cells.from_rows(
         [

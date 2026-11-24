@@ -1221,7 +1221,7 @@ def the_sheet() -> dict[str, Any]:
         across("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
         across("NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0),
     )
-    holidays = SEAM["_CreateHolidayCalendar"](serial("2027-01-01"))
+    holidays = SEAM["_CreateHolidayCalendar"](serial("2027-01-01"), bridge.MISSING)
     a_schedule = SEAM["_CreateFuturesSchedule"](
         down("F27", "G27", "H27"),
         down(serial("2026-12-29"), serial("2027-01-27"), serial("2027-02-24")),
@@ -1427,7 +1427,7 @@ def test_the_sheet_prepares_and_values_a_pair_from_ranges_in_either_order(
                 "ACME Trading",
                 "SOFR",
                 serial(PAY),
-                SEAM["_CreateHolidayCalendar"](serial("2027-01-01")),
+                SEAM["_CreateHolidayCalendar"](serial("2027-01-01"), bridge.MISSING),
             ),
         ),
     )

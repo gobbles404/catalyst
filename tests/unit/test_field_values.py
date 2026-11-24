@@ -33,7 +33,7 @@ def rows(*lines: list[object]) -> Cells:
 
 @pytest.fixture
 def calendar() -> str:
-    return str(ENTRY["_CreateHolidayCalendar"](row(46023.0)))
+    return str(ENTRY["_CreateHolidayCalendar"](row(46023.0), bridge.MISSING))
 
 
 # --- the record the function receives -------------------------------------------------------
@@ -421,7 +421,7 @@ def test_a_handle_whose_kind_holds_an_instrument_selects_it() -> None:
 
 def test_a_selector_of_a_kind_that_holds_no_instrument_says_so() -> None:
     with pytest.raises(ValueError, match=r"^a holiday calendar selects no instrument$"):
-        selected(HolidayCalendar(np.array([], dtype="datetime64[D]")))
+        selected(HolidayCalendar(np.array([], dtype="datetime64[D]"), None))
 
 
 # --- what registration refuses --------------------------------------------------------------

@@ -944,7 +944,7 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
     )
     history = seam_history(ix, "2026-12-16", DEC_31, ["2027-01-01"], {})
     market = seam_market(history, "SEAM", 1.0, 1.2)
-    weekends = ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]))
+    weekends = ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING)
     fields = row(
         "route",
         "settlement_method",

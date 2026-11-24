@@ -1160,3 +1160,26 @@ under a template that settles physically, and 1.5 on a physically settled row, n
 by its trade. O1267 and O1268 hold the field's new words in the instrument's catalog.
 Then on one of the desk's own sheets enter the fractional swap that could not be
 booked and compare its mark with the desk's own.
+
+## 44. A holiday calendar's name, and the collection of named calendars
+
+Agreed 21 November 2026 and built in #268, issue #255:
+[payment-calendar-keys.md](payment-calendar-keys.md), the first of two pull requests.
+`_CreateHolidayCalendar` takes a second argument, a name, and it is optional: every
+calendar already on a sheet reads as it did. A calendar made with a name shows it in its
+handle and beside each day of its readback. `_CollectPaymentCalendars` gathers named
+calendars into one collection, each name once. Nothing reads a collection yet: choosing
+a trade's payment calendar by name is the second pull request, and until it lands
+`payment_holiday_calendar` takes a handle as it does today. No number moves.
+
+UAT: the kept workbook, rows 3660 to 3680. B3662 and B3663 are two synthetic calendars
+made under the names `PAY_A` and `PAY_B`; read the name in each handle. B3664 is the
+first one's day made without a name: its handle shows no name, as every calendar above
+it on the sheet. B3666 reads `PAY_B` back, its two days with the name beside each.
+B3671 collects the two named calendars and B3673 reads the collection back: each name
+and how many days it lists, 1 and 2. Rows 3678 to 3680 are refused: a calendar with no
+name among the members, one name twice, and a name holding a plus sign. Type PAY_B over
+PAY_A inside the formula of B3662 and read the collection's refusal in B3671, which
+names both cells; type PAY_A back and the collection returns. Then on one of the desk's
+own sheets name two payment calendars and collect them, ready for the second pull
+request.

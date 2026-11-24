@@ -42,7 +42,8 @@ class DiscountCurve:
 
 def curve_name(where: str, text: str) -> str:
     """The rule on a curve's name and, since named-curves-slice-3.md, on a trade's
-    discount_curve_key, which must match one exactly: text with no whitespace around it and
+    discount_curve_key, which must match one exactly, and since payment-calendar-keys.md the
+    part of a calendar name's rule the two share: text with no whitespace around it and
     not whitespace alone, refused in the words of where it stands, `name` for a curve and the
     field, with its row where a ticket supplied it, for a key; the text itself otherwise, as
     typed, since a key matches a name case and all."""

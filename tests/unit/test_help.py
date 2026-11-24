@@ -302,14 +302,36 @@ def test_the_holiday_calendar_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateHolidayCalendar"]
     assert not hidden
     assert description == (
-        "Creates a holiday calendar from the days one market is closed and shows its handle, "
-        "the text other formulas take as the calendar."
+        "Creates a holiday calendar from the days one market is closed, under a name where a "
+        "payment calendar key will select it, and shows its handle, the text other formulas take "
+        "as the calendar."
     )
     assert arguments == [
         (
             "holiday",
             "The column of dates the market is closed, such as A2:A11, one holiday per row.",
         ),
+        (  # optional, so shown in brackets, since payment-calendar-keys.md
+            "[name]",
+            "The calendar's name, text such as NYFED, exact and case-sensitive with no whitespace "
+            "around it and no plus sign: what a payment calendar key selects. Leave it out for a "
+            "calendar no key selects.",
+        ),
+    ]
+    description, arguments, hidden = SPECS["_CollectPaymentCalendars"]
+    assert not hidden
+    assert description == (
+        "Collects named holiday calendars into one collection, each name once, the calendars as "
+        "they are and nothing of their days combined, and shows its handle, the text other "
+        "formulas take as the collection."
+    )
+    assert arguments == [
+        (
+            "calendar_handles",
+            "The calendars to collect: a cell, a row or a column of cells showing "
+            "_CreateHolidayCalendar's results, such as B2:B3, each made with a name and each name "
+            "once.",
+        )
     ]
 
 

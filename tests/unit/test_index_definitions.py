@@ -209,7 +209,7 @@ def ReadHolidayCalendar(calendar: Handle[HolidayCalendar]) -> str:
 
 
 def a_calendar(column: object) -> str:
-    text = bridge.call("_CreateHolidayCalendar", [column])
+    text = bridge.call("_CreateHolidayCalendar", [column, bridge.MISSING])
     assert isinstance(text, str) and CALENDAR.fullmatch(text), text
     return text
 
@@ -257,16 +257,16 @@ def test_a_single_cell_is_a_calendar_of_one_day() -> None:
     ],
 )
 def test_a_calendar_that_cannot_be_made_says_why(column: object, text: str) -> None:
-    assert bridge.call("_CreateHolidayCalendar", [column]) == text
+    assert bridge.call("_CreateHolidayCalendar", [column, bridge.MISSING]) == text
 
 
 # A rejected column stops the call before the function runs, so nothing is published and the
 # publication number does not move.
 def test_a_rejected_column_publishes_no_object_and_no_handle() -> None:
     before = number(a_calendar(HOLIDAYS), CALENDAR)
-    assert bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46023.0], [None]])]) == (
-        "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
-    )
+    assert bridge.call(
+        "_CreateHolidayCalendar", [Cells.from_rows([[46023.0], [None]]), bridge.MISSING]
+    ) == ("#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date")
     assert number(a_calendar(HOLIDAYS), CALENDAR) == before + 1
 
 
@@ -327,7 +327,11 @@ def test_a_combination_reads_back_as_a_calendar_of_its_days_once_each() -> None:
 def test_a_combination_refuses_its_cells_in_the_seams_words_and_publishes_nothing() -> None:
     a, b = a_calendar(CALENDAR_A), a_calendar(CALENDAR_B)
     other = a_schedule(CODES, FUTURES, MISSING)
-    failed = str(bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46023.0], [None]])]))
+    failed = str(
+        bridge.call(
+            "_CreateHolidayCalendar", [Cells.from_rows([[46023.0], [None]]), bridge.MISSING]
+        )
+    )
     assert failed == "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
     before = number(a_calendar(HOLIDAYS), CALENDAR)
     combine = bridge.call

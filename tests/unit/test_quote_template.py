@@ -73,7 +73,7 @@ def create(*args: object) -> object:
 
 
 def a_calendar() -> object:
-    return ENTRY["_CreateHolidayCalendar"](cells([46352.0], [46381.0]))
+    return ENTRY["_CreateHolidayCalendar"](cells([46352.0], [46381.0]), bridge.MISSING)
 
 
 def a_quote_template(**fields: object) -> QuoteTemplate:

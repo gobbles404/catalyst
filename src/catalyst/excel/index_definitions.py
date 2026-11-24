@@ -34,11 +34,16 @@ from catalyst.index_definitions.holiday_calendar import (
 from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
 from catalyst.index_definitions.index import Index, index
 from catalyst.index_definitions.index_conventions import IndexConventions, index_conventions
+from catalyst.index_definitions.payment_calendars import (
+    PaymentCalendars,
+    collect_payment_calendars,
+)
 from catalyst.instrumentation.work_counts import WorkCounter
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
 __all__ = [
+    "_CollectPaymentCalendars",
     "_CombineHolidayCalendars",
     "_CreateContractSpecifications",
     "_CreateFuturesSchedule",
@@ -77,10 +82,17 @@ def _CreateHolidayCalendar(
         DateColumn,
         "The column of dates the market is closed, such as A2:A11, one holiday per row.",
     ],
+    name: Annotated[
+        str | None,
+        "The calendar's name, text such as NYFED, exact and case-sensitive with no whitespace "
+        "around it and no plus sign: what a payment calendar key selects. Leave it out for a "
+        "calendar no key selects.",
+    ] = None,
 ) -> Handle[HolidayCalendar]:
-    """Creates a holiday calendar from the days one market is closed and shows its handle, the
-    text other formulas take as the calendar."""
-    return holiday_calendar(holiday)
+    """Creates a holiday calendar from the days one market is closed, under a name where a
+    payment calendar key will select it, and shows its handle, the text other formulas take as
+    the calendar."""
+    return holiday_calendar(holiday, name)
 
 
 @excel_function
@@ -96,6 +108,21 @@ def _CombineHolidayCalendars(
     in order, once each, and shows its handle, an ordinary calendar for payment_holiday_calendar,
     util_ShiftDate or another combination."""
     return combine_holiday_calendars(calendar_handles, WorkCounter())
+
+
+@excel_function
+def _CollectPaymentCalendars(
+    calendar_handles: Annotated[
+        Handles[HolidayCalendar],
+        "The calendars to collect: a cell, a row or a column of cells showing "
+        "_CreateHolidayCalendar's results, such as B2:B3, each made with a name and each name "
+        "once.",
+    ],
+) -> Handle[PaymentCalendars]:
+    """Collects named holiday calendars into one collection, each name once, the calendars as
+    they are and nothing of their days combined, and shows its handle, the text other formulas
+    take as the collection."""
+    return collect_payment_calendars(calendar_handles, WorkCounter())
 
 
 @excel_function

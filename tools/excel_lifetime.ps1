@@ -595,6 +595,37 @@ $calendars = {
     $c = Settle $state $sheet { param($c) $c.Live -eq 3 }
     Check "three live again, two more published" ($c.Live -eq 3 -and $c.Published -eq 7 -and $c.Released -eq 4) $c.Text
     Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+
+    # Named calendars and their collection, payment-calendar-keys.md: the two sources made again
+    # under names in F1 and F2 and collected in F3, the readback's rows counted in F4.
+    Put $state $sheet "F1" '=_CreateHolidayCalendar(A2:A4,"PAY_A")'
+    Put $state $sheet "F2" '=_CreateHolidayCalendar(B2:B3,"PAY_B")'
+    Put $state $sheet "F3" "=_CollectPaymentCalendars(F1:F2)"
+    Put $state $sheet "F4" "=ROWS(util_ReadHandle(F3))"
+    $named = Text $state $sheet "F1"
+    Check "a named calendar's handle shows its name" ($named.StartsWith("${id}:holiday_calendar:PAY_A:")) $named
+    $held = Text $state $sheet "F3"
+    Check "the collection's cell shows a payment calendars handle" ($held.StartsWith("${id}:payment_calendars:")) $held
+    Check "its readback holds two calendars under two heading rows" ((Text $state $sheet "F4") -eq "4") (Text $state $sheet "F4")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 6 }
+    Check "the two named calendars and the collection are live: six live, ten published" ($c.Live -eq 6 -and $c.Published -eq 10 -and $c.Released -eq 4) $c.Text
+
+    # A renamed: the calendar and the collection publish anew and the old two are released.
+    Put $state $sheet "F1" '=_CreateHolidayCalendar(A2:A4,"PAY_C")'
+    $renamed = Text $state $sheet "F1"
+    Check "a renamed calendar is a new publication under the new name" ($renamed.StartsWith("${id}:holiday_calendar:PAY_C:")) $renamed
+    $followed = Text $state $sheet "F3"
+    Check "and the collection follows with a new handle" ($followed -ne $held -and $followed.StartsWith("${id}:payment_calendars:")) $followed
+    $c = Settle $state $sheet { param($c) $c.Live -eq 6 -and $c.Released -ge 6 }
+    Check "the old calendar and the old collection are released; six live, twelve published" ($c.Live -eq 6 -and $c.Released -eq 6 -and $c.Published -eq 12) $c.Text
+
+    # B given A's name: the collection fails in the library's words and owns nothing.
+    Put $state $sheet "F2" '=_CreateHolidayCalendar(B2:B3,"PAY_C")'
+    $twice = Text $state $sheet "F3"
+    Check "two calendars of one name fail the collection in the library's words" ($twice -eq "#ERROR _CollectPaymentCalendars: ValueError: calendar_handles cell 1 and cell 2 are both named 'PAY_C', expected each name once") $twice
+    $c = Settle $state $sheet { param($c) $c.Live -eq 5 }
+    Check "the failed collection owns nothing: five live, one more published, eight released" ($c.Live -eq 5 -and $c.Published -eq 13 -and $c.Released -eq 8) $c.Text
+    Check "no release missed, no disposal error, with the named calendars" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Close-Book $state $book
 }
 

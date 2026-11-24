@@ -103,7 +103,9 @@ def test_one_field_and_the_ng_templates_seven_take_one_path() -> None:
 
 
 def test_each_value_is_the_scalar_its_type_names_and_a_calendar_the_object_itself() -> None:
-    calendar = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46352.0], [46381.0]]))
+    calendar = ENTRY["_CreateHolidayCalendar"](
+        Cells.from_rows([[46352.0], [46381.0]]), bridge.MISSING
+    )
     template = a_template(
         quantity=10.0,
         trade_date=46289.0,
@@ -300,7 +302,7 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
 
 
 def test_the_reader_spills_the_instrument_and_each_default_under_its_field() -> None:
-    calendar = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46352.0]]))
+    calendar = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46352.0]]), bridge.MISSING)
     handle = ENTRY["_CreateTradeTemplate"](
         "fixed_float",
         row("quantity_unit", "quantity", "trade_date", "payment_holiday_calendar"),

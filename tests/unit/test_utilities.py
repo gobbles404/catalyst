@@ -223,7 +223,7 @@ def a_two_contract_schedule() -> object:
 def test_futures_fixings_spill_their_columns_with_dates_as_serials_and_settles_exactly() -> None:
     days = Cells.from_rows([[46146.0], [46143.0]])
     settles = Cells.from_rows([[106.42], [101.94]])
-    calendar = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46023.0]])])
+    calendar = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46023.0]]), bridge.MISSING])
     handle = bridge.call(
         "_CreateFuturesFixings", [days, settles, an_index(a_two_contract_schedule(), calendar)]
     )
@@ -244,7 +244,7 @@ def test_a_calendar_spills_four_columns_with_the_flags_as_booleans() -> None:
         "_CreateFuturesSchedule",
         [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46162.0]]), MISSING],
     )
-    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
+    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]]), bridge.MISSING])
     handle = bridge.call("_CreateCalendar", [valuation, an_index(schedule, holidays)])
     kinds, slots, joined = read(handle)
     assert rows((kinds, slots, joined)) == [
@@ -265,7 +265,7 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
         "_CreateFuturesSchedule",
         [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46162.0]]), MISSING],
     )
-    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
+    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]]), bridge.MISSING])
     over = an_index(schedule, holidays)
     fixed = bridge.call(
         "_CreateMarketHistory",
@@ -484,7 +484,9 @@ def test_a_market_spills_the_calendar_and_a_price_by_kind() -> None:
         (46167.0, 1.0, 72.10, NUMBER_CODE),
         (46162.0, 0.0, "closed", TEXT_CODE),
     ):
-        holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[holiday]])])
+        holidays = bridge.call(
+            "_CreateHolidayCalendar", [Cells.from_rows([[holiday]]), bridge.MISSING]
+        )
         over = an_index(schedule, holidays)
         calendar = bridge.call("_CreateCalendar", [valuation, over])
         fixings = bridge.call("_CreateFuturesFixings", [46161.0, 70.0, over])
@@ -520,7 +522,7 @@ def test_a_price_vector_spills_one_column_of_prices_under_two_heading_rows() -> 
 # Serials for 1 January, 19 January and 16 February 2026.
 def test_a_calendar_spills_its_one_column_under_two_heading_rows() -> None:
     holidays = Cells.from_rows([[46023.0], [46041.0], [46069.0]])
-    handle = bridge.call("_CreateHolidayCalendar", [holidays])
+    handle = bridge.call("_CreateHolidayCalendar", [holidays, bridge.MISSING])
     assert rows(read(handle)) == [
         ["holiday"],
         ["datetime64[D]"],
@@ -619,7 +621,7 @@ def the_futures_index() -> str:
             MISSING,
         ],
     )
-    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
+    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]]), bridge.MISSING])
     return an_index(schedule, holidays)
 
 
@@ -933,7 +935,7 @@ def test_the_balance_of_a_period_takes_its_valuation_date_handle_through_the_sea
             "2026-10-31, expected a valuation day on or before the period's last day"
         )
         calendar = bridge.call(
-            "_CreateHolidayCalendar", [Cells.from_rows([[serial("2026-12-25")]])]
+            "_CreateHolidayCalendar", [Cells.from_rows([[serial("2026-12-25")]]), bridge.MISSING]
         )
         for wrong, what in (
             (None, "is blank"),
@@ -961,7 +963,9 @@ def test_the_balance_of_a_period_takes_its_valuation_date_handle_through_the_sea
 # calendar is left out. Nothing is published for a result.
 def test_a_date_shifted_by_an_offset_comes_out_as_a_date() -> None:
     live = bridge.live_handles()
-    synthetic = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[serial("2026-10-12")]])])
+    synthetic = bridge.call(
+        "_CreateHolidayCalendar", [Cells.from_rows([[serial("2026-10-12")]]), bridge.MISSING]
+    )
     for date, offset, calendar, expected in (
         ("2026-10-09", "+1bd", MISSING, "2026-10-12"),
         ("2026-10-09", "+1BD", synthetic, "2026-10-13"),
@@ -984,7 +988,9 @@ def test_a_date_shifted_by_an_offset_comes_out_as_a_date() -> None:
         assert bridge.call("util_ShiftDate", [serial(date), offset, calendar]) == serial(expected)
     # Since #181 a chain, compound-date-offsets.md: the requested chain from 12 August 2026 on a
     # calendar closing Christmas Day, 28 December, and 25 December without it; the order the rule.
-    christmas = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[serial("2026-12-25")]])])
+    christmas = bridge.call(
+        "_CreateHolidayCalendar", [Cells.from_rows([[serial("2026-12-25")]]), bridge.MISSING]
+    )
     for date, offset, calendar, expected in (
         ("2026-08-12", "+3em+25cd-1bd+1bd", christmas, "2026-12-28"),
         ("2026-08-12", "+003EM+025cD-01BD+001bd", christmas, "2026-12-28"),
@@ -998,11 +1004,17 @@ def test_a_date_shifted_by_an_offset_comes_out_as_a_date() -> None:
     # the 12th and the 14th of October 2026, and B, the 13th and the 14th, combined close the
     # three weekdays after the weekend, so from Friday the 9th +1bd is Thursday the 15th and +2bd
     # Friday the 16th, and from the 15th -1bd is the 9th; a calendar listing the union agrees.
-    a = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46309.0], [46307.0], [46309.0]])])
-    b = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46308.0], [46309.0]])])
+    a = bridge.call(
+        "_CreateHolidayCalendar",
+        [Cells.from_rows([[46309.0], [46307.0], [46309.0]]), bridge.MISSING],
+    )
+    b = bridge.call(
+        "_CreateHolidayCalendar", [Cells.from_rows([[46308.0], [46309.0]]), bridge.MISSING]
+    )
     combined = bridge.call("_CombineHolidayCalendars", [Cells.from_rows([[a], [b]])])
     union = bridge.call(
-        "_CreateHolidayCalendar", [Cells.from_rows([[46307.0], [46308.0], [46309.0]])]
+        "_CreateHolidayCalendar",
+        [Cells.from_rows([[46307.0], [46308.0], [46309.0]]), bridge.MISSING],
     )
     for date, offset, calendar, expected in (
         ("2026-10-09", "+1bd", combined, "2026-10-15"),
@@ -1145,7 +1157,7 @@ def test_an_index_spills_one_row_of_what_it_holds() -> None:
         "_CreateFuturesSchedule",
         [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46162.0]]), MISSING],
     )
-    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
+    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]]), bridge.MISSING])
     conventions = bridge.call(
         "_CreateIndexConventions", ["DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU"]
     )
