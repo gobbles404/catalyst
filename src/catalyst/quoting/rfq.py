@@ -174,7 +174,9 @@ def rfq(index: Index, ticket: FieldValues, template: QuoteTemplate, counter: Wor
         return f"{component_words(codes, period, k)} of row {int(occurrence[k]) + 1}"
 
     method = np.full(components, METHODS.index(terms.method), dtype=np.intp)
-    observations = observed(method, index, contract, start, end, named, booked=booked)
+    observations = observed(
+        method, index, contract, start, end, named, booked=booked, dated=periods.dated
+    )
     counter.hit(OBSERVATIONS_MADE, observations.component.size)
     references = observation_references(
         schedule,

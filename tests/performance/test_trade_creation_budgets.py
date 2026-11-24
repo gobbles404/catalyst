@@ -1336,27 +1336,27 @@ MONTHLY_RESOLUTION_NUMPY = {
         **resolution_numpy(1),
         **WHOLE_MONTHS_NUMPY,
         # The kind's rule read as every row supported, one all, and the published observations'
-        # looks: a lastday row among them, a component with no print, a lastday month of several.
-        "ndarray.any": 36,
+        # looks: a lastday row among them, whether any component was entered as dates, a
+        # component with no print, a lastday month of several.
+        "ndarray.any": 37,
         "ndarray.all": 3,  # in place of any row other than lastday, since the rule has one owner
         "ndarray.nonzero": 3,
         "ndarray.ravel": 3,
         "ndarray.flatten": 9,
         "numpy.asanyarray": 22,
         # The published observations, a batch's worth whatever its rows: each component's run of
-        # prints found, two searches of the schedule's months and two of its dates beside the
-        # anchor's, then counted off and laid out, a place, a date and a share per observation.
-        # A month of one print goes the road a month of five does, where the dedicated IFERC
-        # kind gathered one date per component: any 33, astype 28, cumsum 14, repeat 1,
+        # prints found, two searches of the schedule's months and none of its dates where no
+        # row is dated, then counted off and laid out, a place, a date and a share per
+        # observation. A month of one print goes the road a month of five does, where the
+        # dedicated IFERC kind gathered one date per component: any 33, cumsum 14, repeat 1,
         # searchsorted 1, arange 5, empty 33, reduce 38 and no sum before issue #271's step 5.
-        "ndarray.searchsorted": 6,
+        "ndarray.searchsorted": 4,
         "ndarray.repeat": 5,
         "ndarray.cumsum": 15,
-        "ndarray.astype": 31,
         "ndarray.sum": 1,
         "numpy.arange": 7,
         "numpy.empty": 32,
-        "ufunc.reduce": 42,
+        "ufunc.reduce": 43,
     }.items()
     if name not in ("ndarray.sort", "numpy._unique_hash")
 }

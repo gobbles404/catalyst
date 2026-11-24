@@ -348,6 +348,7 @@ def resolved(
         end,
         lambda k: named_trade(trade_ids, int(occurrence[k])),
         booked=booked,
+        dated=periods.dated,
     )
     # One anchor for every index since iferc-publication-payment-anchor.md, each component's
     # last observation day, the expiry under lastday on a futures index and the last
@@ -357,7 +358,15 @@ def resolved(
     second_leg = None
     if second is not None:
         second_leg, second_observations = _the_second_leg(
-            second[0], fields, periods.contracts[1], occurrence, start, end, trade_ids, second[1]
+            second[0],
+            fields,
+            periods.contracts[1],
+            occurrence,
+            start,
+            end,
+            trade_ids,
+            second[1],
+            periods.dated,
         )
         legs = (observations, second_observations)
     payment = _the_payments(settlement, fields, legs, occurrence, trade_ids, counter, calendars)
@@ -671,15 +680,17 @@ class RowPeriods:
     component its occurrence, its schedule row on each
     leg's schedule, one array per leg in leg order, a monthly component's the row of its month
     and a onetime component's the row of the contract pricing its first day, the first and the
-    last day it covers, and since onetime-averaging.md whether it is a onetime row's window,
-    aligned; which rows entered a code, a read-only mask the batch owns, with the texts they
-    entered in row order; and how many distinct codes were read for their months."""
+    last day it covers, since onetime-averaging.md whether it is a onetime row's window, and
+    whether its row entered two dates and not a code, which a published index selects its
+    prints by, aligned; which rows entered a code, a read-only mask the batch owns, with the
+    texts they entered in row order; and how many distinct codes were read for their months."""
 
     occurrence: NDArray[np.intp]
     contracts: tuple[NDArray[np.intp], ...]
     start: NDArray[np.datetime64]
     end: NDArray[np.datetime64]
     window: NDArray[np.bool_]
+    dated: NDArray[np.bool_]
     entered: tuple[NDArray[np.bool_], tuple[str, ...]]
     codes_read: int
 
@@ -836,7 +847,7 @@ def resolve_periods(
     )
     entered = np.array(code_on, dtype=bool)  # the batch's own copy of which rows entered a code
     entered.setflags(write=False)
-    return RowPeriods(occurrence, contracts, start, end, window, (entered, codes), len(spans))
+    return RowPeriods(occurrence, contracts, start, end, window, on, (entered, codes), len(spans))
 
 
 def contract_days(schedule: TradeSchedule) -> NDArray[np.datetime64]:
@@ -958,12 +969,14 @@ def _the_second_leg(
     end: NDArray[np.datetime64],
     trade_ids: NDArray[np.int64] | None,
     months: NDArray[np.int64],
+    dated: NDArray[np.bool_],
 ) -> tuple[LegInputs, Observations]:
     """The second leg's inputs and observations, since two-index-fixed-float.md, over the rows
     the first leg resolved and the contract rows the periods resolved on this index's schedule:
     the quantity unit resolved on this index, each distinct text once; second_schedule_method
     read from the list, each distinct text once; and the observations this leg's methods give the
-    components over the same days, named as the first leg's are. No price of its own since
+    components over the same days, by code or by dates as the first leg's are, named as the
+    first leg's are. No price of its own since
     two-index-one-price.md: the trade's one fixed price is the outright."""
     specifications, by_unit = _each_distinct(
         fields, "quantity_unit", partial(_the_specification, index, owner=_owner(index, True))
@@ -978,6 +991,7 @@ def _the_second_leg(
         end,
         lambda k: named_trade(trade_ids, int(occurrence[k])),
         "second_schedule_method",
+        dated=dated,
     )
     leg = LegInputs(
         index, np.array(specifications, dtype=np.intp)[by_unit], schedule_method, contract, months
