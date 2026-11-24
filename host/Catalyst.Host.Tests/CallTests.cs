@@ -461,6 +461,13 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46270.0, "x"), Column(2.875, 2.93), ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is text 'x', expected date" };
             yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46270.0, 46269.0), ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: price is missing, expected column of numbers" };
             yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46270.0, 46269.0), Row(2.875, 2.93), ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: price is 1x2 array, expected column of numbers" };
+            // The published fixings: the index left out or a number, a blank among the prices, text among the dates, the prices left out and a row where a column is expected, the seam's words.
+            yield return new object[] { "_CreatePublishedFixings", new object[] { Column(46279.0, 46272.0), Column(3.20, 3.00), ExcelMissing.Value }, "#ERROR _CreatePublishedFixings: index is missing, expected index handle" };
+            yield return new object[] { "_CreatePublishedFixings", new object[] { Column(46279.0, 46272.0), Column(3.20, 3.00), 3.00 }, "#ERROR _CreatePublishedFixings: index is number 3.0, expected index handle" };
+            yield return new object[] { "_CreatePublishedFixings", new object[] { Column(46279.0, 46272.0), Column(3.20, ExcelEmpty.Value), ExcelMissing.Value }, "#ERROR _CreatePublishedFixings: price cell (2, 1) is blank, expected number" };
+            yield return new object[] { "_CreatePublishedFixings", new object[] { Column(46279.0, "x"), Column(3.20, 3.00), ExcelMissing.Value }, "#ERROR _CreatePublishedFixings: publication_date cell (2, 1) is text 'x', expected date" };
+            yield return new object[] { "_CreatePublishedFixings", new object[] { Column(46279.0, 46272.0), ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreatePublishedFixings: price is missing, expected column of numbers" };
+            yield return new object[] { "_CreatePublishedFixings", new object[] { Column(46279.0, 46272.0), Row(3.20, 3.00), ExcelMissing.Value }, "#ERROR _CreatePublishedFixings: price is 1x2 array, expected column of numbers" };
             // The calendar: two handles, the valuation date and the index. A number, a missing argument and text naming no live object where the valuation date should be fail in the seam's words; the library's rules and the wrong kinds, which need live handles, are in the fact below.
             yield return new object[] { "_CreateCalendar", new object[] { 46167.0, ExcelMissing.Value }, "#ERROR _CreateCalendar: valuation_date is number 46167.0, expected valuation date handle" };
             yield return new object[] { "_CreateCalendar", new object[] { ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateCalendar: valuation_date is missing, expected valuation date handle" };
@@ -2962,7 +2969,7 @@ namespace Catalyst.Host.Tests
             var onTheHoliday = (string)Seam.Call("_CreateFuturesFixings", Column(46167.0, 46164.0, 46163.0, 46162.0), Column(71.4, 71.25, 71.10, 70.85), Index(schedule, elsewhere));
             Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is over another index, 'sample', expected the calendar's, 'sample'", Seam.Call("_CreateMarketHistory", calendar, onTheHoliday));
             Assert.Equal("#ERROR _CreateMarketHistory: calendar is futures fixings handle '" + fixings + "', expected calendar handle", Seam.Call("_CreateMarketHistory", fixings, fixings));
-            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is a calendar, expected futures, IFERC or Gas Daily fixings", Seam.Call("_CreateMarketHistory", calendar, calendar));
+            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is a calendar, expected futures, IFERC, Gas Daily or published fixings", Seam.Call("_CreateMarketHistory", calendar, calendar));
         }
 
         // The market history over the other two calendars: a Gas Daily calendar of September to
@@ -3009,7 +3016,7 @@ namespace Catalyst.Host.Tests
             var december = (string)Seam.Call("_CreateIfercFixings", Column("Z26", "X26", "V26"), Column(2.20, 2.10, 1.85), ifercIndex);
             Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings contract_code 'Z26' is a month not yet fixed in calendar, expected an index for fixed months alone", Seam.Call("_CreateMarketHistory", november, december));
             Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is over another index, 'Henry Hub IFERC', expected the calendar's, 'Henry Hub Gas Daily'", Seam.Call("_CreateMarketHistory", september, indices));
-            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is a market history, expected futures, IFERC or Gas Daily fixings", Seam.Call("_CreateMarketHistory", september, daily));
+            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is a market history, expected futures, IFERC, Gas Daily or published fixings", Seam.Call("_CreateMarketHistory", september, daily));
         }
 
         // The price vector: the index's name and one column of prices make one, the name and a
@@ -3240,6 +3247,75 @@ namespace Catalyst.Host.Tests
             var iferc = Index(Seam.Call("_CreateIfercSchedule", "F26", 46027.0), ExcelMissing.Value, "Waha IFERC");
             Assert.Equal("#ERROR _CreateGasDailyFixings: ValueError: index is an IFERC index, expected a Gas Daily index", Seam.Call("_CreateGasDailyFixings", 46269.0, 2.93, iferc));
             Assert.Equal("#ERROR _CreateGasDailyFixings: index is gas daily schedule handle '" + schedule + "', expected index handle", Seam.Call("_CreateGasDailyFixings", 46269.0, 2.93, schedule));
+        }
+
+        // Published fixings, the history and the market: the prices of the three prints dated
+        // before Wednesday 16 September 2026, newest first, over an index of six weekly prints of
+        // three months, make fixings whose handle carries the index's name and whose spill, the
+        // creator's own form, makes the same fixings again. The history over the calendar shows
+        // each fixed print's price and unfixed on the three still to come; the market shows
+        // September's quote on each of its two prints still to come and October's on its one.
+        // On Tuesday the 15th Monday's print has fixed: without a price for it the history is
+        // refused, and with a stand-in, the front price of the price vector, it is made. The
+        // library's rules answer through the same objects: a price column one row short, a
+        // series oldest first, the day a price was released where its date should be, an IFERC
+        // index where the published one should be, and a price for a print not yet fixed.
+        [Fact]
+        public void published_fixings_a_history_and_a_market_are_created_and_read_back_with_a_stand_in()
+        {
+            var schedule = (string)Seam.Call("_CreatePublishedSchedule", Column("Q26", "U26", "U26", "U26", "U26", "V26"), Column(46265.0, 46272.0, 46279.0, 46286.0, 46293.0, 46300.0));
+            var index = Index(schedule, ExcelMissing.Value, "DOE Diesel");
+            var fixings = (string)Seam.Call("_CreatePublishedFixings", Column(46279.0, 46272.0, 46265.0), Column(3.20, 3.00, 2.95), index);
+            Assert.StartsWith(Pid + ":published_fixings:DOE Diesel:", fixings);
+            var spill = (object[,])Seam.Call("util_ReadHandle", fixings);
+            Assert.Equal(5, spill.GetLength(0));
+            Assert.Equal(2, spill.GetLength(1));
+            Assert.Equal("publication_date", spill[0, 0]);
+            Assert.Equal("price", spill[0, 1]);
+            Assert.Equal("datetime64[D]", spill[1, 0]);
+            Assert.Equal("float64", spill[1, 1]);
+            Assert.Equal(46279.0, spill[2, 0]);
+            Assert.Equal(3.20, spill[2, 1]);
+            Assert.Equal(46265.0, spill[4, 0]);
+            Assert.Equal(2.95, spill[4, 1]);
+            var again = (string)Seam.Call("_CreatePublishedFixings", Column(spill[2, 0], spill[3, 0], spill[4, 0]), Column(spill[2, 1], spill[3, 1], spill[4, 1]), index);
+            Assert.NotEqual(fixings, again);
+            Assert.Equal(spill, (object[,])Seam.Call("util_ReadHandle", again));
+            var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46281.0, 0.5), index);
+            var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
+            Assert.StartsWith(Pid + ":market_history:DOE Diesel:", history);
+            var priced = (object[,])Seam.Call("util_ReadHandle", history);
+            Assert.Equal(8, priced.GetLength(0));
+            Assert.Equal("fixing_price", priced[0, 4]);
+            Assert.Equal(2.95, priced[2, 4]);
+            Assert.Equal(3.20, priced[4, 4]);
+            Assert.Equal("unfixed", priced[5, 4]);
+            Assert.Equal("unfixed", priced[7, 4]);
+            var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "DOE Diesel", Column(3.50, 3.65)));
+            Assert.StartsWith(Pid + ":market:DOE Diesel:", market);
+            var quoted = (object[,])Seam.Call("util_ReadHandle", market);
+            Assert.Equal(8, quoted.GetLength(0));
+            Assert.Equal(3.20, quoted[4, 4]);
+            Assert.Equal(3.50, quoted[5, 4]);
+            Assert.Equal(3.50, quoted[6, 4]);
+            Assert.Equal("V26", quoted[7, 1]);
+            Assert.Equal(3.65, quoted[7, 4]);
+            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 3 prices, expected at most 2, one per contract from 'U26' through 'V26'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "DOE Diesel", Column(3.50, 3.65, 3.70))));
+            var tuesday = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46280.0, 0.5), index);
+            var twoPrices = (string)Seam.Call("_CreatePublishedFixings", Column(46272.0, 46265.0), Column(3.00, 2.95), index);
+            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings has no price for the print dated 2026-09-14, expected a price for every fixed print in calendar, a stand-in where its publisher has not released it", Seam.Call("_CreateMarketHistory", tuesday, twoPrices));
+            var standIn = (string)Seam.Call("_CreatePublishedFixings", Column(46279.0, 46272.0, 46265.0), Column(3.50, 3.00, 2.95), index);
+            var stoodIn = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateMarketHistory", tuesday, standIn));
+            Assert.Equal(3.50, stoodIn[4, 4]);
+            Assert.Equal(true, stoodIn[4, 3]);
+            var monday = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46279.0, 0.5), index);
+            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings publication_date 2026-09-14 is a print not yet fixed in calendar, expected a price for fixed prints alone; a print is fixed from the day after its date", Seam.Call("_CreateMarketHistory", monday, fixings));
+            Assert.Equal("#ERROR _CreatePublishedFixings: ValueError: price has 2 prices, expected 3, one per publication_date", Seam.Call("_CreatePublishedFixings", Column(46279.0, 46272.0, 46265.0), Column(3.20, 3.00), index));
+            Assert.Equal("#ERROR _CreatePublishedFixings: ValueError: publication_date row 2 is 2026-09-07, expected a date before row 1's 2026-08-31", Seam.Call("_CreatePublishedFixings", Column(46265.0, 46272.0), Column(2.95, 3.00), index));
+            Assert.Equal("#ERROR _CreatePublishedFixings: ValueError: publication_date row 1 is 2026-09-15, expected the publication date of one of the index's prints", Seam.Call("_CreatePublishedFixings", Column(46280.0, 46272.0), Column(3.20, 3.00), index));
+            var iferc = Index(Seam.Call("_CreateIfercSchedule", "F26", 46027.0), ExcelMissing.Value, "Waha IFERC");
+            Assert.Equal("#ERROR _CreatePublishedFixings: ValueError: index is an IFERC index, expected a published index", Seam.Call("_CreatePublishedFixings", 46272.0, 3.00, iferc));
+            Assert.Equal("#ERROR _CreatePublishedFixings: index is published schedule handle '" + schedule + "', expected index handle", Seam.Call("_CreatePublishedFixings", 46272.0, 3.00, schedule));
         }
 
         // The mixed road out: a rectangle of three kinds comes back one tagged value per cell.

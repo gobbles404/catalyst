@@ -24,6 +24,7 @@ from catalyst.market_data.futures_fixings import FuturesFixings, futures_fixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings, gas_daily_fixings
 from catalyst.market_data.iferc_fixings import IfercFixings, iferc_fixings
 from catalyst.market_data.price_vector import PriceVector, price_vector
+from catalyst.market_data.published_fixings import PublishedFixings, published_fixings
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
@@ -32,6 +33,7 @@ __all__ = [
     "_CreateGasDailyFixings",
     "_CreateIfercFixings",
     "_CreatePriceVector",
+    "_CreatePublishedFixings",
 ]
 
 
@@ -104,6 +106,30 @@ def _CreateGasDailyFixings(
     printed for each, one for every calendar day between the newest and the oldest, and shows its
     handle, the text other formulas take as the fixings."""
     return gas_daily_fixings(flow_date, price, index)
+
+
+@excel_function
+def _CreatePublishedFixings(
+    publication_date: Annotated[
+        DateColumn,
+        "The column of dates on the prints that have a price, newest first, such as A2:A4 "
+        "holding 14-Sep-2026 down to 31-Aug-2026, each a date of the index's schedule.",
+    ],
+    price: Annotated[
+        NumberColumn,
+        "The column of prices beside the dates, such as B2:B4, one per date; a stand-in where "
+        "a print has fixed and its publisher has not released it.",
+    ],
+    index: Annotated[
+        Handle[Index],
+        "The index handle: the cell showing _CreateIndex's result, such as D3, or a name for "
+        "it; a published index, whose schedule the dates are checked against.",
+    ],
+) -> Handle[PublishedFixings]:
+    """Creates the published fixings of one index from the dates of its prints that have a
+    price, newest first, and the price of each, checked against the dates of its index's
+    schedule, and shows its handle, the text other formulas take as the fixings."""
+    return published_fixings(publication_date, price, index)
 
 
 @excel_function

@@ -317,11 +317,11 @@ def test_a_handle_of_another_kind_in_either_slot_is_refused_by_name() -> None:
     # which names what it is.
     assert bridge.call("_CreateMarketHistory", [calendar, calendar]) == (
         "#ERROR _CreateMarketHistory: ValueError: fixings is a calendar, "
-        "expected futures, IFERC or Gas Daily fixings"
+        "expected futures, IFERC, Gas Daily or published fixings"
     )
     assert bridge.call("_CreateMarketHistory", [calendar, made]) == (
         "#ERROR _CreateMarketHistory: ValueError: fixings is a market history, "
-        "expected futures, IFERC or Gas Daily fixings"
+        "expected futures, IFERC, Gas Daily or published fixings"
     )
 
 
@@ -839,7 +839,7 @@ def test_fixings_over_another_index_are_refused_through_the_seam() -> None:
     )
     assert bridge.call("_CreateMarketHistory", [a_calendar(), a_holiday_calendar(MAY_25)]) == (
         "#ERROR _CreateMarketHistory: ValueError: fixings is a holiday calendar, "
-        "expected futures, IFERC or Gas Daily fixings"
+        "expected futures, IFERC, Gas Daily or published fixings"
     )
 
 
@@ -1048,4 +1048,135 @@ def test_a_vector_named_for_another_index_reaches_the_sheet_in_the_librarys_word
     ) == (
         "#ERROR _CreateMarket: ValueError: price_vector names index 'Henry Hub Gas Daily', "
         "expected market_history's index 'Henry Hub IFERC'"
+    )
+
+
+# --- a published index through the seam: fixings, history and market ------------------------
+
+# The published fixings page's sample: six weekly prints of three months, 31 August, the four
+# Mondays of September and 5 October 2026, valued on Wednesday 16 September, when the three
+# prints dated before it have fixed.
+AUG_31, SEP_7, SEP_14, SEP_21, SEP_28, OCT_5 = 46265.0, 46272.0, 46279.0, 46286.0, 46293.0, 46300.0
+SEP_15, SEP_16 = 46280.0, 46281.0
+DIESEL = "DOE Diesel"
+
+
+@functools.cache
+def the_diesel_index() -> str:
+    schedule = bridge.call(
+        "_CreatePublishedSchedule",
+        [
+            column("Q26", "U26", "U26", "U26", "U26", "V26"),
+            column(AUG_31, SEP_7, SEP_14, SEP_21, SEP_28, OCT_5),
+        ],
+    )
+    return an_index(schedule, MISSING, DIESEL)
+
+
+def diesel_prices(*pairs: tuple[float, float]) -> str:
+    """Published fixings from date and price pairs as the sheet sends them, the newest first."""
+    args = [column(*(d for d, _ in pairs)), column(*(p for _, p in pairs)), the_diesel_index()]
+    text = bridge.call("_CreatePublishedFixings", args)
+    assert isinstance(text, str) and text.startswith(f"{PID}:published_fixings:{DIESEL}:"), text
+    return text
+
+
+def a_diesel_calendar(serial: float = SEP_16) -> str:
+    return a_calendar(a_valuation(serial), the_diesel_index())
+
+
+THREE = ((SEP_14, 3.20), (SEP_7, 3.00), (AUG_31, 2.95))
+
+
+def test_a_published_history_is_created_from_two_handles_and_read_back_print_by_print() -> None:
+    history = a_history(a_diesel_calendar(), diesel_prices(*THREE))
+    assert history.startswith(f"{PID}:market_history:{DIESEL}:")
+    kinds, slots, joined = read(history)
+    assert rows((kinds, slots, joined)) == [
+        HEADERS,
+        TYPES,
+        [AUG_31, "Q26", 1.0, 1.0, 2.95],
+        [SEP_7, "U26", 1.0, 1.0, 3.00],
+        [SEP_14, "U26", 1.0, 1.0, 3.20],
+        [SEP_21, "U26", 1.0, 0.0, "unfixed"],
+        [SEP_28, "U26", 1.0, 0.0, "unfixed"],
+        [OCT_5, "V26", 1.0, 0.0, "unfixed"],
+    ]
+    assert kinds[2:5, 4].tolist() == [NUMBER_CODE] * 3
+    assert kinds[5:, 4].tolist() == [TEXT_CODE] * 3
+
+
+# One quote per month from the month of the first print still to come: September's quote is the
+# price of each of its two prints still to come, and October's of its one.
+def test_a_published_market_is_read_back_with_a_months_quote_on_each_print_still_to_come() -> None:
+    history = a_history(a_diesel_calendar(), diesel_prices(*THREE))
+    market = a_market(history, a_vector(3.50, 3.65, name=DIESEL))
+    assert market.startswith(f"{PID}:market:{DIESEL}:")
+    assert rows(read(market)) == [
+        MARKET_HEADERS,
+        TYPES,
+        [AUG_31, "Q26", 1.0, 1.0, 2.95],
+        [SEP_7, "U26", 1.0, 1.0, 3.00],
+        [SEP_14, "U26", 1.0, 1.0, 3.20],
+        [SEP_21, "U26", 1.0, 0.0, 3.50],
+        [SEP_28, "U26", 1.0, 0.0, 3.50],
+        [OCT_5, "V26", 1.0, 0.0, 3.65],
+    ]
+    # A vector that stops at September is read back through September's last print.
+    short = rows(read(a_market(history, a_vector(3.50, name=DIESEL))))
+    assert [row[0] for row in short[2:]] == [AUG_31, SEP_7, SEP_14, SEP_21, SEP_28]
+    assert bridge.call("_CreateMarket", [history, a_vector(3.50, 3.65, 3.70, name=DIESEL)]) == (
+        "#ERROR _CreateMarket: ValueError: price_vector has 3 prices, expected at most 2, "
+        "one per contract from 'U26' through 'V26'"
+    )
+    assert bridge.call("util_ReadPrompt", [a_diesel_calendar()]) == "U26"
+
+
+# The stand-in on the sheet: on Tuesday 15 September Monday's print has fixed, and without a
+# price for it the history is refused in the library's words; with the front price of the price
+# vector entered in its place the history and the market are made, and the published price,
+# entered in the same cell, moves that one print alone.
+def test_a_fixed_print_without_a_price_is_refused_and_a_stand_in_makes_the_market() -> None:
+    tuesday = a_diesel_calendar(SEP_15)
+    assert bridge.call("_CreateMarketHistory", [tuesday, diesel_prices(*THREE[1:])]) == (
+        "#ERROR _CreateMarketHistory: ValueError: fixings has no price for the print dated "
+        "2026-09-14, expected a price for every fixed print in calendar, a stand-in where its "
+        "publisher has not released it"
+    )
+    quotes = a_vector(3.50, 3.65, name=DIESEL)
+    with_stand_in = a_history(tuesday, diesel_prices((SEP_14, 3.50), *THREE[1:]))
+    stood_in = rows(read(a_market(with_stand_in, quotes)))
+    released = rows(read(a_market(a_history(tuesday, diesel_prices(*THREE)), quotes)))
+    assert [row[4] for row in stood_in[2:]] == [2.95, 3.00, 3.50, 3.50, 3.50, 3.65]
+    assert [row[4] for row in released[2:]] == [2.95, 3.00, 3.20, 3.50, 3.50, 3.65]
+    assert [row[3] for row in stood_in[2:]] == [row[3] for row in released[2:]]
+    # On the Monday itself the print is still live, and a price for it is refused.
+    monday = a_diesel_calendar(SEP_14)
+    assert bridge.call("_CreateMarketHistory", [monday, diesel_prices(*THREE)]) == (
+        "#ERROR _CreateMarketHistory: ValueError: fixings publication_date 2026-09-14 is a print "
+        "not yet fixed in calendar, expected a price for fixed prints alone; a print is fixed "
+        "from the day after its date"
+    )
+
+
+def test_published_fixings_of_another_index_and_of_another_kind_are_refused() -> None:
+    other = an_index(
+        bridge.call("_CreatePublishedSchedule", [column("U26", "U26"), column(SEP_7, SEP_14)]),
+        MISSING,
+        "Other Diesel",
+    )
+    theirs = bridge.call(
+        "_CreatePublishedFixings", [column(SEP_14, SEP_7), column(3.2, 3.0), other]
+    )
+    assert bridge.call("_CreateMarketHistory", [a_diesel_calendar(), theirs]) == (
+        "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, 'Other Diesel', "
+        "expected the calendar's, 'DOE Diesel'"
+    )
+    assert bridge.call("_CreateMarketHistory", [a_calendar(), diesel_prices(*THREE)]) == (
+        "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, 'DOE Diesel', "
+        "expected the calendar's, 'WTI NYMEX'"
+    )
+    assert bridge.call("_CreateMarketHistory", [a_diesel_calendar(), a_diesel_calendar()]) == (
+        "#ERROR _CreateMarketHistory: ValueError: fixings is a calendar, expected futures, IFERC, "
+        "Gas Daily or published fixings"
     )

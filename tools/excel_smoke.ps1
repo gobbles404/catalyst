@@ -1618,7 +1618,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(DW4),5,5)" = "unfixed"
     "=_CreateMarketHistory(DW6,DU1)" = "#ERROR _CreateMarketHistory: ValueError: fixings flow_date 2026-09-11 is after valuation date 2026-09-10, expected flow days on or before the valuation date"
     "=_CreateMarketHistory(AR6,DW3)" = "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, 'Henry Hub IFERC', expected the calendar's, 'Henry Hub Gas Daily'"
-    "=_CreateMarketHistory(CT5,CT7)" = "#ERROR _CreateMarketHistory: ValueError: fixings is a market history, expected futures, IFERC or Gas Daily fixings"
+    "=_CreateMarketHistory(CT5,CT7)" = "#ERROR _CreateMarketHistory: ValueError: fixings is a market history, expected futures, IFERC, Gas Daily or published fixings"
     # The price vector: a creator over one column of prices, read back through util_ReadHandle
     # under its header and type, a zero and a negative price kept in their places, and one over
     # a single cell; a row where a column is expected, the header taken with the prices, numeric
@@ -1769,6 +1769,49 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AAH8),4,4)" = "TRUE"
     "=INDEX(util_ReadHandle(AAH8),5,4)" = "FALSE"
     "=util_ReadPrompt(AAH8)"            = "U26"
+    # The published fixings: a creator over the prices of the three prints dated before 16
+    # September, newest first, in AAJ and AAK, and the index in AAH3, read back through
+    # util_ReadHandle in the creator's own form. A price column one row short, a series oldest
+    # first, the day a price was released where its date should be and an IFERC index, the
+    # library's words; the index left out, the seam's.
+    '=MID(AAL1,FIND(":",AAL1)+1,29)' = "published_fixings:DOE Diesel:"
+    "=INDEX(util_ReadHandle(AAL1),1,1)" = "publication_date"
+    "=INDEX(util_ReadHandle(AAL1),1,2)" = "price"
+    "=INDEX(util_ReadHandle(AAL1),3,1)" = "46279"
+    "=INDEX(util_ReadHandle(AAL1),3,2)" = "3.2"
+    "=INDEX(util_ReadHandle(AAL1),5,2)" = "2.95"
+    "=ROWS(util_ReadHandle(AAL1))"      = "5"
+    "=_CreatePublishedFixings(AAJ2:AAJ4,AAK2:AAK3,AAH3)" = "#ERROR _CreatePublishedFixings: ValueError: price has 2 prices, expected 3, one per publication_date"
+    "=_CreatePublishedFixings(AAB2:AAB4,AAK2:AAK4,AAH3)" = "#ERROR _CreatePublishedFixings: ValueError: publication_date row 2 is 2026-09-07, expected a date before row 1's 2026-08-31"
+    "=_CreatePublishedFixings(AAJ6:AAJ7,AAK2:AAK3,AAH3)" = "#ERROR _CreatePublishedFixings: ValueError: publication_date row 1 is 2026-09-15, expected the publication date of one of the index's prints"
+    "=_CreatePublishedFixings(AAJ2:AAJ4,AAK2:AAK4,EB2)"  = "#ERROR _CreatePublishedFixings: ValueError: index is an IFERC index, expected a published index"
+    "=_CreatePublishedFixings(AAJ2:AAJ4,AAK2:AAK4)"      = "#ERROR _CreatePublishedFixings: index is missing, expected index handle"
+    # The published history in AAL2, the calendar of AAH5 with the fixings of AAL1: each fixed
+    # print's price and unfixed on the three still to come. The market in AAL4 over it, with the
+    # two quotes of AAM: September's on each of its two prints still to come, October's on its one.
+    '=MID(AAL2,FIND(":",AAL2)+1,26)' = "market_history:DOE Diesel:"
+    "=INDEX(util_ReadHandle(AAL2),1,5)" = "fixing_price"
+    "=INDEX(util_ReadHandle(AAL2),3,5)" = "2.95"
+    "=INDEX(util_ReadHandle(AAL2),5,5)" = "3.2"
+    "=INDEX(util_ReadHandle(AAL2),6,5)" = "unfixed"
+    "=ROWS(util_ReadHandle(AAL2))"      = "8"
+    '=MID(AAL4,FIND(":",AAL4)+1,18)' = "market:DOE Diesel:"
+    "=INDEX(util_ReadHandle(AAL4),5,5)" = "3.2"
+    "=INDEX(util_ReadHandle(AAL4),6,5)" = "3.5"
+    "=INDEX(util_ReadHandle(AAL4),7,5)" = "3.5"
+    "=INDEX(util_ReadHandle(AAL4),8,2)" = "V26"
+    "=INDEX(util_ReadHandle(AAL4),8,5)" = "3.65"
+    # The stand-in: on Tuesday 15 September, the calendar in AAH11, Monday's print has fixed.
+    # The fixings of AAL6 hold no price for it and the history is refused; AAN2 is the page's
+    # formula, the published price where its cell holds one and the front price of the price
+    # vector where it does not, so the fixings of AAL7 make the history of AAL8. A price for
+    # Monday's print on the Monday itself, the calendar of AAH8, is refused.
+    "=_CreateMarketHistory(AAH11,AAL6)" = "#ERROR _CreateMarketHistory: ValueError: fixings has no price for the print dated 2026-09-14, expected a price for every fixed print in calendar, a stand-in where its publisher has not released it"
+    "=AAN2"                             = "3.5"
+    "=INDEX(util_ReadHandle(AAL8),5,5)" = "3.5"
+    "=INDEX(util_ReadHandle(AAL8),5,4)" = "TRUE"
+    "=INDEX(util_ReadHandle(AAL8),6,5)" = "unfixed"
+    "=_CreateMarketHistory(AAH8,AAL1)"  = "#ERROR _CreateMarketHistory: ValueError: fixings publication_date 2026-09-14 is a print not yet fixed in calendar, expected a price for fixed prints alone; a print is fixed from the day after its date"
     # The Gas Daily schedule: a creator over three contract months, their codes and the first and
     # last day of gas of each, in DG to DI, and over the first row alone, read back through
     # util_ReadHandle; a first-date column one row long and a last-date column one row short, the
@@ -3726,6 +3769,25 @@ $cells = [ordered]@{
     "AAH5" = "=_CreateCalendar(AAH4,AAH3)"
     "AAH7" = "=_CreateValuationDate(DATE(2026,9,14),0.5)"
     "AAH8" = "=_CreateCalendar(AAH7,AAH3)"
+    # The published fixings: the prices of the three prints dated before 16 September, the newest
+    # first, in AAJ2:AAK4, and beneath them the day a price was released, which is no print's
+    # date; the fixings, the history over the calendar of AAH5, a vector of two quotes and the
+    # market. Then Tuesday 15 September: its calendar in AAH11, fixings without Monday's price
+    # in AAL6, and the stand-in in AAN2, the published price from AAO2 where that cell holds one
+    # and the front price of the vector where it is blank, as here.
+    "AAJ2" = "14-Sep-2026"; "AAK2" = "3.2";  "AAM2" = "3.5";  "AAN2" = "=IF(ISNUMBER(AAO2),AAO2,AAM2)"
+    "AAJ3" = "7-Sep-2026";  "AAK3" = "3";    "AAM3" = "3.65"; "AAN3" = "3"
+    "AAJ4" = "31-Aug-2026"; "AAK4" = "2.95";                  "AAN4" = "2.95"
+    "AAJ6" = "15-Sep-2026"; "AAJ7" = "7-Sep-2026"
+    "AAL1" = "=_CreatePublishedFixings(AAJ2:AAJ4,AAK2:AAK4,AAH3)"
+    "AAL2" = "=_CreateMarketHistory(AAH5,AAL1)"
+    "AAL3" = '=_CreatePriceVector("DOE Diesel",AAM2:AAM3)'
+    "AAL4" = "=_CreateMarket(AAL2,AAL3)"
+    "AAH10" = "=_CreateValuationDate(DATE(2026,9,15),0.5)"
+    "AAH11" = "=_CreateCalendar(AAH10,AAH3)"
+    "AAL6" = "=_CreatePublishedFixings(AAJ3:AAJ4,AAK3:AAK4,AAH3)"
+    "AAL7" = "=_CreatePublishedFixings(AAJ2:AAJ4,AAN2:AAN4,AAH3)"
+    "AAL8" = "=_CreateMarketHistory(AAH11,AAL7)"
     # The Gas Daily schedule: three contract months of Henry Hub Gas Daily, the first and last day
     # of gas of each, a fourth first date for a column one row long, a copy of the last-date column
     # with a blank, a code over a number, and two creator cells, over the three rows and over the

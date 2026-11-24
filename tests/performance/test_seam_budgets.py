@@ -2030,6 +2030,57 @@ def test_an_iferc_history_is_two_handles_in_and_the_calendar_kept(
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
 
 
+def published_fixing_columns(count: int) -> tuple[Cells, Cells]:
+    """The dates of the first so many prints published_columns lays out, as the sheet sends
+    them, the newest in the first row, and a price beside each."""
+    newest_first = range(count - 1, -1, -1)
+    return (
+        Cells.from_rows([[46161.0 + 7 * i] for i in newest_first]),
+        Cells.from_rows([[3.0 + (i % 30) / 100] for i in newest_first]),
+    )
+
+
+def published_history_sources() -> tuple[object, object]:
+    """The two handles a published history takes: the calendar of the ten years of weekly prints
+    published_columns lays out, valued after the last print's date so that every print has
+    fixed, and a price for each of the 480."""
+    valuation = PATH["_CreateValuationDate"](49740.0, 0.5)
+    index = an_index(PATH["_CreatePublishedSchedule"](*published_columns(120)))
+    made = PATH["_CreateCalendar"](valuation, index)
+    return made, PATH["_CreatePublishedFixings"](*published_fixing_columns(480), index)
+
+
+# Ten years of weekly prints, every one fixed, and their prices: two handles as above, the
+# builder's dispatch to the published binder, its one comparison of the fixings' index with the
+# calendar's, and one look, a price for a print not yet fixed. That every fixed print has its
+# price is a comparison of two counts, the fixed prints counted when the calendar was made and
+# the prices, so nothing is covered, searched or sorted: each price's row was found when the
+# fixings were made, and the history holds the fixings' own two arrays and copies neither.
+def test_a_published_history_is_two_handles_in_and_one_look(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    made, fixings = published_history_sources()
+    PATH["_CreateMarketHistory"](made, fixings)
+    assert call_profile(lambda: PATH["_CreateMarketHistory"](made, fixings)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text": 2,
+        "_resolve": 2,
+        "_CreateMarketHistory": 1,
+        "market_history": 1,
+        "published_history": 1,
+        "_over_the_calendars_index": 1,
+        "_frozen": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings)) == {
+        "ndarray.any": 1,  # a price for a print not yet fixed
+        "ndarray.setflags": 2,  # the two columns, read-only already
+        "ufunc.reduce": 1,
+    }
+
+
 # Reading a history back is reading its calendar back, the same calls, and then the fifth
 # column written by kind through the helper the market's reader shares: the words made once, the
 # wider kinds and slots, the codes paired with the words and the pairs shown, the two words
@@ -2119,6 +2170,21 @@ def iferc_market_sources() -> tuple[object, object]:
     )
 
 
+def published_market_sources() -> tuple[object, object]:
+    """The two handles a published market takes: the calendar of the ten years of weekly prints
+    published_columns lays out, valued on 11 September 2026 with seventeen prints fixed and a
+    price for each, and a vector of 116 quotes, one per month from the fifth, whose second print
+    is the first still to come."""
+    valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
+    index = an_index(PATH["_CreatePublishedSchedule"](*published_columns(120)))
+    made = PATH["_CreateCalendar"](valuation, index)
+    fixings = PATH["_CreatePublishedFixings"](*published_fixing_columns(17), index)
+    history = PATH["_CreateMarketHistory"](made, fixings)
+    return history, PATH["_CreatePriceVector"](
+        "sample", Cells.from_rows([[3.0 + i] for i in range(116)])
+    )
+
+
 MARKET_LEDGER = {
     "Registered.run": 1,
     "_arguments": 1,
@@ -2162,12 +2228,13 @@ def stopping_early(
     )
 
 
-# The same ledger over a Gas Daily history, a year of flow days with four quotes, and over an
-# IFERC one, ten years of months with 116: the kind of the calendar is read by nothing here.
+# The same ledger over a Gas Daily history, a year of flow days with four quotes, over an IFERC
+# one, ten years of months with 116, and over a published one, ten years of weekly prints with
+# 116: the kind of the calendar is read by nothing here.
 @pytest.mark.parametrize(
     "sources",
-    [gas_daily_market_sources, iferc_market_sources],
-    ids=["a Gas Daily market", "an IFERC market"],
+    [gas_daily_market_sources, iferc_market_sources, published_market_sources],
+    ids=["a Gas Daily market", "an IFERC market", "a published market"],
 )
 def test_a_market_over_the_other_two_calendars_costs_the_same(
     sources: Callable[[], tuple[object, object]],
@@ -2326,6 +2393,44 @@ def test_gas_daily_fixings_are_two_columns_and_an_index_in_and_one_publication_o
         "numpy.array": 2,  # the two copies the fixings keep
         "ndarray.setflags": 2,  # frozen
         "ufunc.reduce": 2,
+    }
+
+
+# Ten years of weekly prices, given newest first: the two columns through the rules a Gas Daily
+# series goes through, the index by handle, then the builder's own work, by column and never by
+# price: one look that each date is before the row above, one search of the schedule's dates
+# for every price's print at once, one look that each was found, and one copy of the prices.
+def test_published_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    dated, prices = published_fixing_columns(480)
+    index = an_index(PATH["_CreatePublishedSchedule"](*published_columns(120)))
+    PATH["_CreatePublishedFixings"](dated, prices, index)
+    assert call_profile(lambda: PATH["_CreatePublishedFixings"](dated, prices, index)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 3,
+        "_text": 1,  # the handle's text rule
+        "_resolve": 1,  # and its one lookup
+        "_date_column": 1,
+        "_column": 1,
+        "_one_column": 2,
+        "_shape": 2,
+        "_dates": 1,
+        "_not_dates": 1,
+        "_as_days": 1,
+        "_numbers": 1,
+        "_CreatePublishedFixings": 1,
+        "published_fixings": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreatePublishedFixings"](dated, prices, index)) == {
+        "ndarray.any": 3,  # the seam's look at the dates, their order, and every date a print's
+        "ndarray.astype": 2,  # the date column on its way to days
+        "ndarray.searchsorted": 1,  # every price's print, one search of the schedule's dates
+        "numpy.array": 1,  # the one copy, of the prices
+        "ndarray.setflags": 2,  # each price's print and the prices, frozen
+        "ufunc.reduce": 3,
     }
 
 

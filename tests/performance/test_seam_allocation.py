@@ -677,6 +677,46 @@ def test_a_published_calendar_makes_two_flags_a_print_and_copies_no_column() -> 
     )
 
 
+def published_fixing_columns(count: int) -> tuple[Cells, Cells]:
+    """The dates of the first so many prints published_columns lays out, as the sheet sends
+    them, the newest in the first row, and a price beside each."""
+    newest_first = range(count - 1, -1, -1)
+    return (
+        Cells.from_rows([[46161.0 + 7 * i] for i in newest_first]),
+        Cells.from_rows([[3.0 + (i % 30) / 100] for i in newest_first]),
+    )
+
+
+# Published fixings keep two arrays a price long, each price's print and its copy of the
+# prices, 16 bytes a price, and on the way pay the date column's conversion and its look, as a
+# Gas Daily series does, two flags for the order and the dates found, and the search's rows,
+# which are the array kept: measured 18,855 bytes at 480 prices on 2026-11-24, 39 a price, and
+# 174,375 at 4,800, 36 a price.
+def test_published_fixings_keep_each_prices_print_and_a_copy_of_the_prices() -> None:
+    count = 480
+    dated, prices = published_fixing_columns(count)
+    index = an_index(ENTRY["_CreatePublishedSchedule"](*published_columns(120)))
+    assert (
+        least_peak(lambda: ENTRY["_CreatePublishedFixings"](dated, prices, index))
+        <= 40 * count + 2 * SLACK
+    )
+
+
+# A published history makes one flag a price long, its look for a price on a print not yet
+# fixed, and nothing else: its rows and its prices are the fixings' own two read-only arrays,
+# held and not copied, and that every fixed print has a price is a comparison of two counts.
+# Measured 728 bytes at 480 prices on 2026-11-24 and 5,048 at 4,800, a byte a price.
+def test_a_published_history_makes_one_flag_a_price_and_copies_no_column() -> None:
+    count = 480
+    index = an_index(ENTRY["_CreatePublishedSchedule"](*published_columns(120)))
+    calendar = ENTRY["_CreateCalendar"](ENTRY["_CreateValuationDate"](49740.0, 0.5), index)
+    fixings = ENTRY["_CreatePublishedFixings"](*published_fixing_columns(count), index)
+    assert (
+        least_peak(lambda: ENTRY["_CreateMarketHistory"](calendar, fixings))
+        <= 2 * count + 2 * SLACK
+    )
+
+
 def history_sources(contracts: int) -> tuple[object, object]:
     """The two handles a history takes: the calendar calendar_sources makes, valued on 11
     September 2026, and fixings on every business day from Friday 1 May 2026 to the day

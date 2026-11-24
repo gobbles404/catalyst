@@ -20,6 +20,7 @@ from catalyst.market_data.futures_fixings import FuturesFixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings
 from catalyst.market_data.iferc_fixings import IfercFixings
 from catalyst.market_data.price_vector import PriceVector
+from catalyst.market_data.published_fixings import PublishedFixings
 from catalyst_probes import probe
 
 PID = os.getpid()  # leads every handle this Python publishes
@@ -948,6 +949,214 @@ def test_the_gas_daily_index_that_cannot_be_taken_says_why() -> None:
     assert bridge.call("_CreateGasDailyFixings", [FLOW_DAYS, MIDPOINTS, the_iferc_index()]) == (
         "#ERROR _CreateGasDailyFixings: ValueError: index is an IFERC index, "
         "expected a Gas Daily index"
+    )
+
+
+# --- _CreatePublishedFixings -----------------------------------------------------
+
+
+# The page's sample as the sheet sends it: the prices of the three prints dated before
+# Wednesday 16 September 2026, the newest in the first row, over an index of six weekly prints,
+# 31 August, the four Mondays of September and 5 October 2026.
+AUG_31, P_SEP_7, SEP_14, SEP_21, SEP_28, OCT_5 = (
+    46265.0,
+    46272.0,
+    46279.0,
+    46286.0,
+    46293.0,
+    46300.0,
+)
+DATED = Cells.from_rows([[SEP_14], [P_SEP_7], [AUG_31]])
+PRINT_PRICES = Cells.from_rows([[3.20], [3.00], [2.95]])
+PUBLISHED_HANDLE = re.compile(r"[0-9]+:published_fixings:.+:([0-9]+)")
+
+
+@functools.cache
+def the_published_index() -> str:
+    """The published index of six weekly prints of three months, made once."""
+    schedule = bridge.call(
+        "_CreatePublishedSchedule",
+        [
+            Cells.from_rows([["Q26"], ["U26"], ["U26"], ["U26"], ["U26"], ["V26"]]),
+            Cells.from_rows([[AUG_31], [P_SEP_7], [SEP_14], [SEP_21], [SEP_28], [OCT_5]]),
+        ],
+    )
+    return an_index_of("DOE Diesel", schedule, MISSING)
+
+
+# This hidden reader proves that a handle resolves to the fixings the seam kept: each price's
+# print, its row of the index's schedule, and the prices, the oldest first, the other way up
+# from the sheet.
+@probe
+def ReadPublishedFixings(fixings: Handle[PublishedFixings]) -> str:
+    kept = " ".join(str(row) for row in fixings.rows.tolist())
+    return f"{kept} | {' '.join(repr(float(p)) for p in fixings.prices)}"
+
+
+def published(dated: object, prices: object) -> str:
+    text = bridge.call("_CreatePublishedFixings", [dated, prices, the_published_index()])
+    assert isinstance(text, str) and PUBLISHED_HANDLE.fullmatch(text), text
+    return text
+
+
+def test_published_fixings_are_created_from_two_columns_and_read_back() -> None:
+    made = published(DATED, PRINT_PRICES)
+    assert bridge.call("ReadPublishedFixings", [made]) == "0 1 2 | 2.95 3.0 3.2"
+    assert made.startswith(f"{PID}:published_fixings:DOE Diesel:")  # the index's name
+
+
+# A single cell is a column of one, so the price of one print needs no range.
+def test_two_single_cells_make_the_fixings_of_one_print() -> None:
+    assert bridge.call("ReadPublishedFixings", [published(SEP_21, 3.5)]) == "3 | 3.5"
+
+
+@pytest.mark.parametrize(
+    ("dated", "prices", "text"),
+    [
+        (
+            DATED,
+            Cells.from_rows([[3.20], [3.00]]),
+            "#ERROR _CreatePublishedFixings: ValueError: price has 2 prices, expected 3, "
+            "one per publication_date",
+        ),
+        (
+            Cells.from_rows([[AUG_31], [P_SEP_7], [SEP_14]]),
+            PRINT_PRICES,
+            "#ERROR _CreatePublishedFixings: ValueError: publication_date row 2 is 2026-09-07, "
+            "expected a date before row 1's 2026-08-31",
+        ),
+        (
+            Cells.from_rows([[SEP_14], [SEP_14], [AUG_31]]),
+            PRINT_PRICES,
+            "#ERROR _CreatePublishedFixings: ValueError: publication_date row 2 is 2026-09-14, "
+            "expected a date before row 1's 2026-09-14",
+        ),
+        (
+            Cells.from_rows([[SEP_14 + 1], [P_SEP_7], [AUG_31]]),
+            PRINT_PRICES,
+            "#ERROR _CreatePublishedFixings: ValueError: publication_date row 1 is 2026-09-15, "
+            "expected the publication date of one of the index's prints",
+        ),
+        (
+            Cells.from_rows([[SEP_14], [P_SEP_7], [AUG_31 - 7]]),
+            PRINT_PRICES,
+            "#ERROR _CreatePublishedFixings: ValueError: publication_date row 3 is 2026-08-24, "
+            "expected the publication date of one of the index's prints",
+        ),
+        (
+            Cells.from_rows([[SEP_14], [None], [AUG_31]]),
+            PRINT_PRICES,
+            "#ERROR _CreatePublishedFixings: publication_date cell (2, 1) is blank, expected date",
+        ),
+        (
+            Cells.from_rows([[SEP_14], ["7-Sep-2026"], [AUG_31]]),
+            PRINT_PRICES,
+            "#ERROR _CreatePublishedFixings: publication_date cell (2, 1) is text '7-Sep-2026', "
+            "expected date",
+        ),
+        (
+            DATED,
+            Cells.from_rows([[3.20], [None], [2.95]]),
+            "#ERROR _CreatePublishedFixings: price cell (2, 1) is blank, expected number",
+        ),
+        (
+            DATED,
+            Cells.from_rows([[3.20], ["n/a"], [2.95]]),
+            "#ERROR _CreatePublishedFixings: price cell (2, 1) is text 'n/a', expected number",
+        ),
+        (
+            DATED,
+            Cells.from_rows([[3.20, 3.00, 2.95]]),
+            "#ERROR _CreatePublishedFixings: price is 1x3 array, expected column of numbers",
+        ),
+        (
+            MISSING,
+            PRINT_PRICES,
+            "#ERROR _CreatePublishedFixings: publication_date is missing, expected column of dates",
+        ),
+        (
+            DATED,
+            MISSING,
+            "#ERROR _CreatePublishedFixings: price is missing, expected column of numbers",
+        ),
+    ],
+    ids=[
+        "a price column one row short",
+        "a series pasted oldest first",
+        "a date given twice",
+        "the day a price was released, not the date it carries",
+        "history from before the schedule's first print",
+        "a blank among the dates",
+        "text among the dates",
+        "a blank among the prices",
+        "text among the prices",
+        "a row of prices",
+        "the dates left out",
+        "the prices left out",
+    ],
+)
+def test_published_fixings_that_cannot_be_made_say_why(
+    dated: object, prices: object, text: str
+) -> None:
+    assert bridge.call("_CreatePublishedFixings", [dated, prices, the_published_index()]) == text
+
+
+def test_the_published_index_that_cannot_be_taken_says_why() -> None:
+    assert bridge.call("_CreatePublishedFixings", [DATED, PRINT_PRICES, MISSING]) == (
+        "#ERROR _CreatePublishedFixings: index is missing, expected index handle"
+    )
+    assert bridge.call("_CreatePublishedFixings", [DATED, PRINT_PRICES, the_iferc_index()]) == (
+        "#ERROR _CreatePublishedFixings: ValueError: index is an IFERC index, "
+        "expected a published index"
+    )
+    # The other kinds' fixings refuse a published index in turn, each in its own words.
+    assert bridge.call("_CreateIfercFixings", ["U26", 3.0, the_published_index()]) == (
+        "#ERROR _CreateIfercFixings: ValueError: index is a published index, "
+        "expected an IFERC index"
+    )
+    assert bridge.call("_CreateGasDailyFixings", [SEP_14, 3.0, the_published_index()]) == (
+        "#ERROR _CreateGasDailyFixings: ValueError: index is a published index, "
+        "expected a Gas Daily index"
+    )
+
+
+# The publication number moves only when an object is stored, so a failed creator leaves no gap.
+def test_a_failed_published_construction_publishes_no_object_and_no_handle() -> None:
+    before = number(published(DATED, PRINT_PRICES), PUBLISHED_HANDLE)
+    assert cast(
+        str,
+        bridge.call(
+            "_CreatePublishedFixings",
+            [DATED, Cells.from_rows([[3.20], [3.00]]), the_published_index()],
+        ),
+    ).startswith("#ERROR _CreatePublishedFixings: ValueError: price has 2 prices")
+    assert number(published(DATED, PRINT_PRICES), PUBLISHED_HANDLE) == before + 1
+
+
+def test_a_handle_of_another_kind_is_not_published_fixings() -> None:
+    other = gas_daily(FLOW_DAYS, MIDPOINTS)
+    assert bridge.call("ReadPublishedFixings", [other]) == (
+        f"#ERROR ReadPublishedFixings: fixings is gas daily fixings handle {other!r}, "
+        "expected published fixings handle"
+    )
+
+
+# The spill is the creator's own form, newest first, a date beside its price: fed back to the
+# creator it makes equal fixings.
+def test_a_published_fixings_spill_fed_back_to_its_creator_makes_equal_fixings() -> None:
+    made = published(DATED, PRINT_PRICES)
+    kinds, slots, joined = read(made)
+    spilled = rows((kinds, slots, joined))
+    assert spilled == [
+        ["publication_date", "price"],
+        ["datetime64[D]", "float64"],
+        [SEP_14, 3.20],
+        [P_SEP_7, 3.00],
+        [AUG_31, 2.95],
+    ]
+    again = published(*columns(spilled))
+    assert bridge.call("ReadPublishedFixings", [again]) == (
+        bridge.call("ReadPublishedFixings", [made])
     )
 
 
