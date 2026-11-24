@@ -22,6 +22,7 @@ from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index_conventions import IndexConventions
+from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst_probes import probe
 
 PID = os.getpid()  # leads every handle this Python publishes
@@ -439,6 +440,216 @@ def test_a_handle_of_another_kind_is_not_an_iferc_schedule() -> None:
     other = a_schedule(CODES, FUTURES, MISSING)
     assert bridge.call("ReadIfercSchedule", [other]) == (
         f"#ERROR ReadIfercSchedule: schedule is futures schedule handle {other!r}, "
+        "expected iferc schedule handle"
+    )
+
+
+# --- _CreatePublishedSchedule -------------------------------------------------------
+
+
+# The published schedule page's sample as the sheet sends it: six prints, the code of the month
+# each counts toward as text and its date as a serial, 31 August, the four Mondays of September
+# and 5 October 2026.
+PUBLISHED_CODES = Cells.from_rows([["Q26"], ["U26"], ["U26"], ["U26"], ["U26"], ["V26"]])
+PUBLISHED_DATES = Cells.from_rows(
+    [[46265.0], [46272.0], [46279.0], [46286.0], [46293.0], [46300.0]]
+)
+PUBLISHED = re.compile(r"[0-9]+:published_schedule:([0-9]+)")
+
+
+# This hidden reader proves that a handle resolves to the schedule the seam kept: the months,
+# each once, each print's month and the publication dates.
+@probe
+def ReadPublishedSchedule(schedule: Handle[PublishedSchedule]) -> str:
+    months = " ".join(str(row) for row in schedule.contract.tolist())
+    return f"{' '.join(schedule.codes)} | {months} | {days_or_none(schedule.publication_date)}"
+
+
+def a_published_schedule(codes: object, published: object) -> str:
+    text = bridge.call("_CreatePublishedSchedule", [codes, published])
+    assert isinstance(text, str) and PUBLISHED.fullmatch(text), text
+    return text
+
+
+def test_a_published_schedule_is_created_from_two_columns_and_read_back() -> None:
+    schedule = a_published_schedule(PUBLISHED_CODES, PUBLISHED_DATES)
+    assert bridge.call("ReadPublishedSchedule", [schedule]) == (
+        "Q26 U26 V26 | 0 1 1 1 1 2 | "
+        "2026-08-31 2026-09-07 2026-09-14 2026-09-21 2026-09-28 2026-10-05"
+    )
+
+
+# Two single cells are two columns of one, so a schedule of one print needs no range.
+def test_two_single_cells_are_a_published_schedule_of_one_print() -> None:
+    schedule = a_published_schedule("U26", 46272.0)
+    assert bridge.call("ReadPublishedSchedule", [schedule]) == "U26 | 0 | 2026-09-07"
+
+
+@pytest.mark.parametrize(
+    ("args", "text"),
+    [
+        (
+            [PUBLISHED_CODES, Cells.from_rows([[46265.0], [46272.0], [46279.0]])],
+            "#ERROR _CreatePublishedSchedule: ValueError: publication_date has 3 dates, "
+            "expected 6, one per contract_code",
+        ),
+        (
+            ["U26", PUBLISHED_DATES],
+            "#ERROR _CreatePublishedSchedule: ValueError: publication_date has 6 dates, "
+            "expected 1, one per contract_code",
+        ),
+        (
+            [
+                Cells.from_rows([["U26"], ["U26"], ["V26"], ["U26"], ["U26"], ["V26"]]),
+                PUBLISHED_DATES,
+            ],
+            "#ERROR _CreatePublishedSchedule: ValueError: contract_code row 4 is 'U26', a month "
+            "whose prints ended at row 2, expected each month's prints in consecutive rows",
+        ),
+        (
+            [
+                PUBLISHED_CODES,
+                Cells.from_rows([[46265.0], [46272.0], [46272.0], [46286.0], [46293.0], [46300.0]]),
+            ],
+            "#ERROR _CreatePublishedSchedule: ValueError: publication_date row 3 is 2026-09-07, "
+            "expected a date after row 2's 2026-09-07",
+        ),
+        (
+            [
+                PUBLISHED_CODES,
+                Cells.from_rows([[46300.0], [46293.0], [46286.0], [46279.0], [46272.0], [46265.0]]),
+            ],
+            "#ERROR _CreatePublishedSchedule: ValueError: publication_date row 2 is 2026-09-28, "
+            "expected a date after row 1's 2026-10-05",
+        ),
+        (
+            [
+                PUBLISHED_CODES,
+                Cells.from_rows([[46265.0], [None], [46279.0], [46286.0], [46293.0], [46300.0]]),
+            ],
+            "#ERROR _CreatePublishedSchedule: publication_date cell (2, 1) is blank, expected date",
+        ),
+        (
+            [
+                PUBLISHED_CODES,
+                Cells.from_rows([[46265.0], [46272.5], [46279.0], [46286.0], [46293.0], [46300.0]]),
+            ],
+            "#ERROR _CreatePublishedSchedule: publication_date cell (2, 1) is number 46272.5, "
+            "expected date",
+        ),
+        (
+            [
+                PUBLISHED_CODES,
+                Cells.from_rows(
+                    [["31-Aug-2026"], [46272.0], [46279.0], [46286.0], [46293.0], [46300.0]]
+                ),
+            ],
+            "#ERROR _CreatePublishedSchedule: publication_date cell (1, 1) is text "
+            "'31-Aug-2026', expected date",
+        ),
+        (
+            [
+                Cells.from_rows([["Q26"], [46023.0], ["U26"], ["U26"], ["U26"], ["V26"]]),
+                PUBLISHED_DATES,
+            ],
+            "#ERROR _CreatePublishedSchedule: contract_code cell (2, 1) is number 46023.0, "
+            "expected text",
+        ),
+        (
+            [
+                Cells.from_rows([["Q26"], [""], ["U26"], ["U26"], ["U26"], ["V26"]]),
+                PUBLISHED_DATES,
+            ],
+            "#ERROR _CreatePublishedSchedule: contract_code cell (2, 1) is empty text, "
+            "expected text",
+        ),
+        (
+            [Cells.from_rows([["Q26", "U26", "V26"]]), PUBLISHED_DATES],
+            "#ERROR _CreatePublishedSchedule: contract_code is 1x3 array, expected column of text",
+        ),
+        (
+            [PUBLISHED_CODES, Cells.from_rows([[46265.0, 46272.0, 46279.0]])],
+            "#ERROR _CreatePublishedSchedule: publication_date is 1x3 array, expected column of "
+            "dates",
+        ),
+        (
+            [MISSING, PUBLISHED_DATES],
+            "#ERROR _CreatePublishedSchedule: contract_code is missing, expected column of text",
+        ),
+        (
+            [PUBLISHED_CODES, MISSING],
+            "#ERROR _CreatePublishedSchedule: publication_date is missing, expected column of "
+            "dates",
+        ),
+        (
+            [None, PUBLISHED_DATES],
+            "#ERROR _CreatePublishedSchedule: contract_code is blank, expected column of text",
+        ),
+        (
+            [PUBLISHED_CODES, None],
+            "#ERROR _CreatePublishedSchedule: publication_date is blank, expected column of dates",
+        ),
+        (
+            [
+                Cells.from_rows([["Q26"], [46023.0], ["U26"]]),
+                Cells.from_rows([[46265.0], [None]]),
+            ],
+            "#ERROR _CreatePublishedSchedule: contract_code cell (2, 1) is number 46023.0, "
+            "expected text",
+        ),
+    ],
+    ids=[
+        "a publication column three rows short",
+        "six publication dates for one code",
+        "a month whose code returns after another began",
+        "a publication date listed twice",
+        "a schedule pasted newest first",
+        "a blank in the publication column",
+        "a date with a time",
+        "text in the publication column",
+        "a number among the codes",
+        "empty text among the codes",
+        "a row of codes",
+        "a row of dates",
+        "the codes left out",
+        "the publication dates left out",
+        "a blank cell where the codes should be",
+        "a blank cell where the publication dates should be",
+        "both columns wrong, the codes named first",
+    ],
+)
+def test_a_published_schedule_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
+    assert bridge.call("_CreatePublishedSchedule", args) == text
+
+
+# The publication number moves only when an object is stored, so a failed creator leaves no gap,
+# whether the library or the seam refused the call.
+def test_a_failed_published_schedule_publishes_no_object_and_no_handle() -> None:
+    before = number(a_published_schedule(PUBLISHED_CODES, PUBLISHED_DATES), PUBLISHED)
+    assert bridge.call(
+        "_CreatePublishedSchedule",
+        [PUBLISHED_CODES, Cells.from_rows([[46265.0], [46272.0], [46279.0]])],
+    ) == (
+        "#ERROR _CreatePublishedSchedule: ValueError: publication_date has 3 dates, "
+        "expected 6, one per contract_code"
+    )
+    assert bridge.call(
+        "_CreatePublishedSchedule",
+        [PUBLISHED_CODES, Cells.from_rows([[46265.0], [None], [46279.0]])],
+    ) == ("#ERROR _CreatePublishedSchedule: publication_date cell (2, 1) is blank, expected date")
+    assert number(a_published_schedule(PUBLISHED_CODES, PUBLISHED_DATES), PUBLISHED) == (before + 1)
+
+
+# The two schedules of two columns are two kinds: neither's handle stands for the other.
+def test_a_handle_of_another_kind_is_not_a_published_schedule() -> None:
+    other = an_iferc_schedule(IFERC_CODES, IFERC_PUBLICATIONS)
+    assert bridge.call("ReadPublishedSchedule", [other]) == (
+        f"#ERROR ReadPublishedSchedule: schedule is iferc schedule handle {other!r}, "
+        "expected published schedule handle"
+    )
+    mine = a_published_schedule(PUBLISHED_CODES, PUBLISHED_DATES)
+    assert bridge.call("ReadIfercSchedule", [mine]) == (
+        f"#ERROR ReadIfercSchedule: schedule is published schedule handle {mine!r}, "
         "expected iferc schedule handle"
     )
 
@@ -1078,6 +1289,51 @@ def test_an_iferc_and_a_gas_daily_index_are_created_without_a_holiday_calendar()
     ]
 
 
+# A published index reads back its months, not its prints: six prints of three months are three
+# contracts, the count every reader of a schedule's codes takes.
+def test_a_published_index_is_created_without_a_holiday_calendar_and_counts_its_months() -> None:
+    _, holidays, conventions, specifications = the_parts()
+    published = a_published_schedule(PUBLISHED_CODES, PUBLISHED_DATES)
+    weekly = an_index(
+        "DOE Diesel",
+        "U.S. national retail diesel - EIA weekly",
+        published,
+        conventions,
+        specifications,
+        MISSING,
+        MISSING,
+    )
+    assert rows(read(weekly)) == [
+        INDEX_HEADERS,
+        INDEX_TYPES,
+        [
+            "DOE Diesel",
+            "U.S. national retail diesel - EIA weekly",
+            "published",
+            3.0,
+            2.0,
+            0.0,
+            "unset",
+        ],
+    ]
+    assert bridge.call(
+        "_CreateIndex",
+        [
+            "DOE Diesel",
+            "U.S. national retail diesel - EIA weekly",
+            published,
+            conventions,
+            specifications,
+            seam_key(holidays),
+            MISSING,
+            seam_calendars(),
+        ],
+    ) == (
+        f"#ERROR _CreateIndex: ValueError: holiday_key is {seam_key(holidays)!r}, "
+        "expected none with a published schedule"
+    )
+
+
 def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None:
     schedule, holidays, conventions, specifications = the_parts()
     assert bridge.call(
@@ -1151,7 +1407,7 @@ def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None
             ],
         ) == (
             f"#ERROR _CreateIndex: ValueError: schedule is {what}, "
-            "expected a futures, IFERC or Gas Daily schedule"
+            "expected a futures, IFERC, Gas Daily or published schedule"
         )
     made = an_index(
         "Henry Hub NYMEX",
@@ -1176,7 +1432,7 @@ def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None
         ],
     ) == (
         "#ERROR _CreateIndex: ValueError: schedule is an index, "
-        "expected a futures, IFERC or Gas Daily schedule"
+        "expected a futures, IFERC, Gas Daily or published schedule"
     )
 
 

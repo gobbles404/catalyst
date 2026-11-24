@@ -1199,6 +1199,56 @@ def test_a_gas_daily_schedule_is_three_columns_in_and_one_publication_out(
     }
 
 
+# --- the published schedule: two columns in, one publication out ---------------------
+
+
+def published_columns(months: int, prints: int = 4) -> tuple[Cells, Cells]:
+    """The code of its month and the date of each print, for that many months of that many
+    prints a week apart, as the sheet sends them: one row per print, a month's code on every
+    print of it."""
+    codes = Cells.from_rows([[f"c{i}"] for i in range(months) for _ in range(prints)])
+    dates = Cells.from_rows([[46161.0 + 7 * i] for i in range(months * prints)])
+    return codes, dates
+
+
+# Ten years of weekly prints, 480 rows of 120 months: the two columns through the rules the
+# IFERC schedule's go through, then the builder's own work, which is by column and never by
+# print. One comparison down the codes finds the row each month begins on; one down the dates
+# holds them in order; one sum gives each print its month. The months' codes are looked at once
+# each for a month given twice, a set of 120, and no print's code is read again.
+def test_a_published_schedule_is_two_columns_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    codes, dates = published_columns(120)
+    PATH["_CreatePublishedSchedule"](codes, dates)
+    assert call_profile(lambda: PATH["_CreatePublishedSchedule"](codes, dates)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text_column": 1,
+        "_date_column": 1,
+        "_one_column": 2,
+        "_shape": 2,
+        "_texts": 1,
+        "_dates": 1,
+        "_not_dates": 1,
+        "_as_days": 1,
+        "_CreatePublishedSchedule": 1,
+        "published_schedule": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreatePublishedSchedule"](codes, dates)) == {
+        "ndarray.any": 2,  # the seam's look at the date column, and the dates in order
+        "ndarray.astype": 2,  # the date column on its way to days
+        "numpy.array": 2,  # the codes as one column to compare, and the copy of the dates
+        "numpy.empty": 1,  # whether each row begins a month, filled by the one comparison
+        "ndarray.nonzero": 1,  # the row each month begins on
+        "ndarray.cumsum": 1,  # each print's month
+        "ndarray.setflags": 2,  # each print's month and the dates, frozen
+        "ufunc.reduce": 2,
+    }
+
+
 # --- the third index definition: five texts in, one publication out ------------------
 
 
@@ -1444,6 +1494,35 @@ def test_an_index_is_two_texts_and_four_handles_in_and_one_publication_out(
         "without_holiday_key": 1,
         "_publish": 1,
     }
+    # A published index is an IFERC index's ledger with its own dispatch: no key and no
+    # calendar, and nothing of the schedule's 480 prints looked at.
+    prints = PATH["_CreatePublishedSchedule"](*published_columns(120))
+    weekly = (
+        "DOE Diesel",
+        "U.S. national retail diesel - EIA weekly",
+        prints,
+        conventions,
+        specifications,
+        MISSING,
+        MISSING,
+        MISSING,
+    )
+    PATH["_CreateIndex"](*weekly)
+    assert call_profile(lambda: PATH["_CreateIndex"](*weekly)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 8,
+        "_text": 5,
+        "_resolve": 3,
+        "_CreateIndex": 1,
+        "index": 1,
+        "WorkCounter.__init__": 1,
+        "published_index": 1,
+        "_the_calendar": 1,
+        "without_holiday_key": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateIndex"](*weekly)) == {}
 
 
 # Reading an index back: the handle's text rule and one lookup, then one row of seven cells
@@ -1752,6 +1831,38 @@ def test_an_iferc_calendar_is_an_index_and_a_valuation_date_in_and_four_columns_
         "ndarray.setflags": 4,
         "numpy.count_nonzero": 1,  # the fixed periods counted
         "ufunc.reduce": 1,
+    }
+
+
+# Ten years of weekly prints, 480 rows: two handles as above and the least a calendar can do.
+# The schedule's order was checked when the schedule was made, so the builder looks at nothing
+# of it: no code is counted, no date compared with the one above, and neither column is copied,
+# the calendar holding the schedule's own two read-only arrays. What is made is the priced
+# flag, in one empty, and the fixed flag, one comparison; then one publication.
+def test_a_published_calendar_is_an_index_and_a_valuation_date_in_and_two_flags_made(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
+    schedule = PATH["_CreatePublishedSchedule"](*published_columns(120))
+    index = an_index(schedule)
+    PATH["_CreateCalendar"](valuation, index)
+    assert call_profile(lambda: PATH["_CreateCalendar"](valuation, index)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text": 2,
+        "_resolve": 2,
+        "_CreateCalendar": 1,
+        "calendar": 1,
+        "_published_calendar": 1,
+        "_at_least_one": 1,
+        "_frozen": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, index)) == {
+        "numpy.empty": 1,  # the priced flag, true throughout
+        "ndarray.setflags": 4,
+        "numpy.count_nonzero": 1,  # the fixed periods counted
     }
 
 

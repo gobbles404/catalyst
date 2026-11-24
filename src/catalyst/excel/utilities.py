@@ -45,6 +45,7 @@ from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import IndexConventions
 from catalyst.index_definitions.periods import end_date, start_date
+from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FieldType, Instrument
 from catalyst.instruments.fields import DatesOrTexts
@@ -158,6 +159,17 @@ def gas_daily_schedule_table(obj: GasDailySchedule) -> MixedArray:
         obj.codes,
         obj.first_date,
         obj.last_date,
+    )
+
+
+@shown.register
+def published_schedule_table(obj: PublishedSchedule) -> MixedArray:
+    # One row per print, the creator's own form: the code of the month each print counts
+    # toward, one take of the months over the prints, beside its date.
+    return MixedArray.table(
+        [("contract_code", "publication_date"), ("str", "datetime64[D]")],
+        tuple(np.array(obj.codes, dtype=object)[obj.contract]),
+        obj.publication_date,
     )
 
 

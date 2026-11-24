@@ -30,6 +30,7 @@ from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.kind import Kind
+from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT
 from catalyst.instruments.fields import DatesOrTexts
@@ -338,12 +339,28 @@ GAS_DAILY = index_on(
 )
 
 
+PUBLISHED = index_on(
+    "weekly",
+    "Sample published index",
+    published_schedule(("F26",), dates("2026-01-05")),
+    NG.conventions,
+    NG.specifications,
+    None,
+    None,
+    UNITS,
+)
+
+
 @pytest.mark.parametrize(
     ("change", "message"),
     [
         (
             {"ix": GAS_DAILY},
             "index is a Gas Daily index, expected a futures or an IFERC index for a fixed_float",
+        ),
+        (
+            {"ix": PUBLISHED},
+            "index is a published index, expected a futures or an IFERC index for a fixed_float",
         ),
         (
             {"specification": spec(5, 1)},

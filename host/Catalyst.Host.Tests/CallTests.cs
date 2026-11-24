@@ -406,6 +406,15 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", 46023.0), Column(46296.0, 46328.0) }, "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is number 46023.0, expected text" };
             yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26"), ExcelMissing.Value }, "#ERROR _CreateIfercSchedule: publication_date is missing, expected column of dates" };
             yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26"), Row(46296.0, 46328.0) }, "#ERROR _CreateIfercSchedule: publication_date is 1x2 array, expected column of dates" };
+            // The published schedule: a publication column one row short, a month whose code returns after another began, a date listed twice and a schedule pasted newest first, the library's words; a blank among the publication dates, a number among the codes, the publication dates left out and a row where a column is expected, the seam's.
+            yield return new object[] { "_CreatePublishedSchedule", new object[] { Column("U26", "U26", "V26"), Column(46272.0, 46279.0) }, "#ERROR _CreatePublishedSchedule: ValueError: publication_date has 2 dates, expected 3, one per contract_code" };
+            yield return new object[] { "_CreatePublishedSchedule", new object[] { Column("U26", "U26", "V26", "U26"), Column(46272.0, 46279.0, 46300.0, 46307.0) }, "#ERROR _CreatePublishedSchedule: ValueError: contract_code row 4 is 'U26', a month whose prints ended at row 2, expected each month's prints in consecutive rows" };
+            yield return new object[] { "_CreatePublishedSchedule", new object[] { Column("U26", "U26", "V26"), Column(46272.0, 46272.0, 46300.0) }, "#ERROR _CreatePublishedSchedule: ValueError: publication_date row 2 is 2026-09-07, expected a date after row 1's 2026-09-07" };
+            yield return new object[] { "_CreatePublishedSchedule", new object[] { Column("V26", "U26", "U26"), Column(46300.0, 46279.0, 46272.0) }, "#ERROR _CreatePublishedSchedule: ValueError: publication_date row 2 is 2026-09-14, expected a date after row 1's 2026-10-05" };
+            yield return new object[] { "_CreatePublishedSchedule", new object[] { Column("U26", "U26"), Column(46272.0, ExcelEmpty.Value) }, "#ERROR _CreatePublishedSchedule: publication_date cell (2, 1) is blank, expected date" };
+            yield return new object[] { "_CreatePublishedSchedule", new object[] { Column("U26", 46023.0), Column(46272.0, 46279.0) }, "#ERROR _CreatePublishedSchedule: contract_code cell (2, 1) is number 46023.0, expected text" };
+            yield return new object[] { "_CreatePublishedSchedule", new object[] { Column("U26", "U26"), ExcelMissing.Value }, "#ERROR _CreatePublishedSchedule: publication_date is missing, expected column of dates" };
+            yield return new object[] { "_CreatePublishedSchedule", new object[] { Column("U26", "U26"), Row(46272.0, 46279.0) }, "#ERROR _CreatePublishedSchedule: publication_date is 1x2 array, expected column of dates" };
             // The Gas Daily schedule: a first-date column one row short, the library's words; a blank among the last dates, a number among the codes, the last dates left out and a row where a column is expected, the seam's.
             yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", "V26", "X26"), Column(46266.0, 46296.0), Column(46295.0, 46326.0, 46356.0) }, "#ERROR _CreateGasDailySchedule: ValueError: first_date has 2 dates, expected 3, one per contract_code" };
             yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", "V26"), Column(46266.0, 46296.0), Column(46295.0, ExcelEmpty.Value) }, "#ERROR _CreateGasDailySchedule: last_date cell (2, 1) is blank, expected date" };
@@ -2460,6 +2469,35 @@ namespace Catalyst.Host.Tests
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", one)).GetLength(0));
         }
 
+        // A published schedule: two columns make one, a row per print, and two single cells make
+        // one of one print; util_ReadHandle spills it back in the creator's own form, the two
+        // headers, the two types, then a row per print, the code of the month it counts toward on
+        // every print of that month and its publication date as a serial. Six prints of three
+        // months here: 31 August, the four Mondays of September and 5 October 2026.
+        [Fact]
+        public void a_published_schedule_is_created_from_two_columns_and_read_back_through_its_handle()
+        {
+            var handle = (string)Seam.Call("_CreatePublishedSchedule", Column("Q26", "U26", "U26", "U26", "U26", "V26"), Column(46265.0, 46272.0, 46279.0, 46286.0, 46293.0, 46300.0));
+            Assert.StartsWith(Pid + ":published_schedule:", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
+            Assert.Equal(8, spill.GetLength(0));
+            Assert.Equal(2, spill.GetLength(1));
+            Assert.Equal("contract_code", spill[0, 0]);
+            Assert.Equal("publication_date", spill[0, 1]);
+            Assert.Equal("str", spill[1, 0]);
+            Assert.Equal("datetime64[D]", spill[1, 1]);
+            Assert.Equal("Q26", spill[2, 0]);
+            Assert.Equal(46265.0, spill[2, 1]);
+            Assert.Equal("U26", spill[3, 0]);
+            Assert.Equal("U26", spill[6, 0]);
+            Assert.Equal(46293.0, spill[6, 1]);
+            Assert.Equal("V26", spill[7, 0]);
+            Assert.Equal(46300.0, spill[7, 1]);
+            var one = (string)Seam.Call("_CreatePublishedSchedule", "U26", 46272.0);
+            Assert.NotEqual(handle, one);
+            Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", one)).GetLength(0));
+        }
+
         // A Gas Daily schedule: three columns make one, three single cells make one of one contract
         // month, and util_ReadHandle spills it back, the three headers, the three types, then a
         // row per contract month, the code as text and both dates as serials.
@@ -2581,7 +2619,15 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _CreateIndex: ValueError: holiday_key is missing, expected a holiday calendar's key with a futures schedule", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, conventions, specifications, Key(ExcelMissing.Value), ExcelMissing.Value, Calendars()));
             var gasDaily = (string)Seam.Call("_CreateGasDailySchedule", Column("U26", "V26", "X26"), Column(46266.0, 46296.0, 46327.0), Column(46295.0, 46326.0, 46356.0));
             Assert.Equal("#ERROR _CreateIndex: ValueError: holiday_key is '" + Key(holidays) + "', expected none with a Gas Daily schedule", Seam.Call("_CreateIndex", "Henry Hub Gas Daily", "Henry Hub natural gas - Platts Gas Daily", gasDaily, conventions, specifications, Key(holidays), ExcelMissing.Value, Calendars()));
-            Assert.Equal("#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", holidays, conventions, specifications, Key(ExcelMissing.Value), ExcelMissing.Value, Calendars()));
+            Assert.Equal("#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC, Gas Daily or published schedule", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", holidays, conventions, specifications, Key(ExcelMissing.Value), ExcelMissing.Value, Calendars()));
+            // A published index: its kind read off the schedule, its contracts the three months
+            // of its six prints, no holiday calendar, and a key given refused.
+            var published = (string)Seam.Call("_CreatePublishedSchedule", Column("Q26", "U26", "U26", "U26", "U26", "V26"), Column(46265.0, 46272.0, 46279.0, 46286.0, 46293.0, 46300.0));
+            var weekly = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateIndex", "DOE Diesel", "U.S. national retail diesel - EIA weekly", published, conventions, specifications, Key(ExcelMissing.Value), ExcelMissing.Value, Calendars()));
+            Assert.Equal("published", weekly[2, 2]);
+            Assert.Equal(3.0, weekly[2, 3]);
+            Assert.Equal(false, weekly[2, 5]);
+            Assert.Equal("#ERROR _CreateIndex: ValueError: holiday_key is '" + Key(holidays) + "', expected none with a published schedule", Seam.Call("_CreateIndex", "DOE Diesel", "U.S. national retail diesel - EIA weekly", published, conventions, specifications, Key(holidays), ExcelMissing.Value, Calendars()));
             Assert.Equal("#ERROR _CreateIndex: index_conventions is holiday calendar handle '" + holidays + "', expected index conventions handle", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, holidays, specifications, Key(holidays), ExcelMissing.Value, Calendars()));
         }
 
@@ -2851,6 +2897,24 @@ namespace Catalyst.Host.Tests
             Assert.Equal("U26", Seam.Call("util_ReadPrompt", gasCalendar));
             var ifercCalendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46341.0, 0.5), Index(iferc, ExcelMissing.Value));
             Assert.Equal("Z26", Seam.Call("util_ReadPrompt", ifercCalendar));
+            // A published calendar: a row per print on the month it counts toward, valued on
+            // Wednesday 16 September 2026, the prints dated before that day fixed, the 14th's
+            // among them, and the prompt the month of the first print still to come; valued on
+            // Monday the 14th that day's own print is still live.
+            var published = Index((string)Seam.Call("_CreatePublishedSchedule", Column("Q26", "U26", "U26", "U26", "U26", "V26"), Column(46265.0, 46272.0, 46279.0, 46286.0, 46293.0, 46300.0)), ExcelMissing.Value);
+            var publishedCalendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46281.0, 0.5), published);
+            var prints = (object[,])Seam.Call("util_ReadHandle", publishedCalendar);
+            Assert.Equal(8, prints.GetLength(0));
+            Assert.Equal(46279.0, prints[4, 0]);
+            Assert.Equal("U26", prints[4, 1]);
+            Assert.Equal(true, prints[4, 2]);
+            Assert.Equal(true, prints[4, 3]);
+            Assert.Equal(false, prints[5, 3]);
+            Assert.Equal("V26", prints[7, 1]);
+            Assert.Equal("U26", Seam.Call("util_ReadPrompt", publishedCalendar));
+            var onTheDay = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46279.0, 0.5), published));
+            Assert.Equal(false, onTheDay[4, 3]);
+            Assert.Equal(true, onTheDay[3, 3]);
             var ended = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46225.0, 0.5), index);
             Assert.Equal("#ERROR util_ReadPrompt: ValueError: calendar has no unfixed period, expected at least one to quote", Seam.Call("util_ReadPrompt", ended));
             Assert.Equal("#ERROR util_ReadPrompt: calendar is futures schedule handle '" + schedule + "', expected calendar handle", Seam.Call("util_ReadPrompt", schedule));

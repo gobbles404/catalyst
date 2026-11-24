@@ -19,6 +19,7 @@ from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_sched
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.kind import Kind
+from catalyst.index_definitions.published_schedule import PublishedSchedule, published_schedule
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:
@@ -709,7 +710,89 @@ def test_an_iferc_schedule_that_cannot_make_a_calendar_says_why(
     assert str(failure.value) == message
 
 
-# --- the general rules of the two new kinds ---------------------------------------------
+# --- a published schedule: one row per print, dated by its publication date --------------
+
+
+def a_published_schedule(*prints: tuple[str, str]) -> PublishedSchedule:
+    codes = tuple(code for code, _ in prints)
+    return published_schedule(codes, dates(*(published for _, published in prints)))
+
+
+# The published schedule page's sample, the four weekly prints of September 2026 between the
+# last of August and the first of October, valued on Wednesday 16 September, when the prints
+# dated the 7th and the 14th have fixed.
+PUBLISHED = a_published_schedule(
+    ("Q26", "2026-08-31"),
+    ("U26", "2026-09-07"),
+    ("U26", "2026-09-14"),
+    ("U26", "2026-09-21"),
+    ("U26", "2026-09-28"),
+    ("V26", "2026-10-05"),
+)
+SEP_16 = valuation_date(day("2026-09-16"), 0.5)
+
+
+def test_the_published_sample_is_one_row_per_print_on_the_month_it_counts_toward() -> None:
+    made = calendar(SEP_16, an_index(PUBLISHED, None))
+    assert made.index.kind is Kind.PUBLISHED
+    assert [str(date) for date in made.dates] == [
+        "2026-08-31",
+        "2026-09-07",
+        "2026-09-14",
+        "2026-09-21",
+        "2026-09-28",
+        "2026-10-05",
+    ]
+    assert codes_of(made) == ["Q26", "U26", "U26", "U26", "U26", "V26"]
+    assert made.contract.tolist() == [0, 1, 1, 1, 1, 2]
+    assert made.is_priced.all()
+    assert made.is_fixed.tolist() == [True, True, True, False, False, False]
+    assert made.first_unfixed == 3
+    assert made.index.schedule is PUBLISHED and made.index.holiday_calendar is None
+
+
+# Monday's price is live on the Monday and fixed from the Tuesday, whatever part of either day
+# has elapsed and whether or not its publisher has released it.
+def test_a_print_is_fixed_from_the_day_after_its_publication_date() -> None:
+    index = an_index(PUBLISHED, None)
+    on_the_day = calendar(valuation_date(day("2026-09-14"), 1.0), index)
+    assert on_the_day.is_fixed.tolist() == [True, True, False, False, False, False]
+    assert on_the_day.first_unfixed == 2
+    the_day_after = calendar(valuation_date(day("2026-09-15"), 0.0), index)
+    assert the_day_after.is_fixed.tolist() == [True, True, True, False, False, False]
+    before_any = calendar(valuation_date(day("2026-08-31"), 0.5), index)
+    assert not before_any.is_fixed.any()
+
+
+# November 2026 ends on a Monday: its last print is fixed on 1 December, so no print of the
+# month is live in the month after.
+def test_a_months_last_print_is_fixed_on_the_first_day_of_the_next_month() -> None:
+    november = a_published_schedule(
+        ("X26", "2026-11-23"), ("X26", "2026-11-30"), ("Z26", "2026-12-07")
+    )
+    made = calendar(valuation_date(day("2026-12-01"), 0.5), an_index(november, None))
+    assert made.is_fixed.tolist() == [True, True, False]
+    assert made.prompt_code() == "Z26"
+    on_the_day = calendar(valuation_date(day("2026-11-30"), 0.5), an_index(november, None))
+    assert on_the_day.is_fixed.tolist() == [True, False, False]
+    assert on_the_day.prompt_code() == "X26"
+
+
+def test_a_published_schedule_of_one_print_is_a_calendar() -> None:
+    one = calendar(SEP_16, an_index(a_published_schedule(("U26", "2026-09-07")), None))
+    assert codes_of(one) == ["U26"] and one.is_fixed.tolist() == [True]
+    assert one.dates.tolist() == [day("2026-09-07")]
+
+
+# The schedule's order was checked when the schedule was made, so the one rule left to the
+# calendar is a print to make a row of.
+def test_a_published_schedule_of_no_print_cannot_make_a_calendar() -> None:
+    with pytest.raises(ValueError) as failure:
+        calendar(SEP_16, an_index(published_schedule((), dates()), None))
+    assert str(failure.value) == "index has 0 contracts, expected at least 1"
+
+
+# --- the general rules of the kinds after futures -----------------------------------------
 
 
 @settings(deadline=None)
@@ -772,6 +855,42 @@ def test_every_iferc_month_is_one_row_dated_by_its_publication_day(data: st.Data
         assert not column.flags.writeable
 
 
+@settings(deadline=None)
+@given(data=st.data())
+def test_every_published_print_is_one_row_on_its_month_dated_by_its_publication_date(
+    data: st.DataObject,
+) -> None:
+    months = data.draw(st.integers(1, 30))
+    codes = data.draw(
+        st.lists(st.text(min_size=1, max_size=6), unique=True, min_size=months, max_size=months)
+    )
+    prints = data.draw(st.lists(st.integers(1, 6), min_size=months, max_size=months))
+    total = sum(prints)
+    gaps = np.array(
+        data.draw(st.lists(st.integers(1, 20), min_size=total, max_size=total)), dtype=np.int64
+    )
+    start = np.datetime64("2000-01-01", "D") + np.timedelta64(
+        data.draw(st.integers(0, 20_000)), "D"
+    )
+    published = start + np.cumsum(gaps).astype("timedelta64[D]")
+    by_print = tuple(code for code, count in zip(codes, prints, strict=True) for _ in range(count))
+    schedule = published_schedule(by_print, published)
+    as_of = start + np.timedelta64(data.draw(st.integers(-10, 3700)), "D")
+    made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
+    assert np.array_equal(made.dates, published)
+    assert codes_of(made) == list(by_print)
+    assert np.bincount(made.contract, minlength=months).tolist() == prints
+    assert made.is_priced.all()
+    assert np.array_equal(made.is_fixed, published < as_of)
+    # The fixed prints come first, so the count of them is the row of the first unfixed one.
+    assert made.first_unfixed == int(np.count_nonzero(published < as_of))
+    assert not made.is_fixed[made.first_unfixed :].any()
+    # The schedule's own two arrays, read-only already: the calendar copies neither.
+    assert made.dates is schedule.publication_date and made.contract is schedule.contract
+    for column in (made.dates, made.contract, made.is_priced, made.is_fixed):
+        assert not column.flags.writeable
+
+
 # --- the prompt code: the contract of the first unfixed period ----------------------------
 
 
@@ -779,7 +898,8 @@ def test_every_iferc_month_is_one_row_dated_by_its_publication_day(data: st.Data
 # valuation day, the expiring one on its expiry day and the next from the day after; on a Gas
 # Daily calendar the month of the day after the valuation day, the next month from a month's
 # last day; on an IFERC calendar the first month not yet published, the month itself on its
-# publication day. Nothing here is a new rule: it is the row the calendar counted and the
+# publication day; on a published calendar the month of the first print dated on or after the
+# valuation day. Nothing here is a new rule: it is the row the calendar counted and the
 # contract on it, read as the market reads them.
 @pytest.mark.parametrize(
     ("schedule", "holidays", "as_of", "code"),
@@ -812,6 +932,12 @@ def test_every_iferc_month_is_one_row_dated_by_its_publication_day(data: st.Data
         (IFERC, None, "2026-11-02", "X26"),
         (IFERC, None, "2026-12-01", "Z26"),
         (IFERC, None, "2026-09-15", "V26"),
+        (PUBLISHED, None, "2026-09-16", "U26"),
+        (PUBLISHED, None, "2026-09-28", "U26"),
+        (PUBLISHED, None, "2026-09-29", "V26"),
+        (PUBLISHED, None, "2026-08-31", "Q26"),
+        (PUBLISHED, None, "2026-09-01", "U26"),
+        (PUBLISHED, None, "2026-08-01", "Q26"),
     ],
     ids=[
         "futures, the expiry day: the expiring contract",
@@ -832,6 +958,12 @@ def test_every_iferc_month_is_one_row_dated_by_its_publication_day(data: st.Data
         "IFERC, the second publication day: the second month",
         "IFERC, the last publication day: the last month",
         "IFERC, before any publication: the first month",
+        "published, two of a month's four prints fixed: that month",
+        "published, a month's last print on its own date: that month still",
+        "published, the day after a month's last print: the next month",
+        "published, the first print's own date: its month",
+        "published, the day after a month's only print: the next month",
+        "published, before any print: the first month",
     ],
 )
 def test_the_prompt_code_is_the_contract_of_the_first_unfixed_period(
@@ -847,6 +979,7 @@ def test_the_fraction_of_the_valuation_day_changes_the_prompt_code_of_no_kind() 
         (SCHEDULE, CLOSED_MAY_25, "2026-06-22"),
         (GAS_DAILY, None, "2026-09-30"),
         (IFERC, None, "2026-11-02"),
+        (PUBLISHED, None, "2026-09-28"),
     ):
         codes = {
             calendar(valuation_date(day(as_of), f), an_index(schedule, holidays)).prompt_code()
@@ -863,11 +996,13 @@ def test_the_fraction_of_the_valuation_day_changes_the_prompt_code_of_no_kind() 
         (SCHEDULE, CLOSED_MAY_25, "2026-07-22"),
         (GAS_DAILY, None, "2026-11-30"),
         (IFERC, None, "2026-12-02"),
+        (PUBLISHED, None, "2026-10-06"),
     ],
     ids=[
         "futures, the day after the last expiry",
         "Gas Daily, the last flow day",
         "IFERC, the day after the last publication",
+        "published, the day after the last print",
     ],
 )
 def test_a_calendar_whose_every_period_has_fixed_has_no_prompt_code(

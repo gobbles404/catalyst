@@ -374,6 +374,28 @@ def test_the_gas_daily_schedule_creator_explains_itself() -> None:
     ]
 
 
+def test_the_published_schedule_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreatePublishedSchedule"]
+    assert not hidden
+    assert description == (
+        "Creates a published schedule from the dated prints of one index, each print's date and "
+        "the contract month it counts toward, and shows its handle, the text other formulas take "
+        "as the schedule."
+    )
+    assert arguments == [
+        (
+            "contract_code",
+            "The column of contract codes, one per print, such as A2:A5 holding U26 four times: "
+            "the month each print counts toward, a month's prints in consecutive rows.",
+        ),
+        (
+            "publication_date",
+            "The column of dates the publisher puts on each print, beside the codes, such as "
+            "B2:B5, one per code, oldest first; a print is fixed from the day after its date.",
+        ),
+    ]
+
+
 def test_the_conventions_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateIndexConventions"]
     assert not hidden
@@ -568,8 +590,8 @@ def test_the_index_creator_explains_itself() -> None:
         ),
         (
             "schedule",
-            "The index's schedule handle, futures, IFERC or Gas Daily: the cell showing its "
-            "creator's result, such as B2, or a name for it.",
+            "The index's schedule handle, futures, IFERC, Gas Daily or published: the cell "
+            "showing its creator's result, such as B2, or a name for it.",
         ),
         (
             "index_conventions",
@@ -585,7 +607,7 @@ def test_the_index_creator_explains_itself() -> None:
             "[holiday_key]",
             "The market's holiday calendar with a futures schedule, by key: one calendar's name, "
             "such as NYMEX, or several joined by +, such as NYMEX+ICE, closed when any is; left "
-            "out for an IFERC or Gas Daily schedule.",
+            "out for any other schedule.",
         ),
         (
             "[reporting_lot]",
@@ -606,9 +628,9 @@ def test_the_calendar_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateCalendar"]
     assert not hidden
     assert description == (
-        "Creates the calendar of one index, one row per day it prices, or per month for an "
-        "index published monthly, each with its contract and whether it has fixed, and shows "
-        "its handle, the text other formulas take as the calendar."
+        "Creates the calendar of one index, one row per period it prices, a day, a month or a "
+        "published print, each with its contract and whether it has fixed, and shows its handle, "
+        "the text other formulas take as the calendar."
     )
     assert arguments == [
         (
