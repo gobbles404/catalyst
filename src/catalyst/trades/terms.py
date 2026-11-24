@@ -27,6 +27,7 @@ from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index, ReportingLot
 from catalyst.index_definitions.kind import Kind, described
+from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.instruments.definitions import FLOAT_FLOAT, Instrument
 from catalyst.instruments.fields import DatesOrTexts
 from catalyst.trades.schedule_methods import (
@@ -34,7 +35,11 @@ from catalyst.trades.schedule_methods import (
     ScheduleMethod,
     permits_physical_settlement,
     supported_on_iferc,
+    supported_on_published,
 )
+
+# The schedule of an index a fixed_float is booked on, as trade_schedule_of types it.
+type TradeSchedule = FuturesSchedule | IfercSchedule | PublishedSchedule
 
 
 class Route(Enum):
@@ -174,7 +179,7 @@ class LegTerms:
     and no other, read once by the encoding, which signs the leg's amounts with it."""
 
     index: Index
-    schedule: FuturesSchedule | IfercSchedule
+    schedule: TradeSchedule
     reporting_lot: ReportingLot
     specification: NDArray[np.intp]
     schedule_method: NDArray[np.intp]
@@ -617,7 +622,7 @@ def _the_prices(
 
 def _the_leg(
     index: Index,
-    schedule: FuturesSchedule | IfercSchedule,
+    schedule: TradeSchedule,
     lot: ReportingLot,
     specification: NDArray[np.intp],
     schedule_method: NDArray[np.intp],
@@ -674,6 +679,7 @@ def _the_second_leg(
             f"index 2 is another index named {index.name!r}, the name of index 1, expected one "
             "index for one name"
         )
+    pair_kinds(first, index)
     mine, theirs = index.conventions, first.conventions
     if subtracted:
         spread_pair(first, index)
@@ -710,21 +716,37 @@ def _the_second_leg(
     )
 
 
-def trade_schedule_of(index: Index) -> FuturesSchedule | IfercSchedule:
+def pair_kinds(first: Index, second: Index) -> None:
+    """The kinds of index a pair is built on, the kernel's rule, applied by the resolution
+    before the second leg's periods are read so that a refused pair is refused in these words:
+    a published index books a fixed_float of its own and no pair, its months averaging on its
+    own prints' dates, so either leg on one is refused naming which."""
+    for which, each in (("index 1", first), ("index 2", second)):
+        if each.kind is Kind.PUBLISHED:
+            raise ValueError(
+                f"{which} {each.name!r} is a published index, expected a futures or an IFERC "
+                "index with two indexes; a pair on a published index is not built"
+            )
+
+
+def trade_schedule_of(index: Index) -> TradeSchedule:
     """The schedule of an index a fixed_float is booked on, typed as the kind rule found it: a
-    futures schedule, whose rows' expiry days settle the contracts, or since #167 an IFERC
-    schedule, whose rows' publication days print each month's index, the traded basis; a Gas
-    Daily or a published index is refused, in the resolution of a batch and in the kernel alike.
-    The steps that read a day off the schedule dispatch on which it is."""
+    futures schedule, whose rows' expiry days settle the contracts; since #167 an IFERC
+    schedule, whose rows' publication days print each month's index, the traded basis; or a
+    published schedule, whose prints a month averages; a Gas Daily index is refused, in the
+    resolution of a batch and in the kernel alike. The steps that read a day off the schedule
+    dispatch on which it is."""
     match index.kind:
         case Kind.FUTURES:
             return cast(FuturesSchedule, index.schedule)  # what the kind just said
         case Kind.IFERC:
             return cast(IfercSchedule, index.schedule)
-        case Kind.GAS_DAILY | Kind.PUBLISHED:
+        case Kind.PUBLISHED:
+            return cast(PublishedSchedule, index.schedule)
+        case Kind.GAS_DAILY:
             raise ValueError(
-                f"index is {described(index.kind, 'index')}, expected a futures or an IFERC "
-                "index for a fixed_float"
+                f"index is {described(index.kind, 'index')}, expected a futures, IFERC or "
+                "published index for a fixed_float"
             )
         case _:
             assert_never(index.kind)
@@ -804,6 +826,12 @@ def frequency_rules(
                 "IFERC index; an IFERC month has one index, published once, and a onetime period "
                 "averages the pricing days of a futures index"
             )
+        if kind is Kind.PUBLISHED:
+            raise ValueError(
+                f"settlement_frequency of {first(onetime)} is 'onetime', expected 'monthly' on a "
+                "published index; one average across months would weight each month by its "
+                "number of prints, and a strip settles month by month"
+            )
         if paired:
             raise ValueError(
                 f"settlement_frequency of {first(onetime)} is 'onetime', expected 'monthly' with "
@@ -879,6 +907,11 @@ def nearby_rules(
             f"nearby of {named(k)} is {int(nearby[k])}, expected 1 on an IFERC index; an IFERC "
             "month has one index, published once, and no contract after the prompt to count"
         )
+    if kind is Kind.PUBLISHED:
+        raise ValueError(
+            f"nearby of {named(k)} is {int(nearby[k])}, expected 1 on a published index; a "
+            "print counts toward its own month, and there is no contract to roll"
+        )
     if paired:
         raise ValueError(
             f"nearby of {named(k)} is {int(nearby[k])}, expected 1 with two indexes; a later "
@@ -947,6 +980,31 @@ def _the_choices(
             )
 
 
+def _the_published_method(
+    schedule_method: NDArray[np.intp],
+    settlement: Settlement,
+    trade_ids: NDArray[np.int64] | None,
+    field: str,
+) -> None:
+    """Each occurrence's method with the batch's settlement on a published index: the
+    settlement is financial, nothing being delivered against a published price, and every
+    row's method is asian, the average of the prints that count toward its month, the first row
+    of another method refused by its method and its row."""
+    if settlement is Settlement.PHYSICAL:
+        raise ValueError(
+            "settlement_method is 'physical', expected 'financial' on a published index; "
+            "nothing is delivered against a published price"
+        )
+    supported = supported_on_published(schedule_method)
+    if not supported.all():
+        i = int((~supported).argmax())
+        raise ValueError(
+            f"{field} of {named_trade(trade_ids, i)} is "
+            f"{METHODS[int(schedule_method[i])].value!r}, expected 'asian' on a published "
+            "index; a published month is the average of its prints"
+        )
+
+
 def _the_method(
     schedule_method: NDArray[np.intp],
     settlement: Settlement,
@@ -978,6 +1036,9 @@ def _the_method(
                 f"{METHODS[int(schedule_method[i])].value!r}, expected 'lastday' on an IFERC "
                 "index; an IFERC month has one index, published once"
             )
+        return
+    if kind is Kind.PUBLISHED:
+        _the_published_method(schedule_method, settlement, trade_ids, field)
         return
     match settlement:
         case Settlement.FINANCIAL:

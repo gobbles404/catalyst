@@ -346,7 +346,7 @@ PUBLISHED = index_on(
     NG.conventions,
     NG.specifications,
     None,
-    None,
+    None if NG.reporting_lot is None else NG.reporting_lot.name,
     UNITS,
 )
 
@@ -356,11 +356,27 @@ PUBLISHED = index_on(
     [
         (
             {"ix": GAS_DAILY},
-            "index is a Gas Daily index, expected a futures or an IFERC index for a fixed_float",
+            "index is a Gas Daily index, expected a futures, IFERC or published index for a "
+            "fixed_float",
         ),
         (
             {"ix": PUBLISHED},
-            "index is a published index, expected a futures or an IFERC index for a fixed_float",
+            "settlement_method is 'physical', expected 'financial' on a published index; nothing "
+            "is delivered against a published price",
+        ),
+        (
+            {"ix": PUBLISHED, "settlement": Settlement.FINANCIAL},
+            "schedule_method of trade 1001 at row 1 is 'lastday', expected 'asian' on a published "
+            "index; a published month is the average of its prints",
+        ),
+        (
+            {
+                "ix": PUBLISHED,
+                "settlement": Settlement.FINANCIAL,
+                "schedule_method": rows(3, 3, 0, 3, 3),
+            },
+            "schedule_method of trade 1003 at row 3 is 'lastday', expected 'asian' on a published "
+            "index; a published month is the average of its prints",
         ),
         (
             {"specification": spec(5, 1)},

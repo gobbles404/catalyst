@@ -23,14 +23,16 @@ from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.kind import with_holiday_calendar
+from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.trades.schedule_methods import (
     METHODS,
     ScheduleMethod,
     counts_back_from_expiry,
     requires_whole_month,
     supported_on_iferc,
+    supported_on_published,
 )
-from catalyst.trades.terms import trade_schedule_of
+from catalyst.trades.terms import TradeSchedule, trade_schedule_of
 
 # How far the weights of a component may miss one, a few units in the last place: 1/3 three
 # times is one exactly, 1/7 seven times is not.
@@ -185,6 +187,31 @@ def observed(
                 np.ones(count),
                 count,
             )
+        case PublishedSchedule():
+            # Every print that counts toward the component's month, an equal share each: the
+            # month's prints are the schedule's rows on its contract, one run, found by two
+            # searches of the column that says each print's month, so no date is compared and
+            # no calendar read. asian alone, and the whole month.
+            averaged = supported_on_published(method)
+            if not averaged.all():
+                k = int((~averaged).argmax())
+                raise ValueError(
+                    f"{field} of {named(k)} is {METHODS[int(method[k])].value!r}, "
+                    "expected 'asian' on a published index; a published month is the average "
+                    "of its prints"
+                )
+            _whole_months(schedule, contract, start, end, method, averaged, named, PUBLISHED_WHOLE)
+            first = np.searchsorted(schedule.contract, contract, side="left")
+            prints = np.searchsorted(schedule.contract, contract, side="right") - first
+            total = int(prints.sum())
+            place = np.arange(total) - np.repeat(np.cumsum(prints) - prints, prints)
+            place += np.repeat(first, prints)
+            return observations(
+                np.repeat(np.arange(count, dtype=np.intp), prints),
+                schedule.publication_date[place],
+                np.repeat(1.0 / prints, prints),
+                count,
+            )
         case FuturesSchedule():
             pass
         case _:
@@ -286,10 +313,14 @@ FUTURES_WHOLE = (
     "the expiry-based methods take the contract's month entire, and a part of it prices under asian"
 )
 IFERC_WHOLE = "an IFERC month's index is one price for the whole month"
+PUBLISHED_WHOLE = (
+    "a published month averages every print that counts toward it, and a part of a month is "
+    "not built"
+)
 
 
 def _whole_months(
-    schedule: FuturesSchedule | IfercSchedule,
+    schedule: TradeSchedule,
     contract: NDArray[np.intp],
     start: NDArray[np.datetime64],
     end: NDArray[np.datetime64],

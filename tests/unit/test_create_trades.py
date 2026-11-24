@@ -36,7 +36,6 @@ from catalyst.index_definitions.holiday_calendars import (
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
-from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT, NONE, FieldType, Instrument
 from catalyst.instruments.fields import DatesOrTexts, FieldValues
@@ -2009,24 +2008,8 @@ def test_the_index_must_be_a_futures_index_with_one_contract_per_month() -> None
         None,
         UNITS,
     )
-    assert (
-        refused(daily)
-        == "index is a Gas Daily index, expected a futures or an IFERC index for a fixed_float"
-    )
-    # A published index makes markets and no trades yet: a batch on one is refused by its kind.
-    weekly = index_on(
-        "weekly",
-        "Sample published index",
-        published_schedule(("F26",), dates("2026-01-05")),
-        NG.conventions,
-        NG.specifications,
-        None,
-        None,
-        UNITS,
-    )
-    assert (
-        refused(weekly)
-        == "index is a published index, expected a futures or an IFERC index for a fixed_float"
+    assert refused(daily) == (
+        "index is a Gas Daily index, expected a futures, IFERC or published index for a fixed_float"
     )
     labelled = an_index(contracts=(("X26", "2026-10-28"), ("c1", "2026-11-25")))
     assert refused(labelled) == (

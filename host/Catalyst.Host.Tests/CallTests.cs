@@ -3318,6 +3318,55 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _CreatePublishedFixings: index is published schedule handle '" + schedule + "', expected index handle", Seam.Call("_CreatePublishedFixings", 46272.0, 3.00, schedule));
         }
 
+        // A fixed_float on a published index, issue #271's worked example: 40,000 gallons of
+        // September 2026 against a fixed 3.10, the month's four weekly prints an equal share each
+        // and its quote 3.50. On Wednesday the 16th two prints have fixed, at 3.00 and 3.20, and
+        // the trade is worth 8,000 with 20,000 gallons live; on Monday the 14th that day's print
+        // is still live, 11,000 and 30,000; on Tuesday the 15th it has fixed at a stand-in of
+        // 3.50, 11,000 and 20,000. The month pays five business days after its last print, dated
+        // Monday the 28th. A method other than asian, a part of a month and a quote are refused.
+        [Fact]
+        public void a_fixed_float_on_a_published_index_averages_its_months_prints_with_a_stand_in()
+        {
+            var schedule = (string)Seam.Call("_CreatePublishedSchedule", Column("Q26", "U26", "U26", "U26", "U26", "V26"), Column(46265.0, 46272.0, 46279.0, 46286.0, 46293.0, 46300.0));
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "GAL", "DOLLAR", "VOLUME", "GAL");
+            var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "gal", 1.0, "GAL", 0.0, 0.0 } });
+            var index = (string)Seam.Call("_CreateIndex", "DOE Diesel", "U.S. national retail diesel - EIA weekly", schedule, conventions, specifications, ExcelMissing.Value, "gal", ExcelMissing.Value);
+            var payments = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46381.0);
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key", "settlement_frequency", "nearby");
+            var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("gal", "month", "asian", "cleared", "financial", "TEST_CLEARER", "+5bd", payments, "monthly", 1.0));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
+            var trades = (string)Trades(index, headers, new object[,] { { 1001.0, 46254.0, "U26", 40000.0, 3.10 } }, template);
+            Assert.StartsWith(Pid + ":trades:DOE Diesel:", trades);
+            var booked = (object[,])Seam.Call("util_ReadHandle", trades);
+            Assert.Equal("asian", booked[2, 4]);
+            Assert.Equal(46300.0, booked[2, 13]);
+            var quotes = (string)Seam.Call("_CreatePriceVector", "DOE Diesel", Column(3.50, 3.65));
+            var wednesday = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46281.0, 0.5), index), (string)Seam.Call("_CreatePublishedFixings", Column(46279.0, 46272.0, 46265.0), Column(3.20, 3.00, 2.95), index));
+            var results = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", trades, wednesday), (string)Seam.Call("_CreateMarket", wednesday, quotes), ExcelMissing.Value);
+            Assert.StartsWith(Pid + ":trade_results:DOE Diesel:", results);
+            Assert.Equal(8000.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
+            var byDay = (object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "day");
+            Assert.Equal(20000.0, (double)byDay[3, 1], 6);
+            Assert.Equal(46279.0, byDay[5, 0]);
+            Assert.Equal(0.0, (double)byDay[5, 1], 6);
+            Assert.Equal(46286.0, byDay[6, 0]);
+            Assert.Equal(10000.0, (double)byDay[6, 1], 6);
+            Assert.Equal(20000.0, (double)((object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "month"))[4, 1], 6);
+            var monday = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46279.0, 0.5), index), (string)Seam.Call("_CreatePublishedFixings", Column(46272.0, 46265.0), Column(3.00, 2.95), index));
+            var live = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", trades, monday), (string)Seam.Call("_CreateMarket", monday, quotes), ExcelMissing.Value);
+            Assert.Equal(11000.0, (double)((object[,])Seam.Call("_ReportValues", live))[2, 0], 6);
+            Assert.Equal(30000.0, (double)((object[,])Seam.Call("_ReportRisk", live, "nominal_delta", "year"))[3, 1], 6);
+            var tuesday = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46280.0, 0.5), index), (string)Seam.Call("_CreatePublishedFixings", Column(46279.0, 46272.0, 46265.0), Column(3.50, 3.00, 2.95), index));
+            var stoodIn = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", trades, tuesday), (string)Seam.Call("_CreateMarket", tuesday, quotes), ExcelMissing.Value);
+            Assert.Equal(11000.0, (double)((object[,])Seam.Call("_ReportValues", stoodIn))[2, 0], 6);
+            Assert.Equal(20000.0, (double)((object[,])Seam.Call("_ReportRisk", stoodIn, "nominal_delta", "year"))[3, 1], 6);
+            var lastday = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("gal", "month", "lastday", "cleared", "financial", "TEST_CLEARER", "+5bd", payments, "monthly", 1.0));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: schedule_method of trade 1001 at row 1 is 'lastday', expected 'asian' on a published index; a published month is the average of its prints", Trades(index, headers, new object[,] { { 1001.0, 46254.0, "U26", 40000.0, 3.10 } }, lastday));
+            var dated = Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price");
+            Assert.Equal("#ERROR _CreateTrades: ValueError: U26 of trade 1001 at row 1 is covered from 2026-09-16 to 2026-09-30, part of its month, expected the whole month under asian; a published month averages every print that counts toward it, and a part of a month is not built", Trades(index, dated, new object[,] { { 1001.0, 46254.0, 46281.0, 46295.0, 40000.0, 3.10 } }, template));
+        }
+
         // The mixed road out: a rectangle of three kinds comes back one tagged value per cell.
         [Fact]
         public void a_mixed_array_out_keeps_each_cell_as_it_was()

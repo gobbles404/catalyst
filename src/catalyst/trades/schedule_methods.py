@@ -43,6 +43,15 @@ def supported_on_iferc(method: NDArray[np.intp]) -> NDArray[np.bool_]:
     return method == METHODS.index(ScheduleMethod.LASTDAY)
 
 
+def supported_on_published(method: NDArray[np.intp]) -> NDArray[np.bool_]:
+    """asian alone: a published month is the average of the prints that count toward it, an
+    equal share each. penultimate and last3day count business days back from an expiry, and a
+    published index has neither; lastday is refused until the IFERC index, one print a month,
+    moves onto the published kind. The terms refuse a batch with any other method on a published
+    index, and the observations read the same rule before making a month's prints."""
+    return method == METHODS.index(ScheduleMethod.ASIAN)
+
+
 def permits_physical_settlement(method: NDArray[np.intp]) -> NDArray[np.bool_]:
     """lastday alone, on a futures index: a penultimate, last3day or asian future is cash settled
     on a price other than the expiry's settle, so a physical batch is lastday rows alone. The

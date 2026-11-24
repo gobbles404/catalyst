@@ -14,7 +14,7 @@ import pytest
 from holiday_fixtures import a_name, closed_on, index_on
 from test_bilateral_kernel import CLOSE, curve_of, curve_set
 from test_create_trades import bound_calendar, key_of, seam_key, with_calendars
-from test_market import a_gas_daily_history
+from test_market import a_gas_daily_history, a_published_history
 from test_trade_valuation import a_history as seam_history
 from test_trade_valuation import a_market as seam_market
 from test_trade_valuation import an_index as seam_index
@@ -795,9 +795,17 @@ def test_the_period_and_the_market_refuse_what_they_cannot_price() -> None:
     )
     # A Gas Daily index has no fixed_float and so no quote.
     with pytest.raises(
-        ValueError, match=r"^index is .*, expected a futures or an IFERC index for a fixed_float$"
+        ValueError,
+        match=r"^index is .*, expected a futures, IFERC or published index for a fixed_float$",
     ):
         quote_on(quoted(a_gas_daily_history("2026-10-15"), 2.9), "V26", financial())
+    # A published index books and values trades and is not quoted yet.
+    with pytest.raises(ValueError) as unbuilt:
+        quote_on(quoted(a_published_history("2026-09-16"), 3.5, 3.65), "U26", financial())
+    assert str(unbuilt.value) == (
+        "index is a published index, expected a futures or an IFERC index for a quote; a quote "
+        "on a published index is not built"
+    )
 
 
 def test_prices_may_be_zero_or_negative_and_the_quote_keeps_the_indexs_units() -> None:
