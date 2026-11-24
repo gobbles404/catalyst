@@ -363,7 +363,10 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_occurrences": 1,
         "_the_brokered": 1,  # which rows name a broker, since #188
         "_the_components": 1,
-        "whole_quantities": 1,
+        # fractional-quantities.md: the quantity rule chosen by the batch's settlement, once,
+        # and a financial batch's, finite, where whole_quantities read every batch's
+        "settled_quantities": 1,
+        "finite_quantities": 1,
         "finite_prices": 1,
         "_the_payment": 1,
         "_frozen_days": 4,  # the trade dates, the payment days, the starts and the ends
@@ -382,8 +385,9 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
 # builder, which checks the order and the weights, counts twice and copies and freezes three
 # columns, the payment offset and the kernel's frozen copies, the days each component covers
 # counted off its two dates, the end held on or after the start and both in one month;
-# the quantity rule is one look, whole or not, since zero is a count, zero-quantities.md; and the
-# payment days are one look against the sheet's last day, 31 December 9999, since a later day
+# the quantity rule is one look, finite or not, since fractional-quantities.md a financial
+# batch's and no rounding with it, where it was whole or not, zero a count, zero-quantities.md; and
+# the payment days are one look against the sheet's last day, 31 December 9999, since a later day
 # could reach no cell; and the distinct codes and the distinct lags are each sorted once by their
 # first rows, so that a refusal names the first bad row and not the first bad spelling. Since #172
 # each row chooses its period: three looks over the rows, half a pair or no period, an end before
@@ -425,7 +429,6 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
         "ndarray.ravel": 4,
         "ndarray.repeat": 1,
         "ndarray.reshape": 9,  # one more within the groups' unique, since #181
-        "ndarray.round": 1,
         "ndarray.searchsorted": 1,  # each component's last observation, its payment's anchor
         "ndarray.setflags": 22,  # the kernel's thirteen copies, the nearbys' among them since
         # nearby-selection.md, the two period bounds since
@@ -477,6 +480,47 @@ def test_resolution_reads_each_distinct_code_once_and_nothing_per_row(
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
     }
+
+
+@pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
+def test_the_quantity_rule_is_one_look_chosen_by_the_settlement_and_nothing_per_row(
+    call_profile: CallProfile, numpy_calls: CallProfile, rows: int, contracts: int
+) -> None:
+    # fractional-quantities.md: the kernel picks the rule once by the batch's settlement and
+    # reads the quantities once under it, whatever the rows. A financial batch looks for a number
+    # that is not finite and rounds nothing; a physical one compares each quantity with itself
+    # rounded, the one rounding of the resolution, as every batch did.
+    ticket = a_ticket(rows, contracts)
+    financial = a_template()
+    physical = trade_template(
+        one_row(
+            {
+                **{k: v for k, v in TEMPLATE_FIELDS.items() if not k.startswith("payment_")},
+                "settlement_method": "physical",
+            }
+        )
+    )
+    rules = ("settled_quantities", "finite_quantities", "whole_quantities")
+
+    def looks(template: TradeTemplate) -> dict[str, int]:
+        profile = call_profile(lambda: resolved((GAS,), ticket, template, WorkCounter()))
+        return {name: profile.get(name, 0) for name in rules}
+
+    def rounds(template: TradeTemplate) -> int:
+        profile = numpy_calls(lambda: resolved((GAS,), ticket, template, WorkCounter()))
+        return profile.get("ndarray.round", 0)
+
+    assert looks(financial) == {
+        "settled_quantities": 1,
+        "finite_quantities": 1,
+        "whole_quantities": 0,
+    }
+    assert looks(physical) == {
+        "settled_quantities": 1,
+        "finite_quantities": 0,
+        "whole_quantities": 1,
+    }
+    assert (rounds(financial), rounds(physical)) == (0, 1)
 
 
 @pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)

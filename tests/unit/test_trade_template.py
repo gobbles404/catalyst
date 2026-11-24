@@ -184,9 +184,31 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
             {"quantity_unit": "NYMEX NG", "route": "cleared", "schedule_method": "pen"},
             "schedule_method is 'pen', expected lastday, penultimate, last3day or asian",
         ),
-        ({"quantity": 1.5}, "quantity is 1.5, expected a whole number"),
-        ({"quantity": -2.5}, "quantity is -2.5, expected a whole number"),
-        ({"quantity": float("inf")}, "quantity is inf, expected a whole number"),
+        # Since fractional-quantities.md a quantity's rule follows the settlement method: whole
+        # under a physical one, in either order of the two fields and in the words a template
+        # always gave, a non-finite number included; finite under a financial one or none.
+        (
+            {"settlement_method": "physical", "quantity": 1.5},
+            "quantity is 1.5, expected a whole number",
+        ),
+        (
+            {"quantity": -2.5, "settlement_method": "physical"},
+            "quantity is -2.5, expected a whole number",
+        ),
+        (
+            {"quantity": float("inf"), "settlement_method": "physical"},
+            "quantity is inf, expected a whole number",
+        ),
+        ({"quantity": float("inf")}, "quantity is inf, expected a finite quantity"),
+        ({"quantity": float("nan")}, "quantity is nan, expected a finite quantity"),
+        (
+            {"settlement_method": "financial", "quantity": float("-inf")},
+            "quantity is -inf, expected a finite quantity",
+        ),
+        (  # its own field's rule first: the method is refused before the quantity is read
+            {"quantity": 1.5, "settlement_method": "cash"},
+            "settlement_method is 'cash', expected physical or financial",
+        ),
         (  # since #175: a marketing reserve is a finite amount of zero or more
             {"marketing_reserve": -5.0},
             "marketing_reserve is -5.0, expected a finite amount of zero or more",
@@ -272,7 +294,7 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
     assert create("fixed_float", row("quantity_unit"), row(1.0)) == (
         "#ERROR _CreateTradeTemplate: values cell (1, 1) is number 1.0, expected text"
     )
-    assert create("fixed_float", row("quantity"), row(1.5)) == (
+    assert create("fixed_float", row("settlement_method", "quantity"), row("physical", 1.5)) == (
         "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number"
     )
 
@@ -298,6 +320,31 @@ def test_a_zero_quantity_is_held_as_a_row_kept_ready() -> None:
     assert a_template(quantity=-0.0).defaults["quantity"] == 0.0
     handle = ENTRY["_CreateTradeTemplate"]("fixed_float", row("quantity"), row(0.0))
     assert re.fullmatch(rf"{os.getpid()}:trade_template:\d+", str(handle))
+
+
+def test_a_fractional_quantity_is_held_as_entered_unless_the_template_settles_physically() -> None:
+    # fractional-quantities.md: a quantity's rule follows the settlement method. A template that
+    # settles financially holds a fraction as entered, never rounded, and so does one that names
+    # no method, whose quantity waits for the ticket's; one that settles physically holds whole
+    # numbers alone, as every template did.
+    for quantity in (1.5, -0.25, 0.1 + 0.2, 1e-9, 12_345.678_9):
+        held = a_template(settlement_method="financial", quantity=quantity).defaults["quantity"]
+        assert held == quantity and type(held) is float
+        assert a_template(quantity=quantity).defaults["quantity"] == quantity
+    assert a_template(settlement_method="physical", quantity=-4.0).defaults["quantity"] == -4.0
+    # The reader spills the fraction as the cell held it.
+    handle = ENTRY["_CreateTradeTemplate"](
+        "fixed_float", row("settlement_method", "quantity"), row("financial", 1.5)
+    )
+    assert spilled(handle) == [
+        ["instrument", "settlement_method", "quantity"],
+        ["str", "str", "float64"],
+        ["fixed_float", "financial", 1.5],
+    ]
+    # A float_float settles financially and nothing else, so its template takes a fraction
+    # whether or not the method is in the row.
+    made = ENTRY["_CreateTradeTemplate"]("float_float", row("quantity"), row(-0.25))
+    assert re.fullmatch(rf"{os.getpid()}:trade_template:\d+", str(made))
 
 
 # --- the period fields, contract-codes-and-dates.md, since #172 ----------------------------------

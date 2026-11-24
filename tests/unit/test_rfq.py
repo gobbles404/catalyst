@@ -402,14 +402,19 @@ def test_the_markets_states_reuse_the_request() -> None:
     assert price(paid, weighted, flat) == pytest.approx(3.0, **CLOSE)  # both months at the settle
 
 
-def test_a_trade_booked_at_the_request_price_marks_zero_with_every_payment_ahead() -> None:
+@pytest.mark.parametrize("quantities", [QUANTITIES, (1.5, 0.25)], ids=["whole", "fractional"])
+def test_a_trade_booked_at_the_request_price_marks_zero_with_every_payment_ahead(
+    quantities: tuple[float, float],
+) -> None:
     # The request's months and quantities booked as barrels at its price under the same terms,
-    # the template's +5bd on the weekend calendar: the mark is zero on either route.
+    # the template's +5bd on the weekend calendar: the mark is zero on either route. Since
+    # fractional-quantities.md the same holds at a barrel and a half and a quarter of one, the
+    # quantities a request always took and a financial trade now books.
     for route, template, curves in (
         (Route.CLEARED, cleared(), None),
         (Route.BILATERAL, otc(), RATES),
     ):
-        k = price(MARKET, request(template=template), curves)
+        k = price(MARKET, request(quantities=quantities, template=template), curves)
         contract = rows(1, 2)
         bilateral_only = route is Route.BILATERAL
         terms = resolved_trades(
@@ -427,7 +432,7 @@ def test_a_trade_booked_at_the_request_price_marks_zero_with_every_payment_ahead
             dates(DEC_31, DEC_31),
             np.arange(2, dtype=np.intp),
             contract,
-            numbers(*QUANTITIES),
+            numbers(*quantities),
             *bounds_of(STRIP, contract),
             numbers(k, k),
             PaymentTerms(

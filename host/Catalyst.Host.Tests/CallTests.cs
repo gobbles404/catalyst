@@ -289,7 +289,8 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit", "schedule_method"), Row("NYMEX NG", "Asian") }, "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'Asian', expected lastday, penultimate, last3day or asian" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("payment_day"), "2bd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_day is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("payment_day"), "+1bd+2xd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_day is '+1bd+2xd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, '+2xd' begins with no instruction" };
-            yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity"), 1.5 }, "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number" };
+            // fractional-quantities.md: a quantity's rule follows the settlement method, so the fraction is refused where the template settles physically, in the words a template always gave.
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("settlement_method", "quantity"), Row("physical", 1.5) }, "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number" };
             // The quote template, template-based-quoting.md: a booking field and a blank period header refused by name, the cashflow refused as no instrument a quote prices, a value by the trade template's rule; and the quote's arguments in the seam's words, the market left out or naming nothing.
             yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("route", "quantity"), Row("cleared", 10.0) }, "#ERROR _CreateQuoteTemplate: ValueError: quantity is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_calendar, settlement_frequency, nearby" };
             yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("contract_code", "route"), Row(ExcelEmpty.Value, "cleared") }, "#ERROR _CreateQuoteTemplate: ValueError: contract_code is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_calendar, settlement_frequency, nearby" };
@@ -1228,6 +1229,15 @@ namespace Catalyst.Host.Tests
             Assert.Equal("+2bd", strip[2, 11]);
             Assert.Equal(46356.0, strip[2, 12]);
             Assert.Equal(46387.0, strip[3, 12]);
+            // fractional-quantities.md: the row of two and a half lots the physical template refused books under the financial one, its quantity read back as entered and 25,000 MMBTU quoted; a template that names no settlement method holds the fraction for the ticket's method to judge.
+            var fraction = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", ng, headers, Row(1.0, 46289.0, "Z26", 2.5, 3.0), financial));
+            Assert.Equal("quantity", fraction[0, 8]);
+            Assert.Equal(2.5, fraction[2, 8]);
+            Assert.Equal("quote_quantity", fraction[0, 19]);
+            Assert.Equal(25000.0, fraction[2, 19]);
+            var held = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity"), 1.5));
+            Assert.Equal("quantity", held[0, 1]);
+            Assert.Equal(1.5, held[2, 1]);
             Assert.Equal("#ERROR _CreateTrades: ValueError: quantity_unit is 'ICE PHH', expected one of the index's specifications: 'NYMEX NG'", Seam.Call("_CreateTrades", ng, headers, rows, (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("ICE PHH", "month", "monthly", 1.0, "lastday", "cleared", "physical", "CME Clearing"))));
         }
 

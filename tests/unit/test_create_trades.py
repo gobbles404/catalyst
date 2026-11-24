@@ -1723,18 +1723,24 @@ def test_a_batch_that_cannot_be_resolved_says_why(
 
 
 def test_a_quantity_is_named_by_its_trades_row_though_a_strip_sits_before_it() -> None:
-    message = refused(
-        TOY,
-        {
-            "trade_id": [1, 2],
-            "trade_date": ["2026-09-24", "2026-09-24"],
-            "contract_code": ["Z26-F27", "F27"],
-            "quantity": [3, 2.5],
-            "fixed_price": [3.2, 3.3],
-        },
-        TOY_TEMPLATE,
+    ticket: dict[str, list[object]] = {
+        "trade_id": [1, 2],
+        "trade_date": ["2026-09-24", "2026-09-24"],
+        "contract_code": ["Z26-F27", "F27"],
+        "quantity": [3, 2.5],
+        "fixed_price": [3.2, 3.3],
+    }
+    # Settled physically a quantity is a whole number, the fraction named by its trade's row.
+    assert refused(NG, ticket, NG_TEMPLATE) == (
+        "quantity of trade 2 at row 2 is 2.5, expected a whole number"
     )
-    assert message == "quantity of trade 2 at row 2 is 2.5, expected a whole number"
+    # Settled financially the same rows book, since fractional-quantities.md, the fraction as
+    # entered; a number that is not finite is refused, named the same way.
+    batch, _ = created(TOY, ticket, TOY_TEMPLATE)
+    np.testing.assert_array_equal(batch.resolved.quantity, [3.0, 3.0, 2.5])
+    assert refused(TOY, {**ticket, "quantity": [3, float("nan")]}, TOY_TEMPLATE) == (
+        "quantity of trade 2 at row 2 is nan, expected a finite quantity"
+    )
 
 
 def test_two_lags_for_one_contract_make_two_payment_groups_by_their_days() -> None:

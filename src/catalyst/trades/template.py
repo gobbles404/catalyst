@@ -3,7 +3,8 @@ template's row and taken, last and required, by every batch of trades whose tick
 rest. The template retains the definition, the fields its row named and its own values and no
 index, so one template serves every compatible index. It reads each value it holds for the rule
 intrinsic to its field, a code from its list, a payment day as the date it holds or as a rule
-of one or more date instructions read whole, a whole quantity, zero included, a finite price,
+of one or more date instructions read whole, a finite price, a quantity by its settlement's
+rule where the row names the settlement and as any finite number where it does not,
 and leaves the rules that need the ticket or the index, which fields are required, whether the
 two overlap, the schedule, whether a
 contract code is the period of any row, to the resolution of a batch: since #172 a template's
@@ -17,7 +18,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from types import MappingProxyType
-from typing import Final, assert_never
+from typing import Final, assert_never, cast
 
 import numpy as np
 
@@ -34,9 +35,10 @@ from catalyst.trades.terms import (
     Settlement,
     SettlementFrequency,
     finite_prices,
+    finite_quantities,
     marketing_reserves,
+    settled_quantities,
     whole_nearbys,
-    whole_quantities,
     whole_trade_ids,
 )
 
@@ -66,10 +68,26 @@ def trade_template(values: FieldValues) -> TradeTemplate:
     failure being the message; a period field whose cell held nothing is a name without a value.
     Nothing is required, since a template is a partial record and the ticket supplies the rest,
     and no index is read, since the template retains none: a specification name waits for the
-    index the batch is created on, and a contract code for the rows that book by it."""
+    index the batch is created on, and a contract code for the rows that book by it.
+
+    One rule stands between two fields, since fractional-quantities.md, and is read once, after
+    every field's own: a quantity's rule follows the settlement method. Where the row holds both,
+    the quantity is held to that settlement's rule here, settled_quantities, so a fraction under
+    a physical settlement is refused in the words a template always gave, named by its field.
+    Where the row holds the quantity alone, the rule waits for the settlement method the ticket
+    supplies: the quantity is held here to the part every settlement shares, finite, and the
+    kernel applies the rest when the batch is made, naming the trade."""
     if values.rows != 1:
         raise ValueError(f"values has {values.rows} rows, expected one row of field values")
     defaults = {name: field_value(values, name) for name in values.names if _holds(values, name)}
+    if "quantity" in defaults:
+        quantity = np.array([cast(float, defaults["quantity"])])
+        if "settlement_method" in defaults:
+            # The text was read by settlement_of, its field's own rule, a moment ago.
+            settlement = Settlement(cast(str, defaults["settlement_method"]))
+            settled_quantities(quantity, settlement, lambda _: "quantity")
+        else:
+            finite_quantities(quantity, lambda _: "quantity")
     return TradeTemplate(values.instrument, values.names, MappingProxyType(defaults))
 
 
@@ -180,12 +198,6 @@ def payment_rule_of(where: str, text: str) -> tuple[Instruction, ...]:
     return read_offset(where, text)
 
 
-def quantity_of(where: str, number: float) -> float:
-    """A quantity by the kernel's rule, whole, zero included, named by its field."""
-    whole_quantities(np.array([number]), lambda _: where)
-    return number
-
-
 def price_of(where: str, number: float) -> float:
     """A price by the kernel's rule, finite, named by its field."""
     finite_prices(np.array([number]), lambda _: where)
@@ -263,7 +275,8 @@ READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
 NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float | int]]] = MappingProxyType(
     {
         "trade_id": trade_id_of,
-        "quantity": quantity_of,
+        # No reader for the quantity, since fractional-quantities.md: its rule follows the
+        # settlement method, another field, so trade_template reads it once both are in hand.
         "fixed_price": price_of,
         "spread_price": price_of,  # a float_float's one price, float-float-spread.md
         "marketing_reserve": marketing_reserve_of,

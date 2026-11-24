@@ -235,8 +235,10 @@ FIXED_FLOAT = Instrument(
             True,
             NONE,
             FieldType.NUMBER,
-            "a signed whole count, zero included",
-            "A whole count of the selected quantity definition, positive, negative or zero; a "
+            "a signed number, zero included; whole when settled physically",
+            "A count of the selected quantity definition, positive, negative or zero: under a "
+            "financial settlement any finite number, 1.5 being a lot and a half, used and read "
+            "back as entered and never rounded; under a physical settlement a whole number; a "
             "zero row is kept, has no exposure and no quantity-based reserve, keeps a marketing "
             "or CVA reserve it entered and can be filled in later",
         ),
@@ -463,11 +465,12 @@ FLOAT_FLOAT = Instrument(
             True,
             NONE,
             FieldType.NUMBER,
-            "a signed whole count, zero included",
-            "A whole count of the selected quantity definition: a positive quantity buys the "
-            "spread, receiving the first index and paying the second and the spread price, a "
-            "negative one sells it; a zero row is kept, has no exposure, keeps a marketing or "
-            "CVA reserve it entered and can be filled in later",
+            "a signed number, zero and fractions included",
+            "A count of the selected quantity definition, any finite number, 1.5 being a lot "
+            "and a half, used and read back as entered and never rounded: a positive quantity "
+            "buys the spread, receiving the first index and paying the second and the spread "
+            "price, a negative one sells it; a zero row is kept, has no exposure, keeps a "
+            "marketing or CVA reserve it entered and can be filled in later",
         ),
         Field(
             "quantity_unit",
