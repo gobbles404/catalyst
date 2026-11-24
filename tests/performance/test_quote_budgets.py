@@ -48,7 +48,7 @@ TEMPLATE_FIELDS: dict[str, object] = {
     "settlement_frequency": "monthly",
     "nearby": 1.0,
     "payment_day": "+5bd",
-    "payment_holiday_calendar": None,
+    "payment_calendar_key": "PAYS",
     "discount_curve_key": "SOFR",
 }
 
@@ -56,26 +56,22 @@ TEMPLATE_FIELDS: dict[str, object] = {
 def test_the_quote_template_creator_reads_each_value_once_and_publishes_once(
     call_profile: CallProfile,
 ) -> None:
-    holidays = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46352.0]]), bridge.MISSING)
+    # The calendar under its name and the collection of it, made before the profiled call:
+    # the template's row holds the key, text, and the creator binds it once.
+    holidays = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46352.0]]), "PAYS")
+    calendars = PATH["_CollectPaymentCalendars"](holidays)
     headers = Cells.from_rows([list(TEMPLATE_FIELDS)])
-    values = Cells.from_rows(
-        [
-            [
-                holidays if name == "payment_holiday_calendar" else value
-                for name, value in TEMPLATE_FIELDS.items()
-            ]
-        ]
-    )
+    values = Cells.from_rows([list(TEMPLATE_FIELDS.values())])
 
     def call() -> object:
-        return PATH["_CreateQuoteTemplate"]("fixed_float", headers, values)
+        return PATH["_CreateQuoteTemplate"]("fixed_float", headers, values, calendars)
 
     assert str(call()).split(":")[1] == "quote_template"
     assert call_profile(call) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 3,
-        "_text": 2,  # the name, and the handle cell's text
+        "_validate": 4,  # the collection the fourth, since payment-calendar-keys.md
+        "_text": 2,  # the name, and the collection's handle text
         "_text_row": 1,
         "_texts": 1,
         "_shape": 2,  # the headers' row and, since the shape comes first, the values'
@@ -86,14 +82,13 @@ def test_the_quote_template_creator_reads_each_value_once_and_publishes_once(
         "instrument": 1,
         "_bind_fields": 1,
         "_field_body": 1,  # the cells placed among the texts once
-        "_field_texts": 6,  # six text and code columns
+        "_field_texts": 7,  # seven text and code columns, the payment calendar key among them
         "_field_dates_or_texts": 1,  # the payment day, a date or a text, since
         # payment-day-date-or-rule.md: its two looks
         "_not_dates": 1,
         "_as_days": 1,
         "_field_numbers": 1,  # the nearby, the template's one number
-        "_field_handles": 1,
-        "_resolve": 1,  # the one handle cell
+        "_resolve": 1,  # the collection, the one handle among the arguments
         "_CreateQuoteTemplate": 1,
         "quote_template": 1,
         "quote_template.<locals>.<genexpr>": 7,  # the instrument's fields up to its first quoted
@@ -101,12 +96,19 @@ def test_the_quote_template_creator_reads_each_value_once_and_publishes_once(
         "FieldValues.field.<locals>.<genexpr>": 36,
         "field_value": 9,  # one per field, the nearby the ninth since nearby-selection.md, no mask
         # of supplied cells to read
-        "FieldValues.texts": 6,
+        "FieldValues.texts": 7,
         "FieldValues.numbers": 1,
         "nearby_of": 1,  # the nearby read for its rule when the template is made
         "whole_nearbys": 1,
         "FieldValues.dates_or_texts": 1,
-        "FieldValues.objects": 1,
+        # The key bound once to its calendar, payment-calendar-keys.md: its form read by the
+        # field's reader and again by the step that binds it, the collection searched for the
+        # one name, and the binding counted.
+        "calendar_key": 2,
+        "payment_calendar": 1,
+        "calendar_named": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 1,
         "route_of": 1,
         "settlement_of": 1,
         "schedule_method_of": 1,
@@ -146,7 +148,7 @@ CAL = index(
     "BBL",
     UNITS,
 )
-WEEKENDS_ONLY = holiday_calendar(np.array(["2030-01-01"], dtype="datetime64[D]"))
+WEEKENDS_ONLY = holiday_calendar(np.array(["2030-01-01"], dtype="datetime64[D]"), "PAYS")
 SOFR = discount_curve(
     "SOFR",
     np.array(["2027-06-16", "2027-07-01", "2028-01-03"], dtype="datetime64[D]"),
@@ -164,11 +166,11 @@ def a_template(route: str) -> QuoteTemplate:
         "settlement_frequency": "monthly",
         "nearby": 1.0,
         "payment_day": DayOrRule(None, "+1bd"),  # the rule as the template holds it
-        "payment_holiday_calendar": WEEKENDS_ONLY,
+        "payment_calendar_key": "PAYS",  # the key, and below the calendar it was bound to
     }
     if route == "bilateral":
         values["discount_curve_key"] = "SOFR"
-    return QuoteTemplate(FIXED_FLOAT, tuple(values), MappingProxyType(values))
+    return QuoteTemplate(FIXED_FLOAT, tuple(values), MappingProxyType(values), WEEKENDS_ONLY)
 
 
 def in_june() -> Market:
@@ -398,6 +400,7 @@ ONETIME_BILATERAL = QuoteTemplate(
     MappingProxyType(
         {**BILATERAL.values, "quantity_per": "period", "settlement_frequency": "onetime"}
     ),
+    BILATERAL.payment_calendar,
 )
 # The functions a label runs and two dates do not, the label's own entry, the month rule and the
 # span read through the two date utilities' grammar; and the months' functions, which a window

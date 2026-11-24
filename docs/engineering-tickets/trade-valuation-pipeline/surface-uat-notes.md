@@ -1183,3 +1183,39 @@ PAY_A inside the formula of B3662 and read the collection's refusal in B3671, wh
 names both cells; type PAY_A back and the collection returns. Then on one of the desk's
 own sheets name two payment calendars and collect them, ready for the second pull
 request.
+
+## 45. A payment calendar is chosen by key
+
+Agreed 21 November 2026 and built in #269, issue #255:
+[payment-calendar-keys.md](payment-calendar-keys.md), the second of two pull requests.
+The field `payment_holiday_calendar`, which took a calendar's handle, is replaced by
+`payment_calendar_key`, which takes a calendar's name, or several names joined by a plus
+sign: `NYFED+LON` is the calendar closed on every day either is closed, and the order of
+the names does not matter. `_CreateTrades` and `_CreateQuoteTemplate` take the collection
+the names are looked up in as a last argument. Every financially settled row needs a key
+the collection holds, a row paying on a stated date included; a stated date is still paid
+as entered. Each row's key is read back as the last column of the batch, so no column a
+sheet already reads has moved.
+
+A sheet made before this fails by name until it changes four things: name each payment
+calendar where it is made, collect them, rename the header and type the name where the
+calendar's cell was referred to, and give the two creators the collection.
+
+UAT: the kept workbook. Every template that named a payment calendar's cell now types a
+key, `PAY_` and that cell's address; rows 3685 to 3709 make those 25 calendars again
+under their names over the same day cells, and B3711 collects them. No payment day and no
+number on the sheet moved. Read I1288, `PAY_B35`, where the handle of B35 stood, and the
+batch in B1292, which now names B3711; its readback in F1292 is one column wider, the key
+in AC1294. Three readbacks moved right to make room for their new column: AK1626, AG1710
+and AG1756. Then rows 3741 to 3762, a ticket whose rows each choose their calendar: read
+the four payment days in B3761:E3761, 30 November, 1 December, 2 December and 2 December
+2026, and each row's key beneath them. A readback shows a day as Excel counts it, so the
+four cells read 46356, 46357, 46358 and 46358 until they are formatted as dates. Type
+PAY_B over PAY_A in G3747 and read B3761 move to 1 December, 46357; type PAY_A back. Type
+=DATE(2026,11,30) over D3662, the one day PAY_A is closed: the calendar, its collection
+and the batch are remade, the first row pays Friday 27 November, 46353, and the last two
+Tuesday 1 December; type =DATE(2026,11,26) back. B3766 is a payment on a stated Saturday,
+5 December, 46361, as entered. Rows 3768 to 3772 are refused, each
+in its own words, and B3779 is a quote template given no collection. Then on one of the
+desk's own sheets make the four changes and book a ticket whose rows name two calendars
+and both together.

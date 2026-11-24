@@ -288,8 +288,8 @@ def test_the_holiday_calendar_creator_explains_itself() -> None:
     assert not hidden
     assert description == (
         "Combines holiday calendars into one closed on every day any of them is closed, the days "
-        "in order, once each, and shows its handle, an ordinary calendar for "
-        "payment_holiday_calendar, util_ShiftDate or another combination."
+        "in order, once each, and shows its handle, an ordinary calendar for an index, "
+        "util_ShiftDate or another combination."
     )
     assert arguments == [
         (
@@ -717,6 +717,13 @@ def test_the_trades_creator_explains_itself() -> None:
             "The trade-template handle: the cell showing _CreateTradeTemplate's result, such as "
             "B3, or a name for it, which selects the instrument and supplies the shared fields.",
         ),
+        (  # optional, since payment-calendar-keys.md
+            "[payment_calendars]",
+            "The collection each row's payment_calendar_key selects from: the cell showing "
+            # I5, outside the ticket the other examples lay out in A4:E9, beside the indexes.
+            "_CollectPaymentCalendars's result, such as I5. Leave it out for a physically "
+            "settled batch.",
+        ),
     ]
 
 
@@ -791,6 +798,12 @@ def test_the_quote_template_creator_explains_itself() -> None:
             "quote_allowed.",
         ),
         ("values", "The values in one row beneath those fields, such as A2:G2."),
+        (  # optional, since payment-calendar-keys.md
+            "[payment_calendars]",
+            "The collection payment_calendar_key selects from: the cell showing "
+            "_CollectPaymentCalendars's result, such as B4. Leave it out where the row holds no "
+            "payment_calendar_key.",
+        ),
     ]
 
 

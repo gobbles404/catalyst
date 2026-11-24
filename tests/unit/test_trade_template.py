@@ -14,7 +14,6 @@ from numpy.typing import NDArray
 
 from catalyst.excel import bridge
 from catalyst.excel.bridge import Cells, Handle, register
-from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from catalyst.instruments.definitions import FIXED_FLOAT
 from catalyst.instruments.fields import FieldValues, selected
@@ -33,13 +32,7 @@ def CatchTemplate(template: Handle[TradeTemplate]) -> float:
     return 0.0
 
 
-def CatchCalendar(calendar: Handle[HolidayCalendar]) -> float:
-    CAUGHT.append(calendar)
-    return 0.0
-
-
 register(CatchTemplate, hidden=True)
-register(CatchCalendar, hidden=True)
 
 
 def row(*cells: object) -> Cells:
@@ -102,16 +95,13 @@ def test_one_field_and_the_ng_templates_seven_take_one_path() -> None:
     assert a_template(quantity_unit="ICE PHH").defaults["quantity_unit"] == "ICE PHH"
 
 
-def test_each_value_is_the_scalar_its_type_names_and_a_calendar_the_object_itself() -> None:
-    calendar = ENTRY["_CreateHolidayCalendar"](
-        Cells.from_rows([[46352.0], [46381.0]]), bridge.MISSING
-    )
+def test_each_value_is_the_scalar_its_type_names_and_a_calendar_key_the_text_typed() -> None:
     template = a_template(
         quantity=10.0,
         trade_date=46289.0,
         contract_code="z26",
         payment_day="+2bd",
-        payment_holiday_calendar=calendar,
+        payment_calendar_key="NYFED+LON",
     )
     defaults = template.defaults
     assert defaults["quantity"] == 10.0 and type(defaults["quantity"]) is float
@@ -120,9 +110,13 @@ def test_each_value_is_the_scalar_its_type_names_and_a_calendar_the_object_itsel
     )
     assert defaults["contract_code"] == "z26"  # as typed; resolution reads either case
     assert defaults["payment_day"] == DayOrRule(None, "+2bd")  # the rule, read for the grammar
-    held = defaults["payment_holiday_calendar"]
-    assert type(held) is HolidayCalendar
-    assert held is behind("CatchCalendar", calendar)
+    # Since payment-calendar-keys.md the payment calendar is a key, held as typed: the template
+    # has no collection, so it reads the key's form and binds no calendar; a batch does.
+    held = defaults["payment_calendar_key"]
+    assert held == "NYFED+LON" and type(held) is str
+    assert a_template(payment_calendar_key="NOT_COLLECTED").defaults == {
+        "payment_calendar_key": "NOT_COLLECTED"
+    }
 
 
 def test_a_template_selects_its_instrument_for_a_ticket() -> None:
@@ -232,6 +226,21 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
             "cva_reserve is nan, expected a finite amount",
         ),
         ({"fixed_price": float("inf")}, "fixed_price is inf, expected a finite price"),
+        (  # since payment-calendar-keys.md: one name, or several joined by a plus sign
+            {"payment_calendar_key": "NYFED++LON"},
+            "payment_calendar_key is 'NYFED++LON', expected a calendar's name, or several joined "
+            "by '+'; a name is missing",
+        ),
+        (
+            {"payment_calendar_key": "NYFED + LON"},
+            "payment_calendar_key is 'NYFED + LON', expected a calendar's name, or several "
+            "joined by '+', each with no whitespace around it",
+        ),
+        (
+            {"payment_calendar_key": "LON+NYFED+LON"},
+            "payment_calendar_key is 'LON+NYFED+LON', expected a calendar's name, or several "
+            "joined by '+', each once; 'LON' is given twice",
+        ),
         (
             {"payment_day": LONG_LAG},
             "payment_day has a count of 4301 digits, expected at most 7; the sheet's "
@@ -302,16 +311,15 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
 
 
 def test_the_reader_spills_the_instrument_and_each_default_under_its_field() -> None:
-    calendar = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46352.0]]), bridge.MISSING)
     handle = ENTRY["_CreateTradeTemplate"](
         "fixed_float",
-        row("quantity_unit", "quantity", "trade_date", "payment_holiday_calendar"),
-        row("LOT", 10.0, 46289.0, calendar),
+        row("quantity_unit", "quantity", "trade_date", "payment_calendar_key"),
+        row("LOT", 10.0, 46289.0, "NYFED+LON"),
     )
     assert spilled(handle) == [
-        ["instrument", "quantity_unit", "quantity", "trade_date", "payment_holiday_calendar"],
+        ["instrument", "quantity_unit", "quantity", "trade_date", "payment_calendar_key"],
         ["str", "str", "float64", "datetime64[D]", "str"],
-        ["fixed_float", "LOT", 10.0, 46289.0, "a holiday calendar"],
+        ["fixed_float", "LOT", 10.0, 46289.0, "NYFED+LON"],  # the key as typed
     ]
 
 

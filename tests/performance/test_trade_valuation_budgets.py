@@ -51,7 +51,9 @@ def sheet() -> dict[str, Any]:
         column([serial(d) for d in EXPIRIES]),
         bridge.MISSING,
     )
-    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]), bridge.MISSING)
+    # Under a name since payment-calendar-keys.md: the index prices on it and a template's key
+    # selects it from the collection below.
+    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]), "PAYS")
     conventions = PATH["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specifications = PATH["_CreateContractSpecifications"](
         Cells.from_rows(
@@ -70,7 +72,7 @@ def sheet() -> dict[str, Any]:
         "settlement_method",
         "clearing_house",
         "payment_day",
-        "payment_holiday_calendar",
+        "payment_calendar_key",
         "settlement_frequency",
         "nearby",
     ]
@@ -87,7 +89,7 @@ def sheet() -> dict[str, Any]:
                     "financial",
                     "TEST",
                     "+2bd",
-                    holidays,
+                    "PAYS",
                     "monthly",
                     1.0,
                 ]
@@ -112,11 +114,17 @@ def sheet() -> dict[str, Any]:
         "headers": headers,
         "history": history,
         "market": market,
+        "holidays": holidays,
+        "calendars": PATH["_CollectPaymentCalendars"](holidays),
     }
 
 
 def a_batch(
-    sheet: dict[str, Any], rows: int, contracts: int, template: object | None = None
+    sheet: dict[str, Any],
+    rows: int,
+    contracts: int,
+    template: object | None = None,
+    calendars: object | None = None,
 ) -> str:
     body = Cells.from_rows(
         [
@@ -125,7 +133,8 @@ def a_batch(
         ]
     )
     chosen = sheet["template"] if template is None else template
-    return str(PATH["_CreateTrades"](sheet["index"], sheet["headers"], body, chosen))
+    held = sheet["calendars"] if calendars is None else calendars
+    return str(PATH["_CreateTrades"](sheet["index"], sheet["headers"], body, chosen, held))
 
 
 @pytest.fixture(scope="module")
@@ -133,7 +142,6 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
     """The sheet's batch made bilateral, since #177: the same fields with a counterparty for the
     clearing house and the route bilateral, and a curve anchored on the valuation day running to
     the end of 2028 at 0.9, past every payment."""
-    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]), bridge.MISSING)
     fields = [
         "quantity_unit",
         "quantity_per",
@@ -143,7 +151,7 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
         "counterparty",
         "discount_curve_key",
         "payment_day",
-        "payment_holiday_calendar",
+        "payment_calendar_key",
         "settlement_frequency",
         "nearby",
     ]
@@ -161,7 +169,7 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
                     "ACME Trading",
                     "SOFR",
                     "+2bd",
-                    holidays,
+                    "PAYS",
                     "monthly",
                     1.0,
                 ]
@@ -654,15 +662,24 @@ def test_a_collection_allocates_by_the_saved_entries_and_its_report_by_the_recta
 
 # --- a combined payment calendar, combine-holiday-calendars.md ------------------------------------
 
+# What a key of two names adds to the making of a batch beside a key of one.
+COMBINED_AT_CREATION = {
+    "calendar_named": 1,  # the second name found in the collection
+    "combine_holiday_calendars": 1,
+    "holiday_calendar": 1,  # the combination, an ordinary calendar
+    "WorkCounter.hit": 3,  # the calendars taken, the days read and the days kept
+}
 
-# A template paying on a combination of the sheet's calendar with itself does the plain template's
-# work, call for call, at creation, preparation, evaluation and reporting: the union ran once, when
-# the combination was made, and no step after it reads a calendar again.
+
+# A template whose key joins the sheet's calendar with a twin of it, PAYS+TWIN, does the plain
+# template's work, call for call, at preparation, evaluation and reporting: since
+# payment-calendar-keys.md the union runs once, when the batch is made, where it ran when the
+# combination's own cell was made, and no step after it reads a calendar again.
 def test_a_combined_payment_calendar_adds_no_work_after_creation(
     call_profile: CallProfile, sheet: dict[str, Any]
 ) -> None:
-    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]), bridge.MISSING)
-    combined = str(PATH["_CombineHolidayCalendars"](Cells.from_rows([[holidays], [holidays]])))
+    twin = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]), "TWIN")
+    both = PATH["_CollectPaymentCalendars"](Cells.from_rows([[sheet["holidays"]], [twin]]))
     fields = Cells.from_rows(
         [
             [
@@ -673,7 +690,7 @@ def test_a_combined_payment_calendar_adds_no_work_after_creation(
                 "settlement_method",
                 "clearing_house",
                 "payment_day",
-                "payment_holiday_calendar",
+                "payment_calendar_key",
                 "settlement_frequency",
                 "nearby",
             ]
@@ -692,7 +709,7 @@ def test_a_combined_payment_calendar_adds_no_work_after_creation(
                     "financial",
                     "TEST",
                     "+2bd",
-                    combined,
+                    "PAYS+TWIN",
                     "monthly",
                     1.0,
                 ]
@@ -702,11 +719,11 @@ def test_a_combined_payment_calendar_adds_no_work_after_creation(
     rows, contracts = 50, 6
 
     def steps(template: object) -> list[dict[str, int]]:
-        batch = a_batch(sheet, rows, contracts, template)
+        batch = a_batch(sheet, rows, contracts, template, both)
         prepared = str(PATH["_PrepareTrades"](batch, sheet["history"]))
         results = str(PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING))
         return [
-            call_profile(lambda: a_batch(sheet, rows, contracts, template)),
+            call_profile(lambda: a_batch(sheet, rows, contracts, template, both)),
             call_profile(lambda: PATH["_PrepareTrades"](batch, sheet["history"])),
             call_profile(
                 lambda: PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING)
@@ -715,12 +732,13 @@ def test_a_combined_payment_calendar_adds_no_work_after_creation(
         ]
 
     plain, on_combination = steps(sheet["template"]), steps(on_combined)
-    assert on_combination == plain
-    assert all("combine_holiday_calendars" not in step for step in on_combination)
-    # The union itself, once, when the combination was made.
-    assert (
-        call_profile(
-            lambda: PATH["_CombineHolidayCalendars"](Cells.from_rows([[holidays], [holidays]]))
-        )["combine_holiday_calendars"]
-        == 1
-    )
+    assert on_combination[1:] == plain[1:]
+    assert all("combine_holiday_calendars" not in step for step in on_combination[1:])
+    # The union itself, once, when the batch is made: the second name found, the two calendars
+    # combined into one, its three counts reported; nothing else of the creation differs.
+    created, created_plain = on_combination[0], plain[0]
+    assert {
+        name: created.get(name, 0) - created_plain.get(name, 0)
+        for name in sorted(set(created) | set(created_plain))
+        if created.get(name, 0) != created_plain.get(name, 0)
+    } == COMBINED_AT_CREATION

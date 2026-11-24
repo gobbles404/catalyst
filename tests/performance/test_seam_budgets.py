@@ -2324,47 +2324,6 @@ def test_rows_of_fields_bind_with_one_look_per_column_and_nothing_per_row(
     }
 
 
-def test_a_row_of_fields_with_a_handle_cell_resolves_it_once(
-    call_profile: CallProfile, numpy_calls: CallProfile
-) -> None:
-    calendar = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46023.0]]), bridge.MISSING)
-    headers = Cells.from_rows(
-        [["quantity_unit", "payment_holiday_calendar", "trade_date", "quantity"]]
-    )
-    row = Cells.from_rows([["lots", calendar, 46164.0, 10.0]])
-    PATH["EchoFieldRow"]("fixed_float", headers, row)
-    profile = call_profile(lambda: PATH["EchoFieldRow"]("fixed_float", headers, row))
-    binding = {
-        name: count
-        for name, count in profile.items()
-        if name
-        in {
-            "_bind_fields",
-            "_field_body",
-            "_field_texts",
-            "_field_numbers",
-            "_field_dates",
-            "_field_handles",
-            "_resolve",
-            "_field_row",
-            "by_name",
-            "instrument",
-        }
-    }
-    assert binding == {
-        "_field_row": 1,  # one row, the template's shape
-        "by_name": 1,
-        "instrument": 1,
-        "_bind_fields": 1,
-        "_field_body": 1,  # the cells placed among the texts once, since #172
-        "_field_texts": 1,  # the unit column, its cell taken at its place
-        "_field_handles": 1,  # the handle column, its cell's text at its place too
-        "_resolve": 1,  # one handle cell, one lookup
-        "_field_dates": 1,
-        "_field_numbers": 1,
-    }
-
-
 # --- the combination of calendars, combine-holiday-calendars.md: n handles in, one publication out
 
 

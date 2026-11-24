@@ -12,11 +12,16 @@ from typing import Any, cast
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from test_create_trades import seam_calendars, seam_keyed, with_calendars
 
 from catalyst.excel import bridge
 from catalyst.excel.bridge import Cells
 
 ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
+# A batch or a quote template made on the sheet names the tests' collection of payment
+# calendars, payment-calendar-keys.md.
+ENTRY["_CreateTrades"] = with_calendars(ENTRY["_CreateTrades"])
+ENTRY["_CreateQuoteTemplate"] = with_calendars(ENTRY["_CreateQuoteTemplate"])
 FIRST = np.datetime64("1899-12-30", "D")
 
 
@@ -41,7 +46,11 @@ def templated(fields: list[object], values: list[object]) -> object:
     appended as monthly where the test's fields leave it out, since onetime-averaging.md's
     second slice made the field one every template or ticket must carry, and nearby as 1 the
     same way since nearby-selection.md's: the tests' field tuples and the slices over them stand
-    as they were, neither field being a test's subject here."""
+    as they were, neither field being a test's subject here. And since
+    payment-calendar-keys.md a calendar's handle among the values, where the payment
+    calendar key goes, is given as its key, seam_keyed, the batch naming the tests'
+    collection: the tests still say which calendar a template pays on."""
+    values = seam_keyed(fields, values)
     if "settlement_frequency" not in fields:
         fields, values = [*fields, "settlement_frequency"], [*values, "monthly"]
     if "nearby" not in fields:
@@ -389,7 +398,7 @@ def toy() -> dict[str, Any]:
         "settlement_method": "financial",
         "clearing_house": "TEST_CLEARER",
         "payment_day": "+2bd",
-        "payment_holiday_calendar": calendar,
+        "payment_calendar_key": calendar,
     }
     template = templated([*fields], [*fields.values()])
     trades = ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(*NG_ROWS), template)
@@ -603,7 +612,7 @@ def test_a_lag_past_the_sheets_calendar_fails_the_template_or_the_batch_in_the_l
         "quantity_unit": "TOY",
         "settlement_method": "financial",
         "clearing_house": "TEST_CLEARER",
-        "payment_holiday_calendar": ENTRY["_CreateHolidayCalendar"](
+        "payment_calendar_key": ENTRY["_CreateHolidayCalendar"](
             column([serial("2026-01-01")]), bridge.MISSING
         ),
     }
@@ -679,7 +688,7 @@ PEN_FIELDS = (
     "settlement_method",
     "clearing_house",
     "payment_day",
-    "payment_holiday_calendar",
+    "payment_calendar_key",
 )
 
 
@@ -2198,7 +2207,7 @@ def test_two_starts_on_one_contract_share_a_batch_and_two_ends_pay_apart(
 # a last3day template over seven fields, the lag left to the ticket; A, 60 of Z26 at 70 at +1bd,
 # paying Monday 7 December, and B, -30 at 72 at +3bd, paying Wednesday the 9th; the settles of
 # the 2nd, 3rd and 4th 71, 75 and 73.
-PAYS_FIELDS = (*PEN_FIELDS[:6], "payment_holiday_calendar")
+PAYS_FIELDS = (*PEN_FIELDS[:6], "payment_calendar_key")
 PAYS_HEADERS = (*NG_HEADERS, "payment_day")
 PAYS_HOLIDAYS = ["2026-01-01"]
 PAYS_A: list[object] = [1.0, serial("2026-11-30"), "Z26", 60.0, 70.0, "+1bd"]
@@ -2402,7 +2411,7 @@ MIXED_FIELDS = (
     "trade_date",
     "fixed_price",
     "payment_day",
-    "payment_holiday_calendar",
+    "payment_calendar_key",
 )
 MIXED_HEADERS = (
     "trade_id",
@@ -2720,7 +2729,7 @@ def ete_template(basis: str | None = "month", broker: str | None = None) -> str:
     closed on New Year's Day, the basis in it unless None leaves it to the ticket, and since #188
     naming the broker given, the fee examples' ION, so that they still charge brokerage."""
     payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]), bridge.MISSING))
-    fields = ["quantity_per", *ETE_FIELDS, "payment_holiday_calendar"]
+    fields = ["quantity_per", *ETE_FIELDS, "payment_calendar_key"]
     values: list[object] = [basis, "cleared", "financial", "ETE Clearing", "+1bd", payments]
     if broker is not None:
         k = fields.index("clearing_house") + 1
@@ -3570,7 +3579,7 @@ def waha() -> dict[str, Any]:
         "settlement_method": "financial",
         "clearing_house": "ICE Clear Europe",
         "payment_day": "+2bd",
-        "payment_holiday_calendar": pays,
+        "payment_calendar_key": pays,
     }
     template = templated([*fields], [*fields.values()])
     trades = ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(WAHA_ROW), template)
@@ -3695,7 +3704,7 @@ def test_an_iferc_batch_that_is_not_a_financial_lastday_one_is_refused_when_made
         **{
             key: value
             for key, value in waha["fields"].items()
-            if key not in ("payment_day", "payment_holiday_calendar")
+            if key not in ("payment_day", "payment_calendar_key")
         },
         "settlement_method": "physical",
     }
@@ -4005,6 +4014,7 @@ def test_reserves_past_the_largest_number_publish_no_batch() -> None:
         [101.0, serial("2026-11-20"), "Z26", 1.0, "LOT", 25.0, "lastday"],
         [102.0, serial("2026-11-20"), "Z26", 1.0, "LOT", 25.0, "lastday"],
     ]
+    seam_calendars()  # the tests' collection, published before the count is taken
     live = bridge.live_handles()
     assert ENTRY["_CreateTrades"](huge, row(*ETE_HEADERS), rows(*two), template) == (
         "#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, "
@@ -4290,7 +4300,7 @@ BILATERAL_REFUSAL = (
 
 def a_template_of(fields: tuple[str, ...], values: tuple[object, ...]) -> str:
     payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]), bridge.MISSING))
-    return str(templated([*fields, "payment_holiday_calendar"], [*values, payments]))
+    return str(templated([*fields, "payment_calendar_key"], [*values, payments]))
 
 
 def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_seam(
@@ -4613,7 +4623,7 @@ UNIT_FIELDS = (
     "settlement_method",
     "counterparty",
     "discount_curve_key",
-    "payment_holiday_calendar",
+    "payment_calendar_key",
     "marketing_reserve",
 )
 UNIT_HEADERS = (*NG_HEADERS, "payment_day")
@@ -5336,7 +5346,7 @@ def test_a_half_year_values_as_its_six_months_do() -> None:
         "settlement_method": "financial",
         "clearing_house": "TEST_CLEARER",
         "payment_day": "+2bd",
-        "payment_holiday_calendar": ENTRY["_CreateHolidayCalendar"](
+        "payment_calendar_key": ENTRY["_CreateHolidayCalendar"](
             column([serial("2030-01-01")]), bridge.MISSING
         ),
     }

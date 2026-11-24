@@ -8,7 +8,7 @@ equal and opposite; and the refusals, a later nearby where it is not priced, a n
 lists no contract for, and a history or a market that holds no price of it."""
 
 import pytest
-from test_create_trades import a_ticket, created
+from test_create_trades import a_ticket, created, key_of
 from test_nearby_fixings import JUNE_17, ROLL, history_on
 from test_nearby_trades import JUNE_12, JUNE_16, WINDOW, rows_over, valued
 from test_quote import a_template as a_quote_template
@@ -43,7 +43,7 @@ def window_quote(nearby: int) -> QuoteTemplate:
         settlement_frequency="onetime",
         nearby=nearby,
         payment_day=DayOrRule(day("2026-06-18"), None),
-        payment_holiday_calendar=ROLL.holiday_calendar,
+        payment_calendar_key=key_of(ROLL.holiday_calendar),
     )
 
 
@@ -58,7 +58,7 @@ def monthly_quote(nearby: int, method: str = "asian") -> QuoteTemplate:
         settlement_frequency="monthly",
         nearby=nearby,
         payment_day=DayOrRule(None, "+2bd"),
-        payment_holiday_calendar=ROLL.holiday_calendar,
+        payment_calendar_key=key_of(ROLL.holiday_calendar),
     )
 
 
@@ -119,7 +119,7 @@ def test_once_a_month_has_paid_the_mark_and_the_cash_are_equal_and_opposite() ->
         "settlement_method": "financial",
         "clearing_house": "CME Clearing",
         "payment_day": "+2bd",
-        "payment_holiday_calendar": ROLL.holiday_calendar,
+        "payment_calendar_key": key_of(ROLL.holiday_calendar),
     }
     ticket: dict[str, list[object]] = {
         "trade_id": [1],

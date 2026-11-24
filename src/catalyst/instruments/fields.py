@@ -52,7 +52,7 @@ class FieldValues:
     for a template and one or more for a ticket; names, the fields present, in the sheet's column
     order, each once, every one a field of the instrument; columns, by field name, each the
     seam's typed column, numbers as a float64 array, dates as a datetime64[D] array, text and
-    codes as a tuple of text, a handle field as a tuple of the objects the handles stood for,
+    codes as a tuple of text,
     one per row, and a field of a date or a text as the DatesOrTexts record above, since
     payment-day-date-or-rule.md; and supplied, since #172, by the name of each present field
     whose definition lets a cell go unsupplied, a read-only mask over the rows, True where the
@@ -91,9 +91,6 @@ class FieldValues:
 
     def texts(self, name: str) -> tuple[str, ...]:
         return cast(tuple[str, ...], self.columns[name])
-
-    def objects(self, name: str) -> tuple[object, ...]:
-        return cast(tuple[object, ...], self.columns[name])
 
     def dates_or_texts(self, name: str) -> DatesOrTexts:
         return cast(DatesOrTexts, self.columns[name])

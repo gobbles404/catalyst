@@ -20,6 +20,7 @@ from typing import Any
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from test_create_trades import key_of, the_calendars
 from test_trades import (
     an_index,
     bounds_of,
@@ -513,7 +514,7 @@ def test_the_two_trades_made_through_the_creators_value_the_same() -> None:
         "settlement_method": "financial",
         "counterparty": "ACME Trading",
         "discount_curve_key": "SOFR",
-        "payment_holiday_calendar": PAY_DAYS,
+        "payment_calendar_key": key_of(PAY_DAYS),
     }
     template = trade_template(
         FieldValues(FIXED_FLOAT, 1, tuple(fields), {k: (v,) for k, v in fields.items()})
@@ -527,7 +528,7 @@ def test_the_two_trades_made_through_the_creators_value_the_same() -> None:
         "payment_day": DatesOrTexts.of_texts(("+261bd", "+522bd")),
     }
     ticket = FieldValues(FIXED_FLOAT, 2, tuple(columns), columns)
-    batch = trades((UNIT,), ticket, template, UNITS, WorkCounter())
+    batch = trades((UNIT,), ticket, template, UNITS, WorkCounter(), the_calendars())
     assert batch.encoded.payment_date is not None
     np.testing.assert_array_equal(batch.encoded.payment_date, dates(A_YEAR, TWO_YEARS))
     assert batch.resolved.counterparty == ("ACME Trading", "ACME Trading")

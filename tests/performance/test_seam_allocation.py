@@ -1080,8 +1080,9 @@ def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() 
 # their places, an array and the tuple of eight a row each, beside the looks' masks over the rows:
 # measured 147,006 bytes at 2,500 rows on 2026-10-10, about 59 a row, where 3,837 bytes, one a row,
 # stood from 2026-10-04 while a text column was the host's tuple itself; 60 a row and the slack
-# twice over. A row of four fields with a handle cell echoed back through EchoFieldRow, the handle
-# resolved and the table built cell by cell: 2,340 bytes.
+# twice over. A row of four fields echoed back through EchoFieldRow, the payment calendar key
+# among them, text since payment-calendar-keys.md where a handle was resolved, the table built
+# cell by cell: within the four slacks the handle's 2,340 bytes stood in.
 def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
     rows = N // 4
     headers = Cells.from_rows([["quantity", "fixed_price", "contract_code"]])
@@ -1090,18 +1091,18 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
         least_peak(lambda: ENTRY["CountFieldRows"]("fixed_float", headers, body))
         <= 60 * rows + 2 * SLACK
     )
-    calendar = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46023.0]]), bridge.MISSING)
-    one = Cells.from_rows([["quantity_unit", "payment_holiday_calendar", "trade_date", "quantity"]])
-    row = Cells.from_rows([["lots", calendar, 46164.0, 10.0]])
+    one = Cells.from_rows([["quantity_unit", "payment_calendar_key", "trade_date", "quantity"]])
+    row = Cells.from_rows([["lots", "NYFED+LON", 46164.0, 10.0]])
     live = bridge.live_handles()
     assert least_peak(lambda: ENTRY["EchoFieldRow"]("fixed_float", one, row)) <= 4 * SLACK
     assert bridge.live_handles() == live
 
 
 # --- the trade creators -------------------------------------------------------------------------
-# A template of the toy's eight fields, one with a handle cell, keeps eight scalars and the objects
-# the library already holds: measured 2,331 bytes on 2026-10-06, which four times the slack
-# covers. A batch of 2,500 single-month rows keeps nineteen columns of eight bytes a row, the
+# A template of the toy's eight fields, the payment calendar's key among them since
+# payment-calendar-keys.md where a handle cell stood, keeps eight scalars: measured 2,331 bytes
+# on 2026-10-06, which four times the slack covers. A batch of 2,500 single-month rows keeps
+# nineteen columns of eight bytes a row, the
 # terms' eight by component, the covered days among them since #159 and the two dates each
 # component covers since #161, while the month's quantity shares the entered quantity's column
 # under month, and the encoding's three by component, the payment
@@ -1139,9 +1140,10 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         Cells.from_rows([[float((day - first).astype(np.int64))] for day in expiries]),
         MISSING,
     )
-    holidays = ENTRY["_CreateHolidayCalendar"](
-        Cells.from_rows([[day] for day in closed]), bridge.MISSING
-    )
+    # The index's calendar under a name, so that the templates select it by key from the
+    # collection of it, made here, outside every measured call.
+    holidays = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[day] for day in closed]), "PAYS")
+    calendars = ENTRY["_CollectPaymentCalendars"](holidays)
     conventions = ENTRY["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specifications = ENTRY["_CreateContractSpecifications"](
         Cells.from_rows(
@@ -1162,7 +1164,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
                 "settlement_method",
                 "clearing_house",
                 "payment_day",
-                "payment_holiday_calendar",
+                "payment_calendar_key",
                 "settlement_frequency",
                 "nearby",
             ]
@@ -1178,7 +1180,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
                 "financial",
                 "TEST",
                 "+2bd",
-                holidays,
+                "PAYS",
                 "monthly",
                 1.0,
             ]
@@ -1199,7 +1201,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
                 "schedule_method",
                 "quantity_per",
                 "payment_day",
-                "payment_holiday_calendar",
+                "payment_calendar_key",
                 "discount_curve_key",
                 "settlement_frequency",
                 "nearby",
@@ -1207,11 +1209,11 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         ]
     )
     quote_values = Cells.from_rows(
-        [["bilateral", "financial", "asian", "calday", "+5bd", holidays, "SOFR", "monthly", 1.0]]
+        [["bilateral", "financial", "asian", "calday", "+5bd", "PAYS", "SOFR", "monthly", 1.0]]
     )
 
     def a_quote() -> object:
-        return ENTRY["_CreateQuoteTemplate"]("fixed_float", quote_names, quote_values)
+        return ENTRY["_CreateQuoteTemplate"]("fixed_float", quote_names, quote_values, calendars)
 
     assert least_peak(a_quote) <= 6 * SLACK
     template = ENTRY["_CreateTradeTemplate"]("fixed_float", names, values)
@@ -1227,7 +1229,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
     def created() -> str:
         # Asserted inside the measured call, so each of the calls measured, the warm-ups as much
         # as the traced ones, is a batch published and never a refusal.
-        batch = ENTRY["_CreateTrades"](ix, headers, body, template)
+        batch = ENTRY["_CreateTrades"](ix, headers, body, template, calendars)
         assert isinstance(batch, str) and re.fullmatch(r"\d+:trades:gas:\d+", batch), batch
         return batch
 
@@ -1235,8 +1237,10 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
     # 280 before the bounds and the frequency, 321 with them, and since onetime-averaging.md's
     # third slice 324, three one-byte masks a row, which rows are a window and which components,
     # 811,252 at 2,500 rows; since nearby-selection.md 332, each row's nearby held as one whole
-    # number of eight bytes, 829,917 at 2,500 rows.
-    assert peak <= 332 * rows + 2 * SLACK
+    # number of eight bytes, 829,917 at 2,500 rows; since payment-calendar-keys.md 340, each
+    # row's payment calendar key kept to be read back, one reference of eight bytes a row as
+    # every label is: 829,418 before and 850,058 after at 2,500 rows on 2026-11-21.
+    assert peak <= 340 * rows + 2 * SLACK
 
 
 # A combination keeps its distinct days and nothing of its sources: two calendars of the same

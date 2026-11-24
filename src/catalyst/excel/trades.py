@@ -32,6 +32,7 @@ from catalyst.excel.bridge import (
 from catalyst.globals.discount_curve_set import DiscountCurveSet
 from catalyst.globals.unit_conversions import UNITS
 from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.payment_calendars import PaymentCalendars
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market.market import Market
 from catalyst.market.market_history import MarketHistory
@@ -93,11 +94,17 @@ def _CreateTrades(
         "The trade-template handle: the cell showing _CreateTradeTemplate's result, such as B3, "
         "or a name for it, which selects the instrument and supplies the shared fields.",
     ],
+    payment_calendars: Annotated[
+        Handle[PaymentCalendars] | None,
+        "The collection each row's payment_calendar_key selects from: the cell showing "
+        "_CollectPaymentCalendars's result, such as I5. Leave it out for a physically settled "
+        "batch.",
+    ] = None,
 ) -> Handle[Trades]:
     """Creates a batch of trades on one index, or on a pair as two legs, from a
     template's shared fields and a ticket's rows, each contract code resolved against each
     index's schedule, and shows its handle, the text other formulas take as the trades."""
-    return trades(indexes, trade_rows, template, UNITS, WorkCounter())
+    return trades(indexes, trade_rows, template, UNITS, WorkCounter(), payment_calendars)
 
 
 @excel_function

@@ -105,7 +105,7 @@ def _CombineHolidayCalendars(
     ],
 ) -> Handle[HolidayCalendar]:
     """Combines holiday calendars into one closed on every day any of them is closed, the days
-    in order, once each, and shows its handle, an ordinary calendar for payment_holiday_calendar,
+    in order, once each, and shows its handle, an ordinary calendar for an index,
     util_ShiftDate or another combination."""
     return combine_holiday_calendars(calendar_handles, WorkCounter())
 

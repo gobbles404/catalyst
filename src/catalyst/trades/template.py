@@ -25,6 +25,7 @@ import numpy as np
 from catalyst.cashflows.rules import currency_of, finite_amounts
 from catalyst.globals.discount_curve import curve_name
 from catalyst.index_definitions.date_offsets import Instruction, read_offset
+from catalyst.index_definitions.payment_calendars import calendar_key
 from catalyst.index_definitions.periods import period_months
 from catalyst.instruments.definitions import FieldType, Instrument
 from catalyst.instruments.fields import FieldValues, selected
@@ -49,11 +50,10 @@ class TradeTemplate:
     template's row named, in the sheet's order, each one the template owns for every batch made
     under it, so that a ticket's column of the same name is refused whatever either holds; and
     the defaults by field name, in the same order: each the one value the row held, a number as
-    a float, a date as a numpy day, text and a code as text, a holiday calendar as the object its
-    handle stood for, and since payment-day-date-or-rule.md the payment day as a DayOrRule, the
-    day or the rule text the row held; owned, each being a scalar or an object the library
-    already holds, and read for nothing until a batch is resolved. Since #172 a name may stand
-    with no default: a
+    a float, a date as a numpy day, text and a code as text, the payment calendar key among
+    them since payment-calendar-keys.md, and since payment-day-date-or-rule.md the payment
+    day as a DayOrRule, the day or the rule text the row held; owned, each being a scalar, and
+    read for nothing until a batch is resolved. Since #172 a name may stand with no default: a
     period field, contract_code, start_date or end_date, whose cell held nothing, which the
     template then supplies to no row, as its page says."""
 
@@ -118,7 +118,7 @@ class DayOrRule:
 def field_value(values: FieldValues, name: str) -> object:
     """The one value of a field in a one-row record, as the scalar its type names, read for the
     field's own rule where it has one: a number for the kernel's, text for its list or grammar; a
-    date, a holiday calendar and since #172 a contract code mean what they are, the code read for
+    date and since #172 a contract code mean what they are, the code read for
     its months by the resolution, for the rows that book by it, and by nothing here; a payment
     day, since payment-day-date-or-rule.md, is the day it holds, or its rule text read for the
     grammar, as a DayOrRule. A quote template reads its values by the same rule, since
@@ -137,8 +137,6 @@ def field_value(values: FieldValues, name: str) -> object:
             if read is not None:
                 read(name, text)
             return text
-        case FieldType.HOLIDAY_CALENDAR:
-            return values.objects(name)[0]
         case FieldType.DATE_OR_TEXT:
             entered = values.dates_or_texts(name)
             if entered.is_date[0]:
@@ -269,6 +267,9 @@ READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
         "settlement_frequency": settlement_frequency_of,  # onetime-averaging.md
         "payment_day": payment_rule_of,  # the rule form; a date is read by nobody
         "discount_curve_key": curve_name,  # the curve's own name rule, named-curves-slice-3.md
+        # The key's form, read here; its names are bound to calendars when a batch is made,
+        # payment-calendar-keys.md.
+        "payment_calendar_key": calendar_key,
         "currency": currency_of,  # the cashflow instrument's, since #200
     }
 )

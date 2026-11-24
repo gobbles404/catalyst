@@ -43,7 +43,6 @@ from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import IndexConventions
-from catalyst.index_definitions.kind import named
 from catalyst.index_definitions.payment_calendars import PaymentCalendars
 from catalyst.index_definitions.periods import end_date, start_date
 from catalyst.instrumentation.work_counts import WorkCounter
@@ -520,7 +519,7 @@ def template_table(
 ) -> MixedArray:
     """A template's spill, a trade template's and a quote template's alike: the instrument, then
     each field named under its name in the order given, one row, a number, a day and text as
-    they are, a holiday calendar as the words of its kind, and `(not supplied)` under a field
+    they are, and `(not supplied)` under a field
     named with no value."""
     headers: list[str] = ["instrument"]
     types: list[str] = ["str"]
@@ -543,9 +542,6 @@ def template_table(
             case FieldType.TEXT | FieldType.CODE:
                 types.append("str")
                 columns.append((str(value),))
-            case FieldType.HOLIDAY_CALENDAR:
-                types.append("str")
-                columns.append((named(value),))
             case FieldType.DATE_OR_TEXT:  # the day or the rule, payment-day-date-or-rule.md
                 entered = cast(DayOrRule, value)
                 if entered.day is not None:
@@ -667,6 +663,10 @@ def trades_table(obj: Trades) -> MixedArray:
     # nearby after it, since nearby-selection.md, appended the same way: each row's own number,
     # the contract its days are priced by counted from the prompt.
     numbers("nearby", "int64", terms.nearby[rows])
+    # payment_calendar_key after it, since payment-calendar-keys.md, appended the same way so
+    # that no column before it moves: each row's key as entered, where the batch settles
+    # financially.
+    labels("payment_calendar_key", terms.payment_calendar_key)
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
 

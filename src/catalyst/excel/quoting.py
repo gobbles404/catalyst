@@ -32,6 +32,7 @@ from catalyst.excel.bridge import (
 )
 from catalyst.globals.discount_curve_set import DiscountCurveSet
 from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.payment_calendars import PaymentCalendars
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market.market import Market
 from catalyst.quoting.ftc_prices import FtcPrices, ftc_prices
@@ -62,10 +63,16 @@ def _CreateQuoteTemplate(
         "quote_allowed.",
     ],
     values: Annotated[FieldRow[str], "The values in one row beneath those fields, such as A2:G2."],
+    payment_calendars: Annotated[
+        Handle[PaymentCalendars] | None,
+        "The collection payment_calendar_key selects from: the cell showing "
+        "_CollectPaymentCalendars's result, such as B4. Leave it out where the row holds no "
+        "payment_calendar_key.",
+    ] = None,
 ) -> Handle[QuoteTemplate]:
     """Creates the static terms of a quote under an instrument and shows their handle, the text
     _Quote takes as the quote template."""
-    return quote_template(values)
+    return quote_template(values, payment_calendars, WorkCounter())
 
 
 @excel_function

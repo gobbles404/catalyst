@@ -15,6 +15,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 from test_bilateral_kernel import CLOSE
+from test_create_trades import seam_key, with_calendars
 from test_fit_to_curve import CODES, EXAMPLE, FIELDS, PRICES, RATES, by_request
 from test_quote import DEC_31, STRIP, bilateral, financial, physical, priced
 from test_rfq import LONGER, WINDOW_PRICE, WINDOW_WORDS, request, windows
@@ -41,6 +42,9 @@ ENTRY = {
         "_CreateHolidayCalendar",
     )
 }
+# A batch or a quote template made on the sheet names the tests' collection of payment
+# calendars, payment-calendar-keys.md.
+ENTRY["_CreateQuoteTemplate"] = with_calendars(ENTRY["_CreateQuoteTemplate"])
 
 # The issue's example: January, February and March 2027 at 4.50, 4.30 and 3.00, the same quantity
 # each month, agreed at 3.95 with two decimals allowed. The request's fit-to-curve quote is
@@ -372,7 +376,9 @@ def test_the_worksheet_function_spills_the_check_over_the_months_through_the_sea
     )
     history = seam_history(ix, "2026-12-16", DEC_31, ["2027-01-01"], {})
     market = seam_market(history, "SEAM", *PRICES)
-    weekends = ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING)
+    weekends = seam_key(
+        ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")]), bridge.MISSING)
+    )
     template = ENTRY["_CreateQuoteTemplate"](
         "fixed_float",
         row(*FIELDS),

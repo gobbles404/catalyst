@@ -33,7 +33,12 @@ from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
-from catalyst.index_definitions.kind import named
+from catalyst.index_definitions.payment_calendars import (
+    KEYS_BOUND,
+    PaymentCalendars,
+    no_collection,
+    payment_calendar,
+)
 from catalyst.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT, FLOAT_FLOAT, FieldType
@@ -102,7 +107,7 @@ CONDITIONS: Final[dict[str, tuple[str, Route | Settlement]]] = {
     "counterparty": ("route", Route.BILATERAL),  # since #175
     "discount_curve_key": ("route", Route.BILATERAL),  # named-curves-slice-3.md
     "payment_day": ("settlement_method", Settlement.FINANCIAL),  # payment-day-date-or-rule.md
-    "payment_holiday_calendar": ("settlement_method", Settlement.FINANCIAL),
+    "payment_calendar_key": ("settlement_method", Settlement.FINANCIAL),  # payment-calendar-keys.md
 }
 
 
@@ -131,17 +136,22 @@ def trades(
     template: TradeTemplate,
     units: UnitConversions,
     counter: WorkCounter,
+    calendars: PaymentCalendars | None = None,
 ) -> Trades:
     """The one way to make Trades: resolution, which makes each leg's schedule methods'
     observations on the way to the payment days, one index or since two-index-fixed-float.md
     two, then encoding over the terms and those observations, the unit tables and the counter
     passed in and never looked up; a failure in any publishes nothing."""
-    terms, observations, entered = resolved(indexes, ticket, template, counter)
+    terms, observations, entered = resolved(indexes, ticket, template, counter, calendars)
     return Trades(terms, encoded(terms, observations, units, counter), *entered)
 
 
 def resolved(
-    indexes: Sequence[Index], ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
+    indexes: Sequence[Index],
+    ticket: FieldValues,
+    template: TradeTemplate,
+    counter: WorkCounter,
+    calendars: PaymentCalendars | None = None,
 ) -> tuple[ResolvedTrades, tuple[Observations, ...], tuple[NDArray[np.bool_], tuple[str, ...]]]:
     """The resolution child: the terms of a batch from a template and a ticket, checked in this
     order, the first failure being the message, and then the kernel's own rules; with them the
@@ -348,7 +358,7 @@ def resolved(
             second[0], fields, periods.contracts[1], occurrence, start, end, trade_ids, second[1]
         )
         legs = (observations, second_observations)
-    payment = _the_payments(settlement, fields, legs, occurrence, trade_ids, counter)
+    payment = _the_payments(settlement, fields, legs, occurrence, trade_ids, counter, calendars)
     counter.hit(RESOLVED_OCCURRENCES, fields.rows)
     counter.hit(RESOLVED_COMPONENTS, int(occurrence.size))
     terms = resolved_trades(
@@ -376,6 +386,7 @@ def resolved(
         marketing_reserve=fields.amounts("marketing_reserve", marketing_reserves),
         cva_reserve=fields.amounts("cva_reserve", finite_amounts),  # signed, cva-reserve.md
         discount_curve_key=fields.keys("discount_curve_key"),
+        payment_calendar_key=fields.labels("payment_calendar_key"),  # bound above, kept to show
         schedule_month=months,
         second_leg=second_leg,
         price_unit=price_unit,
@@ -523,11 +534,6 @@ class _Fields:
             return np.full(self.rows, self.template.defaults[name], dtype="datetime64[D]")
         return self.ticket.dates(name)
 
-    def objects(self, name: str) -> tuple[object, ...]:
-        if name in self.template.defaults:
-            return (self.template.defaults[name],) * self.rows
-        return self.ticket.objects(name)
-
     def days_or_rules(self, name: str) -> DatesOrTexts:
         """A field of a date or a rule text per occurrence, since payment-day-date-or-rule.md, the
         two told apart once by the seam and never read for which they are: the template's one
@@ -550,8 +556,6 @@ class _Fields:
                 return repr(float(self.numbers(name)[0]))
             case FieldType.DATE:
                 return str(self.dates(name)[0])
-            case FieldType.HOLIDAY_CALENDAR:
-                return named(self.objects(name)[0])
             case FieldType.DATE_OR_TEXT:
                 entered = self.days_or_rules(name)
                 return str(entered.dates[0]) if entered.is_date[0] else repr(entered.texts[0])
@@ -980,6 +984,7 @@ def _the_payments(
     occurrence: NDArray[np.intp],
     trade_ids: NDArray[np.int64] | None,
     counter: WorkCounter,
+    collection: PaymentCalendars | None,
 ) -> PaymentTerms | None:
     """The payment terms over the legs' anchors: one anchor for every index since
     iferc-publication-payment-anchor.md, each component's last observation day, the expiry under
@@ -989,7 +994,9 @@ def _the_payments(
     anchors = last_days(legs[0], occurrence.size)
     for observations in legs[1:]:
         anchors = np.maximum(anchors, last_days(observations, occurrence.size))
-    return _the_payment_terms(settlement, fields, anchors, occurrence, trade_ids, counter)
+    return _the_payment_terms(
+        settlement, fields, anchors, occurrence, trade_ids, counter, collection
+    )
 
 
 def schedule_rows(
@@ -1039,6 +1046,7 @@ def _the_payment_terms(
     occurrence: NDArray[np.intp],
     trade_ids: NDArray[np.int64] | None,
     counter: WorkCounter,
+    collection: PaymentCalendars | None,
 ) -> PaymentTerms | None:
     """For a financial settlement, the payment terms: what each occurrence entered for its
     payment_day, a date or a rule text, with its payment calendar, retained, and each component's
@@ -1071,9 +1079,7 @@ def _the_payment_terms(
             return None
         case Settlement.FINANCIAL:
             entered = fields.days_or_rules("payment_day")
-            calendars = cast(
-                tuple[HolidayCalendar, ...], fields.objects("payment_holiday_calendar")
-            )
+            calendars = _the_calendars(fields, collection, counter)
             if not entered.is_date.any():
                 pays, rules_read, shifts = _the_ruled_days(
                     entered.texts, None, anchors, occurrence, calendars, fields
@@ -1110,6 +1116,27 @@ def _the_payment_terms(
             return PaymentTerms(entered, calendars, pays)
         case _:
             assert_never(settlement)
+
+
+def _the_calendars(
+    fields: _Fields, collection: PaymentCalendars | None, counter: WorkCounter
+) -> tuple[HolidayCalendar, ...]:
+    """Each occurrence's payment calendar, the one its payment_calendar_key selects from the
+    collection, payment-calendar-keys.md: each distinct key text bound once, in the order its
+    first row comes, so a refusal names the first row that holds it, by the step a quote
+    template shares, payment_calendar; keys that name one set of calendars share one calendar,
+    and rows that share a calendar are counted together as rows sharing a handle were. Every
+    row's key is bound, a row paying on a date included, which reads its calendar for nothing:
+    the owner's rule of 21 November 2026. A financial batch with no collection is refused by
+    the argument. Work: `payment_keys_bound`, the distinct keys; a combination's own counts."""
+    if collection is None:
+        raise no_collection("a financially settled batch")
+    combined: dict[tuple[str, ...], HolidayCalendar] = {}
+    bound, by_key = _each_distinct(
+        fields, "payment_calendar_key", partial(payment_calendar, collection, combined, counter)
+    )
+    counter.hit(KEYS_BOUND, len(bound))
+    return tuple([bound[int(k)] for k in by_key])
 
 
 def _the_ruled_days(

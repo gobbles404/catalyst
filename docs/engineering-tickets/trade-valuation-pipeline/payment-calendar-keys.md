@@ -1,15 +1,15 @@
 # A payment calendar is chosen by key
 
-**Status:** The first of two pull requests built in #268, agreed with the owner on 21 November
-2026 for [issue #255](https://github.com/gobbles404/catalyst/issues/255), this page in its first
-commit; on `feat/payment-calendar-names`, stacked on `feat/fractional-quantities`, the branch of
-[fractional-quantities.md](fractional-quantities.md), #267. The second pull request, the cutover
-of the field, is stacked on the first. It follows
+**Status:** Built in two pull requests, #268 and #269, agreed with the owner on 21 November
+2026 for [issue #255](https://github.com/gobbles404/catalyst/issues/255). The first is on
+`feat/payment-calendar-names`, stacked on `feat/fractional-quantities`, the branch of
+[fractional-quantities.md](fractional-quantities.md), #267; the second, the cutover of the
+field, on `feat/payment-calendar-keys`, stacked on the first. It follows
 [multiple-discount-curves.md](multiple-discount-curves.md), #201 to #203, which chose a discount
 curve by name, and [combine-holiday-calendars.md](combine-holiday-calendars.md), #183.
 [holiday-calendar.md](../../library/index-definitions/holiday-calendar.md) and
 [collect-payment-calendars.md](../../library/index-definitions/collect-payment-calendars.md) own
-the name and the collection.
+the name, the collection and the key.
 
 ## The issue
 
@@ -40,7 +40,7 @@ So the payment calendar is chosen by name, as a discount curve is: `payment_cale
 | | What | State |
 |---|---|---|
 | 1 | The name and the collection: the optional name on `_CreateHolidayCalendar`, `_CollectPaymentCalendars`, their readbacks. No field changes and nothing reads a collection yet. | #268 |
-| 2 | The cutover, trades and quotes together: `payment_calendar_key` replaces `payment_holiday_calendar`; the key's rule and its binding in `_CreateTrades` and `_CreateQuoteTemplate`; the holiday-calendar field type deleted. | stacked on the first |
+| 2 | The cutover, trades and quotes together: `payment_calendar_key` replaces `payment_holiday_calendar`; the key's rule and its binding in `_CreateTrades` and `_CreateQuoteTemplate`; the holiday-calendar field type deleted. | #269 |
 
 The field is one definition shared by trades and quotes, so it cannot change for one without
 the other; that is why the second is one pull request and not two.
@@ -91,7 +91,7 @@ is a repeat too. Its readback is one row per calendar, the name and how many day
 - The creator's second argument is optional, so a direct call states that the name is missing,
   as Excel does for a formula that leaves it out.
 
-## The second pull request, as agreed
+## The second pull request
 
 The key, each name looked up exactly:
 
@@ -105,13 +105,36 @@ The key, each name looked up exactly:
 | `NYFED + LON` | refused: a name has whitespace around it |
 | `nyfed` | refused, unless a calendar is named `nyfed` |
 
-A trade template can supply the key for the batch, or the ticket a key on each row.
-`_CreateTrades(indexes, fields, trade_rows, template, [payment_calendars])` binds each distinct
-key once and holds the calendars by reference; preparation and evaluation look nothing up.
-`_CreateQuoteTemplate(instrument, fields, values, [payment_calendars])` binds a supplied key and
-holds the calendar, which serves the direct quotes and `_CreateRFQ` without a calendar argument
-on any pricing function. Payment semantics do not change: the anchors, the offsets, a stated
-date used as entered and never rolled, and the payment groups all stand.
+```text
+_CreateTrades(indexes, fields, trade_rows, template, [payment_calendars]) -> handle
+_CreateQuoteTemplate(instrument, fields, values, [payment_calendars]) -> handle
+```
+
+**The field.** `payment_calendar_key`, text, stands where `payment_holiday_calendar` stood in
+the `fixed_float` and the `float_float`: required with a financial settlement, refused with a
+physical one, and a field a quote template may hold. No field of any instrument takes a handle
+now, so the holiday-calendar field type, the seam's column of handle texts and their readers
+are deleted.
+
+**A batch.** A trade template supplies the key for the batch, or the ticket a key on each row.
+`_CreateTrades` binds each distinct key once, in the order its first row comes, and holds the
+calendars by reference; preparation and evaluation look nothing up. Keys naming one set of
+calendars share one calendar, and a combination is made once per set of names, so `NYFED+LON`
+on two thousand rows is one calendar. Every financially settled row binds its key, a row paying
+on a stated date included. Each row's key is kept as entered and read back as the batch's last
+column, so no column a sheet already reads has moved. A physical batch names no collection.
+
+**A quote template.** `_CreateQuoteTemplate` binds the key its row holds and holds the
+calendar, which serves the direct quotes and `_CreateRFQ` with no calendar argument on any
+pricing function. A template that holds no key needs no collection.
+
+**A trade template** is given no collection: it reads the key's form and keeps the text. So a
+changed calendar remakes its collection and every batch and quote template that names the
+collection, and leaves a trade template as it is.
+
+Payment semantics do not change: the anchors, the offsets, a stated date used as entered and
+never rolled, and the payment groups all stand. Every batch on the kept workbook pays on the
+day it paid.
 
 The hand-worked example, each trade's last observation Wednesday 25 November 2026 and its
 `payment_day` `+2bd`, on `PAY_A`, closed 26 November, and `PAY_B`, closed 27 and 30 November:
@@ -121,6 +144,53 @@ The hand-worked example, each trade's last observation Wednesday 25 November 202
 | `PAY_A` | Friday 27, Monday 30 | 30 November 2026 |
 | `PAY_B` | Thursday 26, Tuesday 1 | 1 December 2026 |
 | `PAY_A+PAY_B` | Tuesday 1, Wednesday 2 | 2 December 2026 |
+
+| What | Words |
+|---|---|
+| A name missing | `payment_calendar_key row 1 is 'PAY_A+', expected a calendar's name, or several joined by '+'; a name is missing` |
+| A name with whitespace around it | `payment_calendar_key row 1 is 'NYFED + LON', expected a calendar's name, or several joined by '+', each with no whitespace around it` |
+| A name twice | `payment_calendar_key row 1 is 'NYFED+NYFED', expected a calendar's name, or several joined by '+', each once; 'NYFED' is given twice` |
+| A name the collection lacks | `payment_calendar_key row 2 is 'PAY_A+PAY_C', expected names of the collection's calendars, 'PAY_A' and 'PAY_B'; it holds no 'PAY_C'` |
+| A financial batch given no collection | `payment_calendars is missing, expected a _CollectPaymentCalendars collection, which a financially settled batch selects its payment calendar from` |
+| A quote template holding a key and given no collection | `payment_calendars is missing, expected a _CollectPaymentCalendars collection, which payment_calendar_key selects its payment calendar from` |
+| A financial row with no key | `payment_calendar_key is missing, expected it when settlement_method = financial` |
+| A key on a physical batch | `payment_calendar_key is 'NYFED', expected none unless settlement_method = financial` |
+| A blank key cell, a number for a key | the seam's, by the cell: `trade_rows cell (1, 6) is blank, expected text` |
+
+A key the ticket supplies is named with its row, the first that holds that text; a template's
+key is named alone.
+
+### What a sheet changes
+
+A sheet made before this pull request fails by name until it changes four things:
+
+1. Name each payment calendar where it is made: `=_CreateHolidayCalendar(B2:B9, "NYFED")`.
+2. Collect them, once: `=_CollectPaymentCalendars(D2:D4)`.
+3. Rename the header `payment_holiday_calendar` to `payment_calendar_key`, and type the
+   calendar's name where its cell was referred to.
+4. Give `_CreateTrades` and `_CreateQuoteTemplate` the collection's cell as their last argument.
+
+A `_CombineHolidayCalendars` cell made for a payment calendar is no longer needed: its key is
+the names joined by `+`.
+
+### Ownership
+
+| Fact | Owner |
+|---|---|
+| The field | `payment_calendar_key` in `instruments/definitions.py` |
+| The key's form | `calendar_key` in `index_definitions/payment_calendars.py`, the field's reader in `trades/template.py` |
+| The binding, and its refusals | `payment_calendar` and `no_collection` in the same module, called by `_the_calendars` in `trades/resolution.py` and by `quote_template` in `quoting/template.py`; [collect-payment-calendars.md](../../library/index-definitions/collect-payment-calendars.md#binding-a-key) is the page |
+| The key kept to show | `ResolvedTrades.payment_calendar_key` in `trades/terms.py`, read back last by `trades_table` in `excel/utilities.py` |
+
+### Also pin
+
+- The work: `payment_keys_bound`, one per distinct key text a batch or a quote template binds;
+  a key of several names adds one combination per distinct set of names. Binding one key adds a
+  fixed number of calls to a batch's resolution, the same at five rows and at two thousand.
+- Rows that share a calendar are counted together, as rows that shared a handle were.
+- A key is no payment group: two keys that pay on one day are one group.
+- A collection of no calendars, which the library can make and the sheet cannot, says `none`
+  in the refusal's list of names.
 
 ## Outside this ticket
 

@@ -31,11 +31,6 @@ def rows(*lines: list[object]) -> Cells:
     return Cells.from_rows(lines)
 
 
-@pytest.fixture
-def calendar() -> str:
-    return str(ENTRY["_CreateHolidayCalendar"](row(46023.0), bridge.MISSING))
-
-
 # --- the record the function receives -------------------------------------------------------
 
 
@@ -60,17 +55,18 @@ def bound(instrument: str, headers: Cells, body: Cells, one_row: bool = True) ->
     return caught[0]
 
 
-def test_a_row_of_fields_arrives_typed_by_its_fields_in_the_sheets_order(calendar: str) -> None:
-    headers = row("quantity", "payment_holiday_calendar", "trade_date", "schedule_method")
-    values = bound("fixed_float", headers, row(10.0, calendar, 46164.0, "lastday"))
+def test_a_row_of_fields_arrives_typed_by_its_fields_in_the_sheets_order() -> None:
+    headers = row("quantity", "payment_calendar_key", "trade_date", "schedule_method")
+    values = bound("fixed_float", headers, row(10.0, "NYFED+LON", 46164.0, "lastday"))
     assert values.instrument is FIXED_FLOAT and values.rows == 1
-    assert values.names == ("quantity", "payment_holiday_calendar", "trade_date", "schedule_method")
+    assert values.names == ("quantity", "payment_calendar_key", "trade_date", "schedule_method")
     np.testing.assert_array_equal(values.numbers("quantity"), [10.0])
     assert values.dates("trade_date").dtype == np.dtype("datetime64[D]")
     assert values.dates("trade_date")[0] == np.datetime64("2026-05-22")
     assert values.texts("schedule_method") == ("lastday",)
-    (held,) = values.objects("payment_holiday_calendar")
-    assert type(held) is HolidayCalendar
+    # A payment calendar key is text like any other, since payment-calendar-keys.md: the seam
+    # hands it over as typed and no field of any instrument holds a handle.
+    assert values.texts("payment_calendar_key") == ("NYFED+LON",)
     assert values.has("quantity") and not values.has("fixed_price")
     assert values.field("quantity").type is FieldType.NUMBER
 
@@ -88,20 +84,20 @@ def test_rows_of_fields_arrive_as_columns_one_per_row() -> None:
     np.testing.assert_array_equal(values.numbers("fixed_price"), [3.1, 3.15, 3.4])
 
 
-def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar: str) -> None:
-    headers = row("quantity_unit", "payment_holiday_calendar", "trade_date", "quantity")
+def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names() -> None:
+    headers = row("quantity_unit", "payment_calendar_key", "trade_date", "quantity")
     kinds, slots, text = cast(
         tuple[NDArray[np.uint8], NDArray[np.float64], str],
-        ENTRY["EchoFieldRow"]("fixed_float", headers, row("lots", calendar, 46164.0, 10.0)),
+        ENTRY["EchoFieldRow"]("fixed_float", headers, row("lots", "NYFED", 46164.0, 10.0)),
     )
     assert kinds.shape == (2, 4)
     assert text.split("\0") == [
         "quantity_unit",
-        "payment_holiday_calendar",
+        "payment_calendar_key",
         "trade_date",
         "quantity",
         "lots",
-        "a holiday calendar",
+        "NYFED",
     ]
     assert slots[1, 2] == 46164.0 and slots[1, 3] == 10.0
     assert ENTRY["CountFieldRows"]("fixed_float", row("quantity"), rows([1.0], [2.0], [3.0])) == 3.0
@@ -129,11 +125,11 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar
         ),
         ("fixed_float", row("route"), row(""), "values cell (1, 1) is empty text, expected text"),
         ("fixed_float", row("trade_date"), row(None), "values cell (1, 1) is blank, expected date"),
-        (
+        (  # the key is text, and empty text is not text
             "fixed_float",
-            row("payment_holiday_calendar"),
+            row("payment_calendar_key"),
             row(""),
-            "values cell (1, 1) is empty text, expected holiday calendar handle",
+            "values cell (1, 1) is empty text, expected text",
         ),
         (
             "fixed_float",
@@ -205,18 +201,11 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar
             "values cell (1, 1) is number 46164.5, expected date",
         ),
         ("fixed_float", row("route"), row(1.0), "values cell (1, 1) is number 1.0, expected text"),
-        (
+        (  # a number where the key goes; the seam knows the field as text and nothing more
             "fixed_float",
-            row("payment_holiday_calendar"),
-            row("x:holiday_calendar:9"),
-            "values cell (1, 1) is text 'x:holiday_calendar:9' naming no live object, "
-            "expected holiday calendar handle",
-        ),
-        (
-            "fixed_float",
-            row("payment_holiday_calendar"),
+            row("payment_calendar_key"),
             row(46023.0),
-            "values cell (1, 1) is number 46023.0, expected holiday calendar handle",
+            "values cell (1, 1) is number 46023.0, expected text",
         ),
     ],
 )
@@ -224,60 +213,6 @@ def test_a_row_that_cannot_be_bound_says_why_in_the_decided_order(
     instrument: object, headers: Cells, body: Cells, message: str
 ) -> None:
     assert ENTRY["EchoFieldRow"](instrument, headers, body) == f"#ERROR EchoFieldRow: {message}"
-
-
-def test_handles_are_resolved_from_their_own_cells_in_row_order(calendar: str) -> None:
-    # The review's case: a good handle, then text where a number is wanted. The handle column is
-    # checked first and passes; the text is named in its own cell, not as a second handle in a row
-    # that is not there.
-    out = ENTRY["EchoFieldRow"](
-        "fixed_float", row("payment_holiday_calendar", "quantity"), row(calendar, "ten")
-    )
-    assert out == "#ERROR EchoFieldRow: values cell (1, 2) is text 'ten', expected number"
-    # Down a handle column the first bad cell is the one named, whichever way it is bad.
-    dead_then_number = rows(["x:holiday_calendar:9"], [1.0])
-    assert ENTRY["CountFieldRows"](
-        "fixed_float", row("payment_holiday_calendar"), dead_then_number
-    ) == (
-        "#ERROR CountFieldRows: rows cell (1, 1) is text 'x:holiday_calendar:9' naming no live "
-        "object, expected holiday calendar handle"
-    )
-    number_then_dead = rows([1.0], ["x:holiday_calendar:9"])
-    assert ENTRY["CountFieldRows"](
-        "fixed_float", row("payment_holiday_calendar"), number_then_dead
-    ) == ("#ERROR CountFieldRows: rows cell (1, 1) is number 1.0, expected holiday calendar handle")
-    # A text column before the handle column and a text column after it: each handle is found at
-    # its own place among the body's texts, and the rows come through.
-    good = rows(["cleared", calendar, "lastday"], ["bilateral", calendar, "lastday"])
-    values = bound(
-        "fixed_float",
-        row("route", "payment_holiday_calendar", "schedule_method"),
-        good,
-        one_row=False,
-    )
-    assert values.texts("route") == ("cleared", "bilateral")
-    assert values.texts("schedule_method") == ("lastday", "lastday")
-    assert all(type(held) is HolidayCalendar for held in values.objects("payment_holiday_calendar"))
-    mixed_rows = rows(
-        ["cleared", calendar, "lastday"], ["bilateral", "x:holiday_calendar:9", "lastday"]
-    )
-    assert ENTRY["CountFieldRows"](
-        "fixed_float", row("route", "payment_holiday_calendar", "schedule_method"), mixed_rows
-    ) == (
-        "#ERROR CountFieldRows: rows cell (2, 2) is text 'x:holiday_calendar:9' naming no live "
-        "object, expected holiday calendar handle"
-    )
-
-
-def test_a_handle_of_another_kind_in_a_handle_column_is_refused_naming_the_cell() -> None:
-    date = ENTRY["_CreateValuationDate"](46276.0, 0.5)
-    out = ENTRY["EchoFieldRow"](
-        "fixed_float", row("payment_holiday_calendar", "quantity"), row(date, 1.0)
-    )
-    assert out == (
-        f"#ERROR EchoFieldRow: values cell (1, 1) is valuation date handle {date!r}, "
-        "expected holiday calendar handle"
-    )
 
 
 def test_the_instrument_is_read_before_the_headers_and_the_cells() -> None:
@@ -303,29 +238,27 @@ def test_the_instrument_is_read_before_the_headers_and_the_cells() -> None:
 # --- cells left unsupplied in the three period fields, since #172 -------------------------------
 
 
-def test_a_blank_or_empty_cell_in_a_period_field_is_a_row_that_supplied_nothing(
-    calendar: str,
-) -> None:
+def test_a_blank_or_empty_cell_in_a_period_field_is_a_row_that_supplied_nothing() -> None:
     # Alternating rows: a code with formula-empty dates, a pair with a blank code, a pair with a
-    # formula-empty code; text and a handle on both sides of the three columns, each cell's text
+    # formula-empty code; text on both sides of the three columns, each cell's text
     # found at its own place whatever the cells around it hold.
     headers = row(
-        "route", "contract_code", "start_date", "end_date", "payment_holiday_calendar", "broker"
+        "route", "contract_code", "start_date", "end_date", "payment_calendar_key", "broker"
     )
     values = bound(
         "fixed_float",
         headers,
         rows(
-            ["cleared", "Z26", "", "", calendar, "ION"],
-            ["cleared", None, 46357.0, 46387.0, calendar, "TP"],
-            ["bilateral", "", 46388.0, 46418.0, calendar, "ION"],
+            ["cleared", "Z26", "", "", "NYFED", "ION"],
+            ["cleared", None, 46357.0, 46387.0, "LON", "TP"],
+            ["bilateral", "", 46388.0, 46418.0, "NYFED+LON", "ION"],
         ),
         one_row=False,
     )
     assert values.rows == 3
     assert values.texts("route") == ("cleared", "cleared", "bilateral")
     assert values.texts("broker") == ("ION", "TP", "ION")
-    assert all(type(held) is HolidayCalendar for held in values.objects("payment_holiday_calendar"))
+    assert values.texts("payment_calendar_key") == ("NYFED", "LON", "NYFED+LON")
     assert values.texts("contract_code") == ("Z26",)
     np.testing.assert_array_equal(values.supplied_rows("contract_code"), [True, False, False])
     np.testing.assert_array_equal(values.supplied_rows("start_date"), [False, True, True])
