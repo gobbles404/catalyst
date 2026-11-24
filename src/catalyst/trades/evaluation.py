@@ -30,6 +30,7 @@ from numpy.typing import NDArray
 from catalyst.globals.discount_curve import DiscountCurve
 from catalyst.globals.discount_curve_set import DiscountCurveSet, curve_named, no_curve_named
 from catalyst.globals.payments import compensated, curve_starts_on, discounted, factors_on
+from catalyst.index_definitions.index_conventions import CURRENCY
 from catalyst.instrumentation.work_counts import KERNEL, WorkCounter
 from catalyst.market.market import Market
 from catalyst.trades.contributions import CrossContribution, RateContribution
@@ -137,7 +138,7 @@ def trade_results(
     counter.hit(LIVE_PRICES_READ, quotes_read)
     if curves:
         return _discounted(prepared, matched, curves, contributions, quotes, counter)
-    currency = legs[0].encoded.leg.index.conventions.currency_unit
+    currency_unit = legs[0].encoded.leg.index.conventions.currency_unit
     # The cleared mark: the legs' live amounts, then the unsettled fixed legs and set amounts
     # added, each finite or refused for the batch; Python adds two finite floats past the
     # largest number without a word, so the rule looks.
@@ -147,14 +148,15 @@ def trade_results(
     if not np.isfinite(live):
         raise ValueError(
             f"the batch has {live!r} of live amount in all, expected a finite amount of "
-            f"{currency}; the live slots' contributions, each finite, sum past the largest number"
+            f"{currency_unit}; the live slots' contributions, each finite, sum past the largest "
+            "number"
         )
     mark = float(compensated([prepared.offset_unsettled, *prepared.set_unsettled, *live_amounts]))
     if not np.isfinite(mark):
         raise ValueError(
-            f"the batch has {mark!r} of mark in all, expected a finite amount of {currency}; its "
-            "unsettled fixed legs, set amounts and live amount, each finite, sum past the largest "
-            "number"
+            f"the batch has {mark!r} of mark in all, expected a finite amount of "
+            f"{currency_unit}; its unsettled fixed legs, set amounts and live amount, each "
+            "finite, sum past the largest number"
         )
     return TradeResults(
         prepared=prepared,
@@ -167,7 +169,8 @@ def trade_results(
             ]
         ),
         route=terms.route,
-        currency=currency,
+        currency=CURRENCY,
+        currency_unit=currency_unit,
         as_of=legs[0].history.calendar.valuation_date.as_of,
         mark=mark,
         cash=prepared.cash,
@@ -230,7 +233,7 @@ def _the_contributions(
     observation-prices-readback.md: one per live reference, the array the readback gathers each
     live slot's price from, read here once and never again."""
     quotes = market.live_prices(leg.live_references)
-    currency = leg.encoded.leg.index.conventions.currency_unit
+    currency_unit = leg.encoded.leg.index.conventions.currency_unit
     with np.errstate(over="ignore", invalid="ignore"):
         dated_live_contribution = (
             leg.dated_live_exposure[leg.live_slot] * quotes[leg.reference_of_live_slot]
@@ -242,8 +245,8 @@ def _the_contributions(
             raise ValueError(
                 f"{leg.encoded.named_slot(int(leg.live_slot[i]))}, quoted at {quote!r}, "
                 f"has {float(dated_live_contribution[i])!r} of live contribution, expected a "
-                f"finite amount of {currency}; its exposure times the quote outruns the largest "
-                "number"
+                f"finite amount of {currency_unit}; its exposure times the quote outruns the "
+                "largest number"
             )
         live = float(dated_live_contribution.sum()) if cleared else 0.0
     dated_live_contribution.setflags(write=False)
@@ -399,7 +402,7 @@ def _discounted(
     first = legs[0]
     first_terms = first.encoded.leg
     conventions = first_terms.index.conventions  # a pair settles in one unit, the kernel's rule
-    currency = conventions.currency_unit
+    currency_unit = conventions.currency_unit
     as_of = first.history.calendar.valuation_date.as_of
     groups = encoded.offset_of_group.size
     payment_date = cast(
@@ -460,13 +463,15 @@ def _discounted(
         raise ValueError(
             f"the payment of {label} on {payment_date[g]} on "
             f"{encoded.keys[int(key_of_group[g])]} is {float(amount[g])!r}, expected a finite "
-            f"amount of {currency}; its fixed, set and live legs sum past the largest number"
+            f"amount of {currency_unit}; its fixed, set and live legs sum past the largest "
+            "number"
         )
     for label, total in (("mark", mark), ("DV01", dv01)):
         if not np.isfinite(total):
             raise ValueError(
                 f"the batch has {total!r} of {label} in all, expected a finite amount of "
-                f"{currency}; the groups' amounts, each finite, sum past the largest number"
+                f"{currency_unit}; the groups' amounts, each finite, sum past the largest "
+                "number"
             )
     for leg, each in zip(legs, lots, strict=True):
         _the_lots_checked(
@@ -480,7 +485,7 @@ def _discounted(
         ),
         curves,
         "DV01",
-        f"amount of {currency} per basis point",
+        f"amount of {currency_unit} per basis point",
         "its groups' DV01s sum past the largest number",
     )
     # Since #197 each leg's cross-gamma, after every rule above and under its own.
@@ -502,10 +507,10 @@ def _discounted(
     early_dv01 = tuple(
         [
             early_risk(
-                f"{curve.name} {currency}",
+                f"{curve.name} {CURRENCY}",
                 "payment",
                 as_of,
-                f"{currency} per basis point",
+                f"{currency_unit} per basis point",
                 axes.months,
                 dv01_by_month[c * months : (c + 1) * months],
                 first.by_month.paid_from,
@@ -544,7 +549,8 @@ def _discounted(
         prepared=prepared,
         legs=tuple(results),
         route=terms.route,
-        currency=currency,
+        currency=CURRENCY,
+        currency_unit=currency_unit,
         as_of=as_of,
         mark=mark,
         cash=prepared.cash,
@@ -561,7 +567,8 @@ def _discounted(
             [
                 RateContribution(
                     curve,
-                    currency,
+                    CURRENCY,
+                    currency_unit,
                     float(dv01_by_curve[c]),
                     axes.days,
                     dv01_by_day[c * days : (c + 1) * days],
@@ -626,7 +633,7 @@ def _the_lots_checked(leg: PreparedLeg, lots: DiscountedLots, whose: str) -> Non
     encoded = leg.encoded
     leg_terms = encoded.leg
     conventions = leg_terms.index.conventions
-    currency = conventions.currency_unit
+    currency_unit = conventions.currency_unit
     codes = leg_terms.schedule.codes
     words = leg_terms.reporting_lot.words
     _, delta, discounted_price_sensitivity, daily, monthly, yearly, discounted_total = lots
@@ -644,7 +651,7 @@ def _the_lots_checked(leg: PreparedLeg, lots: DiscountedLots, whose: str) -> Non
         raise ValueError(
             f"{codes[int(encoded.references[r])]} has "
             f"{float(discounted_price_sensitivity[r])!r} "
-            f"of discounted price sensitivity, expected a finite amount of {currency} per "
+            f"of discounted price sensitivity, expected a finite amount of {currency_unit} per "
             f"{conventions.quote_currency_unit}/{conventions.quote_quantity_unit}; its discounted "
             "lots times the lot's coefficient outrun the largest number"
         )

@@ -245,7 +245,7 @@ def _the_set_amounts(
     leg: EncodedLeg,
     is_fixed: NDArray[np.bool_],
     settles: NDArray[np.float64],
-    currency: str,
+    currency_unit: str,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Each group's set amount: each fixed slot's, its exposure times its settle, summed by group,
     one bincount; since #190 each finite before anything is made of it, the arithmetic
@@ -266,8 +266,8 @@ def _the_set_amounts(
         settle = float(settles[int(np.count_nonzero(is_fixed[:s]))])  # the fixed slots before it
         raise ValueError(
             f"{leg.named_slot(s)}, fixed at {settle!r}, has {float(set_of_slot[s])!r} of set "
-            f"amount, expected a finite amount of {currency}; its exposure times the settle "
-            "outruns the largest number"
+            f"amount, expected a finite amount of {currency_unit}; its exposure times the "
+            "settle outruns the largest number"
         )
     outrun = ~np.isfinite(set_amount)
     if outrun.any():
@@ -283,7 +283,8 @@ def _the_set_amounts(
         )
         raise ValueError(
             f"the set amount of {group} is {float(set_amount[g])!r}, expected a finite amount of "
-            f"{currency}; its fixed slots' set amounts, each finite, sum past the largest number"
+            f"{currency_unit}; its fixed slots' set amounts, each finite, sum past the largest "
+            "number"
         )
     return set_amount, set_of_slot
 
@@ -319,7 +320,7 @@ def _the_totals(
     legs: tuple[PreparedLeg, ...],
     is_settled: NDArray[np.bool_],
     unsettled: NDArray[np.bool_],
-    currency: str,
+    currency_unit: str,
 ) -> tuple[float, float, tuple[float, ...]]:
     """The cash, the settled groups' fixed legs and set amounts, and the totals a tick sums with
     the live amounts for the mark, kept for both routes: the unsettled groups' fixed legs in
@@ -350,15 +351,15 @@ def _the_totals(
             else "settled groups' offsets and set amounts"
         )
         raise ValueError(
-            f"the batch has {cash!r} of cash in all, expected a finite amount of {currency}; the "
-            f"{summed} sum past the largest number"
+            f"the batch has {cash!r} of cash in all, expected a finite amount of "
+            f"{currency_unit}; the {summed} sum past the largest number"
         )
     if not np.isfinite(offset_unsettled):
         side = price_words(encoded.terms.instrument)[1]  # a float_float's is its spread leg
         raise ValueError(
             f"the batch has {offset_unsettled!r} of unsettled {side} in all, expected a finite "
-            f"amount of {currency}; the unsettled groups' {side}s, each finite, sum past the "
-            "largest number"
+            f"amount of {currency_unit}; the unsettled groups' {side}s, each finite, sum past "
+            "the largest number"
         )
     for leg, total in zip(legs, set_unsettled, strict=True):
         if not np.isfinite(total):
@@ -369,8 +370,8 @@ def _the_totals(
             )
             raise ValueError(
                 f"{whose} has {total!r} of unsettled set amount in all, expected a finite amount "
-                f"of {currency}; the unsettled groups' set amounts, each finite, sum past the "
-                "largest number"
+                f"of {currency_unit}; the unsettled groups' set amounts, each finite, sum past "
+                "the largest number"
             )
     return cash, offset_unsettled, set_unsettled
 
@@ -497,10 +498,10 @@ def prepared_trades(
             for leg, history, rows, is_fixed in zip(legs, matched, placed, fixed, strict=True)
         ]
     )
-    currency = legs[0].leg.index.conventions.currency_unit
+    currency_unit = legs[0].leg.index.conventions.currency_unit
     unsettled = ~is_settled
     cash, offset_unsettled, set_unsettled = _the_totals(
-        encoded, prepared, is_settled, unsettled, currency
+        encoded, prepared, is_settled, unsettled, currency_unit
     )
     # A cleared batch discounts nothing and runs nothing more here; its ledgers stand.
     unpaid_payments = (
@@ -580,11 +581,13 @@ def _the_prepared_leg(
     fixed_rows = slot_rows[is_fixed]
     settles = history.fixed_prices(fixed_rows, leg.slot_reference[is_fixed])
     conventions = index.conventions
-    currency = conventions.currency_unit
+    currency_unit = conventions.currency_unit
     # Since #190 each number made here is finite before the record is made, the arithmetic
     # running with numpy's flags down and the rules judging, else the first that is not is
     # refused by its operation and its slot, group, contract or the batch.
-    set_amount, fixed_contribution = _the_set_amounts(encoded, leg, is_fixed, settles, currency)
+    set_amount, fixed_contribution = _the_set_amounts(
+        encoded, leg, is_fixed, settles, currency_unit
+    )
     is_live = ~is_fixed
     dated_live_exposure = np.where(is_live, leg.slot_exposure, 0.0)
     live_slot = np.flatnonzero(is_live)

@@ -4,7 +4,7 @@ axes by reference, and the facts refusing a month or a year view standing before
 day's period. Today's single-curve evaluation makes one of each, a cleared batch none and a batch
 of cashflows one rate contribution per curve its keys name, since cashflow-curve-keys.md; a
 result on several curves keeps several, and the collection sums contributions, never results,
-onto its groups, so a rate group is the exact curve object and the currency over every
+onto its groups, so a rate group is the exact curve object and the currency unit over every
 contribution on them wherever it came from.
 docs/library/trades/report-risk.md owns the labels and docs/library/trades/aggregate-results.md
 the collection."""
@@ -25,8 +25,10 @@ CLEARED = "cleared"
 
 @dataclass(frozen=True, slots=True)
 class RateContribution:
-    """One curve's share of a result's DV01: the curve object; the currency; dv01, the total in
-    the currency per basis point, negative for an amount receivable; the DV01 by payment day,
+    """One curve's share of a result's DV01: the curve object; the currency and, since
+    currency-and-currency-unit.md, currency_unit, the unit of it the DV01 is in, a trade's its
+    index's settlement unit and a cashflow's its currency's reference unit; dv01, the total in
+    that unit per basis point, negative for an amount receivable; the DV01 by payment day,
     month and year, each beside the saved axis it stands on, the encoding's payment axes for a
     batch of trades and the batch's distinct days, months and years for cashflows, by reference
     and never copied; and the facts refusing a month or a year view of it standing before the
@@ -34,6 +36,7 @@ class RateContribution:
 
     curve: DiscountCurve
     currency: str
+    currency_unit: str
     dv01: float
     days: NDArray[np.datetime64]
     dv01_by_day: NDArray[np.float64]

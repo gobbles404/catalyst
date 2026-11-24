@@ -26,6 +26,12 @@ from catalyst.excel import bridge
 from catalyst.excel.bridge import MISSING, Cells
 from catalyst.globals.discount_curve import DiscountCurve, bump_discount_curve
 from catalyst.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
+from catalyst.globals.unit_conversions import (
+    UNITS,
+    UnitDefinition,
+    category,
+    unit_conversions,
+)
 from catalyst.globals.valuation_date import valuation_date
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import CASHFLOW, FIXED_FLOAT, FieldType
@@ -92,7 +98,7 @@ def booked(
     shared: TradeTemplate = TEMPLATE,
     counter: WorkCounter | None = None,
 ) -> Cashflows:
-    return cashflows(rows, shared, counter or WorkCounter())
+    return cashflows(rows, shared, UNITS, counter or WorkCounter())
 
 
 def booked_on(curve: DiscountCurve) -> Cashflows:
@@ -515,10 +521,13 @@ def test_the_seam_makes_the_two_handles_named_for_the_currency_and_values_the_ex
     assert sheet["results"].split(":")[1] == "cashflow_results"
     assert bridge.live_handles()[0] == live + 6  # the collection among them
     values = spilled(ENTRY["_ReportValues"](sheet["results"]))
-    assert values[0] == ["cashflow_mark", "cashflow_cash", "currency", "as_of"]
-    assert values[1] == ["float64", "float64", "str", "datetime64[D]"]
+    # currency_unit last, since currency-and-currency-unit.md: a cashflow's amounts are in
+    # its currency's reference unit, whole dollars, the unit the trades settled in dollars
+    # share.
+    assert values[0] == ["cashflow_mark", "cashflow_cash", "currency", "as_of", "currency_unit"]
+    assert values[1] == ["float64", "float64", "str", "datetime64[D]", "str"]
     assert values[2][0] == pytest.approx(500.0, **CLOSE)
-    assert values[2][1:] == [250.0, "USD", serial(AS_OF)]
+    assert values[2][1:] == [250.0, "USD", serial(AS_OF), "USD"]
     risk = spilled(ENTRY["_ReportRisk"](sheet["results"], "dv01", "year"))
     assert risk[0] == ["as_of", serial(AS_OF)]
     assert risk[1] == ["period", DV01_LABEL]
@@ -568,24 +577,25 @@ def test_the_seam_reads_the_batch_and_the_results_back() -> None:
     assert results[0] == [
         "payment_date", "amount", "is_paid", "payment_factor", "npv", "cash", "dv01", "currency",
         "as_of", "cashflow_mark", "cashflow_cash", "cashflow_dv01", "discount_curve_key",
+        "currency_unit",
     ]  # fmt: skip
     assert results[1] == [
         "datetime64[D]", "float64", "bool", "float64", "float64", "float64", "float64", "str",
-        "datetime64[D]", "float64", "float64", "float64", "str",
+        "datetime64[D]", "float64", "float64", "float64", "str", "str",
     ]  # fmt: skip
     assert len(results) == 5  # three days on one key, three groups, under the two heading rows
     first, second, third = results[2], results[3], results[4]
     assert first[:3] == [serial(DAY_BEFORE), 250.0, True] and first[3:7] == [1.0, 0.0, 250.0, 0.0]
     assert first[7:9] == ["USD", serial(AS_OF)]
     assert first[9] == pytest.approx(500.0, **CLOSE) and first[10] == 250.0
-    assert first[11] == pytest.approx(0.85, **CLOSE) and first[12] == "SOFR"
+    assert first[11] == pytest.approx(0.85, **CLOSE) and first[12:] == ["SOFR", "USD"]
     assert second[:3] == [serial(A_YEAR), 10_000.0, False]
     assert second[4] == pytest.approx(9_500.0, **CLOSE) and second[6] == pytest.approx(
         -0.95, **CLOSE
     )
-    assert second[9:] == ["-", "-", "-", "SOFR"]  # the totals once, on the first row
+    assert second[9:] == ["-", "-", "-", "SOFR", "USD"]  # the totals once, on the first row
     assert third[:3] == [serial(TWO_YEARS), -10_000.0, False]
-    assert third[9:] == ["-", "-", "-", "SOFR"]
+    assert third[9:] == ["-", "-", "-", "SOFR", "USD"]
 
 
 def test_the_seam_refuses_in_its_own_words_and_relays_the_librarys() -> None:
@@ -1015,13 +1025,13 @@ def test_the_seam_values_two_keys_and_reads_a_column_and_a_row_for_each() -> Non
     assert booked_rows[0][-1] == "discount_curve_key"
     assert [line[-1] for line in booked_rows[2:]] == ["SOFR", "FFOIS"]
     read = spilled(ENTRY["util_ReadHandle"](sheet["results"]))
-    assert read[0][0] == "payment_date" and read[0][-1] == "discount_curve_key"
+    assert read[0][0] == "payment_date" and read[0][-2:] == ["discount_curve_key", "currency_unit"]
     assert len(read) == 4  # one payment day on two keys: two rows under the headings
     first, second = read[2], read[3]
-    assert first[:3] == [serial(A_YEAR), 10_000.0, False] and first[-1] == "SOFR"
+    assert first[:3] == [serial(A_YEAR), 10_000.0, False] and first[-2:] == ["SOFR", "USD"]
     assert first[3:7] == pytest.approx([0.95, 9_500.0, 0.0, -0.95], **CLOSE)
     assert first[9:12] == pytest.approx([500.0, 0.0, -0.05], **CLOSE)  # the totals once
-    assert second[:3] == [serial(A_YEAR), -10_000.0, False] and second[-1] == "FFOIS"
+    assert second[:3] == [serial(A_YEAR), -10_000.0, False] and second[-2:] == ["FFOIS", "USD"]
     assert second[3:7] == pytest.approx([0.90, -9_000.0, 0.0, 0.90], **CLOSE)
     assert second[9:12] == ["-", "-", "-"]
     # SOFR at 0.96: new results, 600, over the same booked cashflows, the held results as
@@ -1197,3 +1207,58 @@ def test_the_old_header_is_no_field_and_a_rule_is_no_date_each_in_the_seams_word
     assert ENTRY["_CreateTradeTemplate"](
         "cashflow", row("currency", "discount_curve_key", "payment_day"), row("USD", "SOFR", "+5bd")
     ) == ("#ERROR _CreateTradeTemplate: values cell (1, 3) is text '+5bd', expected date")
+
+
+# --- the currency and the unit of it, currency-and-currency-unit.md ------------------------------
+
+
+def test_a_cashflows_unit_is_its_currencys_reference_unit_read_off_the_unit_tables() -> None:
+    # Two facts: the currency a row enters, USD, and the unit of it the amounts are in, the
+    # currency's reference unit in the unit tables, whole units and never cents. The batch,
+    # the results and the contribution carry both.
+    batch = booked()
+    assert (batch.currency, batch.currency_unit) == ("USD", "USD")
+    result = valued(batch)
+    assert (result.currency, result.currency_unit) == ("USD", "USD")
+    assert [(c.currency, c.currency_unit) for c in result.rate_contributions] == [("USD", "USD")]
+    # The unit is the tables' and typed nowhere in the cashflows: under tables whose dollar is
+    # spelled DOLLAR the same ticket books in DOLLAR, the heading's brackets and every refusal
+    # of an amount say so, and the currency is USD as entered.
+    spelled = unit_conversions(
+        category(
+            "USD",
+            "DOLLAR",
+            UnitDefinition("DOLLAR", "DOLLAR", 1.0),
+            UnitDefinition("CENT", "DOLLAR", 0.01),
+        )
+    )
+    batch = cashflows(TICKET, TEMPLATE, spelled, WorkCounter())
+    assert (batch.currency, batch.currency_unit) == ("USD", "DOLLAR")
+    result = valued(batch)
+    assert (result.currency, result.currency_unit) == ("USD", "DOLLAR")
+    assert result.report(Risk.DV01, Bucket.DAY).labels == (
+        "SOFR USD dv01 [DOLLAR per basis point]",
+    )
+    assert result.dv01 == pytest.approx(0.85, **CLOSE)  # the numbers as they were
+    largest = float(np.finfo(np.float64).max)
+    doubled = ticket(trade_date=[AS_OF] * 2, amount=[largest, largest], payment_day=[A_YEAR] * 2)
+    with pytest.raises(ValueError) as caught:
+        cashflows(doubled, TEMPLATE, spelled, WorkCounter())
+    assert str(caught.value) == (
+        f"the payments on {A_YEAR} on SOFR sum to inf, expected a finite amount of DOLLAR; the "
+        "rows' amounts, each finite, sum past the largest number"
+    )
+    apart = ticket(
+        trade_date=[AS_OF] * 2, amount=[largest, largest], payment_day=[A_YEAR, TWO_YEARS]
+    )
+    with pytest.raises(ValueError) as caught:
+        cashflow_results(
+            cashflows(apart, TEMPLATE, spelled, WorkCounter()),
+            valuation_date(np.datetime64(AS_OF), 0.5),
+            collected(curve_of((AS_OF, 1.0), (A_YEAR, 1.0), (TWO_YEARS, 1.0))),
+            WorkCounter(),
+        )
+    assert str(caught.value) == (
+        "the batch has inf of mark in all, expected a finite amount of DOLLAR; the payments, "
+        "each finite, sum past the largest number"
+    )

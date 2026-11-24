@@ -772,7 +772,9 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
     descriptor, `A+B`, carrying the swap's DV01 and a dash under every commodity column, the
     DV01 being the swap's against its one price and no leg's; the leg rows show a dash under
     the DV01, and a one-index source keeps its one row, its descriptor its index's name. The
-    source's route, curve, currency and day stand on every row of it. The collection's totals
+    source's route, curve, currency and day stand on every row of it, and since
+    currency-and-currency-unit.md its currency unit, the unit of the currency its DV01 is in,
+    appended last so that no column before it moves. The collection's totals
     and vectors are _ReportRisk's to show; no handle text, since a source's cell may have been
     released while the collection holds the object."""
     sources = obj.sources
@@ -785,6 +787,7 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
     routes: list[str] = []
     curves: list[str] = []
     currencies: list[str] = []
+    currency_units: list[str] = []
     trade: list[bool] = []
     nominal: list[float] = []
     delta: list[float] = []
@@ -805,6 +808,7 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
                     routes.append(source.route.value)
                     curves.append(word)
                     currencies.append(source.currency)
+                    currency_units.append(source.currency_unit)
                     trade.append(False)
                     units.append("-")
                     dv01_on.append(True)
@@ -817,6 +821,7 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
                     routes.append(source.route.value)
                     curves.append(word)
                     currencies.append(source.currency)
+                    currency_units.append(source.currency_unit)
                     trade.append(True)
                     nominal.append(leg.nominal_delta_total)
                     delta.append(leg.delta_total)
@@ -832,6 +837,7 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
                 routes.append("cashflow")
                 curves.append(word)
                 currencies.append(source.currency)
+                currency_units.append(source.currency_unit)
                 trade.append(False)
                 units.append("-")
                 dv01_on.append(True)
@@ -856,6 +862,7 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
             _dates_on("as_of", np.full(n, obj.as_of, dtype="datetime64[D]")),
             _numbers_on("cross_gamma", np.array(cross), on_trades),
             _words_on("cross_gamma_unit", np.array(units, dtype=object)),
+            _words_on("currency_unit", np.array(currency_units, dtype=object)),
         ]
     )
 
@@ -890,7 +897,9 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # named-curves-slice-3.md, the slot's group's key and the name of the curve the group was
     # discounted on, on every row, a cleared result a dash in both; appended last likewise.
     # Then, since observation-prices-readback.md, the slot's own price facts on every row, fixed
-    # or live, _observation_facts, appended last so that no column before them moves.
+    # or live, _observation_facts, appended last so that no column before them moves. Then,
+    # since currency-and-currency-unit.md, the unit of the currency the batch's amounts are
+    # in, once on the first row as the reserves' currency is and a dash below, the last column.
     encoding = obj.prepared.encoded
     legs = obj.legs
     names, types, columns = _slot_rows(encoding)
@@ -957,6 +966,8 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     reserves = obj.reserves
     currency = np.full(slots, "-", dtype=object)
     currency[0] = reserves.currency
+    currency_unit = np.full(slots, "-", dtype=object)
+    currency_unit[0] = reserves.currency_unit
     # The contract's cross-gamma with every used curve shifted together, the contributions' by
     # reference summed, one row per curve, each leg's own; a cleared result's zero.
     cross = np.zeros(slots)
@@ -993,6 +1004,7 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
             _words_on("discount_curve_key", keys),
             _words_on("discount_curve", curve_names),
             *_observation_facts(legs, slots, offsets, sizes, every),
+            _words_on("currency_unit", currency_unit),
         ],
     )
 
@@ -1099,8 +1111,10 @@ def cashflow_results_table(obj: CashflowResults) -> MixedArray:
     # dv01, with the currency and the valuation day on every row so that a row reads whole;
     # then the batch's totals once, on the first row and a dash below, cashflow_mark,
     # cashflow_cash and cashflow_dv01, the numbers the reports show, since a total repeated on
-    # every row would read as each row's and sum twice; and last the group's key, the name of
-    # the curve it is valued on, after every column a sheet already reads.
+    # every row would read as each row's and sum twice; then the group's key, the name of
+    # the curve it is valued on, after every column a sheet already reads; and last, since
+    # currency-and-currency-unit.md, the unit of the currency the amounts are in, on every
+    # row as the currency is.
     booked = obj.cashflows
     days = booked.payment_days[booked.group_day]
     n = days.size
@@ -1148,6 +1162,7 @@ def cashflow_results_table(obj: CashflowResults) -> MixedArray:
             _numbers_on("cashflow_cash", np.array([obj.cash]), once),
             _numbers_on("cashflow_dv01", np.array([obj.dv01]), once),
             _words_on("discount_curve_key", np.array(booked.keys, dtype=object)[booked.group_key]),
+            _words_on("currency_unit", np.full(n, obj.currency_unit, dtype=object)),
         ],
     )
 

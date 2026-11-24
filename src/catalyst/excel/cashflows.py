@@ -13,6 +13,7 @@ from catalyst.cashflows.valuation import CashflowResults, cashflow_results
 from catalyst.excel.bridge import FieldRows, Handle, TextRow, excel_function
 from catalyst.excel.trades import values_label
 from catalyst.globals.discount_curve_set import DiscountCurveSet
+from catalyst.globals.unit_conversions import UNITS
 from catalyst.globals.valuation_date import ValuationDate
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.trades.template import TradeTemplate
@@ -43,7 +44,7 @@ def _CreateCashflows(
     """Creates a batch of cashflows, known signed amounts in one currency each on its own payment
     date, from a template's shared fields and a ticket's rows, and shows its handle, the text
     _EvaluateCashflows takes as the cashflows."""
-    return cashflows(cashflow_rows, template, WorkCounter())
+    return cashflows(cashflow_rows, template, UNITS, WorkCounter())
 
 
 @excel_function

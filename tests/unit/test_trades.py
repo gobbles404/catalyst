@@ -703,9 +703,10 @@ def test_a_price_in_dollars_settles_in_cents_with_the_unit_naming_both() -> None
         2
     )  # a lot is 1,000,000 cents a dollar
     assert result.legs[0].codes() == ("Z26", "F27", "G27")
-    assert (
-        result.legs[0].price_sensitivity_unit == "CENT per USD/MMBTU" and result.currency == "CENT"
-    )
+    # Two facts since currency-and-currency-unit.md: the currency, and the unit of it the
+    # amounts are in, the index's settlement unit.
+    assert result.legs[0].price_sensitivity_unit == "CENT per USD/MMBTU"
+    assert (result.currency, result.currency_unit) == ("USD", "CENT")
     assert result.legs[0].lot_unit == "lots of NG (10000 MMBTU)"
 
 

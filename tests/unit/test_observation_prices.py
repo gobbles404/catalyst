@@ -107,8 +107,10 @@ def facts(results: TradeResults) -> list[list[object]]:
 def test_the_issues_mixed_example_reads_each_observations_price_and_contribution() -> None:
     results = valued("2026-10-07", 4.30)
     table = grid(results)
-    assert table[0][-4:] == list(COLUMNS)  # appended last: no column before them moves
-    assert table[1][-4:] == ["float64", "float64", "str", "float64"]
+    # Appended after every column before them; since currency-and-currency-unit.md the unit
+    # of the currency follows them, the last column.
+    assert table[0][-5:] == [*COLUMNS, "currency_unit"]
+    assert table[1][-5:] == ["float64", "float64", "str", "float64", "str"]
     assert facts(results) == MIXED
     # The live columns as they were: zero on the fixed rows, the slot's own on the live ones.
     assert [cell(table, r, "is_fixed") for r in range(4)] == [1.0, 1.0, 0.0, 0.0]

@@ -4,9 +4,9 @@ that specification's rate per lot, summed for the batch once, when the batch is 
 charged only where the booking says so, reserve-fee-applicability.md; since #175 the marketing
 reserve each row booked, summed once per row, zero when no row booked one; since cva-reserve.md
 the CVA reserve each row booked, a signed amount summed once per row the same way; and the
-currency they are in. Static booked amounts in the settlement currency: a fixing, a payment, a
-tick or a roll of the valuation date changes none of them, and they enter no mark, cash, delta
-or DV01. docs/library/trades/report-reserves.md is the page."""
+currency and the unit of it they are in. Static booked amounts in the settlement unit: a
+fixing, a payment, a tick or a roll of the valuation date changes none of them, and they enter
+no mark, cash, delta or DV01. docs/library/trades/report-reserves.md is the page."""
 
 import math
 from dataclasses import dataclass
@@ -16,6 +16,7 @@ from typing import assert_never
 import numpy as np
 from numpy.typing import NDArray
 
+from catalyst.index_definitions.index_conventions import CURRENCY
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.trades.terms import ResolvedTrades, Route
 
@@ -31,8 +32,9 @@ RESERVED_OCCURRENCES = "reserved_occurrences"
 
 @dataclass(frozen=True, slots=True)
 class Reserves:
-    """The batch's four totals and their currency. brokerage is the sum over the components of the
-    rows naming a broker, since #188, of each component's count of its specification, the quantity
+    """The batch's four totals, their currency and its unit. brokerage is the sum over the
+    components of the rows naming a broker, since #188, of each component's count of its
+    specification, the quantity
     its basis gave it taken without its sign, times the specification's brokerage rate per lot; a
     row whose broker field was not given, or whose text is none in any case, a screen trade,
     charges nothing. clearing is the same sum over every component with the specification's
@@ -46,14 +48,17 @@ class Reserves:
     twice and a row of zero quantity its full amount; 0.0 when neither supplied the field. cva,
     since cva-reserve.md, is the same sum of the cva_reserve each row entered, a credit valuation
     adjustment the desk books as an amount of either sign, so the total carries the rows' signs
-    and may be negative; 0.0 when neither supplied the field. currency is the index's settlement
-    currency, the conventions' currency_unit, the one every rate and amount is in."""
+    and may be negative; 0.0 when neither supplied the field. currency is the currency the
+    index settles in, the unit tables' currency category, and currency_unit the unit of it
+    every rate and amount is in, the conventions' currency_unit, two facts since
+    currency-and-currency-unit.md."""
 
     brokerage: float
     clearing: float
     marketing: float
     cva: float
     currency: str
+    currency_unit: str
 
 
 def reserves(terms: ResolvedTrades, counter: WorkCounter) -> Reserves:
@@ -98,7 +103,7 @@ def reserves(terms: ResolvedTrades, counter: WorkCounter) -> Reserves:
     specifications = leg.index.specifications
     selection = leg.specification[terms.occurrence]
     counts = np.abs(terms.component_quantity)
-    currency = leg.index.conventions.currency_unit
+    currency_unit = leg.index.conventions.currency_unit
     charged = 0
     brokerage = 0.0
     brokered = terms.brokered[terms.occurrence]
@@ -111,7 +116,7 @@ def reserves(terms: ResolvedTrades, counter: WorkCounter) -> Reserves:
             counts[positions],
             selection[positions],
             specifications.brokerage_rates_per_lot,
-            currency,
+            currency_unit,
         )
         charged += int(positions.size)
     match terms.route:
@@ -123,21 +128,21 @@ def reserves(terms: ResolvedTrades, counter: WorkCounter) -> Reserves:
                 counts,
                 selection,
                 specifications.clearing_rates_per_lot,
-                currency,
+                currency_unit,
             )
             charged += int(counts.size)
         case Route.BILATERAL:
             clearing = 0.0
         case _:
             assert_never(terms.route)
-    marketing = _summed_once("marketing", terms.marketing_reserve, currency, counter)
-    cva = _summed_once("cva", terms.cva_reserve, currency, counter)
+    marketing = _summed_once("marketing", terms.marketing_reserve, currency_unit, counter)
+    cva = _summed_once("cva", terms.cva_reserve, currency_unit, counter)
     counter.hit(RESERVED_FEE_COMPONENTS, charged)
-    return Reserves(brokerage, clearing, marketing, cva, currency)
+    return Reserves(brokerage, clearing, marketing, cva, CURRENCY, currency_unit)
 
 
 def _summed_once(
-    name: str, amounts: NDArray[np.float64] | None, currency: str, counter: WorkCounter
+    name: str, amounts: NDArray[np.float64] | None, currency_unit: str, counter: WorkCounter
 ) -> float:
     """One entered reserve's total: the rows' amounts summed once each, exactly, and the one rule
     the judge, that the total is finite, since amounts each finite by the rule that read them can
@@ -151,7 +156,7 @@ def _summed_once(
     if not math.isfinite(total):
         raise ValueError(
             f"the batch has {total!r} of {name} reserve in all, expected a finite amount of "
-            f"{currency}; the rows' amounts, each finite, sum past the largest number"
+            f"{currency_unit}; the rows' amounts, each finite, sum past the largest number"
         )
     counter.hit(RESERVED_OCCURRENCES, int(amounts.size))
     return total
@@ -201,7 +206,7 @@ def _charged(
     counts: NDArray[np.float64],
     rows: NDArray[np.intp],
     rates: NDArray[np.float64],
-    currency: str,
+    currency_unit: str,
 ) -> float:
     """One fee's total over the components it charges: their counts, the specification rows they
     select and the fee's rates by row, the positions their places among the batch's components
@@ -218,12 +223,13 @@ def _charged(
         row = int(rows[j])
         raise ValueError(
             f"{fee} reserve of {terms.named(k)} is {float(amounts[j])!r}, expected a finite "
-            f"amount of {currency}; {float(counts[j])!r} of "
+            f"amount of {currency_unit}; {float(counts[j])!r} of "
             f"{terms.legs[0].index.specifications.names[row]!r} at {float(rates[row])!r} a lot"
         )
     if not np.isfinite(total):
         raise ValueError(
             f"the batch has {total!r} of {fee} reserve in all, expected a finite amount of "
-            f"{currency}; the components' reserves, each finite, sum past the largest number"
+            f"{currency_unit}; the components' reserves, each finite, sum past the largest "
+            "number"
         )
     return total
