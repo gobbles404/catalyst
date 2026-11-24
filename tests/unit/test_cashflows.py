@@ -82,7 +82,7 @@ TICKET = ticket(
     trade_id=[1, 2, 3],
     trade_date=[AS_OF, AS_OF, AS_OF],
     amount=[10_000.0, -10_000.0, 250.0],
-    payment_date=[A_YEAR, TWO_YEARS, DAY_BEFORE],
+    payment_day=[A_YEAR, TWO_YEARS, DAY_BEFORE],
     description=["Receivable", "Payable", "Earlier rebate"],
 )
 
@@ -219,7 +219,7 @@ def test_a_receipt_of_a_hundred_moves_with_the_curve_and_the_day_and_the_batch_n
     # 100 a year out: 95 of mark, nothing of cash, -0.0095 of DV01; on a curve at 0.96 the batch
     # stands and the result is 96 and -0.0096; on the payment day, over a curve of that one day,
     # the amount is cash and nothing is discounted; the day after, still cash.
-    batch = booked(ticket(trade_date=[AS_OF], amount=[100.0], payment_date=[A_YEAR]))
+    batch = booked(ticket(trade_date=[AS_OF], amount=[100.0], payment_day=[A_YEAR]))
     result = valued(batch)
     assert (result.mark, result.cash) == (pytest.approx(95.0, **CLOSE), 0.0)
     assert result.dv01 == pytest.approx(-0.0095, **CLOSE)
@@ -239,13 +239,13 @@ def test_amounts_on_one_day_are_one_amount_and_on_different_days_stay_apart() ->
     # Equal and opposite on one day cancel to a day of nothing; on different days the nominal
     # amounts net to nothing while the value and the DV01 do not, the days surviving.
     same = booked(
-        ticket(trade_date=[AS_OF, AS_OF], amount=[100.0, -100.0], payment_date=[A_YEAR, A_YEAR])
+        ticket(trade_date=[AS_OF, AS_OF], amount=[100.0, -100.0], payment_day=[A_YEAR, A_YEAR])
     )
     assert same.group_amounts.tolist() == [0.0] and same.rows == 2
     result = valued(same)
     assert (result.mark, result.cash, result.dv01) == (0.0, 0.0, 0.0)
     apart = booked(
-        ticket(trade_date=[AS_OF, AS_OF], amount=[100.0, -100.0], payment_date=[A_YEAR, TWO_YEARS])
+        ticket(trade_date=[AS_OF, AS_OF], amount=[100.0, -100.0], payment_day=[A_YEAR, TWO_YEARS])
     )
     assert apart.group_amounts.tolist() == [100.0, -100.0]
     result = valued(apart)
@@ -260,7 +260,7 @@ def test_fractions_zero_rows_repeats_and_any_order_book_as_they_are() -> None:
         ticket(
             trade_date=[AS_OF] * 4,
             amount=[0.5, 0.0, 100.0, 100.0],
-            payment_date=[TWO_YEARS, A_YEAR, A_YEAR, A_YEAR],
+            payment_day=[TWO_YEARS, A_YEAR, A_YEAR, A_YEAR],
         )
     )
     assert batch.amount.tolist() == [0.5, 0.0, 100.0, 100.0]
@@ -275,7 +275,7 @@ def test_fractions_zero_rows_repeats_and_any_order_book_as_they_are() -> None:
 def test_a_batch_is_the_sum_of_its_singletons() -> None:
     whole = valued(booked())
     parts = [
-        valued(booked(ticket(trade_date=[AS_OF], amount=[a], payment_date=[d])))
+        valued(booked(ticket(trade_date=[AS_OF], amount=[a], payment_day=[d])))
         for a, d in ((10_000.0, A_YEAR), (-10_000.0, TWO_YEARS), (250.0, DAY_BEFORE))
     ]
     assert whole.mark == pytest.approx(sum(p.mark for p in parts), **CLOSE)
@@ -287,7 +287,7 @@ def test_the_template_may_supply_the_payment_itself_and_the_ticket_the_rest() ->
     # A template holding the amount, the day and the currency: every row pays the same, the
     # ticket's trade dates and identifiers its own; a template of one row of everything serves
     # a ticket of trade dates alone.
-    shared = template(currency="USD", amount=100.0, payment_date=A_YEAR, trade_id=7)
+    shared = template(currency="USD", amount=100.0, payment_day=A_YEAR, trade_id=7)
     batch = booked(ticket(trade_date=[AS_OF, DAY_BEFORE]), shared)
     assert batch.amount.tolist() == [100.0, 100.0]
     assert batch.trade_id is not None and batch.trade_id.tolist() == [7, 7]
@@ -324,38 +324,38 @@ def test_a_template_of_another_instrument_is_refused_by_name() -> None:
 
 def test_the_fields_come_from_one_of_the_two_and_the_required_ones_from_either() -> None:
     assert refused_booking(
-        ticket(trade_date=[AS_OF], amount=[1.0], payment_date=[A_YEAR], currency=["USD"])
+        ticket(trade_date=[AS_OF], amount=[1.0], payment_day=[A_YEAR], currency=["USD"])
     ) == ("currency is supplied by the template and by the ticket, expected by one of them")
-    assert refused_booking(ticket(trade_date=[AS_OF], payment_date=[A_YEAR])) == (
+    assert refused_booking(ticket(trade_date=[AS_OF], payment_day=[A_YEAR])) == (
         "amount is missing, expected a value in the template or a column in the ticket"
     )
-    assert refused_booking(ticket(amount=[1.0], payment_date=[A_YEAR])) == (
+    assert refused_booking(ticket(amount=[1.0], payment_day=[A_YEAR])) == (
         "trade_date is missing, expected a value in the template or a column in the ticket"
     )
     assert refused_booking(
-        ticket(trade_date=[AS_OF], amount=[1.0], payment_date=[A_YEAR]), template(counterparty="x")
+        ticket(trade_date=[AS_OF], amount=[1.0], payment_day=[A_YEAR]), template(counterparty="x")
     ) == ("currency is missing, expected a value in the template or a column in the ticket")
     assert refused_booking(ticket(trade_date=[AS_OF], amount=[1.0])) == (
-        "payment_date is missing, expected a value in the template or a column in the ticket"
+        "payment_day is missing, expected a value in the template or a column in the ticket"
     )
 
 
 def test_the_currency_is_usd_exactly_one_per_batch_and_cent_is_no_currency() -> None:
     bare = template(counterparty="Firm A")
     assert refused_booking(
-        ticket(trade_date=[AS_OF], amount=[1.0], payment_date=[A_YEAR], currency=["usd"]), bare
+        ticket(trade_date=[AS_OF], amount=[1.0], payment_day=[A_YEAR], currency=["usd"]), bare
     ) == ("currency row 1 is 'usd', expected USD, the one currency this version books")
     assert refused_booking(
         ticket(
             trade_date=[AS_OF] * 3,
             amount=[1.0] * 3,
-            payment_date=[A_YEAR] * 3,
+            payment_day=[A_YEAR] * 3,
             currency=["USD", "CAD", "CAD"],
         ),
         bare,
     ) == ("currency row 2 is 'CAD', expected USD, the one currency this version books")
     assert refused_booking(
-        ticket(trade_date=[AS_OF], amount=[1.0], payment_date=[A_YEAR], currency=["CENT"]), bare
+        ticket(trade_date=[AS_OF], amount=[1.0], payment_day=[A_YEAR], currency=["CENT"]), bare
     ) == ("currency row 1 is 'CENT', expected USD, the one currency this version books")
     with pytest.raises(ValueError) as caught:
         template(currency="CENT")
@@ -363,7 +363,7 @@ def test_the_currency_is_usd_exactly_one_per_batch_and_cent_is_no_currency() -> 
         str(caught.value) == "currency is 'CENT', expected USD, the one currency this version books"
     )
     both = booked(
-        ticket(trade_date=[AS_OF, AS_OF], amount=[1.0, 2.0], payment_date=[A_YEAR, A_YEAR],
+        ticket(trade_date=[AS_OF, AS_OF], amount=[1.0, 2.0], payment_day=[A_YEAR, A_YEAR],
                currency=["USD", "USD"]),
         bare,
     )  # fmt: skip
@@ -372,11 +372,11 @@ def test_the_currency_is_usd_exactly_one_per_batch_and_cent_is_no_currency() -> 
 
 def test_amounts_are_finite_and_identifiers_whole_each_named_by_its_row() -> None:
     assert refused_booking(
-        ticket(trade_date=[AS_OF] * 2, amount=[1.0, math.inf], payment_date=[A_YEAR] * 2)
+        ticket(trade_date=[AS_OF] * 2, amount=[1.0, math.inf], payment_day=[A_YEAR] * 2)
     ) == ("amount row 2 is inf, expected a finite amount")
-    assert refused_booking(
-        ticket(trade_date=[AS_OF], amount=[math.nan], payment_date=[A_YEAR])
-    ) == ("amount row 1 is nan, expected a finite amount")
+    assert refused_booking(ticket(trade_date=[AS_OF], amount=[math.nan], payment_day=[A_YEAR])) == (
+        "amount row 1 is nan, expected a finite amount"
+    )
     with pytest.raises(ValueError) as caught:
         template(amount=-math.inf)
     assert str(caught.value) == "amount is -inf, expected a finite amount"
@@ -387,14 +387,14 @@ def test_amounts_are_finite_and_identifiers_whole_each_named_by_its_row() -> Non
                 trade_id=[1, 1.5],
                 trade_date=[AS_OF] * 2,
                 amount=[1.0] * 2,
-                payment_date=[A_YEAR] * 2,
+                payment_day=[A_YEAR] * 2,
             )
         ),
     )
     # Amounts finite each but past the largest number together on one day: refused by the day.
     largest = float(np.finfo(np.float64).max)
     assert refused_booking(
-        ticket(trade_date=[AS_OF] * 2, amount=[largest, largest], payment_date=[A_YEAR] * 2)
+        ticket(trade_date=[AS_OF] * 2, amount=[largest, largest], payment_day=[A_YEAR] * 2)
     ) == (
         f"the payments on {A_YEAR} on SOFR sum to inf, expected a finite amount of USD; the rows' "
         "amounts, each finite, sum past the largest number"
@@ -422,14 +422,14 @@ def test_the_curve_starts_on_the_day_and_covers_every_unpaid_day_a_paid_one_need
 def test_a_total_past_the_largest_number_is_refused_by_the_batch() -> None:
     largest = float(np.finfo(np.float64).max)
     batch = booked(
-        ticket(trade_date=[AS_OF] * 2, amount=[largest, largest], payment_date=[A_YEAR, TWO_YEARS])
+        ticket(trade_date=[AS_OF] * 2, amount=[largest, largest], payment_day=[A_YEAR, TWO_YEARS])
     )
     assert refused_valuation(batch) == (
         "the batch has inf of mark in all, expected a finite amount of USD; the payments, each "
         "finite, sum past the largest number"
     )
     paid = booked(
-        ticket(trade_date=[AS_OF] * 2, amount=[largest, largest], payment_date=[DAY_BEFORE, AS_OF])
+        ticket(trade_date=[AS_OF] * 2, amount=[largest, largest], payment_day=[DAY_BEFORE, AS_OF])
     )
     assert refused_valuation(paid) == (
         "the batch has inf of cash in all, expected a finite amount of USD; the payments, each "
@@ -473,7 +473,7 @@ CURVE_HEADERS = row("date", "discount_factor")
 CURVE_BODY = Cells.from_rows(
     [[serial(AS_OF), 1.0], [serial(A_YEAR), 0.95], [serial(TWO_YEARS), 0.90]]
 )
-FIELDS = row("trade_id", "trade_date", "amount", "payment_date", "description")
+FIELDS = row("trade_id", "trade_date", "amount", "payment_day", "description")
 ROWS = Cells.from_rows(
     [
         [1.0, serial(AS_OF), 10_000.0, serial(A_YEAR), "Receivable"],
@@ -543,7 +543,7 @@ def test_the_seam_reads_the_batch_and_the_results_back() -> None:
         "trade_date",
         "amount",
         "currency",
-        "payment_date",
+        "payment_day",  # the field's name, cashflow-payment-day.md, in the place it had
         "counterparty",
         "description",
         "discount_curve_key",  # last, so that no column a sheet already reads has moved
@@ -604,11 +604,11 @@ def test_the_seam_refuses_in_its_own_words_and_relays_the_librarys() -> None:
     )
     assert ENTRY["_CreateCashflows"](row("quantity"), row(1.0), sheet["template"]) == (
         "#ERROR _CreateCashflows: fields cell (1, 1) is text 'quantity', expected a field of "
-        "cashflow: trade_id, trade_date, amount, currency, payment_date, counterparty, "
+        "cashflow: trade_id, trade_date, amount, currency, payment_day, counterparty, "
         "description, discount_curve_key"
     )
     assert ENTRY["_CreateCashflows"](
-        row("trade_date", "amount", "payment_date"),
+        row("trade_date", "amount", "payment_day"),
         Cells.from_rows([[serial(AS_OF), "x", serial(A_YEAR)]]),
         sheet["template"],
     ) == ("#ERROR _CreateCashflows: cashflow_rows cell (1, 2) is text 'x', expected number")
@@ -666,7 +666,7 @@ def keyed(
     return ticket(
         trade_date=[AS_OF] * n,
         amount=amounts,
-        payment_date=days or [A_YEAR] * n,
+        payment_day=days or [A_YEAR] * n,
         discount_curve_key=keys,
         **more,
     )
@@ -745,7 +745,7 @@ def test_rows_net_within_a_day_and_a_key_and_never_across_keys() -> None:
 
 
 def test_the_key_comes_from_the_template_or_the_ticket_and_is_a_curves_name() -> None:
-    plain = ticket(trade_date=[AS_OF] * 2, amount=[1.0, 2.0], payment_date=[A_YEAR] * 2)
+    plain = ticket(trade_date=[AS_OF] * 2, amount=[1.0, 2.0], payment_day=[A_YEAR] * 2)
     from_template = booked(plain, template(currency="USD", discount_curve_key="FFOIS"))
     assert from_template.discount_curve_key == ("FFOIS", "FFOIS")
     assert from_template.keys == ("FFOIS",) and from_template.group_key.tolist() == [0]
@@ -975,7 +975,7 @@ def a_mixed_sheet() -> dict[str, Any]:
     """The ticket's two rows keyed in a ticket column, the two curves and their collection."""
     template = ENTRY["_CreateTradeTemplate"]("cashflow", row("currency"), row("USD"))
     batch = ENTRY["_CreateCashflows"](
-        row("trade_date", "amount", "payment_date", "discount_curve_key"),
+        row("trade_date", "amount", "payment_day", "discount_curve_key"),
         Cells.from_rows(
             [
                 [serial(AS_OF), 10_000.0, serial(A_YEAR), "SOFR"],
@@ -1057,7 +1057,7 @@ def test_the_seam_refuses_a_curve_where_the_collection_goes_and_a_key_naming_non
         "#ERROR _EvaluateCashflows: ValueError: discount_curve_key 'FFOIS' of trade at row 2 "
         "names no curve of the collection, which holds 'SOFR'; expected a curve of that name"
     )
-    fields = row("trade_date", "amount", "payment_date")
+    fields = row("trade_date", "amount", "payment_day")
     cells = Cells.from_rows([[serial(AS_OF), 1.0, serial(A_YEAR)]])
     assert ENTRY["_CreateCashflows"](fields, cells, sheet["template"]) == (
         "#ERROR _CreateCashflows: ValueError: discount_curve_key is missing, expected a value in "
@@ -1075,7 +1075,7 @@ def test_the_seam_publishes_no_results_whose_curve_total_is_past_the_largest_num
         for sign, key in ((1.0, "SOFR"), (-1.0, "FFOIS"))
     ]
     batch = ENTRY["_CreateCashflows"](
-        row("trade_date", "amount", "payment_date", "discount_curve_key"),
+        row("trade_date", "amount", "payment_day", "discount_curve_key"),
         Cells.from_rows(body),
         template,
     )
@@ -1091,3 +1091,109 @@ def test_the_seam_publishes_no_results_whose_curve_total_is_past_the_largest_num
         "finite, sum past the largest number"
     )
     assert bridge.live_handles()[0] == live  # refused before anything was published
+
+
+# --- cashflow-payment-day.md, a cashflow is booked under payment_day ----------------------------
+
+
+def test_the_payment_day_is_the_trades_header_and_a_date_only() -> None:
+    # The cashflow's field is named as the trades' is, and typed as a date where theirs is a
+    # date or a rule; the instrument's own table says so.
+    names = [field.name for field in CASHFLOW.fields]
+    assert names.index("payment_day") == 4 and "payment_date" not in names
+    assert CASHFLOW_TYPES["payment_day"] is FieldType.DATE
+    theirs = {field.name: field.type for field in FIXED_FLOAT.fields}["payment_day"]
+    assert theirs is FieldType.DATE_OR_TEXT
+    shown = spilled(ENTRY["_ShowInstrument"]("cashflow"))
+    at = shown[0].index("payment_day")
+    assert at == 5  # after the row labels, where payment_date stood
+    assert shown[4][at] == "date" and shown[5][at] == "a date"
+    rule = str(shown[6][at])
+    assert rule.startswith("A date only, used as entered, never rolled")
+    assert "a rule such as +1bd is a trade's" in rule
+
+
+def test_a_date_under_payment_day_books_from_the_template_or_the_ticket() -> None:
+    keyed_template = ENTRY["_CreateTradeTemplate"](
+        "cashflow", row("currency", "discount_curve_key"), row("USD", "SOFR")
+    )
+    from_ticket = ENTRY["_CreateCashflows"](
+        row("trade_date", "amount", "payment_day"),
+        Cells.from_rows([[serial(AS_OF), 100.0, serial(A_YEAR)]]),
+        keyed_template,
+    )
+    dated = ENTRY["_CreateTradeTemplate"](
+        "cashflow",
+        row("currency", "discount_curve_key", "payment_day"),
+        row("USD", "SOFR", serial(A_YEAR)),
+    )
+    from_template = ENTRY["_CreateCashflows"](
+        row("trade_date", "amount"), Cells.from_rows([[serial(AS_OF), 100.0]]), dated
+    )
+    # The template's readback names the field it holds, and both batches read back the same:
+    # the day under payment_day, fourth here, a ticket without identifiers having no first column.
+    held = spilled(ENTRY["util_ReadHandle"](dated))
+    assert held[0] == ["instrument", "currency", "discount_curve_key", "payment_day"]
+    assert held[1][3] == "datetime64[D]" and held[2][3] == serial(A_YEAR)
+    for batch in (from_ticket, from_template):
+        read = spilled(ENTRY["util_ReadHandle"](batch))
+        assert read[0] == ["trade_date", "amount", "currency", "payment_day", "discount_curve_key"]
+        assert read[1][3] == "datetime64[D]" and read[2][3] == serial(A_YEAR)
+    # Valued, the two are one answer, and the results name the resolved date payment_date.
+    date = ENTRY["_CreateValuationDate"](serial(AS_OF), 0.5)
+    sofr = ENTRY["_CreateDiscountCurve"](
+        "SOFR", CURVE_HEADERS, Cells.from_rows([[serial(AS_OF), 1.0], [serial(A_YEAR), 0.95]])
+    )
+    curves = ENTRY["_CollectDiscountCurves"](sofr)
+    reads = [
+        spilled(ENTRY["util_ReadHandle"](ENTRY["_EvaluateCashflows"](batch, date, curves)))
+        for batch in (from_ticket, from_template)
+    ]
+    assert reads[0] == reads[1]
+    assert reads[0][0][0] == "payment_date" and reads[0][2][0] == serial(A_YEAR)
+    assert reads[0][2][4] == pytest.approx(95.0, **CLOSE)
+    # In both, as any field: refused by its name.
+    assert ENTRY["_CreateCashflows"](
+        row("trade_date", "amount", "payment_day"),
+        Cells.from_rows([[serial(AS_OF), 100.0, serial(A_YEAR)]]),
+        dated,
+    ) == (
+        "#ERROR _CreateCashflows: ValueError: payment_day is supplied by the template and by "
+        "the ticket, expected by one of them"
+    )
+    assert ENTRY["_CreateCashflows"](
+        row("trade_date", "amount"), Cells.from_rows([[serial(AS_OF), 100.0]]), keyed_template
+    ) == (
+        "#ERROR _CreateCashflows: ValueError: payment_day is missing, expected a value in the "
+        "template or a column in the ticket"
+    )
+
+
+def test_the_old_header_is_no_field_and_a_rule_is_no_date_each_in_the_seams_words() -> None:
+    keyed_template = ENTRY["_CreateTradeTemplate"](
+        "cashflow", row("currency", "discount_curve_key"), row("USD", "SOFR")
+    )
+    no_field = (
+        "is text 'payment_date', expected a field of cashflow: trade_id, trade_date, amount, "
+        "currency, payment_day, counterparty, description, discount_curve_key"
+    )
+    # No alias: the old header is refused in a ticket and in a template by the sentence for any
+    # header that is no field, which lists the fields and so names the new one.
+    assert ENTRY["_CreateCashflows"](
+        row("trade_date", "amount", "payment_date"),
+        Cells.from_rows([[serial(AS_OF), 100.0, serial(A_YEAR)]]),
+        keyed_template,
+    ) == (f"#ERROR _CreateCashflows: fields cell (1, 3) {no_field}")
+    assert ENTRY["_CreateTradeTemplate"](
+        "cashflow", row("currency", "payment_date"), row("USD", serial(A_YEAR))
+    ) == (f"#ERROR _CreateTradeTemplate: fields cell (1, 2) {no_field}")
+    # A rule, the trades' other form of the header, is text where a date goes: refused by its
+    # cell, in the sentence for any cell of the wrong kind, which names no field.
+    assert ENTRY["_CreateCashflows"](
+        row("trade_date", "amount", "payment_day"),
+        Cells.from_rows([[serial(AS_OF), 100.0, "+5bd"]]),
+        keyed_template,
+    ) == ("#ERROR _CreateCashflows: cashflow_rows cell (1, 3) is text '+5bd', expected date")
+    assert ENTRY["_CreateTradeTemplate"](
+        "cashflow", row("currency", "discount_curve_key", "payment_day"), row("USD", "SOFR", "+5bd")
+    ) == ("#ERROR _CreateTradeTemplate: values cell (1, 3) is text '+5bd', expected date")
