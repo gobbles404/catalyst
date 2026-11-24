@@ -141,7 +141,7 @@ def _CreateGasDailySchedule(
 @excel_function
 def _CreateIndexConventions(
     quote_currency_unit: Annotated[
-        str, "The currency unit a price of the index is quoted in: USD or CENT."
+        str, "The currency unit a price of the index is quoted in: DOLLAR or CENT."
     ],
     quote_quantity_unit: Annotated[
         str,
@@ -149,7 +149,7 @@ def _CreateIndexConventions(
         "BBL, L or M3 for VOLUME; KG, LB, MT, ST, LT, G, OZT or CWT_US for MASS; MMBTU, BTU, "
         "THERM, GJ, MWH or KWH for ENERGY.",
     ],
-    currency_unit: Annotated[str, "The currency unit the index settles in: USD or CENT."],
+    currency_unit: Annotated[str, "The currency unit the index settles in: DOLLAR or CENT."],
     quantity_type: Annotated[str, "What a quantity of the index measures: VOLUME, MASS or ENERGY."],
     quantity_unit: Annotated[
         str,

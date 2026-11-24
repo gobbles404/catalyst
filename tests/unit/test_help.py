@@ -377,14 +377,14 @@ def test_the_conventions_creator_explains_itself() -> None:
     assert arguments == [
         (
             "quote_currency_unit",
-            "The currency unit a price of the index is quoted in: USD or CENT.",
+            "The currency unit a price of the index is quoted in: DOLLAR or CENT.",
         ),
         (
             "quote_quantity_unit",
             "The quantity unit a price of the index is quoted per, a unit of the quantity type: "
             + units,
         ),
-        ("currency_unit", "The currency unit the index settles in: USD or CENT."),
+        ("currency_unit", "The currency unit the index settles in: DOLLAR or CENT."),
         ("quantity_type", "What a quantity of the index measures: VOLUME, MASS or ENERGY."),
         (
             "quantity_unit",

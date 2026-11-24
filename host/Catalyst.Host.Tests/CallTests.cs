@@ -26,7 +26,7 @@ namespace Catalyst.Host.Tests
         // replayed here reads either.
         private static string Index(object schedule, object holidays, string name = "sample")
         {
-            var conventions = Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0 } });
             var handle = (string)Seam.Call("_CreateIndex", name, name + " index", schedule, conventions, specifications, holidays, "NYMEX NG");
             Assert.StartsWith(Pid + ":index:" + name + ":", handle);
@@ -341,12 +341,14 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", "V26"), Column(46266.0, 46296.0), ExcelMissing.Value }, "#ERROR _CreateGasDailySchedule: last_date is missing, expected column of dates" };
             yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", "V26"), Row(46266.0, 46296.0), Column(46295.0, 46326.0) }, "#ERROR _CreateGasDailySchedule: first_date is 1x2 array, expected column of dates" };
             // The index conventions: five text scalars, a blank and a number where a code is expected, and a code left out.
-            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "VOLUME", ExcelEmpty.Value }, "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text" };
-            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", 1.0, "VOLUME", "BBL" }, "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text" };
-            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "VOLUME", ExcelMissing.Value }, "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text" };
-            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "Volume", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected VOLUME, MASS or ENERGY" };
-            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "MMBTU", "USD", "VOLUME", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3" };
-            yield return new object[] { "_CreateIndexConventions", new object[] { "usd", "BBL", "USD", "VOLUME", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quote_currency_unit is 'usd', expected USD or CENT" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "DOLLAR", "BBL", "DOLLAR", "VOLUME", ExcelEmpty.Value }, "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "DOLLAR", "BBL", 1.0, "VOLUME", "BBL" }, "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "DOLLAR", "BBL", "DOLLAR", "VOLUME", ExcelMissing.Value }, "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "DOLLAR", "BBL", "DOLLAR", "Volume", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected VOLUME, MASS or ENERGY" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "DOLLAR", "MMBTU", "DOLLAR", "VOLUME", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "DOLLAR", "VOLUME", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quote_currency_unit is 'USD', expected DOLLAR or CENT" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "DOLLAR", "BBL", "USD", "VOLUME", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: currency_unit is 'USD', expected DOLLAR or CENT" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "usd", "BBL", "DOLLAR", "VOLUME", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quote_currency_unit is 'usd', expected DOLLAR or CENT" };
             // The contract specifications: a header row and a table of words for a quantity; a lot size with a fraction, text where a fee is expected, a name given twice, and a unit that is no quantity unit.
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "usd", 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', expected a VOLUME, MASS or ENERGY unit" };
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 2.5, "MMBTU", 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number" };
@@ -587,7 +589,7 @@ namespace Catalyst.Host.Tests
             var own = (object[,])Seam.Call("_ReportRisk", onSofr, "dv01", "year");
             var collected = (object[,])Seam.Call("_ReportRisk", alone, "dv01", "year");
             Assert.Equal(own.GetLength(0), collected.GetLength(0));
-            Assert.Equal("SOFR USD dv01 [USD per basis point]", collected[1, 1]);
+            Assert.Equal("SOFR USD dv01 [DOLLAR per basis point]", collected[1, 1]);
             Assert.Equal(0.85, (double)collected[3, 1], 12);
             Assert.Equal((double)own[5, 1], (double)collected[5, 1], 12);
             Assert.Equal(-0.95, (double)collected[5, 1], 12);
@@ -595,14 +597,14 @@ namespace Catalyst.Host.Tests
             var both = (string)Seam.Call("_AggregateResults", Column(onSofr, onFfois));
             var two = (object[,])Seam.Call("_ReportRisk", both, "dv01", "year");
             Assert.Equal(3, two.GetLength(1));
-            Assert.Equal("FFOIS USD dv01 [USD per basis point]", two[1, 2]);
+            Assert.Equal("FFOIS USD dv01 [DOLLAR per basis point]", two[1, 2]);
             Assert.Equal(0.85, (double)two[3, 1], 12);
             Assert.Equal(0.88, (double)two[3, 2], 12);
             var members = (object[,])Seam.Call("util_ReadHandle", both);
             Assert.Equal(4, members.GetLength(0));
             Assert.Equal(13, members.GetLength(1));  // the currency unit last, currency-and-currency-unit.md
             Assert.Equal("currency_unit", members[0, 12]);
-            Assert.Equal("USD", members[2, 12]);
+            Assert.Equal("DOLLAR", members[2, 12]);
             Assert.Equal("-", members[2, 1]);
             Assert.Equal("-", members[2, 2]);
             Assert.Equal("cashflow", members[2, 3]);
@@ -645,8 +647,8 @@ namespace Catalyst.Host.Tests
             var risk = (object[,])Seam.Call("_ReportRisk", results, "dv01", "day");
             Assert.Equal(5, risk.GetLength(0));  // one payment day, shared by the two curves
             Assert.Equal(3, risk.GetLength(1));
-            Assert.Equal("SOFR USD dv01 [USD per basis point]", risk[1, 1]);
-            Assert.Equal("FFOIS USD dv01 [USD per basis point]", risk[1, 2]);
+            Assert.Equal("SOFR USD dv01 [DOLLAR per basis point]", risk[1, 1]);
+            Assert.Equal("FFOIS USD dv01 [DOLLAR per basis point]", risk[1, 2]);
             Assert.Equal("Total", risk[3, 0]);
             Assert.Equal(-0.95, (double)risk[3, 1], 12);
             Assert.Equal(0.90, (double)risk[3, 2], 12);
@@ -654,7 +656,7 @@ namespace Catalyst.Host.Tests
             var read = (object[,])Seam.Call("util_ReadHandle", results);
             Assert.Equal(4, read.GetLength(0));  // one payment day on two keys: two rows
             Assert.Equal(14, read.GetLength(1));
-            Assert.Equal("USD", read[2, Heading(read, "currency_unit")]);
+            Assert.Equal("DOLLAR", read[2, Heading(read, "currency_unit")]);
             Assert.Equal("SOFR", read[2, Heading(read, "discount_curve_key")]);
             Assert.Equal("FFOIS", read[3, Heading(read, "discount_curve_key")]);
             Assert.Equal(9500.0, (double)read[2, Heading(read, "npv")], 9);
@@ -712,7 +714,7 @@ namespace Catalyst.Host.Tests
             var risk = (object[,])Seam.Call("_ReportRisk", results, "dv01", "year");
             Assert.Equal(7, risk.GetLength(0));
             Assert.Equal(2, risk.GetLength(1));
-            Assert.Equal("SOFR USD dv01 [USD per basis point]", risk[1, 1]);
+            Assert.Equal("SOFR USD dv01 [DOLLAR per basis point]", risk[1, 1]);
             Assert.Equal("Total", risk[3, 0]);
             Assert.Equal(0.85, (double)risk[3, 1], 12);
             Assert.Equal(46753.0, risk[5, 0]);
@@ -722,7 +724,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(5, read.GetLength(0));
             Assert.Equal(14, read.GetLength(1));  // the key, then since currency-and-currency-unit.md the currency unit, last, so that no earlier column moved
             Assert.Equal("currency_unit", read[0, 13]);
-            Assert.Equal("USD", read[4, 13]);
+            Assert.Equal("DOLLAR", read[4, 13]);
             Assert.Equal("discount_curve_key", read[0, 12]);
             Assert.Equal("SOFR", read[4, 12]);
             Assert.Equal("cashflow_mark", read[0, 9]);
@@ -805,7 +807,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(8, risk.GetLength(1));
             Assert.Equal("A nominal_delta [NYMEX NG]", risk[1, 1]);
             Assert.Equal("B delta [NYMEX NG]", risk[1, 4]);
-            Assert.Equal("SOFR USD dv01 [USD per basis point]", risk[1, 5]);
+            Assert.Equal("SOFR USD dv01 [DOLLAR per basis point]", risk[1, 5]);
             Assert.Equal("A SOFR cross_gamma [NYMEX NG per basis point]", risk[1, 6]);
             Assert.Equal("Total", risk[3, 0]);
             Assert.Equal(1.0, (double)risk[3, 1], 12);
@@ -861,7 +863,7 @@ namespace Catalyst.Host.Tests
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar");
             // Since float-float-units.md every float_float types its spread price's unit: dollars per MMBTU here.
             var spreadFields = Row("spread_price_currency_unit", "spread_price_quantity_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar");
-            var template = (string)Seam.Call("_CreateTradeTemplate", "float_float", spreadFields, Row("USD", "MMBTU", "NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays));
+            var template = (string)Seam.Call("_CreateTradeTemplate", "float_float", spreadFields, Row("DOLLAR", "MMBTU", "NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "spread_price");
             var row = Row(1.0, 46371.0, "G27", 1.0, 3.80);
             var trades = (string)Seam.Call("_CreateTrades", Column(a, b), headers, row, template);
@@ -878,7 +880,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(8, risk.GetLength(1));
             Assert.Equal("A nominal_delta [NYMEX NG]", risk[1, 1]);
             Assert.Equal("B delta [NYMEX NG]", risk[1, 4]);
-            Assert.Equal("SOFR USD dv01 [USD per basis point]", risk[1, 5]);
+            Assert.Equal("SOFR USD dv01 [DOLLAR per basis point]", risk[1, 5]);
             Assert.Equal("B SOFR cross_gamma [NYMEX NG per basis point]", risk[1, 7]);
             Assert.Equal("Total", risk[3, 0]);
             Assert.Equal(1.0, (double)risk[3, 1], 12);
@@ -901,7 +903,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(3, booked.GetLength(0));
             Assert.Equal(3.8, (double)booked[2, Heading(booked, "spread_price")], 12);
             Assert.Equal(-1, Heading(booked, "fixed_price"));  // a spread has no fixed price
-            Assert.Equal("USD", booked[2, Heading(booked, "spread_price_currency_unit")]);  // its unit, as typed
+            Assert.Equal("DOLLAR", booked[2, Heading(booked, "spread_price_currency_unit")]);  // its unit, as typed
             Assert.Equal("MMBTU", booked[2, Heading(booked, "spread_price_quantity_unit")]);
             Assert.Equal(-38000.0, (double)booked[2, Heading(booked, "offset")], 9);  // the spread leg, once
             var reserves = (object[,])Seam.Call("_ReportReserves", results);
@@ -914,18 +916,18 @@ namespace Catalyst.Host.Tests
             var pair = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays));
             Assert.StartsWith("#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of fixed_float: trade_id,", (string)Seam.Call("_CreateTrades", Column(a, b), headers, row, pair));
             var clearedFields = Row("spread_price_currency_unit", "spread_price_quantity_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
-            var cleared = (string)Seam.Call("_CreateTradeTemplate", "float_float", clearedFields, Row("USD", "MMBTU", "NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "cleared", "financial", "ICE Clear Europe", 46756.0, holidays));
+            var cleared = (string)Seam.Call("_CreateTradeTemplate", "float_float", clearedFields, Row("DOLLAR", "MMBTU", "NYMEX NG", "month", "monthly", 1.0, "lastday", "lastday", "cleared", "financial", "ICE Clear Europe", 46756.0, holidays));
             Assert.Equal("#ERROR _CreateTrades: ValueError: route is 'cleared', expected 'bilateral' on a float_float; a cleared spread is not built", Seam.Call("_CreateTrades", Column(a, b), headers, row, cleared));
             Assert.Equal("#ERROR _CreateTrades: ValueError: broker of trade 7 at row 1 is 'ICAP', expected none on a float_float; a brokered spread is not built", Seam.Call("_CreateTrades", Column(a, b), Row("trade_id", "trade_date", "contract_code", "quantity", "spread_price", "broker"), Row(7.0, 46371.0, "G27", 1.0, 3.80, "ICAP"), template));
             Assert.Equal("#ERROR _CreateQuoteTemplate: ValueError: instrument is 'float_float', expected one a quote prices: 'fixed_float'", Seam.Call("_CreateQuoteTemplate", "float_float", Row("route"), Row("bilateral")));
         }
 
-        // A futures index of VOLUME over F27, G27 and H27, quoted in USD per that unit with a LOT of that
+        // A futures index of VOLUME over F27, G27 and H27, quoted in DOLLAR per that unit with a LOT of that
         // many of it and one BBL beside it, float-float-units.md: a leg of a crack.
         private static string VolumeIndex(string name, string unit, double lot, object holidays)
         {
             var schedule = Seam.Call("_CreateFuturesSchedule", Column("F27", "G27", "H27"), Column(46385.0, 46414.0, 46442.0), ExcelMissing.Value);
-            var conventions = Seam.Call("_CreateIndexConventions", "USD", unit, "USD", "VOLUME", unit);
+            var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", unit, "DOLLAR", "VOLUME", unit);
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "LOT", lot, unit, 0.0, 0.0 }, { "BBL", 1.0, "BBL", 0.0, 0.0 } });
             var handle = (string)Seam.Call("_CreateIndex", name, name + " index", schedule, conventions, specifications, holidays, "LOT");
             Assert.StartsWith(Pid + ":index:" + name + ":", handle);
@@ -933,8 +935,8 @@ namespace Catalyst.Host.Tests
         }
 
         // float-float-units.md: a crack, two indexes that price in different units under a float_float whose
-        // spread price's unit is typed. RB in USD per GAL with a LOT of 42,000 GAL less WTI in USD per BBL with
-        // a LOT of 1,000 BBL, 1,000 BBL of G27 at 15.00 USD per BBL, RB quoted 2.10 and WTI 70.00: 88,200 less
+        // spread price's unit is typed. RB in DOLLAR per GAL with a LOT of 42,000 GAL less WTI in DOLLAR per BBL with
+        // a LOT of 1,000 BBL, 1,000 BBL of G27 at 15.00 DOLLAR per BBL, RB quoted 2.10 and WTI 70.00: 88,200 less
         // 70,000 less 15,000, one net payment of 3,200 a year on at 0.95, 3,040; one lot of RB and minus one of
         // WTI, each leg's price read back in its own unit and no price converted; the same crack at 1,500 cents
         // a barrel; then a template with no unit, a unit the tables lack and one of another measure, by name.
@@ -959,7 +961,7 @@ namespace Catalyst.Host.Tests
                 rest.CopyTo(cells, units.Length);
                 return Row(cells);
             }
-            var template = (string)Seam.Call("_CreateTradeTemplate", "float_float", fields, Values("USD", "BBL"));
+            var template = (string)Seam.Call("_CreateTradeTemplate", "float_float", fields, Values("DOLLAR", "BBL"));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "spread_price");
             var row = Row(1.0, 46371.0, "G27", 1000.0, 15.0);
             var trades = (string)Seam.Call("_CreateTrades", Column(rb, wti), headers, row, template);
@@ -967,7 +969,7 @@ namespace Catalyst.Host.Tests
             var booked = (object[,])Seam.Call("util_ReadHandle", trades);
             Assert.Equal(3, booked.GetLength(0));
             Assert.Equal(15.0, (double)booked[2, Heading(booked, "spread_price")], 12);
-            Assert.Equal("USD", booked[2, Heading(booked, "spread_price_currency_unit")]);
+            Assert.Equal("DOLLAR", booked[2, Heading(booked, "spread_price_currency_unit")]);
             Assert.Equal("BBL", booked[2, Heading(booked, "spread_price_quantity_unit")]);
             Assert.Equal(42000.0, (double)booked[2, Heading(booked, "quote_quantity")], 9);  // the first leg's, in its gallons
             Assert.Equal(-15000.0, (double)booked[2, Heading(booked, "offset")], 9);  // the spread leg: 1,000 BBL at 15.00
@@ -989,8 +991,8 @@ namespace Catalyst.Host.Tests
             Assert.Equal(-0.000095, (double)risk[3, 6], 12);
             Assert.Equal(0.000095, (double)risk[3, 7], 12);
             var read = (object[,])Seam.Call("util_ReadHandle", results);
-            Assert.Equal("USD/GAL", read[2, Heading(read, "price_unit")]);
-            Assert.Equal("USD/BBL", read[3, Heading(read, "price_unit")]);
+            Assert.Equal("DOLLAR/GAL", read[2, Heading(read, "price_unit")]);
+            Assert.Equal("DOLLAR/BBL", read[3, Heading(read, "price_unit")]);
             Assert.Equal(2.10, (double)read[2, Heading(read, "observation_price")], 12);  // no price converted
             Assert.Equal(88200.0, (double)read[2, Heading(read, "floating_contribution")], 9);
             Assert.Equal(-70000.0, (double)read[3, Heading(read, "floating_contribution")], 9);
@@ -999,16 +1001,16 @@ namespace Catalyst.Host.Tests
             var inCents = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", Column(rb, wti), headers, Row(1.0, 46371.0, "G27", 1000.0, 1500.0), cents));
             Assert.Equal(-15000.0, (double)inCents[2, Heading(inCents, "offset")], 6);
             // The unit is typed on every float_float, a code of the tables and a unit of the indexes' measure.
-            var unitless = (string)Seam.Call("_CreateTradeTemplate", "float_float", Row("spread_price_currency_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar"), Values("USD"));
+            var unitless = (string)Seam.Call("_CreateTradeTemplate", "float_float", Row("spread_price_currency_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar"), Values("DOLLAR"));
             Assert.Equal("#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is missing, expected a value in the template or a column in the ticket", Seam.Call("_CreateTrades", Column(rb, wti), headers, row, unitless));
             var euros = (string)Seam.Call("_CreateTradeTemplate", "float_float", fields, Values("EUR", "BBL"));
-            Assert.Equal("#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'EUR', expected USD or CENT", Seam.Call("_CreateTrades", Column(rb, wti), headers, row, euros));
-            var energy = (string)Seam.Call("_CreateTradeTemplate", "float_float", fields, Values("USD", "MMBTU"));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'EUR', expected DOLLAR or CENT", Seam.Call("_CreateTrades", Column(rb, wti), headers, row, euros));
+            var energy = (string)Seam.Call("_CreateTradeTemplate", "float_float", fields, Values("DOLLAR", "MMBTU"));
             Assert.Equal("#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3", Seam.Call("_CreateTrades", Column(rb, wti), headers, row, energy));
         }
 
         // Since expired-physical-cash.md a physical contract past its expiry is cash where the batch holds no
-        // position on it. GAS in USD per MMBTU, LOT 10,000 MMBTU at 10 of brokerage and 4 of clearing a lot;
+        // position on it. GAS in DOLLAR per MMBTU, LOT 10,000 MMBTU at 10 of brokerage and 4 of clearing a lot;
         // X26 expires 46342, Z26 on 46344, 18 November 2026, and F27 on 46385. One lot bought at 3.00 and sold
         // at 3.10 through ION under one clearing house: on the expiry day 1,000 of mark at any quote, the day
         // after 1,000 of cash whatever the expiry settled at, the slot fixed and its contract settled, no lot
@@ -1019,7 +1021,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46342.0, 46344.0, 46385.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46381.0);
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "LOT", 10000.0, "MMBTU", 10.0, 4.0 }, { "MMBTU", 1.0, "MMBTU", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "GAS", "Gas with a contract to close", schedule, conventions, specifications, holidays, "LOT");
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "broker");
@@ -1110,7 +1112,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(true, spread[2, 16]);
             Assert.Equal("spread_price_currency_unit", spread[0, 17]);
             Assert.Equal(true, spread[2, 17]);
-            Assert.Equal("USD, CENT", spread[5, 17]);
+            Assert.Equal("DOLLAR, CENT", spread[5, 17]);
             Assert.Equal("spread_price_quantity_unit", spread[0, 18]);
             Assert.Equal(true, spread[2, 18]);
             Assert.Equal("second_schedule_method", spread[0, 19]);
@@ -1242,7 +1244,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("K26", "M26", "N26", "Q26", "U26"), Column(46133.0, 46161.0, 46195.0, 46224.0, 46254.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46167.0, 46192.0, 46206.0));
-            var conventions = Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "CL", "CL index", schedule, conventions, specifications, holidays, "BBL");
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
@@ -1300,7 +1302,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("K26", "M26", "N26", "Q26", "U26"), Column(46133.0, 46161.0, 46195.0, 46224.0, 46254.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46167.0, 46192.0, 46206.0));
-            var conventions = Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "CL", "CL index", schedule, conventions, specifications, holidays, "BBL");
             var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46135.0, 0.5), index);
@@ -1357,7 +1359,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("USD", values[2, 2]);
             Assert.Equal("currency_unit", values[0, 4]);
             Assert.Equal("str", values[1, 4]);
-            Assert.Equal("USD", values[2, 4]);
+            Assert.Equal("DOLLAR", values[2, 4]);
             Assert.Equal("cleared_mark", values[0, 0]);
             Assert.Equal("cleared_cash", values[0, 1]);
             Assert.Equal(34000.0, (double)values[2, 0], 6);
@@ -1376,7 +1378,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("period", risk[1, 0]);
             Assert.Equal("sample nominal_delta [NYMEX NG]", risk[1, 1]);
             Assert.Equal("sample delta [NYMEX NG]", risk[1, 2]);
-            Assert.Equal("cleared USD dv01 [USD per basis point]", risk[1, 3]);
+            Assert.Equal("cleared USD dv01 [DOLLAR per basis point]", risk[1, 3]);
             Assert.Equal("str | datetime64[D]", risk[2, 0]);
             Assert.Equal("float64", risk[2, 1]);
             Assert.Equal("Total", risk[3, 0]);
@@ -1422,7 +1424,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(2.0, contributions[2, 9]);
             Assert.Equal(2.0, contributions[2, 10]);
             Assert.Equal("sensitivity_unit", contributions[0, 11]);
-            Assert.Equal("USD per USD/MMBTU", contributions[2, 11]);
+            Assert.Equal("DOLLAR per DOLLAR/MMBTU", contributions[2, 11]);
             Assert.Equal("lot_unit", contributions[0, 12]);
             Assert.Equal("lots of NYMEX NG (10000 MMBTU)", contributions[2, 12]);
             Assert.Equal("payment_factor", contributions[0, 13]);
@@ -1431,11 +1433,11 @@ namespace Catalyst.Host.Tests
             Assert.Equal("brokerage_reserve", contributions[0, 17]);
             Assert.Equal(31, contributions.GetLength(1));  // since #197 the contract's cross-gamma and its unit, since named-curves-slice-3.md the key and the curve, since observation-prices-readback.md the four price columns, since cva-reserve.md the CVA reserve among the reserves, since currency-and-currency-unit.md the currency unit, last
             Assert.Equal("currency_unit", contributions[0, 30]);
-            Assert.Equal("USD", contributions[2, 30]);
+            Assert.Equal("DOLLAR", contributions[2, 30]);
             Assert.Equal("observation_coefficient", contributions[0, 26]);
             Assert.Equal(20000.0, contributions[2, 26]);
             Assert.Equal(72.1, (double)contributions[2, 27], 9);  // the live quote the contribution was made of
-            Assert.Equal("USD/MMBTU", contributions[2, 28]);
+            Assert.Equal("DOLLAR/MMBTU", contributions[2, 28]);
             Assert.Equal(1442000.0, (double)contributions[2, 29], 6);
             Assert.Equal("contract_cross_gamma", contributions[0, 22]);
             Assert.Equal("cross_gamma_unit", contributions[0, 23]);
@@ -1463,7 +1465,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(46168.0, doubled[0, 1]);
             Assert.Equal("sample nominal_delta [NYMEX NG]", doubled[1, 1]);
             Assert.Equal("sample delta [NYMEX NG]", doubled[1, 2]);
-            Assert.Equal("cleared USD dv01 [USD per basis point]", doubled[1, 3]);
+            Assert.Equal("cleared USD dv01 [DOLLAR per basis point]", doubled[1, 3]);
             Assert.Equal("Total", doubled[3, 0]);
             Assert.Equal(2.0, doubled[3, 1]);
             Assert.Equal(2.0, doubled[3, 2]);
@@ -1472,7 +1474,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(2.0, doubled[4, 1]);
             var rate = (object[,])Seam.Call("_ReportRisk", collection, "dv01", "day");
             Assert.Equal(4, rate.GetLength(0));  // all cleared: a Total of nothing per currency over no dated row
-            Assert.Equal("cleared USD dv01 [USD per basis point]", rate[1, 1]);
+            Assert.Equal("cleared USD dv01 [DOLLAR per basis point]", rate[1, 1]);
             Assert.Equal(0.0, rate[3, 1]);
             var alone = (string)Seam.Call("_AggregateResults", results);
             Assert.StartsWith(Pid + ":aggregate_results:", alone);
@@ -1481,7 +1483,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(4, members.GetLength(0));
             Assert.Equal(13, members.GetLength(1));  // since #197 each source's cross-gamma and its unit, since currency-and-currency-unit.md its currency unit, last
             Assert.Equal("currency_unit", members[0, 12]);
-            Assert.Equal("USD", members[2, 12]);
+            Assert.Equal("DOLLAR", members[2, 12]);
             Assert.Equal("cross_gamma", members[0, 10]);
             Assert.Equal("cross_gamma_unit", members[0, 11]);
             Assert.Equal(0.0, members[2, 10]);
@@ -1793,7 +1795,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46323.0, 46351.0, 46416.0, 46444.0), ExcelMissing.Value);
             var weekends = (string)Seam.Call("_CreateHolidayCalendar", 47484.0);
-            var conventions = Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "MMBTU", 1.0, "MMBTU", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "SYN", "Synthetic gas index for the payment-day example", schedule, conventions, specifications, weekends, "MMBTU");
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_holiday_calendar");
@@ -1886,7 +1888,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46356.0, 46363.0, 46394.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46360.0);
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), Row("UNIT", 1.0, "MMBTU", 0.0, 0.0));
             var index = (string)Seam.Call("_CreateIndex", "SYN", "Synthetic gas index for the last3day example", schedule, conventions, specifications, holidays, "UNIT");
             var weekdays = (string)Seam.Call("_CreateHolidayCalendar", 46023.0);
@@ -1940,7 +1942,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46356.0, 46387.0, 46416.0, 46444.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0));
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "GAL", "USD", "VOLUME", "GAL");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "GAL", "DOLLAR", "VOLUME", "GAL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), Row("GAL", 1.0, "GAL", 0.0, 0.0));
             var index = (string)Seam.Call("_CreateIndex", "ETHANE", "Ethane - synthetic volume index", schedule, conventions, specifications, holidays, "GAL");
             var payments = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
@@ -2031,7 +2033,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46356.0, 46387.0, 46416.0, 46444.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0));
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "GAL", "USD", "VOLUME", "GAL");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "GAL", "DOLLAR", "VOLUME", "GAL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), Row("GAL", 1.0, "GAL", 0.0, 0.0));
             var index = (string)Seam.Call("_CreateIndex", "ETHANE", "Ethane - synthetic volume index", schedule, conventions, specifications, holidays, "GAL");
             var payments = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
@@ -2084,7 +2086,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46356.0, 46360.0, 46395.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46023.0);
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), Row("UNIT", 1.0, "MMBTU", 0.0, 0.0));
             var index = (string)Seam.Call("_CreateIndex", "PAYS", "Synthetic gas index for the payment-groups example", schedule, conventions, specifications, holidays, "UNIT");
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_holiday_calendar");
@@ -2113,7 +2115,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("floating_contribution", mixed[0, 30]);
             Assert.Equal(20.0, (double)mixed[2, 27], 9);
             Assert.Equal(71.0, (double)mixed[2, 28], 9);
-            Assert.Equal("USD/MMBTU", mixed[2, 29]);
+            Assert.Equal("DOLLAR/MMBTU", mixed[2, 29]);
             Assert.Equal(1420.0, (double)mixed[2, 30], 9);
             Assert.Equal(0.0, (double)mixed[2, 7], 9);  // the live contribution stays zero on a fixed slot
             Assert.Equal(74.0, (double)mixed[3, 28], 9);
@@ -2158,7 +2160,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(0.0, (double)contributions[7, 7], 9);  // the live contribution, zero once fixed
         }
 
-        // Mixed fields in one batch, mixed-trade-fields.md: the index MIXED, USD per GAL, X26, Z26, F27
+        // Mixed fields in one batch, mixed-trade-fields.md: the index MIXED, DOLLAR per GAL, X26, Z26, F27
         // and G27, 46356, 46387, 46416 and 46444, the market closed on 25 December, 46381, GAL of one
         // gallon and BBL of one barrel; a template of six fields, the route, the settlement, the trade
         // date, the price of 10, +1bd and a payment calendar closed on New Year's Day, 46388; four rows
@@ -2173,7 +2175,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46356.0, 46387.0, 46416.0, 46444.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46381.0);
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "GAL", "USD", "VOLUME", "GAL");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "GAL", "DOLLAR", "VOLUME", "GAL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "GAL", 1.0, "GAL", 0.0, 0.0 }, { "BBL", 1.0, "BBL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "MIXED", "Synthetic volume index for the mixed-fields example", schedule, conventions, specifications, holidays, "GAL");
             var payments = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
@@ -2327,7 +2329,7 @@ namespace Catalyst.Host.Tests
         [Fact]
         public void index_conventions_are_created_from_five_codes_and_read_back_through_their_handle()
         {
-            var handle = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            var handle = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
             Assert.StartsWith(Pid + ":index_conventions:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(3, spill.GetLength(0));
@@ -2336,7 +2338,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("str", spill[1, 0]);
             Assert.Equal("VOLUME", spill[2, 3]);
             Assert.Equal("BBL", spill[2, 4]);
-            var gasoline = (string)Seam.Call("_CreateIndexConventions", "CENT", "GAL", "USD", "VOLUME", "BBL");
+            var gasoline = (string)Seam.Call("_CreateIndexConventions", "CENT", "GAL", "DOLLAR", "VOLUME", "BBL");
             Assert.Equal("CENT", ((object[,])Seam.Call("util_ReadHandle", gasoline))[2, 0]);
         }
 
@@ -2373,7 +2375,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0);
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0 }, { "ICE NG", 2500.0, "MMBTU", 0.75, 0.5 } });
             var handle = (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, conventions, specifications, holidays, ExcelMissing.Value);
             Assert.StartsWith(Pid + ":index:Henry Hub NYMEX:", handle);
@@ -2388,7 +2390,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(10000.0, lotted[2, 10]);
             Assert.Equal("#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the specifications: 'NYMEX NG', 'ICE NG'", Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", schedule, conventions, specifications, holidays, "LOT"));
             // The lot units are units of the conventions' quantity type: the same MMBTU lots under volume conventions are refused, naming the row and the units that would have done.
-            var volume = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            var volume = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
             Assert.Equal("#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3", Seam.Call("_CreateIndex", "WTI NYMEX", "West Texas Intermediate crude oil - NYMEX", schedule, volume, specifications, holidays, ExcelMissing.Value));
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(3, spill.GetLength(0));
@@ -3131,7 +3133,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("Z26", "F27", "G27", "H27"), Column(46346.0, 46377.0, 46407.0, 46440.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0));
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 }, { "LOT", 1000.0, "BBL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "WTI", "West Texas Intermediate crude oil - NYMEX", schedule, conventions, specifications, holidays, "LOT");
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
@@ -3206,7 +3208,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46356.0, 46387.0, 46416.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0));
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 }, { "LOT", 1000.0, "BBL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "MONTHLY", "Month-aligned WTI-like index", schedule, conventions, specifications, holidays, "LOT");
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
@@ -3260,7 +3262,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(5, everything.GetLength(0));
             Assert.Equal(5, everything.GetLength(1));  // since #197
             Assert.Equal("MONTHLY cleared cross_gamma [LOT per basis point]", everything[1, 4]);
-            Assert.Equal("cleared USD dv01 [USD per basis point]", everything[1, 3]);
+            Assert.Equal("cleared USD dv01 [DOLLAR per basis point]", everything[1, 3]);
             Assert.Equal(46357.0, everything[4, 0]);
             Assert.Equal(25.0, (double)everything[4, 1], 6);
             Assert.Equal(25.0, (double)everything[4, 2], 6);
@@ -3296,7 +3298,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateIfercSchedule", Column("X26", "Z26", "F27"), Column(46328.0, 46357.0, 46391.0));
             var pays = (string)Seam.Call("_CreateHolidayCalendar", Column(46388.0));
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "LOT", 2500.0, "MMBTU", 0.0, 0.0 }, { "MMBTU", 1.0, "MMBTU", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "WAHA", "Waha basis - ICE", schedule, conventions, specifications, ExcelMissing.Value, "LOT");
             Assert.StartsWith(Pid + ":index:WAHA:", index);
@@ -3376,7 +3378,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46356.0, 46387.0, 46416.0, 46444.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0));
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "GAL", "USD", "VOLUME", "GAL");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "GAL", "DOLLAR", "VOLUME", "GAL");
             var headings = Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", headings, new object[,] { { "LOT", 1000.0, "BBL", 10.0, 4.0 }, { "BBL", 1.0, "BBL", 0.01, 0.004 }, { "GAL", 1.0, "GAL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "RESERVES", "Ethane with the reserve ticket rates", schedule, conventions, specifications, holidays, "LOT");
@@ -3418,7 +3420,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(6, reserves.GetLength(1));  // since cva-reserve.md the signed CVA before the currency, since currency-and-currency-unit.md the currency unit after it
             Assert.Equal("currency_unit", reserves[0, 5]);
             Assert.Equal("str", reserves[1, 5]);
-            Assert.Equal("USD", reserves[2, 5]);
+            Assert.Equal("DOLLAR", reserves[2, 5]);
             Assert.Equal("brokerage_reserve", reserves[0, 0]);
             Assert.Equal("cva_reserve", reserves[0, 3]);  // signed, since cva-reserve.md
             Assert.Equal("currency", reserves[0, 4]);
@@ -3433,7 +3435,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal(3, table.GetLength(0));
             Assert.Equal(32, table.GetLength(1));  // since #197 the two cross-gamma columns, since slice 3 the key and the curve, since observation-prices-readback.md the four price columns, since cva-reserve.md the CVA reserve among the reserves, since currency-and-currency-unit.md the currency unit, last
             Assert.Equal("currency_unit", table[0, 31]);
-            Assert.Equal("USD", table[2, 31]);
+            Assert.Equal("DOLLAR", table[2, 31]);
             Assert.Equal("brokerage_reserve", table[0, 18]);
             Assert.Equal("currency", table[0, 22]);
             Assert.Equal(50.0, (double)table[2, 18], 9);
@@ -3446,8 +3448,8 @@ namespace Catalyst.Host.Tests
             Assert.Equal(20.0, (double)again[2, 1], 9);
             var dear = (string)Seam.Call("_CreateContractSpecifications", headings, new object[,] { { "LOT", 1000.0, "BBL", 1e308, 0.0 } });
             var huge = (string)Seam.Call("_CreateIndex", "HUGE", "A rate a cell holds that two lots outrun", schedule, conventions, dear, holidays, "LOT");
-            Assert.Equal("#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, expected a finite amount of USD; 2.0 of 'LOT' at 1e+308 a lot", Seam.Call("_CreateTrades", huge, headers, new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25 } }, template));
-            Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has inf of brokerage reserve in all, expected a finite amount of USD; the components' reserves, each finite, sum past the largest number", Seam.Call("_CreateTrades", huge, headers, new object[,] { { 101.0, 46346.0, "Z26", 1.0, "LOT", 0.25 }, { 102.0, 46346.0, "Z26", 1.0, "LOT", 0.25 } }, template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, expected a finite amount of DOLLAR; 2.0 of 'LOT' at 1e+308 a lot", Seam.Call("_CreateTrades", huge, headers, new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25 } }, template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has inf of brokerage reserve in all, expected a finite amount of DOLLAR; the components' reserves, each finite, sum past the largest number", Seam.Call("_CreateTrades", huge, headers, new object[,] { { 101.0, 46346.0, "Z26", 1.0, "LOT", 0.25 }, { 102.0, 46346.0, "Z26", 1.0, "LOT", 0.25 } }, template));
             // Since #175, booking-fields-and-marketing-reserve.md: a marketing column books 15, 20, 25 and 5
             // once per row, 65, the strip Z26-F27 showing its one amount on both components, over 60 and
             // 24; a template's 7 books 28 on the four plain rows, the mark and the lot as without; a
@@ -3540,8 +3542,8 @@ namespace Catalyst.Host.Tests
             Assert.Equal(1260.0, (double)((object[,])Seam.Call("_ReportValues", fortyResults))[2, 0], 6);
             Assert.Equal(-40.0, (double)((object[,])Seam.Call("util_ReadHandle", forty))[2, Heading((object[,])Seam.Call("util_ReadHandle", forty), "cva_reserve")], 9);
             Assert.Equal("#ERROR _CreateTrades: ValueError: cva_reserve is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, cvaHeaders, cvaRows, forty));
-            Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has inf of cva reserve in all, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number", Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 9e307 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 9e307 } }, template));
-            Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has -inf of cva reserve in all, expected a finite amount of USD; the rows' amounts, each finite, sum past the largest number", Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, -9e307 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, -9e307 } }, template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has inf of cva reserve in all, expected a finite amount of DOLLAR; the rows' amounts, each finite, sum past the largest number", Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 9e307 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 9e307 } }, template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has -inf of cva reserve in all, expected a finite amount of DOLLAR; the rows' amounts, each finite, sum past the largest number", Seam.Call("_CreateTrades", index, cvaHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, -9e307 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, -9e307 } }, template));
             // cva-reserve.md's review: a dollar beside ten thousand trillion and its negative is a dollar in any
             // order, the exact total; amounts cancelling past the largest number net to nothing and are not refused.
             foreach (var amounts in new[] { new[] { 1e16, 1.0, -1e16 }, new[] { 1e16, -1e16, 1.0 }, new[] { 1.0, 1e16, -1e16 } })
@@ -3624,8 +3626,8 @@ namespace Catalyst.Host.Tests
             var perDay = 0.0001 * 34 / 365;
             var keyedDv01 = (object[,])Seam.Call("_ReportRisk", keyedResults, "dv01", "day");
             Assert.Equal(3, keyedDv01.GetLength(1));
-            Assert.Equal("SOFR USD dv01 [USD per basis point]", keyedDv01[1, 1]);
-            Assert.Equal("FFOIS USD dv01 [USD per basis point]", keyedDv01[1, 2]);
+            Assert.Equal("SOFR USD dv01 [DOLLAR per basis point]", keyedDv01[1, 1]);
+            Assert.Equal("FFOIS USD dv01 [DOLLAR per basis point]", keyedDv01[1, 2]);
             Assert.Equal(-perDay * 2520.0 * 0.99, (double)keyedDv01[3, 1], 12);
             Assert.Equal(perDay * 1260.0 * 0.98, (double)keyedDv01[3, 2], 12);
             var keyedAll = (object[,])Seam.Call("_ReportRisk", keyedResults, "all", "month");
@@ -3655,7 +3657,7 @@ namespace Catalyst.Host.Tests
         }
 
         // Contract codes and dates on one ticket, contract-codes-and-dates.md: the synthetic index
-        // BBL_ASIAN, USD per BBL, U26, V26, X26 and Z26 expiring 46294, 46325, 46356 and 46387, so
+        // BBL_ASIAN, DOLLAR per BBL, U26, V26, X26 and Z26 expiring 46294, 46325, 46356 and 46387, so
         // that V26 prices every October pricing day, a calendar closed on 1 January 2030 alone,
         // 47484, a BBL of one barrel and a LOT of 1,000, the reporting lot; an asian template paying
         // +1bd on the same calendar, the basis left to the ticket; three rows struck on 15 September,
@@ -3673,7 +3675,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("U26", "V26", "X26", "Z26"), Column(46294.0, 46325.0, 46356.0, 46387.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 47484.0);
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 }, { "LOT", 1000.0, "BBL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "BBL_ASIAN", "Synthetic barrel index for the codes-and-dates example", schedule, conventions, specifications, holidays, "LOT");
             var fields = Row("quantity_unit", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar", "settlement_frequency", "nearby");
@@ -3794,7 +3796,7 @@ namespace Catalyst.Host.Tests
         {
             var schedule = Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46323.0, 46351.0, 46385.0), ExcelMissing.Value);
             var holidays = Seam.Call("_CreateHolidayCalendar", Column(46352.0, 46381.0));
-            var conventions = Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU");
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 0.0, 0.0 } });
             var ng = (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub NYMEX index", schedule, conventions, specifications, holidays, "NYMEX NG");
             var fields = Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house");

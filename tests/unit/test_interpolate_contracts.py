@@ -35,7 +35,12 @@ def futures(name: str, *contracts: tuple[str, str]) -> Index:
     """A one-thousand-barrel index of those contracts, dollars a barrel, closed on nothing that
     matters."""
     return an_index(
-        name, contracts, ("2030-01-01",), ("USD", "BBL"), ("VOLUME", "BBL"), ("LOT", 1000.0, "BBL")
+        name,
+        contracts,
+        ("2030-01-01",),
+        ("DOLLAR", "BBL"),
+        ("VOLUME", "BBL"),
+        ("LOT", 1000.0, "BBL"),
     )
 
 

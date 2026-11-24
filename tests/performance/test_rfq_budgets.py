@@ -290,7 +290,7 @@ def on_the_sheet() -> tuple[object, object, object, object, object]:
         bridge.MISSING,
     )
     holidays = PATH["_CreateHolidayCalendar"](column(serial("2027-01-01")))
-    conventions = PATH["_CreateIndexConventions"]("USD", "BBL", "USD", "VOLUME", "BBL")
+    conventions = PATH["_CreateIndexConventions"]("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL")
     specifications = PATH["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
         row("BBL", 1.0, "BBL", 0.0, 0.0),

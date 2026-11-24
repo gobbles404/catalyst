@@ -52,7 +52,7 @@ def sheet() -> dict[str, Any]:
         bridge.MISSING,
     )
     holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]))
-    conventions = PATH["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
+    conventions = PATH["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specifications = PATH["_CreateContractSpecifications"](
         Cells.from_rows(
             [["name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]

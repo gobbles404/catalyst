@@ -16,7 +16,7 @@ CURRENCY = "USD"
 @dataclass(frozen=True, slots=True)
 class IndexConventions:
     """Five codes, as the desk typed them and as the unit tables spell them: the currency unit and
-    the quantity unit a price is quoted in, USD per BBL say; the currency unit the index settles
+    the quantity unit a price is quoted in, DOLLAR per BBL say; the currency unit the index settles
     in; and what a quantity measures, VOLUME say, with the unit it is stated in, BBL, the two
     quantity units both of that category."""
 
@@ -39,7 +39,7 @@ def index_conventions(
     checked once, in this order, the first failure being the message.
 
     The two currency units first, which depend on nothing else: each is a unit of the tables'
-    currency category, USD or CENT. Then the quantity type, a category a quantity can measure,
+    currency category, DOLLAR or CENT. Then the quantity type, a category a quantity can measure,
     VOLUME, MASS or ENERGY, in capitals like every other code, and not the currency category,
     which scales money. Then the two
     quantity units, judged by it: each a unit of that category, so that a price quoted per gallon
@@ -76,7 +76,7 @@ def index_conventions(
 
 
 def listed(codes: Iterable[str]) -> str:
-    """The codes a message offers, in the tables' order: USD or CENT; GAL, BBL, L or M3."""
+    """The codes a message offers, in the tables' order: DOLLAR or CENT; GAL, BBL, L or M3."""
     *head, last = codes
     return f"{', '.join(head)} or {last}" if head else last
 

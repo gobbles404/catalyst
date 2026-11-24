@@ -53,7 +53,7 @@ TENK = an_index(
     "TENK",
     (("Z26", "2026-12-31"), ("G27", "2027-02-01"), ("F29", "2029-01-05")),
     ("2027-12-27",),
-    ("USD", "BBL"),
+    ("DOLLAR", "BBL"),
     ("VOLUME", "BBL"),
     ("TENK", 10_000.0, "BBL"),
 )
@@ -64,8 +64,8 @@ SONIA = curve_of((AS_OF, 1.0), (A_YEAR, 0.97), (TWO_YEARS, 0.94), name="SONIA")
 HISTORY = history_on(TENK, AS_OF, {})
 MARKET = quoted(HISTORY, 4.10, 50.0)  # G27 at 4.10, F29 at a quote that matters to nothing
 MARCH_29 = "2029-03-01"  # a payment day after F29's last observation, 5 January 2029
-SOFR_DV01 = "SOFR USD dv01 [USD per basis point]"
-FFOIS_DV01 = "FFOIS USD dv01 [USD per basis point]"
+SOFR_DV01 = "SOFR USD dv01 [DOLLAR per basis point]"
+FFOIS_DV01 = "FFOIS USD dv01 [DOLLAR per basis point]"
 SOFR_CROSS = "TENK SOFR cross_gamma [TENK per basis point]"
 FFOIS_CROSS = "TENK FFOIS cross_gamma [TENK per basis point]"
 
@@ -270,8 +270,8 @@ def test_the_mixed_batch_reports_what_its_parts_collected_together_report(order:
     labels = risk_view(mixed, Risk.ALL, Bucket.DAY).labels
     first, second = ("SOFR", "FFOIS") if order != "reversed" else ("FFOIS", "SOFR")
     assert labels[2:] == (
-        f"{first} USD dv01 [USD per basis point]",
-        f"{second} USD dv01 [USD per basis point]",
+        f"{first} USD dv01 [DOLLAR per basis point]",
+        f"{second} USD dv01 [DOLLAR per basis point]",
         f"TENK {first} cross_gamma [TENK per basis point]",
         f"TENK {second} cross_gamma [TENK per basis point]",
     )
@@ -489,7 +489,7 @@ FOUR = an_index(
         ("J27", "2027-04-01"),
     ),
     ("2027-12-27",),
-    ("USD", "BBL"),
+    ("DOLLAR", "BBL"),
     ("VOLUME", "BBL"),
     ("UNIT", 1.0, "BBL"),
 )
@@ -569,7 +569,7 @@ ETH = an_index(
     "ETH",
     (("U26", "2026-09-30"), ("V26", "2026-10-30"), ("X26", "2026-11-30")),
     ("2027-12-27",),
-    ("USD", "BBL"),
+    ("DOLLAR", "BBL"),
     ("VOLUME", "BBL"),
     ("LOT", 1.0, "BBL"),
 )

@@ -306,7 +306,7 @@ def test_discounting_and_collection_keep_the_contract_month_and_the_payment_mont
             "period",
             "NG2 nominal_delta [LOT]",
             "NG2 delta [LOT]",
-            "SOFR USD dv01 [USD per basis point]",
+            "SOFR USD dv01 [DOLLAR per basis point]",
             "NG2 cleared cross_gamma [LOT per basis point]",
             "NG2 SOFR cross_gamma [LOT per basis point]",
         ]

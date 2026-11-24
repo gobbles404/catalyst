@@ -82,7 +82,7 @@ GAS = index(
     "gas",
     "Sample gas index",
     futures_schedule(CODES, EXPIRIES, None),
-    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
@@ -103,7 +103,7 @@ ASIAN_GAS = index(
     "gas",
     "Sample gas index",
     futures_schedule(CODES, MONTH_ENDS, None),
-    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
@@ -643,7 +643,7 @@ def sheet() -> dict[str, object]:
         bridge.MISSING,
     )
     holidays = PATH["_CreateHolidayCalendar"](Cells.from_rows([[serial(day)] for day in HOLIDAYS]))
-    conventions = PATH["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
+    conventions = PATH["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specifications = PATH["_CreateContractSpecifications"](
         Cells.from_rows(
             [["name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
@@ -1084,7 +1084,7 @@ MIXED_GAS = index(
     "gas",
     "Sample gas index",
     futures_schedule(CODES, MONTH_ENDS, None),
-    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot", "MMBTU"),
         np.array([10_000.0, 1.0]),
@@ -1228,7 +1228,7 @@ BASIS = index(
     "basis",
     "Sample basis index",
     iferc_schedule(CODES, IFERC_PUBLICATION),
-    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot",), np.array([2_500.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),

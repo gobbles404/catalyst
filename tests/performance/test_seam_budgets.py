@@ -1133,7 +1133,7 @@ def test_a_gas_daily_schedule_is_three_columns_in_and_one_publication_out(
 def test_index_conventions_are_five_texts_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    codes = ("USD", "BBL", "USD", "VOLUME", "BBL")
+    codes = ("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL")
     PATH["_CreateIndexConventions"](*codes)
     assert call_profile(lambda: PATH["_CreateIndexConventions"](*codes)) == {
         "Registered.run": 1,
@@ -1170,7 +1170,7 @@ def an_index(schedule: object, holidays: object = MISSING) -> object:
         "sample",
         "Sample futures index",
         schedule,
-        PATH["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU"),
+        PATH["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU"),
         PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(1)),
         holidays,
         MISSING,
@@ -1258,7 +1258,7 @@ def index_parts() -> tuple[object, object, object, object]:
     codes, futures, _, _ = schedule_columns(13)
     return (
         PATH["_CreateFuturesSchedule"](codes, futures, MISSING),
-        PATH["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU"),
+        PATH["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU"),
         PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(12)),
         PATH["_CreateHolidayCalendar"](holiday_column(100)),
     )

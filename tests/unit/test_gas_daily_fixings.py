@@ -29,7 +29,7 @@ def prices(*values: float) -> NDArray[np.float64]:
     return np.array(values, dtype=np.float64)
 
 
-CONVENTIONS = index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS)
+CONVENTIONS = index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS)
 SPECIFICATIONS = contract_specifications(
     ("ICE",), np.array([2500.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
 )

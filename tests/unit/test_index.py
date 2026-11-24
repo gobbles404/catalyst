@@ -35,7 +35,7 @@ def day(text: str) -> np.datetime64:
 
 
 # The page's sample: three Henry Hub indices, one per market, sharing one conventions object,
-# USD per MMBTU with quantities in MMBTU, and the specifications page's two lots.
+# DOLLAR per MMBTU with quantities in MMBTU, and the specifications page's two lots.
 FUTURES = futures_schedule(
     tuple(f"c{i}" for i in range(12)),
     dates(
@@ -61,7 +61,7 @@ GAS_DAILY = gas_daily_schedule(
     dates("2026-09-30", "2026-10-31", "2026-11-30"),
 )
 HOLIDAYS = holiday_calendar(dates("2026-01-01", "2026-01-19", "2026-02-16"))
-CONVENTIONS = index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS)
+CONVENTIONS = index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS)
 SPECIFICATIONS = contract_specifications(
     ("NYMEX NG", "ICE NG"),
     np.array([10000.0, 2500.0]),
@@ -261,7 +261,7 @@ def test_specifications_need_not_answer_to_the_schedules_codes_or_count() -> Non
 # is refused there naming the row, the unit and the units that would have done, after the kind
 # and the holiday rules.
 def test_lot_units_of_the_indexs_measure_pass_and_another_measures_are_refused() -> None:
-    volume = index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS)
+    volume = index_conventions("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL", UNITS)
     barrels_and_gallons = contract_specifications(
         ("lots", "gal"), np.array([1000.0, 1.0]), ("BBL", "GAL"), np.zeros(2), np.zeros(2), UNITS
     )
@@ -431,7 +431,7 @@ ETE_FUTURES = futures_schedule(("X26", "Z26"), dates("2026-11-30", "2026-12-31")
 
 def ete(
     quote: tuple[str, str] = ("CENT", "GAL"),
-    settled: str = "USD",
+    settled: str = "DOLLAR",
     reporting_lot: str | None = "LOT",
 ) -> Index:
     conventions = index_conventions(quote[0], quote[1], settled, "VOLUME", "GAL", UNITS)
@@ -456,9 +456,9 @@ def test_the_reporting_lot_is_resolved_once_into_its_quantity_and_its_coefficien
     # The same lot in every quote and settlement unit: 42,000 gallons or a thousand barrels, and
     # the dollars or cents a live lot makes per unit of quote price.
     for quote, settled, quantity, coefficient in (
-        (("USD", "GAL"), "USD", 42_000.0, 42_000.0),
-        (("USD", "BBL"), "USD", 1_000.0, 1_000.0),
-        (("CENT", "BBL"), "USD", 1_000.0, 10.0),
+        (("DOLLAR", "GAL"), "DOLLAR", 42_000.0, 42_000.0),
+        (("DOLLAR", "BBL"), "DOLLAR", 1_000.0, 1_000.0),
+        (("CENT", "BBL"), "DOLLAR", 1_000.0, 10.0),
         (("CENT", "GAL"), "CENT", 42_000.0, 42_000.0),
     ):
         other = ete(quote, settled).reporting_lot
@@ -490,7 +490,7 @@ def test_a_reporting_lot_whose_quantity_outruns_the_largest_number_is_refused() 
     huge = contract_specifications(
         ("LOT",), np.array([1e308]), ("BBL",), np.zeros(1), np.zeros(1), UNITS
     )
-    conventions = index_conventions("CENT", "GAL", "USD", "VOLUME", "GAL", UNITS)
+    conventions = index_conventions("CENT", "GAL", "DOLLAR", "VOLUME", "GAL", UNITS)
     with pytest.raises(ValueError) as failure:
         index(
             "ETE",

@@ -140,7 +140,7 @@ CAL = index(
         np.concatenate([np.array(["2026-12-31"], dtype="datetime64[D]"), MONTH_ENDS]),
         None,
     ),
-    index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS),
+    index_conventions("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL", UNITS),
     contract_specifications(("BBL",), np.array([1.0]), ("BBL",), np.zeros(1), np.zeros(1), UNITS),
     holiday_calendar(np.array([], dtype="datetime64[D]")),
     "BBL",

@@ -13,12 +13,12 @@ from catalyst.index_definitions.index_conventions import IndexConventions, index
 # The page's samples: WTI quoted in dollars per barrel, settled in dollars, its quantity a volume
 # stated in barrels; gasoline quoted in cents per gallon and settled in dollars per barrel; gas
 # in dollars per MMBTU; a metal quoted per pound and stated in tonnes.
-SAMPLE = ("USD", "BBL", "USD", "VOLUME", "BBL")
-GASOLINE = ("CENT", "GAL", "USD", "VOLUME", "BBL")
-GAS = ("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
-METAL = ("USD", "LB", "USD", "MASS", "MT")
+SAMPLE = ("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL")
+GASOLINE = ("CENT", "GAL", "DOLLAR", "VOLUME", "BBL")
+GAS = ("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
+METAL = ("DOLLAR", "LB", "DOLLAR", "MASS", "MT")
 MEASURES = ("VOLUME", "MASS", "ENERGY")
-CURRENCY_UNITS = ("USD", "CENT")
+CURRENCY_UNITS = ("DOLLAR", "CENT")
 VOLUME = "expected a VOLUME unit, GAL, BBL, L or M3"
 MASS = "expected a MASS unit, KG, LB, MT, ST, LT, G, OZT or CWT_US"
 ENERGY = "expected an ENERGY unit, MMBTU, BTU, THERM, GJ, MWH or KWH"
@@ -41,9 +41,9 @@ def conventions(
 
 def test_the_sample_keeps_every_code_in_its_own_field() -> None:
     made = conventions(*SAMPLE)
-    assert made.quote_currency_unit == "USD"
+    assert made.quote_currency_unit == "DOLLAR"
     assert made.quote_quantity_unit == "BBL"
-    assert made.currency_unit == "USD"
+    assert made.currency_unit == "DOLLAR"
     assert made.quantity_type == "VOLUME"
     assert made.quantity_unit == "BBL"
 
@@ -59,8 +59,10 @@ def test_every_unit_of_a_category_and_every_currency_unit_is_accepted_in_either_
         units = list(UNITS.categories[name].sizes)
         reference = units[0]
         for unit in units:
-            assert conventions("USD", unit, "USD", name, reference).quote_quantity_unit == unit
-            assert conventions("USD", reference, "USD", name, unit).quantity_unit == unit
+            assert (
+                conventions("DOLLAR", unit, "DOLLAR", name, reference).quote_quantity_unit == unit
+            )
+            assert conventions("DOLLAR", reference, "DOLLAR", name, unit).quantity_unit == unit
     for quoted in CURRENCY_UNITS:
         for settled in CURRENCY_UNITS:
             made = conventions(quoted, "BBL", settled, "VOLUME", "BBL")
@@ -74,74 +76,101 @@ def test_every_unit_of_a_category_and_every_currency_unit_is_accepted_in_either_
     ("codes", "message"),
     [
         (
-            ("usd", "BBL", "USD", "VOLUME", "BBL"),
-            "quote_currency_unit is 'usd', expected USD or CENT",
+            ("usd", "BBL", "DOLLAR", "VOLUME", "BBL"),
+            "quote_currency_unit is 'usd', expected DOLLAR or CENT",
         ),
         (
-            ("EUR", "BBL", "USD", "VOLUME", "BBL"),
-            "quote_currency_unit is 'EUR', expected USD or CENT",
+            ("EUR", "BBL", "DOLLAR", "VOLUME", "BBL"),
+            "quote_currency_unit is 'EUR', expected DOLLAR or CENT",
         ),
         (
-            ("USD ", "BBL", "USD", "VOLUME", "BBL"),
-            "quote_currency_unit is 'USD ', expected USD or CENT",
+            ("DOLLAR ", "BBL", "DOLLAR", "VOLUME", "BBL"),
+            "quote_currency_unit is 'DOLLAR ', expected DOLLAR or CENT",
         ),
         (
-            ("BBL", "BBL", "USD", "VOLUME", "BBL"),
-            "quote_currency_unit is 'BBL', expected USD or CENT",
-        ),
-        (("USD", "BBL", "cent", "VOLUME", "BBL"), "currency_unit is 'cent', expected USD or CENT"),
-        (("USD", "BBL", "GBP", "VOLUME", "BBL"), "currency_unit is 'GBP', expected USD or CENT"),
-        (("USD", "BBL", " USD", "VOLUME", "BBL"), "currency_unit is ' USD', expected USD or CENT"),
-        (
-            ("USD", "BBL", "MMBTU", "VOLUME", "BBL"),
-            "currency_unit is 'MMBTU', expected USD or CENT",
+            # The currency's own name is no unit of it, since currency-and-currency-unit.md:
+            # the code the dollar had, refused by the sentence that lists the codes.
+            ("USD", "BBL", "DOLLAR", "VOLUME", "BBL"),
+            "quote_currency_unit is 'USD', expected DOLLAR or CENT",
         ),
         (
-            ("USD", "BBL", "USD", "Volume", "BBL"),
+            ("BBL", "BBL", "DOLLAR", "VOLUME", "BBL"),
+            "quote_currency_unit is 'BBL', expected DOLLAR or CENT",
+        ),
+        (
+            ("DOLLAR", "BBL", "cent", "VOLUME", "BBL"),
+            "currency_unit is 'cent', expected DOLLAR or CENT",
+        ),
+        (
+            ("DOLLAR", "BBL", "GBP", "VOLUME", "BBL"),
+            "currency_unit is 'GBP', expected DOLLAR or CENT",
+        ),
+        (
+            ("DOLLAR", "BBL", " DOLLAR", "VOLUME", "BBL"),
+            "currency_unit is ' DOLLAR', expected DOLLAR or CENT",
+        ),
+        (
+            ("DOLLAR", "BBL", "USD", "VOLUME", "BBL"),
+            "currency_unit is 'USD', expected DOLLAR or CENT",
+        ),
+        (
+            ("DOLLAR", "BBL", "MMBTU", "VOLUME", "BBL"),
+            "currency_unit is 'MMBTU', expected DOLLAR or CENT",
+        ),
+        (
+            ("DOLLAR", "BBL", "DOLLAR", "Volume", "BBL"),
             "quantity_type is 'Volume', expected VOLUME, MASS or ENERGY",
         ),
         (
-            ("USD", "BBL", "USD", "volume", "BBL"),
+            ("DOLLAR", "BBL", "DOLLAR", "volume", "BBL"),
             "quantity_type is 'volume', expected VOLUME, MASS or ENERGY",
         ),
         (
-            ("USD", "BBL", "USD", "weight", "BBL"),
+            ("DOLLAR", "BBL", "DOLLAR", "weight", "BBL"),
             "quantity_type is 'weight', expected VOLUME, MASS or ENERGY",
         ),
         (
-            ("USD", "BBL", "USD", "VOLUME ", "BBL"),
+            ("DOLLAR", "BBL", "DOLLAR", "VOLUME ", "BBL"),
             "quantity_type is 'VOLUME ', expected VOLUME, MASS or ENERGY",
         ),
         (
-            ("USD", "BBL", "USD", "USD", "BBL"),
+            ("DOLLAR", "BBL", "DOLLAR", "USD", "BBL"),
             "quantity_type is 'USD', expected VOLUME, MASS or ENERGY",
         ),
-        (("USD", "MMBTU", "USD", "VOLUME", "BBL"), f"quote_quantity_unit is 'MMBTU', {VOLUME}"),
-        (("USD", "bbl", "USD", "VOLUME", "BBL"), f"quote_quantity_unit is 'bbl', {VOLUME}"),
-        (("USD", "BBL ", "USD", "VOLUME", "BBL"), f"quote_quantity_unit is 'BBL ', {VOLUME}"),
-        (("USD", "BARREL", "USD", "VOLUME", "BBL"), f"quote_quantity_unit is 'BARREL', {VOLUME}"),
-        (("USD", "BBL", "USD", "VOLUME", "MT"), f"quantity_unit is 'MT', {VOLUME}"),
-        (("USD", "BBL", "USD", "VOLUME", "bbl"), f"quantity_unit is 'bbl', {VOLUME}"),
-        (("USD", "BBL", "USD", "VOLUME", "GALLON"), f"quantity_unit is 'GALLON', {VOLUME}"),
-        (("USD", "BBL", "USD", "MASS", "MT"), f"quote_quantity_unit is 'BBL', {MASS}"),
-        (("USD", "MT", "USD", "MASS", "kg"), f"quantity_unit is 'kg', {MASS}"),
-        (("USD", "M3", "USD", "ENERGY", "MMBTU"), f"quote_quantity_unit is 'M3', {ENERGY}"),
-        (("USD", "MMBTU", "USD", "ENERGY", "GAL"), f"quantity_unit is 'GAL', {ENERGY}"),
+        (
+            ("DOLLAR", "MMBTU", "DOLLAR", "VOLUME", "BBL"),
+            f"quote_quantity_unit is 'MMBTU', {VOLUME}",
+        ),
+        (("DOLLAR", "bbl", "DOLLAR", "VOLUME", "BBL"), f"quote_quantity_unit is 'bbl', {VOLUME}"),
+        (("DOLLAR", "BBL ", "DOLLAR", "VOLUME", "BBL"), f"quote_quantity_unit is 'BBL ', {VOLUME}"),
+        (
+            ("DOLLAR", "BARREL", "DOLLAR", "VOLUME", "BBL"),
+            f"quote_quantity_unit is 'BARREL', {VOLUME}",
+        ),
+        (("DOLLAR", "BBL", "DOLLAR", "VOLUME", "MT"), f"quantity_unit is 'MT', {VOLUME}"),
+        (("DOLLAR", "BBL", "DOLLAR", "VOLUME", "bbl"), f"quantity_unit is 'bbl', {VOLUME}"),
+        (("DOLLAR", "BBL", "DOLLAR", "VOLUME", "GALLON"), f"quantity_unit is 'GALLON', {VOLUME}"),
+        (("DOLLAR", "BBL", "DOLLAR", "MASS", "MT"), f"quote_quantity_unit is 'BBL', {MASS}"),
+        (("DOLLAR", "MT", "DOLLAR", "MASS", "kg"), f"quantity_unit is 'kg', {MASS}"),
+        (("DOLLAR", "M3", "DOLLAR", "ENERGY", "MMBTU"), f"quote_quantity_unit is 'M3', {ENERGY}"),
+        (("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "GAL"), f"quantity_unit is 'GAL', {ENERGY}"),
     ],
     ids=[
         "a quoted currency unit in another case",
         "a quoted currency unit nobody defined",
         "a quoted currency unit with a space",
+        "the currency's name where the quoted currency unit should be",
         "a quantity unit where the quoted currency unit should be",
         "a settlement currency unit in another case",
         "a settlement currency unit nobody defined",
         "a settlement currency unit with a space",
+        "the currency's name where the settlement currency unit should be",
         "a quantity unit where the settlement currency unit should be",
         "a quantity type in another case",
         "a quantity type in small letters, as it was typed before the codes took capitals",
         "a quantity type nobody defined",
         "a quantity type with a space",
-        "USD where the quantity type should be",
+        "the currency where the quantity type should be",
         "a quoted quantity unit of another category",
         "a quoted quantity unit in another case",
         "a quoted quantity unit with a space",
@@ -168,9 +197,9 @@ def test_conventions_that_cannot_be_made_say_why(
 def test_the_rules_run_in_order_and_the_earlier_failure_is_named() -> None:
     for codes, named in (
         (("usd", "MMBTU", "EUR", "Volume", "MT"), "quote_currency_unit is 'usd'"),
-        (("USD", "MMBTU", "EUR", "Volume", "MT"), "currency_unit is 'EUR'"),
-        (("USD", "MMBTU", "USD", "Volume", "MT"), "quantity_type is 'Volume'"),
-        (("USD", "MMBTU", "USD", "VOLUME", "MT"), "quote_quantity_unit is 'MMBTU'"),
+        (("DOLLAR", "MMBTU", "EUR", "Volume", "MT"), "currency_unit is 'EUR'"),
+        (("DOLLAR", "MMBTU", "DOLLAR", "Volume", "MT"), "quantity_type is 'Volume'"),
+        (("DOLLAR", "MMBTU", "DOLLAR", "VOLUME", "MT"), "quote_quantity_unit is 'MMBTU'"),
     ):
         with pytest.raises(ValueError) as failure:
             conventions(*codes)
@@ -211,4 +240,4 @@ def test_five_texts_none_of_which_is_a_code_fail_at_the_quoted_currency_unit(
 ) -> None:
     with pytest.raises(ValueError) as failure:
         conventions(*codes)
-    assert str(failure.value) == (f"quote_currency_unit is {codes[0]!r}, expected USD or CENT")
+    assert str(failure.value) == (f"quote_currency_unit is {codes[0]!r}, expected DOLLAR or CENT")

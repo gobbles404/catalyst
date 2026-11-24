@@ -81,7 +81,7 @@ def an_index(
     *,
     measure: str = "VOLUME",
     word: str = "BBL",
-    settles: str = "USD",
+    settles: str = "DOLLAR",
     f27: str = "2026-12-29",
     holidays: tuple[str, ...] = ("2026-12-25", "2027-01-01"),
 ) -> Index:
@@ -103,9 +103,9 @@ def an_index(
     )
 
 
-RB = an_index("RB", ("USD", "GAL"), (42_000.0, "GAL"))
-WTI = an_index("WTI", ("USD", "BBL"), (1_000.0, "BBL"))
-HO = an_index("HO", ("USD", "GAL"), (42_000.0, "GAL"))
+RB = an_index("RB", ("DOLLAR", "GAL"), (42_000.0, "GAL"))
+WTI = an_index("WTI", ("DOLLAR", "BBL"), (1_000.0, "BBL"))
+HO = an_index("HO", ("DOLLAR", "GAL"), (42_000.0, "GAL"))
 C5 = an_index("C5", ("CENT", "GAL"), (42_000.0, "GAL"))
 
 # The crack's template: the pair's, a quantity in barrels and the spread price in dollars a
@@ -113,7 +113,7 @@ C5 = an_index("C5", ("CENT", "GAL"), (42_000.0, "GAL"))
 CRACK: dict[str, object] = {
     **PAIR_BILATERAL,
     "quantity_unit": "BBL",
-    "spread_price_currency_unit": "USD",
+    "spread_price_currency_unit": "DOLLAR",
     "spread_price_quantity_unit": "BBL",
 }
 TICKET: dict[str, list[object]] = {
@@ -180,15 +180,15 @@ def near(actual: NDArray[np.float64] | None, expected: list[float]) -> None:
 
 
 def test_the_hand_table_rb_less_wti_both_legs_live() -> None:
-    # 1,000 BBL of RB less WTI at 15.00 USD/BBL, RB at 2.10 USD/GAL and WTI at 70.00 USD/BBL,
-    # one payment a year on at 0.95: 42,000 GAL at 2.10 is 88,200, less 70,000, less 15,000,
-    # payment 3,200, mark 3,040, DV01 -0.304; one lot of RB and minus one of WTI, deltas 0.95
-    # and -0.95, cross-gammas -0.000095 and 0.000095. No price is converted: three quantities,
+    # 1,000 BBL of RB less WTI at 15.00 DOLLAR/BBL, RB at 2.10 DOLLAR/GAL and WTI at 70.00
+    # DOLLAR/BBL, one payment a year on at 0.95: 42,000 GAL at 2.10 is 88,200, less 70,000, less
+    # 15,000, payment 3,200, mark 3,040, DV01 -0.304; one lot of RB and minus one of WTI, deltas
+    # 0.95 and -0.95, cross-gammas -0.000095 and 0.000095. No price is converted: three quantities,
     # each in its own price's unit.
     batch = booked()
     terms = batch.resolved
     assert terms.instrument is FLOAT_FLOAT and terms.descriptor == "RB-WTI"
-    assert terms.price_unit == PriceUnit("USD", "BBL")
+    assert terms.price_unit == PriceUnit("DOLLAR", "BBL")
     rb, wti = batch.encoded.legs
     assert rb.quote_quantity.tolist() == [42_000.0]  # gallons, RB's own quote unit
     assert wti.quote_quantity.tolist() == [-1_000.0]  # barrels, WTI's, the subtracted leg
@@ -215,14 +215,14 @@ def test_the_readbacks_show_the_unit_typed_and_each_legs_price_in_its_own() -> N
     batch = booked()
     table = grid(batch)
     assert cell(table, 0, "spread_price") == 15.0
-    assert cell(table, 0, "spread_price_currency_unit") == "USD"
+    assert cell(table, 0, "spread_price_currency_unit") == "DOLLAR"
     assert cell(table, 0, "spread_price_quantity_unit") == "BBL"
     assert cell(table, 0, "quantity_unit") == "BBL"
     assert cell(table, 0, "quote_quantity") == 42_000.0  # the first leg's, in its gallons
     assert cell(table, 0, "offset") == -15_000.0
     slots = grid(valued(batch))
     assert [cell(slots, r, "index") for r in (0, 1)] == ["RB", "WTI"]
-    assert [cell(slots, r, "price_unit") for r in (0, 1)] == ["USD/GAL", "USD/BBL"]
+    assert [cell(slots, r, "price_unit") for r in (0, 1)] == ["DOLLAR/GAL", "DOLLAR/BBL"]
     assert [cell(slots, r, "observation_price") for r in (0, 1)] == [2.10, 70.00]
     assert [cell(slots, r, "observation_coefficient") for r in (0, 1)] == [42_000.0, -1_000.0]
     # The ticket's 83,790, -66,500 and -14,250: each leg's floating contribution and the spread
@@ -290,7 +290,7 @@ def test_heating_oil_less_wti_is_the_same_example_under_another_name() -> None:
 def test_c5_in_cents_a_gallon_less_wti_at_a_negative_spread_price(
     crude: float, payment: float
 ) -> None:
-    # 1,000 BBL at -9.10 USD/BBL: C5 at 145 cents a gallon is 42,000 GAL at 1.45 dollars,
+    # 1,000 BBL at -9.10 DOLLAR/BBL: C5 at 145 cents a gallon is 42,000 GAL at 1.45 dollars,
     # 60,900, the spread leg 9,100 received; against WTI at 70.00 nothing, at 69.00 1,000.
     batch = booked(ticket={**TICKET, "spread_price": [-9.10]}, indexes=(C5, WTI))
     c5, _ = batch.encoded.legs
@@ -307,8 +307,8 @@ def test_c5_in_cents_a_gallon_less_wti_at_a_negative_spread_price(
 # A per gallon, F27 expiring 29 December 2026, and B per barrel, F27 expiring 4 January 2027;
 # +2bd from the later pays 6 January. A less B, 1,000 BBL at a spread price of 15.00.
 
-A_GAL = an_index("A", ("USD", "GAL"), (42_000.0, "GAL"))
-B_BBL = an_index("B", ("USD", "BBL"), (1_000.0, "BBL"), f27="2027-01-04")
+A_GAL = an_index("A", ("DOLLAR", "GAL"), (42_000.0, "GAL"))
+B_BBL = an_index("B", ("DOLLAR", "BBL"), (1_000.0, "BBL"), f27="2027-01-04")
 LIFECYCLE: dict[str, object] = {**CRACK, "payment_day": "+2bd"}
 F27: dict[str, list[object]] = {**TICKET, "contract_code": ["F27"]}
 
@@ -391,7 +391,7 @@ def test_the_lifecycle_paid_on_6_january_is_one_cash_amount() -> None:
 # contract, G27 to its expiry on the 27th and H27 after.
 
 WTI_CLOSED_18 = an_index(
-    "WTI", ("USD", "BBL"), (1_000.0, "BBL"), holidays=("2026-12-25", "2027-01-01", "2027-01-18")
+    "WTI", ("DOLLAR", "BBL"), (1_000.0, "BBL"), holidays=("2026-12-25", "2027-01-01", "2027-01-18")
 )
 ASIAN: dict[str, object] = {**CRACK, "schedule_method": "asian", "second_schedule_method": "asian"}
 JANUARY: dict[str, list[object]] = {**TICKET, "contract_code": ["F27"], "spread_price": [-9.10]}
@@ -531,7 +531,7 @@ def test_a_gas_spread_typed_in_its_indexes_unit_is_the_first_slices_to_the_last_
     strip: dict[str, list[object]] = {**GAS_TICKET, "contract_code": ["G27-H27"]}
     for ticket in (GAS_TICKET, strip):
         batch = booked_gas(ticket=ticket)
-        assert batch.resolved.price_unit == PriceUnit("USD", "MMBTU")
+        assert batch.resolved.price_unit == PriceUnit("DOLLAR", "MMBTU")
         first = batch.encoded.legs[0]
         np.testing.assert_array_equal(
             batch.encoded.offset, -first.coefficient * batch.resolved.price
@@ -597,10 +597,14 @@ def test_the_spread_prices_unit_is_required_typed_and_one_for_the_batch() -> Non
             f"{name} is missing, expected a value in the template or a column in the ticket"
         )
     assert refused({**CRACK, "spread_price_currency_unit": "EUR"}) == (
-        "spread_price_currency_unit is 'EUR', expected USD or CENT"
+        "spread_price_currency_unit is 'EUR', expected DOLLAR or CENT"
+    )
+    # Nor is the currency's own name a unit of it, since currency-and-currency-unit.md.
+    assert refused({**CRACK, "spread_price_currency_unit": "USD"}) == (
+        "spread_price_currency_unit is 'USD', expected DOLLAR or CENT"
     )
     # A unit of another measure, and a code is matched exactly as the tables spell it.
-    for text in ("MMBTU", "bbl", "USD/BBL"):
+    for text in ("MMBTU", "bbl", "DOLLAR/BBL"):
         assert refused({**CRACK, "spread_price_quantity_unit": text}) == (
             f"spread_price_quantity_unit is {text!r}, expected a VOLUME unit, GAL, BBL, L or M3"
         )
@@ -609,7 +613,7 @@ def test_the_spread_prices_unit_is_required_typed_and_one_for_the_batch() -> Non
     by_row = {k: v for k, v in CRACK.items() if k != "spread_price_quantity_unit"}
     two: dict[str, list[object]] = {k: [*v, *v] for k, v in TICKET.items()}
     agreed = booked(by_row, {**two, "spread_price_quantity_unit": ["BBL", "BBL"]})
-    assert agreed.resolved.price_unit == PriceUnit("USD", "BBL")
+    assert agreed.resolved.price_unit == PriceUnit("DOLLAR", "BBL")
     assert agreed.encoded.offset.tolist() == [-15_000.0, -15_000.0]
     assert refused(by_row, {**two, "spread_price_quantity_unit": ["BBL", "GAL"]}) == (
         "spread_price_quantity_unit row 2 is 'GAL', expected 'BBL' as at row 1; a batch has one "
@@ -628,16 +632,16 @@ def test_two_measures_and_two_settlement_units_are_refused_by_the_second_index()
         "index 2 'A' measures ENERGY, expected VOLUME as index 1 'RB'; a spread across two "
         "measures needs a density or a heat content, which the unit tables do not carry"
     )
-    in_cents = an_index("WTI", ("USD", "BBL"), (1_000.0, "BBL"), settles="CENT")
+    in_cents = an_index("WTI", ("DOLLAR", "BBL"), (1_000.0, "BBL"), settles="CENT")
     assert refused(indexes=(RB, in_cents)) == (
-        "index 2 'WTI' settles in CENT, expected USD as index 1 'RB'; a spread is one payment in "
-        "one currency unit"
+        "index 2 'WTI' settles in CENT, expected DOLLAR as index 1 'RB'; a spread is one payment "
+        "in one currency unit"
     )
 
 
-PJM = an_index("PJM", ("USD", "MWH"), (400.0, "MWH"), measure="ENERGY", word="MMBTU")
-ERCOT = an_index("ERCOT", ("USD", "MWH"), (400.0, "MWH"), measure="ENERGY", word="MMBTU")
-NBP = an_index("NBP", ("USD", "THERM"), (1_000.0, "THERM"), measure="ENERGY", word="MMBTU")
+PJM = an_index("PJM", ("DOLLAR", "MWH"), (400.0, "MWH"), measure="ENERGY", word="MMBTU")
+ERCOT = an_index("ERCOT", ("DOLLAR", "MWH"), (400.0, "MWH"), measure="ENERGY", word="MMBTU")
+NBP = an_index("NBP", ("DOLLAR", "THERM"), (1_000.0, "THERM"), measure="ENERGY", word="MMBTU")
 
 
 def test_electricity_against_heat_is_refused_and_two_heat_units_convert() -> None:
@@ -665,7 +669,7 @@ def test_electricity_against_heat_is_refused_and_two_heat_units_convert() -> Non
         "indexes quote in, MWH or KWH"
     )
     power = booked({**GAS_SPREAD, "spread_price_quantity_unit": "MWH"}, GAS_TICKET, (PJM, ERCOT))
-    assert power.resolved.price_unit == PriceUnit("USD", "MWH")
+    assert power.resolved.price_unit == PriceUnit("DOLLAR", "MWH")
     # Two units of heat are a conversion like any other: 10,000 MMBTU is 100,000 therms, at
     # 0.40 a therm 40,000, less A's 35,000, less 1,000 of spread price.
     therms = booked(GAS_SPREAD, GAS_TICKET, (NBP, A))
@@ -675,7 +679,7 @@ def test_electricity_against_heat_is_refused_and_two_heat_units_convert() -> Non
 
 def test_a_quantity_unit_is_one_amount_on_both_indexes_in_the_spread_prices_unit() -> None:
     # A LOT of 42,000 GAL and a LOT of 1,000 BBL are one amount and book; of 500 BBL, two.
-    half = an_index("WTI", ("USD", "BBL"), (500.0, "BBL"))
+    half = an_index("WTI", ("DOLLAR", "BBL"), (500.0, "BBL"))
     assert refused({**CRACK, "quantity_unit": "LOT"}, {**TICKET, "quantity": [1]}, (RB, half)) == (
         "quantity_unit 'LOT' of trade 1 at row 1 is 1000.0 BBL on index 'RB' and 500.0 BBL on "
         "index 'WTI', expected one quantity per entered unit on both legs"
@@ -685,7 +689,7 @@ def test_a_quantity_unit_is_one_amount_on_both_indexes_in_the_spread_prices_unit
 
 
 def test_the_kernel_holds_a_price_unit_exactly_on_a_float_float() -> None:
-    spread_unit(True, PriceUnit("USD", "BBL"))
+    spread_unit(True, PriceUnit("DOLLAR", "BBL"))
     spread_unit(False, None)
     with pytest.raises(ValueError) as missing:
         spread_unit(True, None)
@@ -694,9 +698,9 @@ def test_the_kernel_holds_a_price_unit_exactly_on_a_float_float() -> None:
         "float_float; a spread price's unit is typed, never taken from an index"
     )
     with pytest.raises(ValueError) as extra:
-        spread_unit(False, PriceUnit("USD", "BBL"))
+        spread_unit(False, PriceUnit("DOLLAR", "BBL"))
     assert str(extra.value) == (
-        "price_unit is USD per BBL, expected none with a fixed_float; its price is in the unit "
+        "price_unit is DOLLAR per BBL, expected none with a fixed_float; its price is in the unit "
         "its indexes quote in"
     )
 
@@ -704,11 +708,11 @@ def test_the_kernel_holds_a_price_unit_exactly_on_a_float_float() -> None:
 def test_a_spread_coefficient_past_the_largest_number_is_refused_by_its_trade() -> None:
     # 2e306 barrels is a number each leg holds, and 159 times as many litres is not: the spread
     # price's own product is judged where it is made, as each leg's is.
-    brent = an_index("BRENT", ("USD", "BBL"), (1_000.0, "BBL"))
+    brent = an_index("BRENT", ("DOLLAR", "BBL"), (1_000.0, "BBL"))
     huge: dict[str, list[object]] = {**TICKET, "quantity": [2e306], "spread_price": [0.0]}
     assert refused({**CRACK, "spread_price_quantity_unit": "L"}, huge, (WTI, brent)) == (
-        "trade 1 at row 1 has inf of spread coefficient, expected a finite amount of USD per "
-        "USD/L; its count times its specification's size in the spread price's unit and the "
+        "trade 1 at row 1 has inf of spread coefficient, expected a finite amount of DOLLAR per "
+        "DOLLAR/L; its count times its specification's size in the spread price's unit and the "
         "currency factor outruns the largest number"
     )
 
@@ -719,9 +723,9 @@ def test_a_spread_coefficient_past_the_largest_number_is_refused_by_its_trade() 
 @pytest.fixture(scope="module")
 def sheet() -> dict[str, Any]:
     """RB and WTI on a sheet: two futures indexes over F27, G27 and H27, 1 January 2027 closed,
-    RB in USD per GAL with a LOT of 42,000 GAL and WTI in USD per BBL with a LOT of 1,000 BBL,
+    RB in DOLLAR per GAL with a LOT of 42,000 GAL and WTI in DOLLAR per BBL with a LOT of 1,000 BBL,
     both defining BBL; valued 4 January 2027, G27 quoted 2.10 and 70.00, SOFR at 0.95 a year on;
-    a float_float template with the spread price in USD per BBL and a row of 1,000 BBL of G27
+    a float_float template with the spread price in DOLLAR per BBL and a row of 1,000 BBL of G27
     at 15.00."""
     headers = across(
         "name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"
@@ -741,7 +745,7 @@ def sheet() -> dict[str, Any]:
                 down(serial("2026-12-29"), serial("2027-01-27"), serial("2027-02-24")),
                 bridge.MISSING,
             ),
-            SEAM["_CreateIndexConventions"]("USD", unit, "USD", "VOLUME", unit),
+            SEAM["_CreateIndexConventions"]("DOLLAR", unit, "DOLLAR", "VOLUME", unit),
             SEAM["_CreateContractSpecifications"](
                 headers,
                 Cells.from_rows([["LOT", lot, unit, 0.0, 0.0], ["BBL", 1.0, "BBL", 0.0, 0.0]]),
@@ -768,7 +772,7 @@ def sheet() -> dict[str, Any]:
         )
     )
     cells["values"] = [
-        "USD",
+        "DOLLAR",
         "BBL",
         "BBL",
         "month",
@@ -797,7 +801,7 @@ def test_the_sheet_books_prepares_and_values_a_crack(sheet: dict[str, Any]) -> N
     assert re.fullmatch(rf"{PID}:trades:RB-WTI:\d+", str(booked_))
     table = read(booked_)
     assert under(table, "spread_price") == [15.0]
-    assert under(table, "spread_price_currency_unit") == ["USD"]
+    assert under(table, "spread_price_currency_unit") == ["DOLLAR"]
     assert under(table, "spread_price_quantity_unit") == ["BBL"]
     assert under(table, "quote_quantity") == [42_000.0] and under(table, "offset") == [-15_000.0]
     prepared = SEAM["_PrepareTrades"](booked_, down(sheet["hist_rb"], sheet["hist_wti"]))
@@ -814,7 +818,7 @@ def test_the_sheet_books_prepares_and_values_a_crack(sheet: dict[str, Any]) -> N
         "RB delta [LOT]",
         "WTI nominal_delta [LOT]",
         "WTI delta [LOT]",
-        "SOFR USD dv01 [USD per basis point]",
+        "SOFR USD dv01 [DOLLAR per basis point]",
         "RB SOFR cross_gamma [LOT per basis point]",
         "WTI SOFR cross_gamma [LOT per basis point]",
     ]
@@ -822,11 +826,11 @@ def test_the_sheet_books_prepares_and_values_a_crack(sheet: dict[str, Any]) -> N
         [1.0, 0.95, -1.0, -0.95, -0.304, -0.000095, 0.000095], **CLOSE
     )
     slots = read(results)
-    assert under(slots, "price_unit") == ["USD/GAL", "USD/BBL"]
+    assert under(slots, "price_unit") == ["DOLLAR/GAL", "DOLLAR/BBL"]
     assert under(slots, "floating_contribution") == pytest.approx([88_200.0, -70_000.0], **CLOSE)
     # The template reads back the unit it was given.
     shown = read(sheet["template"])
-    assert under(shown, "spread_price_currency_unit") == ["USD"]
+    assert under(shown, "spread_price_currency_unit") == ["DOLLAR"]
     assert under(shown, "spread_price_quantity_unit") == ["BBL"]
 
 
@@ -848,16 +852,22 @@ def test_the_sheet_refuses_a_spread_price_with_no_unit_or_a_wrong_one(
         "value in the template or a column in the ticket"
     )
     assert create(both, sheet["headers"], sheet["row"], with_units("EUR", "BBL")) == (
-        "#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'EUR', expected USD or "
-        "CENT"
+        "#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'EUR', expected "
+        "DOLLAR or CENT"
     )
-    assert create(both, sheet["headers"], sheet["row"], with_units("USD", "MMBTU")) == (
+    # The currency's own name is no unit of it, since currency-and-currency-unit.md: the
+    # code the dollar had, refused by the same sentence.
+    assert create(both, sheet["headers"], sheet["row"], with_units("USD", "BBL")) == (
+        "#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'USD', expected "
+        "DOLLAR or CENT"
+    )
+    assert create(both, sheet["headers"], sheet["row"], with_units("DOLLAR", "MMBTU")) == (
         "#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is 'MMBTU', expected a "
         "VOLUME unit, GAL, BBL, L or M3"
     )
     # A fixed_float has no such field: its price is in its indexes' one unit.
     assert SEAM["_CreateTradeTemplate"](
-        "fixed_float", across("route", "spread_price_currency_unit"), across("bilateral", "USD")
+        "fixed_float", across("route", "spread_price_currency_unit"), across("bilateral", "DOLLAR")
     ) == (
         "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', "
         f"expected a field of fixed_float: {FIELDS.format(price='fixed_price')}"

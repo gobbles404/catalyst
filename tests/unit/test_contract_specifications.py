@@ -175,8 +175,8 @@ def test_a_negative_fraction_is_a_fraction_and_a_negative_whole_is_below_one() -
     ("units", "message"),
     [
         (
-            ("MMBTU", "USD", "MMBTU"),
-            "lot_unit row 2 is 'USD', expected a VOLUME, MASS or ENERGY unit",
+            ("MMBTU", "DOLLAR", "MMBTU"),
+            "lot_unit row 2 is 'DOLLAR', expected a VOLUME, MASS or ENERGY unit",
         ),
         (
             ("mmbtu", "MMBTU", "MMBTU"),

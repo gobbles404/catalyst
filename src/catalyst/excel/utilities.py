@@ -1020,7 +1020,7 @@ def _observation_facts(
     observation_coefficient, the slot's exposure, what every price of it multiplies;
     observation_price, the settle the preparation kept where the slot has fixed and the quote
     the evaluation kept where it is live, each the retained number placed on its slot;
-    price_unit, the index's quote currency over its quote quantity unit, USD/LB, on every row
+    price_unit, the index's quote currency over its quote quantity unit, DOLLAR/LB, on every row
     of the leg; and floating_contribution, the exposure times that price, the preparation's
     amount of a fixed slot and the evaluation's of a live one, before the fixed leg and before
     any discounting. Selected and placed: no fixing or quote is read again, no product is made
@@ -1057,7 +1057,7 @@ def _observation_facts(
 
 def _quote_unit(leg: LegResults) -> str:
     """The leg's index's quote unit as price_unit spells it, the currency over the quantity
-    unit, USD/LB or CENT/GAL, the unit every observation_price of the leg is in."""
+    unit, DOLLAR/LB or CENT/GAL, the unit every observation_price of the leg is in."""
     conventions = leg.prepared.encoded.leg.index.conventions
     return f"{conventions.quote_currency_unit}/{conventions.quote_quantity_unit}"
 

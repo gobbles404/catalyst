@@ -38,7 +38,7 @@ CALENDAR = re.compile(r"[0-9]+:holiday_calendar:([0-9]+)")
 
 # The conventions page's sample as the sheet sends it: five texts, an index quoted in dollars per
 # barrel, settled in dollars, its quantity a volume stated in barrels.
-UNITS = ["USD", "BBL", "USD", "VOLUME", "BBL"]
+UNITS = ["DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL"]
 CONVENTIONS = re.compile(r"[0-9]+:index_conventions:([0-9]+)")
 
 # The specifications page's sample as the sheet sends it: the header row, then one row per word
@@ -50,7 +50,7 @@ SPECIFICATION_HEADERS = Cells.from_rows(
 SPECIFICATION_BODY = Cells.from_rows(
     [["NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0], ["ICE NG", 2500.0, "MMBTU", 0.75, 0.5]]
 )
-GAS = ["USD", "MMBTU", "USD", "ENERGY", "MMBTU"]
+GAS = ["DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU"]
 SPECIFICATIONS = re.compile(r"[0-9]+:contract_specifications:([0-9]+)")
 
 
@@ -766,7 +766,7 @@ def the_conventions(*codes: object) -> str:
 
 def test_index_conventions_are_created_from_five_codes_and_read_back_in_order() -> None:
     assert bridge.call("ReadIndexConventions", [the_conventions(*UNITS)]) == (
-        "USD BBL USD VOLUME BBL"
+        "DOLLAR BBL DOLLAR VOLUME BBL"
     )
 
 
@@ -775,27 +775,27 @@ def test_index_conventions_are_created_from_five_codes_and_read_back_in_order() 
     ("args", "text"),
     [
         (
-            ["USD", "BBL", "USD", "VOLUME", None],
+            ["DOLLAR", "BBL", "DOLLAR", "VOLUME", None],
             "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text",
         ),
         (
-            ["USD", "BBL", 1.0, "VOLUME", "BBL"],
+            ["DOLLAR", "BBL", 1.0, "VOLUME", "BBL"],
             "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text",
         ),
         (
-            ["", "BBL", "USD", "VOLUME", "BBL"],
+            ["", "BBL", "DOLLAR", "VOLUME", "BBL"],
             "#ERROR _CreateIndexConventions: quote_currency_unit is empty text, expected text",
         ),
         (
-            ["USD", Cells.from_rows([["BBL"]]), "USD", "VOLUME", "BBL"],
+            ["DOLLAR", Cells.from_rows([["BBL"]]), "DOLLAR", "VOLUME", "BBL"],
             "#ERROR _CreateIndexConventions: quote_quantity_unit is 1x1 array, expected text",
         ),
         (
-            ["USD", "BBL", "USD", "VOLUME", MISSING],
+            ["DOLLAR", "BBL", "DOLLAR", "VOLUME", MISSING],
             "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text",
         ),
         (
-            ["USD", "BBL", True, None, "BBL"],
+            ["DOLLAR", "BBL", True, None, "BBL"],
             "#ERROR _CreateIndexConventions: currency_unit is boolean TRUE, expected text",
         ),
     ],
@@ -824,28 +824,31 @@ def test_a_handle_of_another_kind_is_not_index_conventions() -> None:
 # and a unit of another category; and two units of one category are accepted, cents a gallon
 # quoted and dollars a barrel settled.
 def test_the_conventions_rules_reach_the_sheet_in_the_librarys_words() -> None:
-    assert bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "Volume", "BBL"]) == (
+    assert bridge.call("_CreateIndexConventions", ["DOLLAR", "BBL", "DOLLAR", "Volume", "BBL"]) == (
         "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', "
         "expected VOLUME, MASS or ENERGY"
     )
-    assert bridge.call("_CreateIndexConventions", ["USD", "MMBTU", "USD", "VOLUME", "BBL"]) == (
+    assert bridge.call(
+        "_CreateIndexConventions", ["DOLLAR", "MMBTU", "DOLLAR", "VOLUME", "BBL"]
+    ) == (
         "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', "
         "expected a VOLUME unit, GAL, BBL, L or M3"
     )
-    assert bridge.call("_CreateIndexConventions", ["usd", "BBL", "USD", "VOLUME", "BBL"]) == (
+    assert bridge.call("_CreateIndexConventions", ["usd", "BBL", "DOLLAR", "VOLUME", "BBL"]) == (
         "#ERROR _CreateIndexConventions: ValueError: quote_currency_unit is 'usd', "
-        "expected USD or CENT"
+        "expected DOLLAR or CENT"
     )
-    assert bridge.call("_CreateIndexConventions", ["USD", "BBL", "EUR", "VOLUME", "BBL"]) == (
-        "#ERROR _CreateIndexConventions: ValueError: currency_unit is 'EUR', expected USD or CENT"
+    assert bridge.call("_CreateIndexConventions", ["DOLLAR", "BBL", "EUR", "VOLUME", "BBL"]) == (
+        "#ERROR _CreateIndexConventions: ValueError: currency_unit is 'EUR', "
+        "expected DOLLAR or CENT"
     )
-    gasoline = the_conventions("CENT", "GAL", "USD", "VOLUME", "BBL")
-    assert bridge.call("ReadIndexConventions", [gasoline]) == "CENT GAL USD VOLUME BBL"
+    gasoline = the_conventions("CENT", "GAL", "DOLLAR", "VOLUME", "BBL")
+    assert bridge.call("ReadIndexConventions", [gasoline]) == "CENT GAL DOLLAR VOLUME BBL"
 
 
 def test_a_failed_conventions_construction_publishes_no_object_and_no_handle() -> None:
     before = number(the_conventions(*UNITS), CONVENTIONS)
-    assert bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "weight", "BBL"]) == (
+    assert bridge.call("_CreateIndexConventions", ["DOLLAR", "BBL", "DOLLAR", "weight", "BBL"]) == (
         "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'weight', "
         "expected VOLUME, MASS or ENERGY"
     )

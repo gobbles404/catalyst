@@ -211,7 +211,7 @@ function Build-Chain($State, $Sheet, [string]$Name = "WTI NYMEX", [double]$First
     Put $State $Sheet "A10" "$First"; Put $State $Sheet "A11" "$Second"
     Put $State $Sheet "D1" "=_CreateFuturesSchedule(A2:A4,B2:B4)"
     Put $State $Sheet "D2" "=_CreateHolidayCalendar(C2)"
-    Put $State $Sheet "D3" '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
+    Put $State $Sheet "D3" '=_CreateIndexConventions("DOLLAR","BBL","DOLLAR","VOLUME","BBL")'
     Put $State $Sheet "D4" "=_CreateContractSpecifications(E1:I1,E2:I3)"
     Put $State $Sheet "D5" '=_CreateIndex(A1,"West Texas Intermediate crude oil - NYMEX",D1,D3,D4,D2,"NYMEX")'
     Put $State $Sheet "D6" "=_CreateValuationDate(A6,0.5)"
@@ -757,7 +757,7 @@ $curves = {
     Check "their collection a handle of its kind and the results of theirs" ($collection.StartsWith("${id}:discount_curve_set:") -and $results.StartsWith("${id}:trade_results:WTI NYMEX:")) ($collection + " " + $results)
     Check "the mark is 2,800, two lots at 0.99 less one at 0.98" ((Text $state $sheet "D32") -eq "2800") (Text $state $sheet "D32")
     Check "each curve's DV01 in its own column, -0.088096 on SOFR and 0.043603 on FFOIS" ((Text $state $sheet "D33") -eq "-0.088096" -and (Text $state $sheet "D34") -eq "0.043603") ((Text $state $sheet "D33") + " " + (Text $state $sheet "D34"))
-    Check "the second column FFOIS's by name and the second slot's curve FFOIS" ((Text $state $sheet "D35") -eq "FFOIS USD dv01 [USD per basis point]" -and (Text $state $sheet "D36") -eq "FFOIS") ((Text $state $sheet "D35") + " | " + (Text $state $sheet "D36"))
+    Check "the second column FFOIS's by name and the second slot's curve FFOIS" ((Text $state $sheet "D35") -eq "FFOIS USD dv01 [DOLLAR per basis point]" -and (Text $state $sheet "D36") -eq "FFOIS") ((Text $state $sheet "D35") + " | " + (Text $state $sheet "D36"))
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 8) }
     Check "the chain, the calendar, the template, the batch, the preparation, two curves, the collection and the results: nineteen live, nineteen published" ($c.Live -eq 19 -and $c.Published -eq 19 -and $c.Released -eq 0) $c.Text
 
@@ -777,7 +777,7 @@ $curves = {
     Put $state $sheet "F29" "=D30"; Put $state $sheet "F30" "=D29"
     Put $state $sheet "E29" "=_CollectDiscountCurves(F29:F30)"
     Check "the collection reordered is a new handle" ((Text $state $sheet "E29") -ne $collection -and (Text $state $sheet "E29").StartsWith("${id}:discount_curve_set:")) (Text $state $sheet "E29")
-    Check "and the results a new one reading the same numbers in the same columns" ((Text $state $sheet "D31") -ne $results -and (Text $state $sheet "D32") -eq "2828" -and (Text $state $sheet "D33") -eq "-0.088096" -and (Text $state $sheet "D34") -eq "0.043158" -and (Text $state $sheet "D35") -eq "FFOIS USD dv01 [USD per basis point]") ((Text $state $sheet "D31") + " " + (Text $state $sheet "D34"))
+    Check "and the results a new one reading the same numbers in the same columns" ((Text $state $sheet "D31") -ne $results -and (Text $state $sheet "D32") -eq "2828" -and (Text $state $sheet "D33") -eq "-0.088096" -and (Text $state $sheet "D34") -eq "0.043158" -and (Text $state $sheet "D35") -eq "FFOIS USD dv01 [DOLLAR per basis point]") ((Text $state $sheet "D31") + " " + (Text $state $sheet "D34"))
     $c = Settle $state $sheet { param($c) $c.Live -eq 19 -and $c.Released -ge 5 }
     Check "the old collection and results are released; two more published" ($c.Live -eq 19 -and $c.Published -eq 24 -and $c.Released -eq 5) $c.Text
 
@@ -1602,7 +1602,7 @@ $pairs = {
     Put $state $sheet "L5" "1"; Put $state $sheet "M5" "15-Dec-2026"; Put $state $sheet "N5" "G27"; Put $state $sheet "O5" "1"; Put $state $sheet "P5" "3"
     Put $state $sheet "J1" "=_CreateFuturesSchedule(A1:A3,B1:B3)"
     Put $state $sheet "J2" "=_CreateHolidayCalendar(C1)"
-    Put $state $sheet "J3" '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    Put $state $sheet "J3" '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     Put $state $sheet "J4" "=_CreateContractSpecifications(D1:H1,D2:H2)"
     Put $state $sheet "J5" '=_CreateIndex("A","Pair leg A, a futures index",J1,J3,J4,J2,"NYMEX NG")'
     Put $state $sheet "J7" "=_CreateIfercSchedule(A5:A9,B5:B9)"
@@ -1703,7 +1703,7 @@ $pairs = {
     # with its sign, 4,500.
     Put $state $sheet "L7" "trade_id"; Put $state $sheet "M7" "trade_date"; Put $state $sheet "N7" "contract_code"; Put $state $sheet "O7" "quantity"; Put $state $sheet "P7" "spread_price"
     Put $state $sheet "L8" "1"; Put $state $sheet "M8" "15-Dec-2026"; Put $state $sheet "N8" "G27"; Put $state $sheet "O8" "1"; Put $state $sheet "P8" "3.8"
-    Put $state $sheet "J30" '=_CreateTradeTemplate("float_float",HSTACK(L1:V1,"nearby","spread_price_currency_unit","spread_price_quantity_unit"),HSTACK(L2:V2,1,"USD","MMBTU"))'
+    Put $state $sheet "J30" '=_CreateTradeTemplate("float_float",HSTACK(L1:V1,"nearby","spread_price_currency_unit","spread_price_quantity_unit"),HSTACK(L2:V2,1,"DOLLAR","MMBTU"))'
     Put $state $sheet "J31" "=_CreateTrades(J5:J6,L7:P7,L8:P8,J30)"
     Put $state $sheet "J32" "=_PrepareTrades(J31,J13:J14)"
     Put $state $sheet "J33" "=_EvaluateTrades(J32,J17:K17,J20)"

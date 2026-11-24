@@ -18,7 +18,7 @@ def _CreateIndex(
 ) -> Handle[Index]: ...
 ```
 
-Three Henry Hub indices, one per market, sharing one conventions cell, USD per MMBTU with quantities in MMBTU:
+Three Henry Hub indices, one per market, sharing one conventions cell, DOLLAR per MMBTU with quantities in MMBTU:
 
 | | A | B | C | D |
 |---|---|---|---|---|

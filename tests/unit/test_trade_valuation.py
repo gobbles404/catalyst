@@ -87,12 +87,12 @@ def an_index(
     holidays: list[str],
     lots: list[tuple[str, float]],
     measure: tuple[str, str] = ("ENERGY", "MMBTU"),
-    quoted_in: str = "USD",
+    quoted_in: str = "DOLLAR",
     reporting_lot: str | None = "",
 ) -> tuple[str, str]:
     """An index of those contracts and holidays through the seam, quoted in that currency unit per
-    the measure's unit and settled in USD, with one specification per name given, that many of the
-    measure's unit a lot, in the order given, the first of them the reporting lot unless another
+    the measure's unit and settled in DOLLAR, with one specification per name given, that many of
+    the measure's unit a lot, in the order given, the first of them the reporting lot unless another
     name is given and None leaving the index without one, and its holiday calendar."""
     schedule = ENTRY["_CreateFuturesSchedule"](
         rows(*[[code] for code, _ in contracts]),
@@ -101,7 +101,7 @@ def an_index(
     )
     calendar = ENTRY["_CreateHolidayCalendar"](column([serial(day) for day in holidays]))
     conventions = ENTRY["_CreateIndexConventions"](
-        quoted_in, measure[1], "USD", measure[0], measure[1]
+        quoted_in, measure[1], "DOLLAR", measure[0], measure[1]
     )
     specifications = ENTRY["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
@@ -146,8 +146,8 @@ def a_market(history: str, name: str, *quotes: float) -> str:
 
 NG_NOMINAL = "Henry Hub NYMEX nominal_delta [NYMEX NG]"
 NG_DELTA = "Henry Hub NYMEX delta [NYMEX NG]"
-CLEARED_DV01 = "cleared USD dv01 [USD per basis point]"
-CURVE_DV01 = "SOFR USD dv01 [USD per basis point]"
+CLEARED_DV01 = "cleared USD dv01 [DOLLAR per basis point]"
+CURVE_DV01 = "SOFR USD dv01 [DOLLAR per basis point]"
 NG_CROSS = "Henry Hub NYMEX cleared cross_gamma [NYMEX NG per basis point]"
 NG_PER_BP = "lots of NYMEX NG (10000 MMBTU) per basis point"
 UNIT_CROSS = "UNIT SOFR cross_gamma [UNIT per basis point]"
@@ -206,7 +206,7 @@ def test_the_values_report_spills_the_mark_and_the_cash_under_the_routes_labels(
     assert spilled(ENTRY["_ReportValues"](ng["results"])) == [
         ["cleared_mark", "cleared_cash", "currency", "as_of", "currency_unit"],
         ["float64", "float64", "str", "datetime64[D]", "str"],
-        [7_000.0, 0.0, "USD", serial("2026-11-24"), "USD"],
+        [7_000.0, 0.0, "USD", serial("2026-11-24"), "DOLLAR"],
     ]
 
 
@@ -301,7 +301,7 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
     # the batch's reserves once, none at these rates.
     assert table[2][6:11] == [pytest.approx(512_000.0), 160_000.0, 160_000.0, 16.0, 16.0]
     assert table[2][11:] == [
-        "USD per USD/MMBTU",
+        "DOLLAR per DOLLAR/MMBTU",
         "lots of NYMEX NG (10000 MMBTU)",
         *["-"] * 4,
         0.0,
@@ -315,18 +315,20 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
         "-",
         160_000.0,  # since observation-prices-readback.md the slot's own coefficient, its price,
         3.20,  # the quote of a live slot, the unit it is in and the exposure times the price
-        "USD/MMBTU",
+        "DOLLAR/MMBTU",
         pytest.approx(512_000.0),
-        "USD",  # since currency-and-currency-unit.md the unit of the currency, once
+        "DOLLAR",  # since currency-and-currency-unit.md the unit of the currency, once
     ]
-    assert table[3][11:] == ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"] + ["-"] * 9 + [
+    assert table[3][11:] == ["DOLLAR per DOLLAR/MMBTU", "lots of NYMEX NG (10000 MMBTU)"] + [
+        "-"
+    ] * 9 + [
         0.0,
         NG_PER_BP,
         "-",
         "-",
         -50_000.0,
         3.50,
-        "USD/MMBTU",
+        "DOLLAR/MMBTU",
         pytest.approx(-175_000.0),
         "-",
     ]
@@ -421,7 +423,7 @@ def valued(results: str) -> tuple[float, float, float]:
 Z26_FIRST = {"2026-11-25": 3.22}
 Z26 = {"2026-11-25": 3.23}
 BOTH = {"2026-11-25": 3.23, "2026-12-29": 3.45}
-TOY_UNITS = ["USD per USD/MMBTU", "lots of TOY (10000 MMBTU)"]  # on every results row
+TOY_UNITS = ["DOLLAR per DOLLAR/MMBTU", "lots of TOY (10000 MMBTU)"]  # on every results row
 TOY_PER_BP = "lots of TOY (10000 MMBTU) per basis point"  # since #197, on every results row
 
 
@@ -546,12 +548,12 @@ def test_the_paid_contract_reads_back_fixed_and_settled_with_no_live_exposure(
         "-",
         160_000.0,  # paid, its settle and its contribution still shown: history, not mark
         3.23,
-        "USD/MMBTU",
+        "DOLLAR/MMBTU",
         pytest.approx(516_800.0),
-        "USD",
+        "DOLLAR",
     ]
     assert table[3][-14:-9] == ["-"] * 5  # the four price columns follow the key and curve
-    assert table[3][-5:] == [-50_000.0, 3.50, "USD/MMBTU", pytest.approx(-175_000.0), "-"]
+    assert table[3][-5:] == [-50_000.0, 3.50, "DOLLAR/MMBTU", pytest.approx(-175_000.0), "-"]
     assert table[3][:7] == [
         "F27",
         "F27",
@@ -576,13 +578,13 @@ def test_a_fully_fixed_batch_inside_a_live_market_reports_its_cash_and_no_live_e
         + TOY_UNITS
         + ["-"] * 4
         + [0.0, 0.0, 0.0, 0.0, "USD", 0.0, TOY_PER_BP, "-", "-"]
-        + [160_000.0, 3.23, "USD/MMBTU", pytest.approx(516_800.0), "USD"],
+        + [160_000.0, 3.23, "DOLLAR/MMBTU", pytest.approx(516_800.0), "DOLLAR"],
         ["F27", "F27", serial("2026-12-29"), serial("2026-12-31"), True]
         + [0.0] * 7
         + TOY_UNITS
         + ["-"] * 9
         + [0.0, TOY_PER_BP, "-", "-"]
-        + [-50_000.0, 3.45, "USD/MMBTU", pytest.approx(-172_500.0), "-"],
+        + [-50_000.0, 3.45, "DOLLAR/MMBTU", pytest.approx(-172_500.0), "-"],
     ]
     assert valued(results) == (pytest.approx(0.0), pytest.approx(14_300), 0.0)
 
@@ -756,7 +758,7 @@ def test_the_phh_pen_values_on_the_sheet_as_the_page_says(
     _, _, results = phh_state(phh, as_of, settles, quotes)
     assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
     values = spilled(ENTRY["_ReportValues"](results))[2]
-    assert values[2:] == ["USD", serial(as_of), "USD"]
+    assert values[2:] == ["USD", serial(as_of), "DOLLAR"]
     assert by_header(results, "lot_unit")[0] == "lots of ICE PHH (2500 MMBTU)"
 
 
@@ -1010,7 +1012,7 @@ def test_a_physical_pen_is_refused_when_the_batch_is_made(phh: dict[str, Any]) -
 def test_the_wti_pen_values_its_thousand_barrel_lots_in_dollars_a_barrel() -> None:
     # ICE WTI T F27 on a CL index in barrels: the pen day Friday 18 December 2026, the payment
     # Monday the 21st, the underlying's expiry. Three lots at 60.00: live on 17 December at 61.00,
-    # 3,000 of mark and a delta of 3,000 USD per USD/BBL; paid on the 21st at a pen fixing of
+    # 3,000 of mark and a delta of 3,000 DOLLAR per DOLLAR/BBL; paid on the 21st at a pen fixing of
     # 61.50, 4,500 of cash.
     holidays = ["2026-11-26", "2026-12-25", "2027-01-01", "2027-01-18"]
     index, _ = an_index(
@@ -1178,7 +1180,7 @@ def test_the_pages_example_marks_2000_with_the_row_kept_ready_and_1000_once_it_i
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert table[2][:5] == ["Z26", "Z26", serial("2026-11-25"), False, 20_000.0]
     assert table[2][7] == 20_000.0 and table[2][9] == 2.0  # the contract's, and in lots
-    units = ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"]
+    units = ["DOLLAR per DOLLAR/MMBTU", "lots of NYMEX NG (10000 MMBTU)"]
     assert table[3] == ["F27", "F27", serial("2026-12-29"), False] + [0.0] * 7 + units + [
         "-"
     ] * 9 + [
@@ -1188,7 +1190,7 @@ def test_the_pages_example_marks_2000_with_the_row_kept_ready_and_1000_once_it_i
         "-",
         0.0,  # the row kept ready: nothing of coefficient, at F27's own quote
         3.40,
-        "USD/MMBTU",
+        "DOLLAR/MMBTU",
         0.0,
         "-",
     ]
@@ -1214,7 +1216,7 @@ def test_an_all_zero_batch_is_a_batch_like_any_other_reporting_nothing(ng: dict[
         0.0,
         "USD",
         serial("2026-11-24"),
-        "USD",
+        "DOLLAR",
     ]
     assert spilled(ENTRY["_ReportRisk"](results, "all", "year"))[:4] == [
         *risk_head("2026-11-24", NG_NOMINAL, NG_DELTA, CLEARED_DV01, NG_CROSS),
@@ -1413,7 +1415,7 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
 
 
 # --- the last3day method on the sheet ---------------------------------------------------------
-# last3day-trades.md's synthetic example through the entries: the index SYN, quoted in USD per
+# last3day-trades.md's synthetic example through the entries: the index SYN, quoted in DOLLAR per
 # MMBTU with one specification UNIT of one MMBTU, X26 expiring 30 November 2026, Z26 7 December
 # and F27 7 January 2027, the market closed on 4 December; the template last3day, cleared,
 # financial, paying two weekdays after the last observation; A 60 of Z26 at 70 and B -30 at 72.
@@ -1509,7 +1511,7 @@ def test_the_last3day_batch_values_on_the_sheet_as_the_page_says(
 ) -> None:
     _, _, results = l3d_state(l3d, as_of, quotes)
     assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
-    assert spilled(ENTRY["_ReportValues"](results))[2][2:] == ["USD", serial(as_of), "USD"]
+    assert spilled(ENTRY["_ReportValues"](results))[2][2:] == ["USD", serial(as_of), "DOLLAR"]
     assert by_header(results, "lot_unit")[0] == "lots of UNIT (1 MMBTU)"
     slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
     assert [line[0] for line in slots] == ["Z26"] * 3
@@ -1629,7 +1631,7 @@ def test_a_physical_last3day_future_is_refused_when_the_batch_is_made_on_the_she
 
 
 # --- the asian method on the sheet -----------------------------------------------------------
-# asian-trades.md's synthetic ethane example through the entries: the index ETHANE, quoted in USD
+# asian-trades.md's synthetic ethane example through the entries: the index ETHANE, quoted in DOLLAR
 # per gallon with one specification GAL of one gallon, X26 expiring 30 November 2026, Z26 31
 # December, F27 29 January 2027 and G27 26 February, the market closed on 25 December and 1
 # January; the template asian, cleared, financial, paying two weekdays after the month's last
@@ -1748,7 +1750,7 @@ def test_the_asian_batch_values_on_the_sheet_as_the_page_says(
 ) -> None:
     _, _, results = ethane_state(ethane, as_of, quotes)
     assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
-    assert spilled(ENTRY["_ReportValues"](results))[2][2:] == ["USD", serial(as_of), "USD"]
+    assert spilled(ENTRY["_ReportValues"](results))[2][2:] == ["USD", serial(as_of), "DOLLAR"]
     assert by_header(results, "lot_unit")[0] == "lots of GAL (1 GAL)"
     slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
     assert len(slots) == 22 and [line[0] for line in slots] == ["Z26"] * 22
@@ -2373,8 +2375,8 @@ def test_two_payment_days_equal_their_singletons_and_matching_days_compress_on_t
 
 
 # --- mixed fields in one batch through the seam, mixed-trade-fields.md ----------------------------
-# The ticket's example on the sheet: the MIXED index, USD per GAL, GAL and BBL specifications of one
-# unit each, X26, Z26, F27 and G27 expiring 30 November 2026, 31 December, 29 January 2027 and
+# The ticket's example on the sheet: the MIXED index, DOLLAR per GAL, GAL and BBL specifications of
+# one unit each, X26, Z26, F27 and G27 expiring 30 November 2026, 31 December, 29 January 2027 and
 # 26 February, the market closed on 25 December; a template of six fields, the route, the
 # settlement, the trade date, the price of 10, +1bd and a payment calendar closed on 1 January; the
 # ticket's seven columns with each row's unit, basis, method and clearing house. Every settle 11,
@@ -2434,7 +2436,7 @@ def mixed() -> dict[str, Any]:
         bridge.MISSING,
     )
     holidays = ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in MIXED_HOLIDAYS]))
-    conventions = ENTRY["_CreateIndexConventions"]("USD", "GAL", "USD", "VOLUME", "GAL")
+    conventions = ENTRY["_CreateIndexConventions"]("DOLLAR", "GAL", "DOLLAR", "VOLUME", "GAL")
     specifications = ENTRY["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
         rows(["GAL", 1.0, "GAL", 0.0, 0.0], ["BBL", 1.0, "BBL", 0.0, 0.0]),
@@ -2659,7 +2661,7 @@ ETE_ROWS: list[list[object]] = [
 
 def ete_index(
     quote: tuple[str, str] = ("CENT", "GAL"),
-    settled: str = "USD",
+    settled: str = "DOLLAR",
     reporting_lot: object = "LOT",
     fees: dict[str, tuple[float, float]] | None = None,
 ) -> str:
@@ -2794,7 +2796,7 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
         pytest.approx(420.0),
         pytest.approx(1.0),
         pytest.approx(1.0),
-        "USD per CENT/GAL",
+        "DOLLAR per CENT/GAL",
         "lots of LOT (1000 BBL)",
         *["-"] * 4,
         0.0,
@@ -2810,7 +2812,7 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
         28.0,
         "CENT/GAL",
         pytest.approx(11_760.0),
-        "USD",
+        "DOLLAR",
     ]
 
 
@@ -2829,7 +2831,7 @@ def test_the_three_ete_rows_together_report_three_lots(ete: dict[str, Any]) -> N
         pytest.approx(1_260.0),
         pytest.approx(3.0),
         pytest.approx(3.0),
-        "USD per CENT/GAL",
+        "DOLLAR per CENT/GAL",
         "lots of LOT (1000 BBL)",
         *["-"] * 4,
         0.0,
@@ -2845,7 +2847,7 @@ def test_the_three_ete_rows_together_report_three_lots(ete: dict[str, Any]) -> N
         28.0,
         "CENT/GAL",
         pytest.approx(35_280.0),
-        "USD",
+        "DOLLAR",
     ]
 
 
@@ -2894,17 +2896,17 @@ def test_a_partial_asian_period_reports_the_live_half_of_its_lots(ete: dict[str,
 @pytest.mark.parametrize(
     ("quote", "settled", "fixed", "live", "quantity", "coefficient", "mark"),
     [
-        (("CENT", "GAL"), "USD", 25.0, 28.0, 42_000.0, 420.0, 1_260.0),
-        (("USD", "GAL"), "USD", 0.25, 0.28, 42_000.0, 42_000.0, 1_260.0),
-        (("USD", "BBL"), "USD", 10.5, 11.76, 1_000.0, 1_000.0, 1_260.0),
-        (("CENT", "BBL"), "USD", 1_050.0, 1_176.0, 1_000.0, 10.0, 1_260.0),
+        (("CENT", "GAL"), "DOLLAR", 25.0, 28.0, 42_000.0, 420.0, 1_260.0),
+        (("DOLLAR", "GAL"), "DOLLAR", 0.25, 0.28, 42_000.0, 42_000.0, 1_260.0),
+        (("DOLLAR", "BBL"), "DOLLAR", 10.5, 11.76, 1_000.0, 1_000.0, 1_260.0),
+        (("CENT", "BBL"), "DOLLAR", 1_050.0, 1_176.0, 1_000.0, 10.0, 1_260.0),
         (("CENT", "GAL"), "CENT", 25.0, 28.0, 42_000.0, 42_000.0, 126_000.0),
     ],
     ids=[
-        "CENT/GAL in USD",
-        "USD/GAL in USD",
-        "USD/BBL in USD",
-        "CENT/BBL in USD",
+        "CENT/GAL in DOLLAR",
+        "DOLLAR/GAL in DOLLAR",
+        "DOLLAR/BBL in DOLLAR",
+        "CENT/BBL in DOLLAR",
         "CENT/GAL in CENT",
     ],
 )
@@ -3511,7 +3513,7 @@ def an_iferc_index(name: str, months: list[tuple[str, str]], lots: list[tuple[st
         rows(*[[code] for code, _ in months]),
         column([serial(published) for _, published in months]),
     )
-    conventions = ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
+    conventions = ENTRY["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specifications = ENTRY["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
         rows(*[[lot, size, "MMBTU", 0.0, 0.0] for lot, size in lots]),
@@ -3819,7 +3821,7 @@ RESERVE_SPILL: list[list[object]] = [
         "currency_unit",  # last, since currency-and-currency-unit.md
     ],
     ["float64", "float64", "float64", "float64", "str", "str"],
-    [50.0, 20.0, 0.0, 0.0, "USD", "USD"],
+    [50.0, 20.0, 0.0, 0.0, "USD", "DOLLAR"],
 ]
 RESERVE_HEADERS = RESERVE_SPILL[0][:5]  # the readback's five; its unit is its last column
 
@@ -3913,7 +3915,7 @@ def test_recreating_the_batch_with_other_quantities_or_rates_books_other_reserve
     _, _, results = ete_state(
         fees["index"], fees["template"], doubled, "2026-12-02", {}, (28.0, 29.0)
     )
-    assert reserved(results)[2] == [100.0, 40.0, 0.0, 0.0, "USD", "USD"]
+    assert reserved(results)[2] == [100.0, 40.0, 0.0, 0.0, "USD", "DOLLAR"]
     dearer = ete_index(fees={"LOT": (12.0, 5.0), "BBL": (0.02, 0.005)})
     _, _, results = ete_state(
         dearer, ete_template(broker="ION"), RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0)
@@ -3924,7 +3926,7 @@ def test_recreating_the_batch_with_other_quantities_or_rates_books_other_reserve
         0.0,
         0.0,
         "USD",
-        "USD",
+        "DOLLAR",
     ]  # 24 + 24 + 20 and 10 + 10 + 5
     by_barrel = ete_index(reporting_lot="BBL", fees=RESERVE_FEES)
     _, _, results = ete_state(
@@ -3952,7 +3954,7 @@ def test_a_calday_strip_and_a_partial_asian_month_reserve_on_their_counts(
         0.0,
         0.0,
         "USD",
-        "USD",
+        "DOLLAR",
     ]
     partial: list[list[object]] = [
         [
@@ -3969,7 +3971,7 @@ def test_a_calday_strip_and_a_partial_asian_month_reserve_on_their_counts(
     _, _, results = ete_state(
         fees["index"], fees["template"], partial, "2026-12-02", {}, (28.0, 29.0), ETE_DATED
     )
-    assert reserved(results)[2] == [10.0, 4.0, 0.0, 0.0, "USD", "USD"]
+    assert reserved(results)[2] == [10.0, 4.0, 0.0, 0.0, "USD", "DOLLAR"]
 
 
 def test_reserves_past_the_largest_number_publish_no_batch() -> None:
@@ -3986,11 +3988,12 @@ def test_reserves_past_the_largest_number_publish_no_batch() -> None:
     live = bridge.live_handles()
     assert ENTRY["_CreateTrades"](huge, row(*ETE_HEADERS), rows(*two), template) == (
         "#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, "
-        "expected a finite amount of USD; 2.0 of 'LOT' at 1e+308 a lot"
+        "expected a finite amount of DOLLAR; 2.0 of 'LOT' at 1e+308 a lot"
     )
     assert ENTRY["_CreateTrades"](huge, row(*ETE_HEADERS), rows(*ones), template) == (
         "#ERROR _CreateTrades: ValueError: the batch has inf of brokerage reserve in all, expected "
-        "a finite amount of USD; the components' reserves, each finite, sum past the largest number"
+        "a finite amount of DOLLAR; the components' reserves, each finite, sum past the largest "
+        "number"
     )
     assert bridge.live_handles() == live
 
@@ -4015,7 +4018,7 @@ def test_the_reserves_report_refuses_a_blank_and_another_handle_in_the_seams_wor
 
 
 # --- contract codes and dates on one ticket, contract-codes-and-dates.md, since #172 ------------
-# The ticket's acceptance example: a synthetic financial asian index quoted in USD per BBL, a BBL
+# The ticket's acceptance example: a synthetic financial asian index quoted in DOLLAR per BBL, a BBL
 # specification of one and a LOT of 1,000 BBL, the reporting lot; weekday pricing, no holiday that
 # matters; V26 expiring on Friday 30 October 2026, so that it prices every October pricing day,
 # with U26 before it to open the calendar on 30 September; every observation live at 72 on
@@ -4285,7 +4288,7 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_
     assert reserved(results) == [
         RESERVE_SPILL[0],
         RESERVE_SPILL[1],
-        [60.0, 24.0, 65.0, 0.0, "USD", "USD"],
+        [60.0, 24.0, 65.0, 0.0, "USD", "DOLLAR"],
     ]
     table = spilled(ENTRY["util_ReadHandle"](trades))
     i = table[0].index("marketing_reserve")
@@ -4302,7 +4305,7 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_
         fees["index"], fees["template"], plain_rows, "2026-12-02", {}, (28.0, 29.0)
     )
     assert valued(plain) == valued(results)
-    assert reserved(plain)[2] == [60.0, 24.0, 0.0, 0.0, "USD", "USD"]
+    assert reserved(plain)[2] == [60.0, 24.0, 0.0, 0.0, "USD", "DOLLAR"]
     assert "marketing_reserve" not in spilled(ENTRY["util_ReadHandle"](plain_trades))[0]
     # A duplicate of the first row counts again; a template's seven books once per row; a tick,
     # a fixing and payment leave the booked amounts where they were.
@@ -4315,13 +4318,13 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_
         (28.0, 29.0),
         MARKETING_HEADERS,
     )
-    assert reserved(doubled)[2] == [80.0, 32.0, 80.0, 0.0, "USD", "USD"]
+    assert reserved(doubled)[2] == [80.0, 32.0, 80.0, 0.0, "USD", "DOLLAR"]
     seven = a_template_of(
         ("quantity_per", *ETE_FIELDS, "broker", "marketing_reserve"),
         ("month", "cleared", "financial", "ETE Clearing", "+1bd", "ION", 7.0),
     )
     _, _, templated = ete_state(fees["index"], seven, RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0))
-    assert reserved(templated)[2] == [50.0, 20.0, 28.0, 0.0, "USD", "USD"]
+    assert reserved(templated)[2] == [50.0, 20.0, 28.0, 0.0, "USD", "DOLLAR"]
     _, _, paid = ete_state(
         fees["index"], seven, RESERVE_ROWS, "2027-01-04", {"2026-12-31": 27.0}, (30.0,)
     )
@@ -4331,7 +4334,7 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_
         28.0,
         0.0,
         "USD",
-        "USD",
+        "DOLLAR",
     ]
 
 
@@ -4395,7 +4398,7 @@ def test_the_tickets_rows_book_minus_fifteen_of_cva_once_per_row_through_the_sea
     assert reserved(results) == [
         RESERVE_SPILL[0],
         RESERVE_SPILL[1],
-        [60.0, 24.0, 0.0, -15.0, "USD", "USD"],
+        [60.0, 24.0, 0.0, -15.0, "USD", "DOLLAR"],
     ]
     table = spilled(ENTRY["util_ReadHandle"](trades))
     i = table[0].index("cva_reserve")
@@ -4418,7 +4421,7 @@ def test_the_tickets_rows_book_minus_fifteen_of_cva_once_per_row_through_the_sea
     assert spilled(ENTRY["_ReportRisk"](plain, "all", "year")) == spilled(
         ENTRY["_ReportRisk"](results, "all", "year")
     )
-    assert reserved(plain)[2] == [60.0, 24.0, 0.0, 0.0, "USD", "USD"]
+    assert reserved(plain)[2] == [60.0, 24.0, 0.0, 0.0, "USD", "DOLLAR"]
     assert "cva_reserve" not in spilled(ENTRY["util_ReadHandle"](plain_trades))[0]
     # Both columns, marketing then CVA, each once per row; a duplicate of the first row counts
     # again; a template's -40 books once per row; a tick, a fixing and payment leave the booked
@@ -4430,7 +4433,7 @@ def test_the_tickets_rows_book_minus_fifteen_of_cva_once_per_row_through_the_sea
     both_trades, _, both = ete_state(
         fees["index"], fees["template"], both_rows, "2026-12-02", {}, (28.0, 29.0), both_headers
     )
-    assert reserved(both)[2] == [60.0, 24.0, 65.0, -10.0, "USD", "USD"]
+    assert reserved(both)[2] == [60.0, 24.0, 65.0, -10.0, "USD", "DOLLAR"]
     headings = spilled(ENTRY["util_ReadHandle"](both_trades))[0]
     assert headings.index("cva_reserve") == headings.index("marketing_reserve") + 1
     _, _, doubled = ete_state(
@@ -4442,15 +4445,15 @@ def test_the_tickets_rows_book_minus_fifteen_of_cva_once_per_row_through_the_sea
         (28.0, 29.0),
         CVA_HEADERS,
     )
-    assert reserved(doubled)[2] == [80.0, 32.0, 0.0, 10.0, "USD", "USD"]
+    assert reserved(doubled)[2] == [80.0, 32.0, 0.0, 10.0, "USD", "DOLLAR"]
     forty = a_cva_template_of(-40.0)
     _, _, templated = ete_state(fees["index"], forty, RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0))
-    assert reserved(templated)[2] == [50.0, 20.0, 0.0, -160.0, "USD", "USD"]
+    assert reserved(templated)[2] == [50.0, 20.0, 0.0, -160.0, "USD", "DOLLAR"]
     _, _, paid = ete_state(
         fees["index"], forty, RESERVE_ROWS, "2027-01-04", {"2026-12-31": 27.0}, (30.0,)
     )
     assert valued(paid)[1] == pytest.approx(840.0)
-    assert reserved(paid)[2] == [50.0, 20.0, 0.0, -160.0, "USD", "USD"]
+    assert reserved(paid)[2] == [50.0, 20.0, 0.0, -160.0, "USD", "DOLLAR"]
 
 
 def test_a_cva_reserve_is_refused_by_its_row_its_cell_its_template_or_its_total(
@@ -4483,7 +4486,7 @@ def test_a_cva_reserve_is_refused_by_its_row_its_cell_its_template_or_its_total(
         huge = [[*line[:-1], sign * 9e307] for line in CVA_ROWS[:2]]
         assert create(index, row(*CVA_HEADERS), rows(*huge), template) == (
             f"#ERROR _CreateTrades: ValueError: the batch has {text} of cva reserve in all, "
-            "expected a finite amount of USD; the rows' amounts, each finite, sum past the "
+            "expected a finite amount of DOLLAR; the rows' amounts, each finite, sum past the "
             "largest number"
         )
 
@@ -4502,24 +4505,24 @@ def test_a_cva_dollar_beside_ten_thousand_trillion_survives_whatever_the_rows_or
         return reserved(results)[2]
 
     for order in ((1e16, 1.0, -1e16), (1e16, -1e16, 1.0), (1.0, 1e16, -1e16)):
-        assert booked(CVA_ROWS, order) == [60.0, 24.0, 0.0, 1.0, "USD", "USD"]
-    assert booked(CVA_ROWS, (9e307, 9e307, -9e307)) == [60.0, 24.0, 0.0, 9e307, "USD", "USD"]
+        assert booked(CVA_ROWS, order) == [60.0, 24.0, 0.0, 1.0, "USD", "DOLLAR"]
+    assert booked(CVA_ROWS, (9e307, 9e307, -9e307)) == [60.0, 24.0, 0.0, 9e307, "USD", "DOLLAR"]
     four = [*CVA_ROWS, CVA_ROWS[0]]
-    assert booked(four, (9e307, 9e307, -9e307, -9e307)) == [80.0, 32.0, 0.0, 0.0, "USD", "USD"]
+    assert booked(four, (9e307, 9e307, -9e307, -9e307)) == [80.0, 32.0, 0.0, 0.0, "USD", "DOLLAR"]
     # A tiny amount keeps every bit beside zero rows: 3e-308 alone and with two zero rows.
-    assert booked(CVA_ROWS[:1], (3e-308,)) == [20.0, 8.0, 0.0, 3e-308, "USD", "USD"]
-    assert booked(CVA_ROWS, (3e-308, 0.0, 0.0)) == [60.0, 24.0, 0.0, 3e-308, "USD", "USD"]
+    assert booked(CVA_ROWS[:1], (3e-308,)) == [20.0, 8.0, 0.0, 3e-308, "USD", "DOLLAR"]
+    assert booked(CVA_ROWS, (3e-308, 0.0, 0.0)) == [60.0, 24.0, 0.0, 3e-308, "USD", "DOLLAR"]
     # And past the largest number on the way: 9e307 twice and -9e307 twice beside 3e-308 is 3e-308
     # with five rows and with nine, the first row repeated, four zero rows appended.
     past = (9e307, 9e307, -9e307, -9e307, 3e-308)
-    assert booked([CVA_ROWS[0]] * 5, past) == [100.0, 40.0, 0.0, 3e-308, "USD", "USD"]
+    assert booked([CVA_ROWS[0]] * 5, past) == [100.0, 40.0, 0.0, 3e-308, "USD", "DOLLAR"]
     assert booked([CVA_ROWS[0]] * 9, (*past, 0.0, 0.0, 0.0, 0.0)) == [
         180.0,
         72.0,
         0.0,
         3e-308,
         "USD",
-        "USD",
+        "DOLLAR",
     ]
 
 
@@ -4740,7 +4743,7 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
     assert spilled(ENTRY["_ReportValues"](results)) == [
         ["bilateral_mark", "bilateral_cash", "currency", "as_of", "currency_unit"],
         ["float64", "float64", "str", "datetime64[D]", "str"],
-        [pytest.approx(5.0), 0.0, "USD", serial(UNIT_AS_OF), "USD"],
+        [pytest.approx(5.0), 0.0, "USD", serial(UNIT_AS_OF), "DOLLAR"],
     ]
     # The ticket's spill, all by month: F27's month holds the deltas, the two payment months the
     # DV01s, the Total row the saved scalars above them and, since #186, the months between at
@@ -4813,7 +4816,7 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         [serial(A_YEAR_OUT), 0.0, 0.0, pytest.approx(-0.0095), 0.0],
         [serial(TWO_YEARS_OUT), 0.0, 0.0, pytest.approx(0.018), 0.0],
     ]
-    assert spilled(ENTRY["_ReportReserves"](results))[2] == [0.0, 0.0, 10.0, 0.0, "USD", "USD"]
+    assert spilled(ENTRY["_ReportReserves"](results))[2] == [0.0, 0.0, 10.0, 0.0, "USD", "DOLLAR"]
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert table[0] == RESULT_COLUMNS
     assert table[1] == ["str", "str", "datetime64[D]", "datetime64[D]", "bool"] + [
@@ -4833,7 +4836,7 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
     assert table[2][5:12] == [10.0, 10.0, pytest.approx(800.0), *contract]
     assert table[3][5:12] == [-10.0, -10.0, pytest.approx(-800.0), *contract]
     assert table[2][12:] == [
-        "USD per USD/BBL",
+        "DOLLAR per DOLLAR/BBL",
         UNIT_LOT,
         0.95,
         pytest.approx(100.0),
@@ -4850,12 +4853,12 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         "SOFR",
         10.0,  # the slot's own coefficient, price, unit and amount, the live ones here
         80.0,
-        "USD/BBL",
+        "DOLLAR/BBL",
         pytest.approx(800.0),
-        "USD",  # the unit of the currency, once, since currency-and-currency-unit.md
+        "DOLLAR",  # the unit of the currency, once, since currency-and-currency-unit.md
     ]
     assert table[3][12:] == [
-        "USD per USD/BBL",
+        "DOLLAR per DOLLAR/BBL",
         UNIT_LOT,
         0.90,
         pytest.approx(-100.0),
@@ -4868,7 +4871,7 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         "SOFR",
         -10.0,
         80.0,
-        "USD/BBL",
+        "DOLLAR/BBL",
         pytest.approx(-800.0),
         "-",
     ]
@@ -4900,7 +4903,14 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         [serial(TWO_YEARS_OUT), pytest.approx(0.0184)],
     ]
     for handle in (ticked, replaced):
-        assert spilled(ENTRY["_ReportReserves"](handle))[2] == [0.0, 0.0, 10.0, 0.0, "USD", "USD"]
+        assert spilled(ENTRY["_ReportReserves"](handle))[2] == [
+            0.0,
+            0.0,
+            10.0,
+            0.0,
+            "USD",
+            "DOLLAR",
+        ]
 
 
 def test_the_one_receivable_values_through_its_life_on_the_sheet(unit: dict[str, Any]) -> None:
@@ -4948,7 +4958,7 @@ def test_the_one_receivable_values_through_its_life_on_the_sheet(unit: dict[str,
         table = spilled(ENTRY["util_ReadHandle"](paid))
         assert table[2][4:5] == [True]  # fixed
         assert table[2][14:18] == [1.0, pytest.approx(120.0), 0.0, 0.0]
-        assert spilled(ENTRY["_ReportReserves"](paid))[2] == [0.0, 0.0, 5.0, 0.0, "USD", "USD"]
+        assert spilled(ENTRY["_ReportReserves"](paid))[2] == [0.0, 0.0, 5.0, 0.0, "USD", "DOLLAR"]
     _, _, _, cleared = unit_state(
         unit, unit["one_cleared"], UNIT_AS_OF, (80.0, 50.0), bridge.MISSING
     )
@@ -4959,7 +4969,7 @@ def test_the_one_receivable_values_through_its_life_on_the_sheet(unit: dict[str,
         *risk_head(UNIT_AS_OF, CLEARED_DV01),
         ["Total", 0.0],
     ]
-    assert spilled(ENTRY["_ReportReserves"](cleared))[2] == [0.0, 0.0, 5.0, 0.0, "USD", "USD"]
+    assert spilled(ENTRY["_ReportReserves"](cleared))[2] == [0.0, 0.0, 5.0, 0.0, "USD", "DOLLAR"]
 
 
 def test_the_curves_rules_reach_the_sheet_and_publish_nothing(unit: dict[str, Any]) -> None:
@@ -5077,8 +5087,8 @@ def test_a_batch_keyed_on_two_curves_reads_back_each_key_and_curve_and_reports_b
     dv01 = spilled(ENTRY["_ReportRisk"](results, "dv01", "year"))
     assert dv01[:3] == risk_head(
         UNIT_AS_OF,
-        "SOFR USD dv01 [USD per basis point]",
-        "FFOIS USD dv01 [USD per basis point]",
+        "SOFR USD dv01 [DOLLAR per basis point]",
+        "FFOIS USD dv01 [DOLLAR per basis point]",
     )
     assert dv01[3] == ["Total", pytest.approx(-0.0095), pytest.approx(0.0184)]
     cross = spilled(ENTRY["_ReportRisk"](results, "cross_gamma", "year"))
@@ -5426,27 +5436,34 @@ def test_each_fee_is_charged_where_the_booking_says_so_through_the_seam(
         _, results = fee_state(index, template, lines, route == "bilateral", headers)
         return reserved(results)[2]
 
-    assert booked("bilateral", None) == [0.0, 0.0, 0.0, 0.0, "USD", "USD"]
-    assert booked("bilateral", "ION") == [100.0, 0.0, 0.0, 0.0, "USD", "USD"]
-    assert booked("cleared", None) == [0.0, 40.0, 0.0, 0.0, "USD", "USD"]
-    assert booked("cleared", "ION") == [100.0, 40.0, 0.0, 0.0, "USD", "USD"]
+    assert booked("bilateral", None) == [0.0, 0.0, 0.0, 0.0, "USD", "DOLLAR"]
+    assert booked("bilateral", "ION") == [100.0, 0.0, 0.0, 0.0, "USD", "DOLLAR"]
+    assert booked("cleared", None) == [0.0, 40.0, 0.0, 0.0, "USD", "DOLLAR"]
+    assert booked("cleared", "ION") == [100.0, 40.0, 0.0, 0.0, "USD", "DOLLAR"]
     for token in ("None", "none", "NONE"):
-        assert booked("bilateral", token) == [0.0, 0.0, 0.0, 0.0, "USD", "USD"]
-        assert booked("cleared", token) == [0.0, 40.0, 0.0, 0.0, "USD", "USD"]
+        assert booked("bilateral", token) == [0.0, 0.0, 0.0, 0.0, "USD", "DOLLAR"]
+        assert booked("cleared", token) == [0.0, 40.0, 0.0, 0.0, "USD", "DOLLAR"]
     sold: list[list[object]] = [[1.0, serial("2026-11-20"), "Z26", -10.0, "LOT", 25.0, "lastday"]]
-    assert booked("cleared", "ION", sold) == [100.0, 40.0, 0.0, 0.0, "USD", "USD"]
-    assert booked("cleared", "ION", [*TEN_LOTS, *sold]) == [200.0, 80.0, 0.0, 0.0, "USD", "USD"]
+    assert booked("cleared", "ION", sold) == [100.0, 40.0, 0.0, 0.0, "USD", "DOLLAR"]
+    assert booked("cleared", "ION", [*TEN_LOTS, *sold]) == [200.0, 80.0, 0.0, 0.0, "USD", "DOLLAR"]
     # The broker in the ticket's column instead: the same; a column mixing a broker and none
     # charges the brokered row alone, every row clearing on the cleared route.
     with_broker = (*ETE_HEADERS, "broker")
     brokered: list[list[object]] = [[*TEN_LOTS[0], "ION"]]
-    assert booked("cleared", None, brokered, with_broker) == [100.0, 40.0, 0.0, 0.0, "USD", "USD"]
+    assert booked("cleared", None, brokered, with_broker) == [
+        100.0,
+        40.0,
+        0.0,
+        0.0,
+        "USD",
+        "DOLLAR",
+    ]
     mixed: list[list[object]] = [
         [*TEN_LOTS[0], "ION"],
         [2.0, serial("2026-11-20"), "Z26", 10.0, "LOT", 25.0, "lastday", "None"],
     ]
-    assert booked("cleared", None, mixed, with_broker) == [100.0, 80.0, 0.0, 0.0, "USD", "USD"]
-    assert booked("bilateral", None, mixed, with_broker) == [100.0, 0.0, 0.0, 0.0, "USD", "USD"]
+    assert booked("cleared", None, mixed, with_broker) == [100.0, 80.0, 0.0, 0.0, "USD", "DOLLAR"]
+    assert booked("bilateral", None, mixed, with_broker) == [100.0, 0.0, 0.0, 0.0, "USD", "DOLLAR"]
     # The texts stand as typed in the readback, and neither value nor risk moves with the broker.
     trades, results = fee_state(index, fee_template("cleared"), mixed, False, with_broker)
     table = spilled(ENTRY["util_ReadHandle"](trades))
@@ -5503,7 +5520,7 @@ def test_a_number_past_the_largest_number_fails_each_creator_and_publishes_nothi
     live = bridge.live_handles()
     assert ENTRY["_PrepareTrades"](toy["trades"], spiked) == (
         "#ERROR _PrepareTrades: ValueError: trade 1001 at row 1 on 2026-11-25, a day Z26 prices, "
-        "fixed at 1e+308, has inf of set amount, expected a finite amount of USD; its exposure "
+        "fixed at 1e+308, has inf of set amount, expected a finite amount of DOLLAR; its exposure "
         "times the settle outruns the largest number"
     )
     assert bridge.live_handles() == live
@@ -5513,7 +5530,7 @@ def test_a_number_past_the_largest_number_fails_each_creator_and_publishes_nothi
     live = bridge.live_handles()
     assert ENTRY["_EvaluateTrades"](ng["prepared"], spiked_market, bridge.MISSING) == (
         "#ERROR _EvaluateTrades: ValueError: trade 1001 at row 1 on 2026-11-25, a day Z26 prices, "
-        "quoted at 1e+308, has inf of live contribution, expected a finite amount of USD; its "
+        "quoted at 1e+308, has inf of live contribution, expected a finite amount of DOLLAR; its "
         "exposure times the quote outruns the largest number"
     )
     assert bridge.live_handles() == live

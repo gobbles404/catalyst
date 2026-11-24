@@ -132,7 +132,7 @@ def unlabeled(k: int) -> str:
 
 
 # --- the page's static facts ----------------------------------------------------------------
-# Henry Hub NYMEX: USD per MMBTU, ENERGY measured in MMBTU; one specification, NYMEX NG, 10,000
+# Henry Hub NYMEX: DOLLAR per MMBTU, ENERGY measured in MMBTU; one specification, NYMEX NG, 10,000
 # MMBTU a lot and no fees; the schedule X26, Z26 and F27, X26 the preceding contract the calendar
 # needs as its left boundary; the pricing holidays 26 November and 25 December 2026.
 
@@ -145,7 +145,7 @@ def an_index(
         ("F27", "2026-12-29"),
     ),
     holidays: tuple[str, ...] = ("2026-11-26", "2026-12-25"),
-    quote: tuple[str, str] = ("USD", "MMBTU"),
+    quote: tuple[str, str] = ("DOLLAR", "MMBTU"),
     measure: tuple[str, str] = ("ENERGY", "MMBTU"),
     lot: tuple[str, float, str] = ("NYMEX NG", 10_000.0, "MMBTU"),
     reporting_lot: str | None = "",
@@ -159,7 +159,7 @@ def an_index(
         name,
         f"{name} index",
         schedule,
-        index_conventions(quote[0], quote[1], "USD", measure[0], measure[1], UNITS),
+        index_conventions(quote[0], quote[1], "DOLLAR", measure[0], measure[1], UNITS),
         contract_specifications(
             (spec_name,), numbers(lot_size), (lot_unit,), numbers(0.0), numbers(0.0), UNITS
         ),
@@ -554,9 +554,9 @@ def test_a_duplicate_occurrence_adds_its_exposure_twice() -> None:
 
 
 def test_a_lot_in_another_unit_than_the_quote_is_converted_once() -> None:
-    # Quoted in USD per gallon, a lot of 1,000 barrels: 42,000 gallons a lot.
+    # Quoted in DOLLAR per gallon, a lot of 1,000 barrels: 42,000 gallons a lot.
     crude = an_index(
-        "crude", quote=("USD", "GAL"), measure=("VOLUME", "BBL"), lot=("NYMEX", 1_000.0, "BBL")
+        "crude", quote=("DOLLAR", "GAL"), measure=("VOLUME", "BBL"), lot=("NYMEX", 1_000.0, "BBL")
     )
     enc = encoded(terms_of(crude), (observed_of(terms_of(crude)),), UNITS, WorkCounter())
     np.testing.assert_allclose(enc.legs[0].quote_quantity, LOTS * 42_000)
@@ -569,7 +569,7 @@ def test_a_price_in_cents_settles_in_dollars() -> None:
     np.testing.assert_array_equal(
         enc.legs[0].quote_quantity, LOTS * 10_000
     )  # MMBTU, the physical quantity
-    np.testing.assert_allclose(enc.legs[0].coefficient, LOTS * 100)  # USD per cent per MMBTU
+    np.testing.assert_allclose(enc.legs[0].coefficient, LOTS * 100)  # DOLLAR per cent per MMBTU
     np.testing.assert_allclose(enc.offset, -LOTS * 100 * FIXED_PRICE)
     np.testing.assert_allclose(enc.legs[0].slot_exposure, [1_600, -500])
 
@@ -643,7 +643,8 @@ def test_one_lot_quoted_in_cents_values_in_dollars_through_live_fixed_and_paid(
     )  # 100 dollars a cent a lot
     assert result.legs[0].nominal_delta_total == pytest.approx(delta)
     assert (
-        result.legs[0].price_sensitivity_unit == "USD per CENT/MMBTU" and result.currency == "USD"
+        result.legs[0].price_sensitivity_unit == "DOLLAR per CENT/MMBTU"
+        and result.currency == "USD"
     )
     assert result.legs[0].lot_unit == "lots of NYMEX NG (10000 MMBTU)"
 
@@ -663,7 +664,7 @@ CENT_SETTLED = index(
         dates("2026-10-28", "2026-11-25", "2026-12-29", "2027-01-27"),
         None,
     ),
-    index_conventions("USD", "MMBTU", "CENT", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "CENT", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("NG",), numbers(10_000.0), ("MMBTU",), numbers(0.0), numbers(0.0), UNITS
     ),
@@ -705,7 +706,7 @@ def test_a_price_in_dollars_settles_in_cents_with_the_unit_naming_both() -> None
     assert result.legs[0].codes() == ("Z26", "F27", "G27")
     # Two facts since currency-and-currency-unit.md: the currency, and the unit of it the
     # amounts are in, the index's settlement unit.
-    assert result.legs[0].price_sensitivity_unit == "CENT per USD/MMBTU"
+    assert result.legs[0].price_sensitivity_unit == "CENT per DOLLAR/MMBTU"
     assert (result.currency, result.currency_unit) == ("USD", "CENT")
     assert result.legs[0].lot_unit == "lots of NG (10000 MMBTU)"
 
@@ -884,7 +885,7 @@ def test_the_five_ng_rows_mark_7000_then_8600_on_the_tick() -> None:
     assert (initial.mark, initial.cash) == (7_000, 0)
     np.testing.assert_array_equal(initial.legs[0].price_sensitivity, [160_000, -50_000])
     assert initial.legs[0].nominal_delta_total == 11 and initial.dv01 == 0.0  # lots of ten thousand
-    assert initial.legs[0].price_sensitivity_unit == "USD per USD/MMBTU"
+    assert initial.legs[0].price_sensitivity_unit == "DOLLAR per DOLLAR/MMBTU"
     assert initial.legs[0].codes() == ("Z26", "F27") and initial.currency == "USD"
     assert initial.route is Route.CLEARED and initial.as_of == day("2026-11-24")
     np.testing.assert_allclose(initial.legs[0].dated_live_contribution, [512_000, -175_000])
@@ -1467,7 +1468,7 @@ def test_the_pen_strip_encodes_one_slot_per_month_paying_one_clearing_day_after_
 
 
 # --- the dated axis: the daily toy of dated-exposure.md ---------------------------------------
-# One index quoted in USD per MMBTU with a lot of one MMBTU; X26 expiring 30 November 2026 bounds
+# One index quoted in DOLLAR per MMBTU with a lot of one MMBTU; X26 expiring 30 November 2026 bounds
 # the calendar, Z26 expires 31 December and G27 29 January; two components on Z26, A of 60 at 70
 # and B of -30 at 72, each observed on 1, 2 and 3 December with a third of its quantity, both
 # paying on 5 January 2027.
@@ -2190,8 +2191,8 @@ def test_any_batch_equals_its_singletons_summed_with_its_delta_on_its_own_contra
 
 
 # --- the last3day method: three equally weighted observations, one payment --------------------
-# last3day-trades.md's synthetic example: an index quoted in USD per MMBTU and settling in USD,
-# one specification UNIT of one MMBTU, X26 expiring 30 November 2026, Z26 7 December and F27
+# last3day-trades.md's synthetic example: an index quoted in DOLLAR per MMBTU and settling in
+# DOLLAR, one specification UNIT of one MMBTU, X26 expiring 30 November 2026, Z26 7 December and F27
 # 7 January 2027, the market closed on 4 December; the payment calendar open every weekday. Two
 # trades of Z26, A 60 at 70 and B -30 at 72, pay two business days after the last observation,
 # 9 December. By hand: each component's quantity is shared over 2, 3 and 7 December, 20 and -10
@@ -2493,8 +2494,8 @@ def test_a_zero_quantity_row_keeps_its_three_slots_and_its_contract_at_nothing()
 
 
 # --- the asian method: every pricing day of the month, an equal share each, one payment -------
-# asian-trades.md's synthetic ethane example: an index quoted in USD per gallon and settling in
-# USD, one specification GAL of one gallon, X26 expiring 30 November 2026, Z26 31 December, F27
+# asian-trades.md's synthetic ethane example: an index quoted in DOLLAR per gallon and settling in
+# DOLLAR, one specification GAL of one gallon, X26 expiring 30 November 2026, Z26 31 December, F27
 # 29 January 2027 and G27 26 February, the market closed on 25 December and 1 January; the
 # payment calendar closed on 1 January. Two trades of Z26, A 4,400 gallons at 0.25 and B -2,200
 # at 0.26, pay two business days after the month's last pricing day, 31 December: 5 January, the
@@ -2514,7 +2515,7 @@ ETHANE = an_index(
     "ETHANE",
     (("X26", "2026-11-30"), ("Z26", "2026-12-31"), ("F27", "2027-01-29"), ("G27", "2027-02-26")),
     ETHANE_HOLIDAYS,
-    ("USD", "GAL"),
+    ("DOLLAR", "GAL"),
     ("VOLUME", "GAL"),
     ("GAL", 1.0, "GAL"),
 )
@@ -2614,7 +2615,7 @@ def test_a_month_without_a_pricing_day_is_refused_by_its_contract_under_asian() 
         "x",
         (("F27", "2027-01-29"), ("G27", "2027-02-26"), ("H27", "2027-03-31")),
         tuple(pricing_days("2027-02-01", "2027-03-01")),
-        ("USD", "GAL"),
+        ("DOLLAR", "GAL"),
         ("VOLUME", "GAL"),
         ("GAL", 1.0, "GAL"),
     )
@@ -2643,7 +2644,7 @@ def test_an_asian_month_another_contract_prices_takes_the_days_contracts_when_en
             ("G27", "2027-01-27"),
         ),
         ("2026-11-26", "2026-12-25"),
-        ("USD", "GAL"),
+        ("DOLLAR", "GAL"),
         ("VOLUME", "GAL"),
         ("GAL", 1.0, "GAL"),
     )
@@ -3204,7 +3205,7 @@ def test_the_expiry_based_methods_refuse_a_part_of_a_month_and_asian_a_part_with
 
 
 # --- payment groups: two payment days on one contract, multiple-payment-groups.md -------------
-# The ticket's synthetic index: USD per MMBTU, one UNIT of one MMBTU, X26 expiring 30 November
+# The ticket's synthetic index: DOLLAR per MMBTU, one UNIT of one MMBTU, X26 expiring 30 November
 # 2026, Z26 Friday 4 December and F27 8 January 2027, no holiday on either calendar. A, 60 of Z26
 # at 70 paying one weekday after the last observation, Monday 7 December, and B, -30 at 72 paying
 # three weekdays after, Wednesday the 9th, both last3day, so each observes the 2nd, the 3rd and
@@ -3585,8 +3586,8 @@ def test_partial_asian_periods_on_one_contract_settle_independently() -> None:
 
 
 # --- mixed fields in one batch: units, bases and methods row by row, mixed-trade-fields.md -------
-# The ticket's synthetic index: USD per GAL, VOLUME measured in GAL, two specifications, GAL of one
-# gallon and BBL of one barrel, 42 gallons; X26 expiring 30 November 2026, Z26 31 December, F27
+# The ticket's synthetic index: DOLLAR per GAL, VOLUME measured in GAL, two specifications, GAL of
+# one gallon and BBL of one barrel, 42 gallons; X26 expiring 30 November 2026, Z26 31 December, F27
 # 29 January 2027 and G27 26 February, the market closed on 25 December, the payment calendar on
 # 1 January. Four rows of Z26 at 10 struck on 30 November, all at +1bd: A, 1 BBL a month under
 # lastday, 42 gallons on the 31st paying Monday 4 January; B, -2 GAL a day under penultimate, -62
@@ -3610,7 +3611,7 @@ MIXED = index(
         dates("2026-11-30", "2026-12-31", "2027-01-29", "2027-02-26"),
         None,
     ),
-    index_conventions("USD", "GAL", "USD", "VOLUME", "GAL", UNITS),
+    index_conventions("DOLLAR", "GAL", "DOLLAR", "VOLUME", "GAL", UNITS),
     contract_specifications(
         ("GAL", "BBL"),
         numbers(1.0, 1.0),
@@ -3842,7 +3843,7 @@ def test_the_mixed_batch_marks_fixes_and_pays_as_the_ticket_says(
     np.testing.assert_allclose(result.legs[0].price_sensitivity, [delta])
     assert (
         result.legs[0].codes() == ("Z26",)
-        and result.legs[0].price_sensitivity_unit == "USD per USD/GAL"
+        and result.legs[0].price_sensitivity_unit == "DOLLAR per DOLLAR/GAL"
     )
     counts = counter.freeze().as_dict()
     assert (counts["live_prices_read"], counts["fixings_read"], counts["kernel"]) == (
@@ -3979,7 +3980,7 @@ def test_equivalent_quantities_compress_alike_whatever_unit_states_them() -> Non
     assert result.mark == pytest.approx(2_000) and result.legs[
         0
     ].nominal_delta_total == pytest.approx(2)
-    assert result.legs[0].price_sensitivity_unit == "USD per CENT/MMBTU"
+    assert result.legs[0].price_sensitivity_unit == "DOLLAR per CENT/MMBTU"
     assert result.legs[0].lot_unit == "lots of lot (10000 MMBTU)"
 
 
@@ -4210,8 +4211,8 @@ def test_a_nominal_delta_that_outruns_the_largest_number_is_refused_by_its_contr
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, (history_on(NG, "2026-11-24", {}),), WorkCounter())
     assert str(refused.value) == (
-        "Z26 has inf of price sensitivity, expected a finite amount of USD per USD/MMBTU; its live "
-        "exposures, each finite, sum past the largest number"
+        "Z26 has inf of price sensitivity, expected a finite amount of DOLLAR per DOLLAR/MMBTU; "
+        "its live exposures, each finite, sum past the largest number"
     )
 
 
@@ -4367,24 +4368,24 @@ def test_creation_refuses_a_product_or_sum_past_the_largest_number_where_it_is_m
     # 1e304 lots of 10,000 MMBTU settled in cents, a hundred a dollar: 1e308 MMBTU, finite, and a
     # coefficient past it.
     assert encoding_refused(extreme_terms(CENT_SETTLED, (1e304,), (0.0,))) == (
-        "trade 1 at row 1 has inf of coefficient, expected a finite amount of CENT per USD/MMBTU; "
-        "its quote quantity times the currency factor outruns the largest number"
+        "trade 1 at row 1 has inf of coefficient, expected a finite amount of CENT per "
+        "DOLLAR/MMBTU; its quote quantity times the currency factor outruns the largest number"
     )
     # A coefficient of two at a fixed price of 1e308: the fixed leg, past it on the negative side.
     assert encoding_refused(extreme_terms(ONE, (2.0,), (1e308,))) == (
-        "trade 1 at row 1 has -inf of fixed leg, expected a finite amount of USD; its coefficient "
-        "times its fixed price outruns the largest number"
+        "trade 1 at row 1 has -inf of fixed leg, expected a finite amount of DOLLAR; its "
+        "coefficient times its fixed price outruns the largest number"
     )
     # Two fixed legs of -1e308 in one payment group: the group, by its contract and its payment
     # day, never one of its trades; a physical group by its contract alone.
     assert encoding_refused(extreme_terms(ONE, (1.0, 1.0), (1e308, 1e308))) == (
-        "the fixed leg of Z26 paying on 2026-11-30 is -inf, expected a finite amount of USD; its "
-        "components' fixed legs, each finite, sum past the largest number"
+        "the fixed leg of Z26 paying on 2026-11-30 is -inf, expected a finite amount of DOLLAR; "
+        "its components' fixed legs, each finite, sum past the largest number"
     )
     assert encoding_refused(
         extreme_terms(ONE, (1.0, 1.0), (1e308, 1e308), settlement=Settlement.PHYSICAL)
     ) == (
-        "the fixed leg of Z26 is -inf, expected a finite amount of USD; its components' fixed "
+        "the fixed leg of Z26 is -inf, expected a finite amount of DOLLAR; its components' fixed "
         "legs, each finite, sum past the largest number"
     )
     # Two coefficients of 1e308 observing one day coalesce into a slot past it: the slot, by its
@@ -4392,8 +4393,8 @@ def test_creation_refuses_a_product_or_sum_past_the_largest_number_where_it_is_m
     # which would net the three to 1e308, since the sum made is the sum kept.
     slot = (
         "trade 1 at row 1 on 2026-11-25, a day Z26 prices, has inf of exposure, expected a finite "
-        "amount of USD per USD/MMBTU; its observations' coefficients times their weights sum past "
-        "the largest number"
+        "amount of DOLLAR per DOLLAR/MMBTU; its observations' coefficients times their weights sum "
+        "past the largest number"
     )
     assert encoding_refused(extreme_terms(ONE, (1e308, 1e308), (0.0, 0.0))) == slot
     assert encoding_refused(extreme_terms(ONE, (1e308, 1e308, -1e308), (0.0, 0.0, 0.0))) == slot
@@ -4411,7 +4412,8 @@ def test_preparation_refuses_a_set_amount_or_unsettled_total_past_the_largest_nu
         extreme_terms(ONE, (2.0,), (0.0,)), history_on(ONE, "2026-11-27", {"Z26": 1e308})
     ) == (
         "trade 1 at row 1 on 2026-11-25, a day Z26 prices, fixed at 1e+308, has inf of set amount, "
-        "expected a finite amount of USD; its exposure times the settle outruns the largest number"
+        "expected a finite amount of DOLLAR; its exposure times the settle outruns the largest "
+        "number"
     )
     # 1e308 under last3day: three slots of a third each fixed at 3.00, 1e308 of set amount each,
     # finite, and their sum past it: the group, by its contract and its payment day.
@@ -4419,8 +4421,8 @@ def test_preparation_refuses_a_set_amount_or_unsettled_total_past_the_largest_nu
         extreme_terms(ONE, (1e308,), (0.0,), method=ScheduleMethod.LAST3DAY),
         history_on(ONE, "2026-11-27", {}),
     ) == (
-        "the set amount of Z26 paying on 2026-11-30 is inf, expected a finite amount of USD; its "
-        "fixed slots' set amounts, each finite, sum past the largest number"
+        "the set amount of Z26 paying on 2026-11-30 is inf, expected a finite amount of DOLLAR; "
+        "its fixed slots' set amounts, each finite, sum past the largest number"
     )
     # Z26 and F27 fixed and unpaid on 30 December, 1e308 of each: set at 1.00, the unsettled set
     # amounts in all; bought at 1.00 and set at 0.50, the unsettled fixed legs in all, negative.
@@ -4428,14 +4430,14 @@ def test_preparation_refuses_a_set_amount_or_unsettled_total_past_the_largest_nu
         extreme_terms(ONE, (1e308, 1e308), (0.0, 0.0), BOTH, MID_JANUARY),
         history_on(ONE, "2026-12-30", {"Z26": 1.0, "F27": 1.0}),
     ) == (
-        "the batch has inf of unsettled set amount in all, expected a finite amount of USD; the "
+        "the batch has inf of unsettled set amount in all, expected a finite amount of DOLLAR; the "
         "unsettled groups' set amounts, each finite, sum past the largest number"
     )
     assert preparation_refused(
         extreme_terms(ONE, (1e308, 1e308), (1.0, 1.0), BOTH, MID_JANUARY),
         history_on(ONE, "2026-12-30", {"Z26": 0.5, "F27": 0.5}),
     ) == (
-        "the batch has -inf of unsettled fixed leg in all, expected a finite amount of USD; the "
+        "the batch has -inf of unsettled fixed leg in all, expected a finite amount of DOLLAR; the "
         "unsettled groups' fixed legs, each finite, sum past the largest number"
     )
     # Large and finite stands: two halves set at 1.00 are 1e308 of unsettled set amount.
@@ -4455,7 +4457,7 @@ def test_paid_groups_past_the_largest_number_each_way_are_refused_as_cash() -> N
         extreme_terms(ONE, (1e308, -1e308), (-1.0, -1.0), BOTH, ("2026-11-30", "2026-12-31")),
         history_on(ONE, "2027-01-04", {"Z26": 1.0, "F27": 1.0}),
     ) == (
-        "the batch has nan of cash in all, expected a finite amount of USD; the settled groups' "
+        "the batch has nan of cash in all, expected a finite amount of DOLLAR; the settled groups' "
         "offsets and set amounts sum past the largest number"
     )
 
@@ -4465,8 +4467,8 @@ def test_the_tick_refuses_a_contribution_live_amount_or_mark_past_the_largest_nu
     # pricing it and the quote, before either route sums anything.
     assert evaluation_refused(extreme_terms(ONE, (2.0,), (0.0,)), (1e308, 3.0, 3.0)) == (
         "trade 1 at row 1 on 2026-11-25, a day Z26 prices, quoted at 1e+308, has inf of live "
-        "contribution, expected a finite amount of USD; its exposure times the quote outruns the "
-        "largest number"
+        "contribution, expected a finite amount of DOLLAR; its exposure times the quote outruns "
+        "the largest number"
     )
     # Z26 and F27, 5e307 of each quoted at 2.00: 1e308 of contribution each and 5e307 of nominal
     # delta
@@ -4474,8 +4476,8 @@ def test_the_tick_refuses_a_contribution_live_amount_or_mark_past_the_largest_nu
     # reduction; and so with G27 at -5e307 behind them, which would net the three to 1e308, since
     # the sum made is the sum kept.
     live = (
-        "the batch has inf of live amount in all, expected a finite amount of USD; the live slots' "
-        "contributions, each finite, sum past the largest number"
+        "the batch has inf of live amount in all, expected a finite amount of DOLLAR; the live "
+        "slots' contributions, each finite, sum past the largest number"
     )
     december = ("2026-11-30", "2026-12-31")
     assert (
@@ -4497,7 +4499,7 @@ def test_the_tick_refuses_a_contribution_live_amount_or_mark_past_the_largest_nu
     # 1e308 the live amount is another 1e308, each finite, and Python adds the two past the
     # largest number without a word: the cleared mark, refused for the batch.
     assert evaluation_refused(extreme_terms(ONE, (1.0,), (-1e308,)), (1e308, 3.0, 3.0)) == (
-        "the batch has inf of mark in all, expected a finite amount of USD; its unsettled fixed "
+        "the batch has inf of mark in all, expected a finite amount of DOLLAR; its unsettled fixed "
         "legs, set amounts and live amount, each finite, sum past the largest number"
     )
     # Large and finite stands through every stage: 1e300 bought at 1e7 and quoted at 1.5e7 is a
@@ -4538,7 +4540,7 @@ def wti_like(name: str, contracts: tuple[tuple[str, str], ...]) -> Index:
         futures_schedule(
             tuple(code for code, _ in contracts), dates(*(expiry for _, expiry in contracts)), None
         ),
-        index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS),
+        index_conventions("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL", UNITS),
         contract_specifications(
             ("BBL", "LOT"),
             numbers(1.0, 1_000.0),
@@ -5386,7 +5388,7 @@ WAHA = index(
     "WAHA",
     "Waha basis - ICE",
     WAHA_SCHEDULE,
-    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("LOT", "MMBTU"),
         numbers(2_500.0, 1.0),
@@ -5867,7 +5869,7 @@ def a_fee_index(
         "FEES",
         "Dollars a barrel with the ticket's two specifications",
         schedule,
-        index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS),
+        index_conventions("DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL", UNITS),
         contract_specifications(
             ("LOT", "BBL"),
             numbers(1000.0, 1.0),
@@ -5996,7 +5998,7 @@ def test_a_rate_that_is_not_a_number_is_refused_by_category_trade_and_row() -> N
     with pytest.raises(ValueError) as refused:
         encoded(terms, (observed_of(terms),), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "brokerage reserve of trade 103 at row 3 is nan, expected a finite amount of USD; "
+        "brokerage reserve of trade 103 at row 3 is nan, expected a finite amount of DOLLAR; "
         "1000.0 of 'BBL' at nan a lot"
     )
     # A zero quantity hides nothing: nought times an infinite rate is not a number, and the
@@ -6005,7 +6007,7 @@ def test_a_rate_that_is_not_a_number_is_refused_by_category_trade_and_row() -> N
     with pytest.raises(ValueError) as refused:
         encoded(terms, (observed_of(terms),), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "clearing reserve of trade 104 at row 1 is nan, expected a finite amount of USD; "
+        "clearing reserve of trade 104 at row 1 is nan, expected a finite amount of DOLLAR; "
         "0.0 of 'LOT' at inf a lot"
     )
 
@@ -6015,7 +6017,7 @@ def test_reserves_that_sum_past_the_largest_number_are_refused_for_the_batch() -
     with pytest.raises(ValueError) as refused:
         encoded(terms, (observed_of(terms),), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "the batch has inf of brokerage reserve in all, expected a finite amount of USD; the "
+        "the batch has inf of brokerage reserve in all, expected a finite amount of DOLLAR; the "
         "components' reserves, each finite, sum past the largest number"
     )
 
@@ -6106,7 +6108,7 @@ def test_a_rate_a_fee_does_not_charge_is_never_read() -> None:
             fee_terms(nan_brokerage, (2.0, 2.0), (0, 0), (101, 102), brokers=("none", "ION"))
         )
     assert str(refused.value) == (
-        "brokerage reserve of trade 102 at row 2 is nan, expected a finite amount of USD; "
+        "brokerage reserve of trade 102 at row 2 is nan, expected a finite amount of DOLLAR; "
         "2.0 of 'LOT' at nan a lot"
     )
     infinite_clearing = a_fee_index(clearing=(np.inf, np.inf))
@@ -6114,7 +6116,7 @@ def test_a_rate_a_fee_does_not_charge_is_never_read() -> None:
     with pytest.raises(ValueError) as refused:
         reserves_of(fee_terms(infinite_clearing, (0.0,), (0,), (104,)))
     assert str(refused.value) == (
-        "clearing reserve of trade 104 at row 1 is nan, expected a finite amount of USD; "
+        "clearing reserve of trade 104 at row 1 is nan, expected a finite amount of DOLLAR; "
         "0.0 of 'LOT' at inf a lot"
     )
 
@@ -6215,8 +6217,8 @@ def test_finite_marketing_amounts_summing_past_the_largest_number_are_refused_fo
     with pytest.raises(ValueError) as refused:
         encoded(terms, (observed_of(terms),), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "the batch has inf of marketing reserve in all, expected a finite amount of USD; the rows' "
-        "amounts, each finite, sum past the largest number"
+        "the batch has inf of marketing reserve in all, expected a finite amount of DOLLAR; the "
+        "rows' amounts, each finite, sum past the largest number"
     )
     # The terms take one amount per occurrence and one counterparty per occurrence, no more.
     with pytest.raises(
@@ -6318,7 +6320,7 @@ def test_finite_cva_amounts_summing_past_the_largest_number_are_refused_for_the_
         with pytest.raises(ValueError) as refused:
             encoded(terms, (observed_of(terms),), UNITS, WorkCounter())
         assert str(refused.value) == (
-            f"the batch has {text} of cva reserve in all, expected a finite amount of USD; the "
+            f"the batch has {text} of cva reserve in all, expected a finite amount of DOLLAR; the "
             "rows' amounts, each finite, sum past the largest number"
         )
     with pytest.raises(

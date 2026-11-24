@@ -24,13 +24,13 @@ from catalyst.trades.preparation import prepared_trades
 from catalyst.trades.resolution import Trades, trades
 from catalyst.trades.results import TradeResults
 
-# A copper-style index quoted in USD per LB: U26 bounding the calendar, V26 the October contract
+# A copper-style index quoted in DOLLAR per LB: U26 bounding the calendar, V26 the October contract
 # expiring Wednesday 28 October 2026, X26 and Z26 after it, a lot of one pound.
 HG = an_index(
     "HG",
     (("U26", "2026-09-28"), ("V26", "2026-10-28"), ("X26", "2026-11-25"), ("Z26", "2026-12-29")),
     (),
-    ("USD", "LB"),
+    ("DOLLAR", "LB"),
     ("MASS", "LB"),
     ("LB", 1.0, "LB"),
 )
@@ -67,10 +67,10 @@ SETTLES = {"2026-10-05": 4.10, "2026-10-06": 4.20, "2026-10-07": 4.22, "2026-10-
 COLUMNS = ("observation_coefficient", "observation_price", "price_unit", "floating_contribution")
 # The issue's table: two days fixed at 4.10 and 4.20, two live at 4.30, 6,250 lb each.
 MIXED = [
-    [6_250.0, 4.10, "USD/LB", pytest.approx(25_625.0)],
-    [6_250.0, 4.20, "USD/LB", pytest.approx(26_250.0)],
-    [6_250.0, 4.30, "USD/LB", pytest.approx(26_875.0)],
-    [6_250.0, 4.30, "USD/LB", pytest.approx(26_875.0)],
+    [6_250.0, 4.10, "DOLLAR/LB", pytest.approx(25_625.0)],
+    [6_250.0, 4.20, "DOLLAR/LB", pytest.approx(26_250.0)],
+    [6_250.0, 4.30, "DOLLAR/LB", pytest.approx(26_875.0)],
+    [6_250.0, 4.30, "DOLLAR/LB", pytest.approx(26_875.0)],
 ]
 
 
@@ -142,7 +142,7 @@ def test_every_state_shows_each_slots_price_and_a_paid_group_keeps_its_history(
 ) -> None:
     results = valued(as_of, 4.30)
     assert facts(results) == [
-        [6_250.0, price, "USD/LB", pytest.approx(6_250.0 * price)] for price in prices
+        [6_250.0, price, "DOLLAR/LB", pytest.approx(6_250.0 * price)] for price in prices
     ]
     assert results.mark == pytest.approx(mark) and results.cash == pytest.approx(cash)
     table = grid(results)
@@ -189,7 +189,7 @@ def test_exposures_of_nothing_keep_their_prices() -> None:
     # Two rows of one group net to nothing on every slot, and a row of nothing is a slot of
     # nothing: the coefficient and the contribution zero, the price the slot was valued at shown
     # as on any other, no quotient of the two taken.
-    nothing = [[0.0, price, "USD/LB", 0.0] for price in (4.10, 4.20, 4.30, 4.30)]
+    nothing = [[0.0, price, "DOLLAR/LB", 0.0] for price in (4.10, 4.20, 4.30, 4.30)]
     netted = booked(
         ticket={
             "trade_id": [1001, 1002],

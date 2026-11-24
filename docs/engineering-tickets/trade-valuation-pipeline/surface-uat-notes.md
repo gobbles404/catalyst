@@ -1090,7 +1090,7 @@ Agreed 21 November 2026 and built in #265, issue #263:
 A result now shows two things where it showed one: its currency, `USD`, and the unit of
 that currency its amounts are in, in a new last column, `currency_unit`. For an index
 settled in dollars every cell a sheet already reads is as it was, and the new column
-reads `USD`; the second pull request spells that unit `DOLLAR`. For an index settled in
+reads the dollar's unit, `USD` in #265 and `DOLLAR` since item 42. For an index settled in
 cents the `currency` reads `USD` where it read `CENT`, the new column reads `CENT`, and
 the DV01 heading reads `SOFR USD dv01 [CENT per basis point]`. No number moves. Each
 of these spills is one column wider, so the cell to its right must be free:
@@ -1098,14 +1098,38 @@ of these spills is one column wider, so the cell to its right must be free:
 
 UAT: the kept workbook, rows 3557 to 3603. B3568 is the bilateral row of B2428 booked
 again on HNGC, HNG's twin settled in cents. Read B3570 beside B3574: 9,500 of mark
-against 95, both under `USD`, with `CENT` in F3572 and `USD` in F3576. Read the DV01
+against 95, both under `USD`, with `CENT` in F3572 and `DOLLAR` in F3576. Read the DV01
 heading in C3583. Read the collection from B3591: the trade settled in dollars and the
 cashflows share the first column, 0.8405, and the cents stand in the second, -0.95.
 B3599 reads the collection back, each source's currency in G and its unit in N. Then
-type USD over CENT inside the formula of B3559: the mark in B3572 falls to 95, F3572
-reads `USD`, and the collection's two columns become one, 0.831. Type CENT back and the
+type DOLLAR over CENT inside the formula of B3559: the mark in B3572 falls to 95, F3572
+reads `DOLLAR`, and the collection's two columns become one, 0.831. Type CENT back and the
 two columns return. Elsewhere on the sheet, read any values report, B1304 say, and find
 the same four columns with `currency_unit` after them. Three neighbours moved to make
 room: the readback of the prepared trades from F1302 to AS1302, and the mark and the lot
 beside the reserves reports of rows 1997 and 3211 one column right. Then open one of the
 desk's own sheets and check that no report meets an occupied cell on its right.
+
+## 42. The dollar's unit is spelled DOLLAR
+
+Agreed 21 November 2026 and built in #266, issue #263:
+[currency-and-currency-unit.md](currency-and-currency-unit.md), the second of two pull requests.
+`USD` is the currency and nothing else. Its units are `DOLLAR` and `CENT`, so a field
+that asks for a unit takes `DOLLAR` where it took `USD`: the first and the third
+argument of `_CreateIndexConventions`, the unit a price is quoted in and the unit the
+index settles in, and a `float_float`'s `spread_price_currency_unit`. Every sheet makes
+those edits and fails by name until it does. A cashflow's `currency` stays `USD`. No
+number moves. What reads differently is the unit wherever it shows: the `currency_unit`
+column of item 41, the brackets of a DV01 heading, `sensitivity_unit` and `price_unit`,
+and a refusal that names an amount's unit.
+
+UAT: the kept workbook. B22 and B24 hold `DOLLAR`, and the conventions of B27 read back
+`DOLLAR` in F29 and H29. Type USD over B22 and read the refusal in B27, which lists the
+two units; type DOLLAR back and the sheet returns. Read B1304: the mark as it was, `USD`
+under `currency` and `DOLLAR` under `currency_unit`, and the heading in L1308,
+`cleared USD dv01 [DOLLAR per basis point]`. In the block from row 3557, F3576 reads
+`DOLLAR` beside F3572's `CENT`, and C3592 and D3592 head the dollar column and the cent
+column. Rows 3607 to 3609 hold the three refusals: `USD` in either unit place, and
+`DOLLAR` as a cashflow's currency. Then on one of the desk's own sheets change `USD` to
+`DOLLAR` in each conventions formula and in each spread price's unit, and compare every
+mark with the day before.

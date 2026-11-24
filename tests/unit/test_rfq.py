@@ -244,7 +244,7 @@ def test_the_tickets_cases_by_hand() -> None:
     assert under(table, "payment_source") == ["request", "request"]
     assert under(table, "payment_date") == [serial("2027-02-08"), serial("2027-03-08")]
     assert under(table, "index") == ["STRIP", "STRIP"]
-    assert under(table, "quote_unit") == ["USD per BBL"] * 2
+    assert under(table, "quote_unit") == ["DOLLAR per BBL"] * 2
     assert under(table, "discount_curve_key") == ["SOFR", "SOFR"]
     assert under(table, "settlement_frequency") == ["monthly", "monthly"]
     assert under(table, "nearby") == [1.0, 1.0]
@@ -364,7 +364,7 @@ LONGER = an_index(
         ("H27", "2027-03-31"),
     ),
     ("2027-01-01",),
-    ("USD", "BBL"),
+    ("DOLLAR", "BBL"),
     ("VOLUME", "BBL"),
     ("BBL", 1.0, "BBL"),
 )
@@ -869,7 +869,7 @@ def test_the_template_the_index_and_the_market_refuse_as_a_quote_does() -> None:
                 "TWIN",
                 contracts=(("Z26", "2026-12-15"), ("F27", "2027-01-29"), ("G27", "2027-02-26")),
                 holidays=("2027-01-01",),
-                quote=("USD", "BBL"),
+                quote=("DOLLAR", "BBL"),
                 measure=("VOLUME", "BBL"),
                 lot=("BBL", 1.0, "BBL"),
             )
@@ -1043,7 +1043,7 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "asian",
         "bilateral",
         "financial",
-        "USD per BBL",
+        "DOLLAR per BBL",
         "SOFR",
         "monthly",
         1.0,

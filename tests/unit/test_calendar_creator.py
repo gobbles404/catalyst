@@ -46,7 +46,9 @@ def a_holiday_calendar(*serials: float) -> str:
 def an_index(schedule: object, holidays: object = MISSING) -> str:
     """The index handle of that schedule handle and holiday calendar handle, with one set of
     conventions and specifications, since the calendar reads neither."""
-    conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "VOLUME", "BBL"])
+    conventions = bridge.call(
+        "_CreateIndexConventions", ["DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL"]
+    )
     specifications = bridge.call(
         "_CreateContractSpecifications",
         [

@@ -20,22 +20,22 @@ The signature does not change, and neither do the record and its read-back. Two 
 
 | | A | B | C |
 |---|---|---|---|
-| 1 | quote_currency_unit | USD | CENT |
+| 1 | quote_currency_unit | DOLLAR | CENT |
 | 2 | quote_quantity_unit | BBL | GAL |
-| 3 | currency_unit | USD | USD |
+| 3 | currency_unit | DOLLAR | DOLLAR |
 | 4 | quantity_type | VOLUME | VOLUME |
 | 5 | quantity_unit | BBL | BBL |
 | 6 | `=_CreateIndexConventions(B1, B2, B3, B4, B5)` | shows `30512:index_conventions:8` | |
 | 7 | `=_CreateIndexConventions(C1, C2, C3, C4, C5)` | shows `30512:index_conventions:9`, cents and dollars two units of one currency, gallons and barrels two units of one measure | |
 
-Five text scalars, all required, in this order, which is fixed: the sheet passes them by position, and the code downstream takes the record's fields by name. A single-cell reference is a scalar; an array is not, even a 1×1 one, and empty text is not text. The seam checks each argument alone, left to right, against its declared type and hands over five texts; nothing here restates that. Each code is one the [unit tables](../globals/unit-conversions.md) define, spelt as they spell it: a currency unit is `USD` or `CENT`, the units of the tables' one currency; a quantity type is `VOLUME`, `MASS` or `ENERGY`, the categories a quantity can measure; and the two quantity units are units of that category, GAL, BBL, L or M3 for a volume, so that a price quoted per gallon and a quantity stated in barrels are two units of one measure, and the conversion between them is one factor. The result is a handle: text in the cell that stands for the conventions the seam keeps, declared `Handle[IndexConventions]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the conventions, the five codes.
+Five text scalars, all required, in this order, which is fixed: the sheet passes them by position, and the code downstream takes the record's fields by name. A single-cell reference is a scalar; an array is not, even a 1×1 one, and empty text is not text. The seam checks each argument alone, left to right, against its declared type and hands over five texts; nothing here restates that. Each code is one the [unit tables](../globals/unit-conversions.md) define, spelt as they spell it: a currency unit is `DOLLAR` or `CENT`, the units of the tables' one currency, `USD`, which is the currency's name and no unit of it since [currency-and-currency-unit.md](../../engineering-tickets/trade-valuation-pipeline/currency-and-currency-unit.md); a quantity type is `VOLUME`, `MASS` or `ENERGY`, the categories a quantity can measure; and the two quantity units are units of that category, GAL, BBL, L or M3 for a volume, so that a price quoted per gallon and a quantity stated in barrels are two units of one measure, and the conversion between them is one factor. The result is a handle: text in the cell that stands for the conventions the seam keeps, declared `Handle[IndexConventions]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the conventions, the five codes.
 
 `=util_ReadHandle(A6)` shows the five codes as they went in, one row under the two heading rows, as it did before: the spill does not change.
 
 | quote_currency_unit | quote_quantity_unit | currency_unit | quantity_type | quantity_unit |
 |---|---|---|---|---|
 | str | str | str | str | str |
-| USD | BBL | USD | VOLUME | BBL |
+| DOLLAR | BBL | DOLLAR | VOLUME | BBL |
 
 ## Excel help
 
@@ -44,9 +44,9 @@ Quoted from the declaration in `src/catalyst/excel/index_definitions.py`, which 
 | Item | Text |
 |---|---|
 | Function | Creates the index conventions of one index, the units it is quoted, settled and measured in, checked against the library's unit tables, and shows its handle, the text other formulas take as the conventions. |
-| `quote_currency_unit` | The currency unit a price of the index is quoted in: USD or CENT. |
+| `quote_currency_unit` | The currency unit a price of the index is quoted in: DOLLAR or CENT. |
 | `quote_quantity_unit` | The quantity unit a price of the index is quoted per, a unit of the quantity type: GAL, BBL, L or M3 for VOLUME; KG, LB, MT, ST, LT, G, OZT or CWT_US for MASS; MMBTU, BTU, THERM, GJ, MWH or KWH for ENERGY. |
-| `currency_unit` | The currency unit the index settles in: USD or CENT. |
+| `currency_unit` | The currency unit the index settles in: DOLLAR or CENT. |
 | `quantity_type` | What a quantity of the index measures: VOLUME, MASS or ENERGY. |
 | `quantity_unit` | The unit a quantity of the index is stated in, a unit of the quantity type: GAL, BBL, L or M3 for VOLUME; KG, LB, MT, ST, LT, G, OZT or CWT_US for MASS; MMBTU, BTU, THERM, GJ, MWH or KWH for ENERGY. |
 
@@ -56,8 +56,8 @@ Five rules, in this order, the first failure being the message: the two currency
 
 | Rule | Message |
 |---|---|
-| the quoted currency unit is a currency unit, `USD` or `CENT` | `quote_currency_unit is 'usd', expected USD or CENT` |
-| the settlement currency unit is a currency unit | `currency_unit is 'EUR', expected USD or CENT` |
+| the quoted currency unit is a currency unit, `DOLLAR` or `CENT`; the currency's own name, `USD`, is none | `quote_currency_unit is 'usd', expected DOLLAR or CENT` |
+| the settlement currency unit is a currency unit | `currency_unit is 'EUR', expected DOLLAR or CENT` |
 | the quantity type is a category a quantity can measure: `VOLUME`, `MASS` or `ENERGY`, and not `USD`, which scales money | `quantity_type is 'Volume', expected VOLUME, MASS or ENERGY` |
 | the quoted quantity unit is a unit of the quantity type | `quote_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3` |
 | the stated quantity unit is a unit of the quantity type | `quantity_unit is 'bbl', expected a VOLUME unit, GAL, BBL, L or M3` |
@@ -72,8 +72,8 @@ The examples and properties below are `tests/unit/test_index_conventions.py`; th
 |---|---|
 | the sample above: every code kept as typed, in its own field | example |
 | the gasoline index, cents per gallon settled in dollars per barrel; gas, dollars per MMBTU settled in dollars per MMBTU; a metal quoted per pound and stated in tonnes: accepted, each pair two units of one category | example |
-| every unit of each category accepted as the stated and as the quoted quantity unit, and every pair of USD and CENT in the two currency slots | example |
-| a currency unit in another case, a unit nobody defined, one with a space and a quantity unit where a currency unit should be, in either currency slot: refused, naming USD and CENT | example |
+| every unit of each category accepted as the stated and as the quoted quantity unit, and every pair of DOLLAR and CENT in the two currency slots | example |
+| a currency unit in another case, a unit nobody defined, one with a space and a quantity unit where a currency unit should be, in either currency slot, and the currency's own name, USD, in either: refused, naming DOLLAR and CENT | example |
 | a category in another case, in small letters as it was once typed, a category nobody defined, one with a space and `USD` where the quantity type should be: refused, naming the three categories | example |
 | a quantity unit of another category, one in another case, one with a space and one nobody defined, in either quantity slot: refused, naming the type's units in the tables' order; the same under `MASS` and under `ENERGY` | example |
 | the two currency units checked before the quantity type, and the type before the quantity units, two wrong at once naming the earlier | example |

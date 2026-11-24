@@ -59,7 +59,9 @@ def an_index(schedule: object, holidays: object = MISSING, name: str = "WTI NYME
     index, as the prepared path does on every run; in Excel two equal _CreateIndex cells share
     one while both are live (docs/seam/handles.md). A calendar and the fixings it binds share
     one."""
-    conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "VOLUME", "BBL"])
+    conventions = bridge.call(
+        "_CreateIndexConventions", ["DOLLAR", "BBL", "DOLLAR", "VOLUME", "BBL"]
+    )
     specifications = bridge.call(
         "_CreateContractSpecifications",
         [

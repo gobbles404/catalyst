@@ -67,7 +67,7 @@ from catalyst.trades.risk_report import Bucket, Risk
 # Every float_float types its spread price's unit, float-float-units.md: dollars per MMBTU here,
 # the unit both indexes quote in, on the pair test's three templates.
 UNIT: dict[str, object] = {
-    "spread_price_currency_unit": "USD",
+    "spread_price_currency_unit": "DOLLAR",
     "spread_price_quantity_unit": "MMBTU",
 }
 BILATERAL: dict[str, object] = {**PAIR_BILATERAL, **UNIT}
@@ -522,7 +522,7 @@ def test_a_spreads_report_reads_as_the_collection_of_its_legs() -> None:
         "NTO delta [LOT]",
         "PAN nominal_delta [LOT]",
         "PAN delta [LOT]",
-        "SOFR USD dv01 [USD per basis point]",
+        "SOFR USD dv01 [DOLLAR per basis point]",
     )
     assert len(everything.labels) == 7
     assert everything.totals[:5] == pytest.approx([4.0, 3.8, -4.0, -3.8, -0.0475], **CLOSE)
@@ -620,7 +620,7 @@ def test_the_created_spread_reads_back_its_price_under_its_own_name() -> None:
         h for h in pair if h != "fixed_price"
     ]
     assert cell(table, 0, "spread_price") == 0.10
-    assert [cell(table, 0, unit) for unit in units] == ["USD", "MMBTU"]
+    assert [cell(table, 0, unit) for unit in units] == ["DOLLAR", "MMBTU"]
     assert cell(table, 0, "offset") == pytest.approx(-1_000.0, **CLOSE)  # the spread leg
     assert cell(table, 0, "second_schedule_method") == "lastday"
     assert cell(table, 0, "quote_quantity") == 10_000.0  # the first leg's, the batch's own
@@ -795,7 +795,7 @@ def sheet() -> dict[str, Any]:
         "float_float",
         across(*TEMPLATE_FIELDS),
         across(
-            "USD",
+            "DOLLAR",
             "MMBTU",
             "NYMEX NG",
             "month",
@@ -841,7 +841,7 @@ def test_the_sheet_books_prepares_and_values_a_spread(sheet: dict[str, Any]) -> 
         "A delta [NYMEX NG]",
         "B nominal_delta [NYMEX NG]",
         "B delta [NYMEX NG]",
-        "SOFR USD dv01 [USD per basis point]",
+        "SOFR USD dv01 [DOLLAR per basis point]",
         "A SOFR cross_gamma [NYMEX NG per basis point]",
         "B SOFR cross_gamma [NYMEX NG per basis point]",
     ]

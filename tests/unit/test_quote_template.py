@@ -90,7 +90,7 @@ def an_index() -> object:
     schedule = ENTRY["_CreateFuturesSchedule"](
         cells(["X26"], ["Z26"], ["F27"]), cells([46323.0], [46351.0], [46385.0]), bridge.MISSING
     )
-    conventions = ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
+    conventions = ENTRY["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specs = ENTRY["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
         row("NYMEX NG", 10000.0, "MMBTU", 0.0, 0.0),

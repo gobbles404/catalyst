@@ -63,7 +63,7 @@ def a_ticket(columns: Mapping[str, list[object]]) -> FieldValues:
 # quote in: dollars per MMBTU.
 SPREAD_TEMPLATE: dict[str, object] = {
     **TEMPLATE,
-    "spread_price_currency_unit": "USD",
+    "spread_price_currency_unit": "DOLLAR",
     "spread_price_quantity_unit": "MMBTU",
 }
 

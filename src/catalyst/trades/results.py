@@ -190,9 +190,9 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
     through the later, each saved vector copied through the places the preparation saved and zero
     between them; a saved value before the start refuses the report in the words prepared where
     the vector was made. The labels name the index and its reporting lot for the deltas, `UNIT
-    delta [UNIT]`, the curve's name, the currency and its unit for a DV01, `SOFR USD dv01 [USD
+    delta [UNIT]`, the curve's name, the currency and its unit for a DV01, `SOFR USD dv01 [DOLLAR
     per basis
-    point]`, `cleared USD dv01 [USD per basis point]` where no curve values, and the index, the
+    point]`, `cleared USD dv01 [DOLLAR per basis point]` where no curve values, and the index, the
     curve's name and the lot per basis point for a cross-gamma, `UNIT SOFR cross_gamma [UNIT per
     basis point]`; a result on one curve names it bare, and two curves of one name on one result
     are two words, `SOFR (curve_1)` and `SOFR (curve_2)`.
