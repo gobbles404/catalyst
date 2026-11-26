@@ -619,8 +619,11 @@ def test_the_created_spread_reads_back_its_price_under_its_own_name() -> None:
     # Its unit follows it, as typed, float-float-units.md, and no other column moves.
     units = ["spread_price_currency_unit", "spread_price_quantity_unit"]
     assert headings[at + 1 : at + 3] == units
+    # A pair's last column, since #273, is its fixed price's unit, which a spread shows as
+    # the two beside its price and so not again.
+    assert pair[-1] == "fixed_price_unit" and "fixed_price_unit" not in headings
     assert [h for h in headings if h not in ("spread_price", *units)] == [
-        h for h in pair if h != "fixed_price"
+        h for h in pair if h not in ("fixed_price", "fixed_price_unit")
     ]
     assert cell(table, 0, "spread_price") == 0.10
     assert [cell(table, 0, unit) for unit in units] == ["DOLLAR", "MMBTU"]

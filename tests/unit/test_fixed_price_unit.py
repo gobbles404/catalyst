@@ -8,19 +8,46 @@ dollars per MMBTU; the lifecycle, a strip, a pair and a closed physical contract
 refused, by the field and the row. Every expected number is the issue's or hand arithmetic
 here; the production code is never asked for one."""
 
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
 import pytest
-from holiday_fixtures import closed_on, index_on
+from holiday_fixtures import a_name, closed_on, index_on
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 from test_bilateral_kernel import curve_of, curve_set
-from test_create_trades import a_template, a_ticket, key_of, the_calendars
+from test_create_trades import (
+    a_template,
+    a_ticket,
+    key_of,
+    seam_calendars,
+    seam_key,
+    the_calendars,
+)
 from test_trades import dates, day, history_on, numbers, quoted
-from test_two_index import AS_OF, CLOSE, PAY, PAYS, SOFR, A, B, close
+from test_two_index import (
+    AS_OF,
+    CLOSE,
+    PAY,
+    PAYS,
+    PID,
+    SEAM,
+    SOFR,
+    A,
+    B,
+    across,
+    cell,
+    close,
+    down,
+    grid,
+    read,
+    serial,
+    spilled,
+    under,
+)
 from test_two_index import BILATERAL as PAIR_BILATERAL
 from test_two_index import TICKET as PAIR_TICKET
 from test_two_index import booked as booked_pair
@@ -705,8 +732,8 @@ def test_a_supplied_column_never_falls_back_to_the_default_on_a_row() -> None:
         count("fixed_float", headers, Cells.from_rows([[1.0, "DOLLAR/MT"], [2.0, "CENT/LB"]]))
         == 2.0
     )
-    for cell, words in ((None, "blank"), ("", "empty text")):
-        body = Cells.from_rows([[1.0, "DOLLAR/MT"], [2.0, cell]])
+    for held, words in ((None, "blank"), ("", "empty text")):
+        body = Cells.from_rows([[1.0, "DOLLAR/MT"], [2.0, held]])
         assert count("fixed_float", headers, body) == (
             f"#ERROR CountFieldRows: rows cell (2, 2) is {words}, expected text"
         )
@@ -808,4 +835,284 @@ def _observed(terms: ResolvedTrades) -> Any:
         terms.start_date,
         terms.end_date,
         terms.named,
+    )
+
+
+# --- the readback ---------------------------------------------------------------------------------
+# The sheet's example, the owner's premium: a market of 0.95 dollars a pound, and four rows on
+# one contract, each its own quantity word and its own price unit.
+
+SHEET_ROWS: tuple[Row, ...] = (
+    (50.0, "MT", 1870.0, "DOLLAR/MT"),
+    (275_578.0, "LB", 0.91, "DOLLAR/LB"),
+    (2.0, "LOT", 1870.0, "DOLLAR/MT"),
+    (50.0, "MT", 91.0, "CENT/LB"),
+)
+SHEET_UNITS = ["DOLLAR/MT", "DOLLAR/LB", "DOLLAR/MT", "CENT/LB"]
+# Each row's fixed leg by hand: 50 x 1,870; 275,578 x 0.91; 110,232 lb as tonnes x 1,870; and
+# 50 tonnes as pounds x 0.91.
+SHEET_FIXED = [93_500.0, 250_775.98, 93_500.7370228008, 100_310.3292941193]
+# Against 0.95 a pound the four pay 11,219.57, 11,023.12, 11,219.66 and 4,409.25.
+SHEET_PAYMENT = 37_871.60275871356
+
+
+def test_the_readback_shows_each_price_as_entered_with_its_unit_in_the_last_column() -> None:
+    table = grid(booked(*SHEET_ROWS))
+    assert table[0][-2:] == ["payment_holiday_key", "fixed_price_unit"]  # last, no column moved
+    assert table[1][-1] == "str"
+    assert under(table, "fixed_price_unit") == SHEET_UNITS
+    assert under(table, "fixed_price") == [1870.0, 0.91, 1870.0, 91.0]  # as entered
+    assert under(table, "quantity_unit") == ["MT", "LB", "LOT", "MT"]
+    assert [-float(str(each)) for each in under(table, "offset")] == pytest.approx(
+        SHEET_FIXED, rel=1e-12
+    )
+    # The floating side is the index's own whatever the price's unit: pounds, 0.95 away from
+    # dollars.
+    assert under(table, "quote_quantity") == pytest.approx(
+        [50 * LB_PER_MT, 275_578.0, 110_232.0, 50 * LB_PER_MT], **CLOSE
+    )
+
+
+def test_the_readback_says_the_indexes_unit_where_none_was_typed() -> None:
+    # The price never stands without its unit: no column and no template value, and the
+    # readback shows the unit the index quotes in on every row.
+    table = grid(booked(*[(q, word, price, None) for q, word, price, _ in SHEET_ROWS]))
+    assert table[0][-1] == "fixed_price_unit"
+    assert under(table, "fixed_price_unit") == ["DOLLAR/LB"] * 4
+    cents = an_index("MWC", ("CENT", "LB"))
+    assert under(grid(booked((1.0, "MT", 20.0, None), index=cents)), "fixed_price_unit") == [
+        "CENT/LB"
+    ]
+    # A template's one unit is every row's, and a strip carries its row's unit to each month.
+    by_template = grid(
+        booked(
+            (50.0, "MT", 1870.0, None),
+            template={**BILATERAL, "fixed_price_unit": "DOLLAR/MT"},
+            code="G27-H27",
+        )
+    )
+    assert under(by_template, "fixed_price_unit") == ["DOLLAR/MT", "DOLLAR/MT"]
+    # A physical batch has no payment key before it; the unit is still the last column.
+    physical = {
+        k: v
+        for k, v in {**CLEARED, "settlement_method": "physical"}.items()
+        if not k.startswith("payment_")
+    }
+    table = grid(booked((3.0, "MT", 1870.0, "DOLLAR/MT"), template=physical))
+    assert table[0][-2:] == ["nearby", "fixed_price_unit"]
+    assert cell(table, 0, "fixed_price_unit") == "DOLLAR/MT"
+
+
+def test_a_pairs_readback_shows_its_outright_prices_unit() -> None:
+    typed = grid(
+        booked_pair(
+            PAIR_BILATERAL,
+            {**PAIR_TICKET, "fixed_price": [30.0], "fixed_price_unit": ["CENT/THERM"]},
+        )
+    )
+    assert cell(typed, 0, "fixed_price") == 30.0 and typed[0][-1] == "fixed_price_unit"
+    assert cell(typed, 0, "fixed_price_unit") == "CENT/THERM"
+    assert cell(grid(booked_pair()), 0, "fixed_price_unit") == "DOLLAR/MMBTU"
+
+
+# --- on the sheet ---------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def sheet() -> dict[str, Any]:
+    """The premium on a sheet: an index quoted in dollars a pound over F27, G27 and H27, with a
+    lot of 55,116 pounds, a pound and a tonne, its delta in lots; valued on 4 January 2027 with
+    G27 at 0.95; a cleared template that leaves the quantity unit to each row."""
+    holidays = SEAM["_CreateHolidayCalendar"](a_name(), serial("2027-01-01"))
+    index = SEAM["_CreateIndex"](
+        "AUP",
+        "A sample aluminium premium, dollars a pound",
+        SEAM["_CreateFuturesSchedule"](
+            down("F27", "G27", "H27"),
+            down(serial("2026-12-29"), serial("2027-01-27"), serial("2027-02-24")),
+            bridge.MISSING,
+        ),
+        SEAM["_CreateIndexConventions"]("DOLLAR", "LB", "DOLLAR", "MASS", "LB"),
+        SEAM["_CreateContractSpecifications"](
+            across(
+                "name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"
+            ),
+            Cells.from_rows(
+                [
+                    ["lots", 55116.0, "LB", 0.0, 0.0],
+                    ["lb", 1.0, "LB", 0.0, 0.0],
+                    ["mt", 1.0, "MT", 0.0, 0.0],
+                ]
+            ),
+        ),
+        seam_key(holidays),
+        "lots",
+        seam_calendars(),
+    )
+    history = SEAM["_CreateMarketHistory"](
+        SEAM["_CreateCalendar"](SEAM["_CreateValuationDate"](serial(AS_OF), 0.5), index),
+        SEAM["_CreateFuturesFixings"](
+            down(serial("2026-12-31"), serial("2026-12-30")), down(0.93, 0.92), index
+        ),
+    )
+    fields = (
+        "quantity_per",
+        "settlement_frequency",
+        "nearby",
+        "schedule_method",
+        "route",
+        "settlement_method",
+        "clearing_house",
+        "payment_day",
+        "payment_holiday_key",
+    )
+    values = ("month", "monthly", 1.0, "lastday", "cleared", "financial", "CME Clearing", "+2bd")
+    return {
+        "index": index,
+        "history": history,
+        "market": SEAM["_CreateMarket"](
+            history, SEAM["_CreatePriceVector"]("AUP", down(0.95, 0.96))
+        ),
+        "fields": fields,
+        "values": (*values, seam_key(holidays)),
+        "template": SEAM["_CreateTradeTemplate"](
+            "fixed_float", across(*fields), across(*values, seam_key(holidays))
+        ),
+        "headers": across(
+            "trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price"
+        ),
+        "unit_headers": across(
+            "trade_id",
+            "trade_date",
+            "contract_code",
+            "quantity",
+            "quantity_unit",
+            "fixed_price",
+            "fixed_price_unit",
+        ),
+    }
+
+
+def sheet_rows(*rows: tuple[float, str, float, object]) -> Cells:
+    """Ticket rows on G27 as the sheet holds them, the last cell each row's price unit."""
+    return Cells.from_rows(
+        [
+            [float(i + 1), serial("2026-12-15"), "G27", quantity, word, price, unit]
+            for i, (quantity, word, price, unit) in enumerate(rows)
+        ]
+    )
+
+
+SHEET_WORDS = {"MT": "mt", "LB": "lb", "LOT": "lots"}
+ON_SHEET = tuple((q, SHEET_WORDS[word], price, unit) for q, word, price, unit in SHEET_ROWS)
+
+
+def test_the_sheet_books_mixed_units_values_them_and_reads_them_back(
+    sheet: dict[str, Any],
+) -> None:
+    batch = SEAM["_CreateTrades"](
+        sheet["index"], sheet["unit_headers"], sheet_rows(*ON_SHEET), sheet["template"]
+    )
+    assert re.fullmatch(rf"{PID}:trades:AUP:\d+", str(batch))
+    table = read(batch)
+    assert table[0][-1] == "fixed_price_unit" and table[1][-1] == "str"
+    assert under(table, "fixed_price_unit") == SHEET_UNITS
+    assert under(table, "fixed_price") == [1870.0, 0.91, 1870.0, 91.0]
+    assert [-float(str(each)) for each in under(table, "offset")] == pytest.approx(
+        SHEET_FIXED, rel=1e-12
+    )
+    results = SEAM["_EvaluateTrades"](
+        SEAM["_PrepareTrades"](batch, sheet["history"]), sheet["market"], bridge.MISSING
+    )
+    assert re.fullmatch(rf"{PID}:trade_results:AUP:\d+", str(results)), results
+    values = spilled(SEAM["_ReportValues"](results))
+    assert values[0][0] == "cleared_mark"
+    assert values[2][0] == pytest.approx(SHEET_PAYMENT, rel=1e-12) and values[2][1] == 0.0
+    risk = spilled(SEAM["_ReportRisk"](results, "nominal_delta", "year"))
+    # 606,272.26 pounds in lots of 55,116: a shade under eleven.
+    assert risk[-1][-1] == pytest.approx(10.999932182757778, rel=1e-12)
+
+
+def test_the_sheet_reads_the_default_and_a_templates_unit(sheet: dict[str, Any]) -> None:
+    # No column and no template value: every price in the index's unit, and the readback says so.
+    rows = Cells.from_rows([[2.0, serial("2026-12-15"), "G27", 275_578.0, "lb", 0.91]])
+    plain = read(SEAM["_CreateTrades"](sheet["index"], sheet["headers"], rows, sheet["template"]))
+    assert under(plain, "fixed_price_unit") == ["DOLLAR/LB"]
+    assert under(plain, "offset") == [-250_775.98]
+    # The template's one unit, every row's.
+    tonne_template = SEAM["_CreateTradeTemplate"](
+        "fixed_float",
+        across(*sheet["fields"], "fixed_price_unit"),
+        across(*sheet["values"], "DOLLAR/MT"),
+    )
+    rows = Cells.from_rows([[1.0, serial("2026-12-15"), "G27", 50.0, "mt", 1870.0]])
+    priced = read(SEAM["_CreateTrades"](sheet["index"], sheet["headers"], rows, tonne_template))
+    assert under(priced, "fixed_price_unit") == ["DOLLAR/MT"]
+    assert under(priced, "offset") == [-93_500.0]
+    # And never both.
+    assert SEAM["_CreateTrades"](
+        sheet["index"],
+        sheet["unit_headers"],
+        sheet_rows((50.0, "mt", 1870.0, "DOLLAR/MT")),
+        tonne_template,
+    ) == (
+        "#ERROR _CreateTrades: ValueError: fixed_price_unit is supplied by the template and by "
+        "the ticket, expected by one of them"
+    )
+
+
+SHEET_REFUSALS: list[tuple[object, str]] = [
+    (
+        "DOLLAR-MT",
+        "ValueError: fixed_price_unit row 2 is 'DOLLAR-MT', expected a currency unit and a "
+        "quantity unit joined by one /, such as DOLLAR/MT",
+    ),
+    (
+        "USD/MT",
+        "ValueError: fixed_price_unit of trade 2 at row 2 is 'USD/MT', expected DOLLAR or CENT "
+        "before the /",
+    ),
+    (
+        "DOLLAR/BBL",
+        "ValueError: fixed_price_unit of trade 2 at row 2 is 'DOLLAR/BBL', expected a MASS unit, "
+        "KG, LB, MT, ST, LT, G, OZT or CWT_US, after the /",
+    ),
+    (
+        "DOLLAR/lots",  # the row's own quantity word is a specification and no unit
+        "ValueError: fixed_price_unit of trade 2 at row 2 is 'DOLLAR/lots', expected a MASS unit, "
+        "KG, LB, MT, ST, LT, G, OZT or CWT_US, after the /",
+    ),
+    (None, "trade_rows cell (2, 7) is blank, expected text"),
+    ("", "trade_rows cell (2, 7) is empty text, expected text"),
+    (1870.0, "trade_rows cell (2, 7) is number 1870.0, expected text"),
+]
+
+
+@pytest.mark.parametrize(
+    ("unit", "words"), SHEET_REFUSALS, ids=[repr(u) for u, _ in SHEET_REFUSALS]
+)
+def test_the_sheet_refuses_a_unit_by_its_row_in_the_librarys_words_or_the_seams(
+    sheet: dict[str, Any], unit: object, words: str
+) -> None:
+    rows = sheet_rows((50.0, "mt", 1870.0, "DOLLAR/MT"), (2.0, "lots", 1870.0, unit))
+    assert (
+        SEAM["_CreateTrades"](sheet["index"], sheet["unit_headers"], rows, sheet["template"])
+        == f"#ERROR _CreateTrades: {words}"
+    )
+
+
+def test_the_sheet_refuses_the_field_where_it_is_none_of_the_instruments() -> None:
+    # A template reads the form when it is made; a spread has its own two unit fields.
+    assert SEAM["_CreateTradeTemplate"](
+        "fixed_float", across("fixed_price_unit"), across("DOLLAR")
+    ) == (
+        "#ERROR _CreateTradeTemplate: ValueError: fixed_price_unit is 'DOLLAR', expected a "
+        "currency unit and a quantity unit joined by one /, such as DOLLAR/MT"
+    )
+    refusal = str(
+        SEAM["_CreateTradeTemplate"]("float_float", across("fixed_price_unit"), across("DOLLAR/MT"))
+    )
+    assert refusal.startswith(
+        "#ERROR _CreateTradeTemplate: fields cell (1, 1) is text 'fixed_price_unit', expected a "
+        "field of float_float: "
     )

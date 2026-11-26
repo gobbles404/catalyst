@@ -6,8 +6,9 @@ nothing is converted again. A batch that mixes units reads each distinct unit on
 size per distinct unit and specification its rows select and one currency factor per unit, a
 handful of numbers whatever the rows, then one product over the components. Preparing and
 valuing either batch runs the same functions and the same numpy calls as the batch that types
-none, and no conversion among them. The index is a premium quoted in dollars a pound, with a
-lot of 55,116 pounds, a pound and a tonne."""
+none, and no conversion among them. Reading a batch back shows each row's unit in one column
+more, each distinct unit spelled once. The index is a premium quoted in dollars a pound, with
+a lot of 55,116 pounds, a pound and a tonne."""
 
 from collections.abc import Callable
 
@@ -26,6 +27,7 @@ from test_trade_creation_budgets import (
 )
 
 from catalyst.calendar.calendar import calendar
+from catalyst.excel.utilities import shown
 from catalyst.globals.unit_conversions import UNITS
 from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
@@ -307,3 +309,57 @@ def test_the_resolution_reads_each_distinct_unit_once_and_nothing_per_row(
             "numpy.zeros": -1,
             "ufunc.reduce": 1,
         }
+
+
+# --- the readback ---------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
+def test_the_readback_spells_each_distinct_unit_once_in_one_column_more(
+    call_profile: CallProfile, numpy_calls: CallProfile, rows: int, contracts: int
+) -> None:
+    # Measured against the readback before the column, the same batch at both sizes: one text
+    # column more, the helper that adds a column called 11 times where it was called 10, one
+    # array more, the distinct units' codes, where there were 7, and each distinct unit spelled
+    # once, whatever the rows. Nothing else moved.
+    batches = [
+        trades(
+            (PREMIUM,),
+            a_ticket(rows, contracts, units),
+            a_template(),
+            UNITS,
+            WorkCounter(),
+            CALENDARS,
+        )
+        for units in (None, OWN, MIXED)
+    ]
+    omitted, typed, mixed = (call_profile(lambda b=batch: shown(b)) for batch in batches)
+    assert omitted == typed
+    assert more(mixed, omitted) == {"PriceUnit.code": 3}  # four units where there was one
+    assert (omitted["PriceUnit.code"], omitted["trades_table.<locals>.text"]) == (1, 11)
+    arrays = [numpy_calls(lambda b=batch: shown(b)) for batch in batches]
+    assert arrays[0] == arrays[1] == arrays[2]
+    assert arrays[0]["numpy.array"] == 8
+    assert shown(batches[2]).kinds.shape[1] == 25  # 24 before: the unit is the last column
+
+
+def test_the_readbacks_new_column_costs_its_texts_and_nothing_more() -> None:
+    # Reading 2,000 rows back: 1,433,685 bytes at the peak before the column, about 717 a row
+    # over 24 columns, and 1,500,145 with it, about 750 a row over 25, measured on 2026-11-26:
+    # 33 bytes a row for a text cell, its text joined for the way out and its place among the
+    # cells, as each text column costs. Four units mixed cost what one does, 1,500,315.
+    rows, contracts = 2_000, 24
+    peaks: list[int] = []
+    for units in (None, OWN, MIXED):
+        batch = trades(
+            (PREMIUM,),
+            a_ticket(rows, contracts, units),
+            a_template(),
+            UNITS,
+            WorkCounter(),
+            CALENDARS,
+        )
+        peaks.append(least_peak(lambda b=batch: shown(b)))
+    for peak in peaks:
+        assert peak <= 751 * rows + 2 * SLACK
+    assert abs(peaks[2] - peaks[0]) <= SLACK

@@ -960,7 +960,10 @@ $cashflows = {
 # the NYMEX lot to the index's barrel of 42 gallons, and the template, the batch, the
 # preparation and the results publish anew, the mark following the lot size; then the ticket's
 # quantity goes to nothing and back, the batch, the preparation and the results remade each
-# time while the template, the history and the market stand.
+# time while the template, the history and the market stand. Last, since #273, the ticket
+# gains fixed_price_unit: typed as the index's own unit the mark stands, as cents a gallon it
+# follows the price's unit, a currency's name fails the batch and its two consumers, and the
+# unit put right brings all three back.
 
 $trades = {
     param($state)
@@ -1093,6 +1096,43 @@ $trades = {
     Check "and the delta 0.002 again" ((Text $state $sheet "D20") -eq "0.002") (Text $state $sheet "D20")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) -and $c.Released -ge 23 }
     Check "and three more published and released, no misses, no disposal errors" ($c.Live -eq 18 -and $c.Released -eq 23 -and $c.Published -eq 41 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+
+    # The fixed price's unit, issue #273. The ticket gains a fifth column, fixed_price_unit, and
+    # the batch's formula reads it: typed as the unit the index quotes in, dollars a barrel, the
+    # batch, the preparation and the results publish anew at the same mark, the old three
+    # released. As cents a gallon the 70 is 29.40 a barrel, and two barrels against 73.5 mark
+    # 88.2. A currency's name is no unit of it: the batch fails in the library's words, the
+    # preparation and the results as its consumers, and all three are released. The unit put
+    # right, all three live again at the mark of 7. The template, the history and the market
+    # stand throughout.
+    $template = Text $state $sheet "D14"
+    $trades = Text $state $sheet "D15"
+    Put $state $sheet "O4" "fixed_price_unit"; Put $state $sheet "O5" "DOLLAR/BBL"
+    Put $state $sheet "D15" "=_CreateTrades(D5,K4:O4,K5:O5,D14,E13)"
+    Check "the unit typed as the index's own gives the batch a new handle" ((Text $state $sheet "D15") -ne $trades -and (Text $state $sheet "D15").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D15")
+    Check "and the same mark, 7" ((Text $state $sheet "D19") -eq "7") (Text $state $sheet "D19")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) -and $c.Released -ge 26 }
+    Check "the old batch, preparation and results are released; eighteen live, three more published" ($c.Live -eq 18 -and $c.Released -eq 26 -and $c.Published -eq 44 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    $trades = Text $state $sheet "D15"
+    Put $state $sheet "O5" "CENT/GAL"
+    Check "a changed unit gives the batch a new handle" ((Text $state $sheet "D15") -ne $trades -and (Text $state $sheet "D15").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D15")
+    Check "and the mark follows the price's unit: 70 cents a gallon is 29.40 a barrel, 88.2" ((Text $state $sheet "D19") -eq "88.2") (Text $state $sheet "D19")
+    Check "the delta is the quantity's and stands, 0.002 lots" ((Text $state $sheet "D20") -eq "0.002") (Text $state $sheet "D20")
+    Check "the template, the history and the market stand" ((Text $state $sheet "D14") -eq $template -and (Text $state $sheet "D9") -eq $history -and (Text $state $sheet "D11") -eq $market) (Text $state $sheet "D14")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) -and $c.Released -ge 29 }
+    Check "three more published and released" ($c.Live -eq 18 -and $c.Released -eq 29 -and $c.Published -eq 47 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Put $state $sheet "O5" "USD/BBL"
+    $failed = Text $state $sheet "D15"
+    Check "a currency's name fails the batch in the library's words, by its row" ($failed -eq "#ERROR _CreateTrades: ValueError: fixed_price_unit of trade at row 1 is 'USD/BBL', expected DOLLAR or CENT before the /") $failed
+    $carried = Text $state $sheet "D17"
+    Check "and the preparation as its consumer, the creator's text carried once" ($carried -eq "#ERROR _PrepareTrades: trades is the creator's failure, expected trades handle: $failed") $carried
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 3) }
+    Check "the batch, the preparation and the results own nothing: fifteen live, three released, nothing published" ($c.Live -eq 15 -and $c.Released -eq 32 -and $c.Published -eq 47) $c.Text
+    Put $state $sheet "O5" "DOLLAR/BBL"
+    Check "the unit put right, the batch is live again" ((Text $state $sheet "D15").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D15")
+    Check "and the mark is 7 again" ((Text $state $sheet "D19") -eq "7") (Text $state $sheet "D19")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) }
+    Check "eighteen live again, three more published, no misses, no disposal errors" ($c.Live -eq 18 -and $c.Released -eq 32 -and $c.Published -eq 50 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 }
 
 # --- valuation ------------------------------------------------------------------------------------

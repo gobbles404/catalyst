@@ -286,18 +286,22 @@ def test_a_second_nearby_window_nets_against_futures_on_the_contracts_it_reads()
 # --- the readback ------------------------------------------------------------------------------
 
 
-def test_the_trades_readback_ends_with_each_rows_nearby_and_then_its_calendar_key() -> None:
+def test_the_trades_readback_ends_with_each_rows_nearby_its_calendar_key_and_its_price_unit() -> (
+    None
+):
     table = shown(booked(1.0, 2.0))
     width = table.kinds.shape[1]
     texts = list(table.texts)
-    # The heading row's end: nearby, and after it, since payment-calendar-keys.md, the key.
-    assert texts[width - 3 : width] == [
+    # The heading row's end: nearby, after it, since payment-calendar-keys.md, the key, and
+    # last, since #273, the unit of the fixed price.
+    assert texts[width - 4 : width] == [
         "settlement_frequency",
         "nearby",
         "payment_holiday_key",
+        "fixed_price_unit",
     ]
-    assert texts[2 * width - 2 : 2 * width] == ["int64", "str"]  # their types beneath
-    assert table.numeric_slots[2:, -2].tolist() == [1.0, 2.0]
+    assert texts[2 * width - 3 : 2 * width] == ["int64", "str", "str"]  # their types beneath
+    assert table.numeric_slots[2:, -3].tolist() == [1.0, 2.0]
 
 
 # --- the refusals ------------------------------------------------------------------------------

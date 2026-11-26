@@ -2290,6 +2290,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "offset",
         "settlement_frequency",
         "nearby",
+        "fixed_price_unit",  # last since #273: the unit the row's fixed price is in
     ]
     assert table[1] == [
         "int64",
@@ -2314,6 +2315,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "float64",
         "str",
         "int64",
+        "str",
     ]
     first = [
         1.0,
@@ -2338,6 +2340,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         -310_000.0,
         "monthly",
         1.0,
+        "DOLLAR/MMBTU",  # no unit typed: the unit the index quotes in, said beside the price
     ]
     assert table[2] == first
     assert table[3][3] == "Z26"  # the schedule's spelling, where the ticket typed z26
@@ -2428,9 +2431,11 @@ def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any
         "offset",
         "settlement_frequency",
         "nearby",
-        "payment_holiday_key",  # last, as entered, since payment-calendar-keys.md
+        "payment_holiday_key",  # as entered, since payment-calendar-keys.md
+        "fixed_price_unit",  # last since #273
     ]
-    assert [line[-1] for line in table[2:]] == [seam_key(sheet["holidays"])] * 2
+    assert [line[-2] for line in table[2:]] == [seam_key(sheet["holidays"])] * 2
+    assert [line[-1] for line in table[2:]] == ["DOLLAR/MMBTU"] * 2
     assert [line[0] for line in table[2:]] == [1.0, 1.0]
     assert [line[14] for line in table[2:]] == ["Z26-F27", "Z26-F27"]  # the strip as typed
     assert [line[2] for line in table[2:]] == ["Z26", "F27"]
@@ -2452,7 +2457,10 @@ def test_a_row_kept_ready_crosses_the_seam_as_a_number_and_reads_back_at_nothing
     assert len(table) == 4  # two heading rows and both components, the second kept at nothing
     assert table[3][:4] == [2.0, 1002.0, 46301.0, "F27"]
     assert table[3][8] == 0.0
-    assert table[3][12:] == ["F27", 46388.0, 46418.0, 31.0, 0.0, 0.0, 0.0, 0.0, "monthly", 1.0]
+    assert table[3][12:] == [
+        *["F27", 46388.0, 46418.0, 31.0, 0.0, 0.0, 0.0, 0.0, "monthly", 1.0],
+        "DOLLAR/MMBTU",
+    ]
     # Zero is a number: the seam's words for anything else stand, and text is never coerced.
     create = ENTRY["_CreateTrades"]
     for cell, words in (
@@ -2502,6 +2510,7 @@ def test_the_spill_keeps_the_entered_quantity_beside_the_days_and_the_months_qua
         "offset",
         "settlement_frequency",
         "nearby",
+        "fixed_price_unit",
     ]
     assert table[1][13:17] == ["datetime64[D]", "datetime64[D]", "int64", "float64"]
     assert [line[13] for line in table[2:]] == [46357.0, 46357.0, 46388.0, 46388.0, 46357.0]
