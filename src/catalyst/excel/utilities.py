@@ -583,7 +583,8 @@ def trades_table(obj: Trades) -> MixedArray:
     # leg whatever the legs, and no column is a leg's price; a float_float, since
     # float-float-spread.md, shows its one price under its own name, spread_price, in the same
     # place, and offset is its spread leg; since float-float-units.md the spread price's two
-    # units follow it, as the batch typed them, on every row.
+    # units follow it, as the batch typed them, on every row; a fixed_float's fixed price's
+    # unit, since #273, is each row's own and the last column.
     terms, encoding = obj.resolved, obj.encoded
     leg, leg_encoding = terms.legs[0], encoding.legs[0]  # the first leg's, the batch's own
     paired = len(terms.legs) > 1
@@ -664,6 +665,14 @@ def trades_table(obj: Trades) -> MixedArray:
     # that no column before it moves: each row's key as entered, where the batch settles
     # financially.
     labels("payment_holiday_key", terms.payment_holiday_key)
+    # fixed_price_unit after it, since #273, appended the same way: the unit each row's fixed
+    # price is in, the currency unit over the quantity unit, DOLLAR/MT, the row's own where it
+    # typed one and the unit the index quotes in where the batch typed none, so that the price
+    # as entered never stands without its unit. A float_float shows its spread price's two
+    # units beside the price, above, and no such column.
+    if terms.instrument is not FLOAT_FLOAT:
+        codes = np.array([unit.code for unit in terms.price_units], dtype=object)
+        text("fixed_price_unit", tuple(codes[terms.price_unit[rows]]))
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
 

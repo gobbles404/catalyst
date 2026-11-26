@@ -384,15 +384,17 @@ $formulas = [ordered]@{
     # refused by name.
     '=MID(XV23,FIND(":",XV23)+1,12)'     = "trades:ROLL:"
     "=ROWS(util_ReadHandle(XV23))"      = "4"
-    # The nearby the column before the last since payment-calendar-keys.md, which appends each
-    # row's payment holiday key, as entered, after it.
-    "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23))-1)" = "nearby"
-    "=INDEX(util_ReadHandle(XV23),2,COLUMNS(util_ReadHandle(XV23))-1)" = "int64"
-    "=INDEX(util_ReadHandle(XV23),3,COLUMNS(util_ReadHandle(XV23))-1)" = "1"
-    "=INDEX(util_ReadHandle(XV23),4,COLUMNS(util_ReadHandle(XV23))-1)" = "2"
-    "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23)))" = "payment_holiday_key"
-    "=INDEX(util_ReadHandle(XV23),2,COLUMNS(util_ReadHandle(XV23)))" = "str"
-    "=INDEX(util_ReadHandle(XV23),3,COLUMNS(util_ReadHandle(XV23)))&INDEX(util_ReadHandle(XV23),4,COLUMNS(util_ReadHandle(XV23)))" = "XV2XV2"
+    # The nearby the third column from the last: payment-calendar-keys.md appends each row's
+    # payment holiday key, as entered, after it, and #273 the unit of its fixed price after that.
+    "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23))-2)" = "nearby"
+    "=INDEX(util_ReadHandle(XV23),2,COLUMNS(util_ReadHandle(XV23))-2)" = "int64"
+    "=INDEX(util_ReadHandle(XV23),3,COLUMNS(util_ReadHandle(XV23))-2)" = "1"
+    "=INDEX(util_ReadHandle(XV23),4,COLUMNS(util_ReadHandle(XV23))-2)" = "2"
+    "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23))-1)" = "payment_holiday_key"
+    "=INDEX(util_ReadHandle(XV23),2,COLUMNS(util_ReadHandle(XV23))-1)" = "str"
+    "=INDEX(util_ReadHandle(XV23),3,COLUMNS(util_ReadHandle(XV23))-1)&INDEX(util_ReadHandle(XV23),4,COLUMNS(util_ReadHandle(XV23))-1)" = "XV2XV2"
+    "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23)))" = "fixed_price_unit"
+    "=INDEX(util_ReadHandle(XV23),3,COLUMNS(util_ReadHandle(XV23)))&INDEX(util_ReadHandle(XV23),4,COLUMNS(util_ReadHandle(XV23)))" = "DOLLAR/BBLDOLLAR/BBL"
     "=ROWS(util_ReadHandle(XV24))"      = "6"
     "=INDEX(util_ReadHandle(XV24),3,1)" = "M26"
     "=INDEX(util_ReadHandle(XV24),4,1)" = "N26"
@@ -803,7 +805,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW8),3,18)" = "10000"
     "=INDEX(util_ReadHandle(EW8),3,20)" = "-700000"
     "=ROWS(util_ReadHandle(EW8))"      = "5"
-    "=COLUMNS(util_ReadHandle(EW8))"   = "22"
+    "=COLUMNS(util_ReadHandle(EW8))"   = "23"
     "=INDEX(util_ReadHandle(EW13),1,13)" = "payment_date"
     "=INDEX(util_ReadHandle(EW13),3,3)"  = "q26"
     "=INDEX(util_ReadHandle(EW13),4,3)"  = "u26"
@@ -811,7 +813,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW13),3,13)" = "46226"
     "=INDEX(util_ReadHandle(EW13),4,13)" = "46258"
     "=ROWS(util_ReadHandle(EW13))"       = "4"
-    "=COLUMNS(util_ReadHandle(EW13))"    = "24"
+    "=COLUMNS(util_ReadHandle(EW13))"    = "25"
     '=_CreateTradeTemplate("Future",EW1:FC1,EW2:FC2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'"
     '=_CreateTradeTemplate("fixed_float",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate, last3day or asian"
     '=_CreateTradeTemplate("fixed_float",HSTACK(FA1,EZ4),HSTACK(FA2,EZ15))' = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
@@ -973,7 +975,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(GP4),3,5)"   = "penultimate"
     "=INDEX(util_ReadHandle(GP4),3,13)"  = "+1bd"
     "=INDEX(util_ReadHandle(GP4),3,14)"  = "46195"
-    "=COLUMNS(util_ReadHandle(GP4))"     = "25"
+    "=COLUMNS(util_ReadHandle(GP4))"     = "26"
     "=INDEX(util_ReadHandle(GP5),3,1)"   = "n26"
     "=INDEX(util_ReadHandle(GP5),3,3)"   = "46192"
     "=INDEX(util_ReadHandle(GP5),3,4)"   = "46195"
@@ -1051,7 +1053,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(IS12),4,19)" = "3100"
     "=INDEX(util_ReadHandle(IS12),5,19)" = "3410"
     "=INDEX(util_ReadHandle(IS12),5,20)" = "3410"
-    "=COLUMNS(util_ReadHandle(IS12))"    = "25"
+    "=COLUMNS(util_ReadHandle(IS12))"    = "26"
     "=INDEX(_ReportValues(IY18),3,1)"    = "96.1"
     '=INDEX(_ReportRisk(IY18,"nominal_delta","year"),4,2)'      = "3255"
     "=INDEX(_ReportValues(IY20),3,1)"    = "96.1"
@@ -1412,7 +1414,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(OR23),3,19)"   = "50"
     "=INDEX(util_ReadHandle(OR23),3,20)"   = "20"
     "=INDEX(util_ReadHandle(OR23),3,23)"   = "USD"
-    "=COLUMNS(util_ReadHandle(OR16))"      = "26"
+    "=COLUMNS(util_ReadHandle(OR16))"      = "27"
     "=INDEX(util_ReadHandle(OR16),1,9)"    = "broker"
     "=INDEX(util_ReadHandle(OR16),3,9)"    = "ION"
     "=INDEX(_ReportReserves(IY16),3,1)"    = "0"
@@ -1441,7 +1443,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(OR39),3,2)"    = "24"
     "=INDEX(_ReportReserves(OR39),3,3)"    = "65"
     "=INDEX(_ReportReserves(OR39),3,5)"    = "USD"
-    "=COLUMNS(util_ReadHandle(OR37))"      = "27"
+    "=COLUMNS(util_ReadHandle(OR37))"      = "28"
     "=INDEX(util_ReadHandle(OR37),1,16)"   = "marketing_reserve"
     "=INDEX(util_ReadHandle(OR37),2,16)"   = "float64"
     "=INDEX(util_ReadHandle(OR37),3,16)"   = "15"
@@ -1463,7 +1465,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(OR67),3,1)"    = "0"
     "=INDEX(_ReportReserves(OR67),3,2)"    = "20"
     "=INDEX(_ReportValues(OR67),3,1)"      = "1260"
-    "=COLUMNS(util_ReadHandle(OR65))"      = "25"
+    "=COLUMNS(util_ReadHandle(OR65))"      = "26"
     "=INDEX(_ReportReserves(OR76),3,1)"    = "20"
     "=INDEX(_ReportReserves(OR76),3,2)"    = "20"
     "=INDEX(util_ReadHandle(OR74),1,9)"    = "broker"
@@ -1494,7 +1496,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(OR86),3,3)"    = "0"
     "=INDEX(_ReportReserves(OR86),3,4)"    = "-15"
     "=INDEX(_ReportReserves(OR86),3,5)"    = "USD"
-    "=COLUMNS(util_ReadHandle(OR84))"      = "27"
+    "=COLUMNS(util_ReadHandle(OR84))"      = "28"
     "=INDEX(util_ReadHandle(OR84),1,16)"   = "cva_reserve"
     "=INDEX(util_ReadHandle(OR84),2,16)"   = "float64"
     "=INDEX(util_ReadHandle(OR84),3,16)"   = "25"
@@ -1531,7 +1533,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(OR146),3,4)"   = "3E-308"
     "=INDEX(_ReportReserves(OR159),3,4)"   = "3E-308"
     "=INDEX(_ReportReserves(OR159),3,1)"   = "180"
-    "=COLUMNS(util_ReadHandle(OR52))"      = "26"
+    "=COLUMNS(util_ReadHandle(OR52))"      = "27"
     "=INDEX(util_ReadHandle(OR52),1,9)"    = "discount_curve_key"
     "=INDEX(util_ReadHandle(OR52),3,9)"    = "SOFR"
     "=INDEX(util_ReadHandle(OR52),1,8)"    = "counterparty"
@@ -1814,6 +1816,48 @@ $formulas = [ordered]@{
     '=_Quote(AAP11,"BALU26",AAP39,"flat")' = "3.5"
     '=_QuoteByDates(AAP11,DATE(2026,9,16),DATE(2026,9,30),AAP39,"ftc")' = "3.5"
     '=_Quote(AAP11,"U26",AAP41,"flat")'    = "#ERROR _Quote: ValueError: schedule_method of the quote is 'lastday' on U26, a month of 4 prints, expected a month of one print; lastday is a month's one print, and asian averages several"
+    # A fixed price in a unit of its own, issue #273, on a premium index quoted in dollars a
+    # pound, ABB3: the ROLL index's schedule and days under a lot of 55,116 pounds, a pound and a
+    # tonne, its delta in lots. The ticket of ABD12:ABJ16 books four rows of N26 in ABB10, each
+    # its own quantity word and its own fixed_price_unit: 50 tonnes at 1,870 dollars a tonne,
+    # 275,578 pounds at 0.91 a pound, two lots at 1,870 a tonne and 50 tonnes at 91 cents a
+    # pound. The readback's last column is each row's unit and the price stands as entered; the
+    # fixed legs are 93,500, 250,775.98, 93,500.74 and 100,310.33. Valued in ABB12 with N26 at
+    # 0.95 a pound: 37,871.60, on a shade under eleven lots. ABB13 is the second row with no
+    # unit typed, the index's own read back; ABB15 the first row under a template whose unit is
+    # DOLLAR/MT. Then the refusals: a currency's name, a hyphen, a barrel, the row's own
+    # quantity word, a blank cell, the template and the ticket both, a template's unit of one
+    # code, and the field in a quote template.
+    '=MID(ABB10,FIND(":",ABB10)+1,11)' = "trades:AUP:"
+    "=INDEX(util_ReadHandle(ABB10),1,COLUMNS(util_ReadHandle(ABB10)))" = "fixed_price_unit"
+    "=INDEX(util_ReadHandle(ABB10),2,COLUMNS(util_ReadHandle(ABB10)))" = "str"
+    "=INDEX(util_ReadHandle(ABB10),1,COLUMNS(util_ReadHandle(ABB10))-1)" = "payment_holiday_key"
+    '=TEXTJOIN(" ",TRUE,DROP(TAKE(util_ReadHandle(ABB10),,-1),2))' = "DOLLAR/MT DOLLAR/LB DOLLAR/MT CENT/LB"
+    '=TEXTJOIN(" ",TRUE,DROP(CHOOSECOLS(util_ReadHandle(ABB10),MATCH("fixed_price",TAKE(util_ReadHandle(ABB10),1),0)),2))' = "1870 0.91 1870 91"
+    '=TEXTJOIN(" ",TRUE,DROP(CHOOSECOLS(util_ReadHandle(ABB10),MATCH("quantity_unit",TAKE(util_ReadHandle(ABB10),1),0)),2))' = "mt lb lots mt"
+    '=TEXT(INDEX(util_ReadHandle(ABB10),3,MATCH("offset",TAKE(util_ReadHandle(ABB10),1),0)),"0.00")' = "-93500.00"
+    '=TEXT(INDEX(util_ReadHandle(ABB10),4,MATCH("offset",TAKE(util_ReadHandle(ABB10),1),0)),"0.00")' = "-250775.98"
+    '=TEXT(INDEX(util_ReadHandle(ABB10),5,MATCH("offset",TAKE(util_ReadHandle(ABB10),1),0)),"0.00")' = "-93500.74"
+    '=TEXT(INDEX(util_ReadHandle(ABB10),6,MATCH("offset",TAKE(util_ReadHandle(ABB10),1),0)),"0.00")' = "-100310.33"
+    '=TEXT(INDEX(_ReportValues(ABB12),3,1),"0.00")' = "37871.60"
+    "=INDEX(_ReportValues(ABB12),3,2)" = "0"
+    '=TEXT(INDEX(_ReportRisk(ABB12,"nominal_delta","year"),4,2),"0.000000")' = "10.999932"
+    "=INDEX(util_ReadHandle(ABB13),3,COLUMNS(util_ReadHandle(ABB13)))" = "DOLLAR/LB"
+    '=TEXT(INDEX(util_ReadHandle(ABB13),3,MATCH("offset",TAKE(util_ReadHandle(ABB13),1),0)),"0.00")' = "-250775.98"
+    "=INDEX(util_ReadHandle(ABB15),3,COLUMNS(util_ReadHandle(ABB15)))" = "DOLLAR/MT"
+    '=TEXT(INDEX(util_ReadHandle(ABB15),3,MATCH("offset",TAKE(util_ReadHandle(ABB15),1),0)),"0.00")' = "-93500.00"
+    '=INDEX(_ShowInstrument("fixed_float"),1,25)' = "fixed_price_unit"
+    '=INDEX(_ShowInstrument("fixed_float"),3,25)' = "FALSE"
+    '=INDEX(_ShowInstrument("fixed_float"),5,25)' = "code"
+    '=INDEX(_ShowInstrument("fixed_float"),8,25)' = "FALSE"
+    "=_CreateTrades(ABB3,ABD12:ABJ12,ABD18:ABJ18,ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_unit of trade 5 at row 1 is 'USD/MT', expected DOLLAR or CENT before the /"
+    "=_CreateTrades(ABB3,ABD12:ABJ12,ABD19:ABJ19,ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_unit row 1 is 'DOLLAR-MT', expected a currency unit and a quantity unit joined by one /, such as DOLLAR/MT"
+    "=_CreateTrades(ABB3,ABD12:ABJ12,ABD20:ABJ20,ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_unit of trade 7 at row 1 is 'DOLLAR/BBL', expected a MASS unit, KG, LB, MT, ST, LT, G, OZT or CWT_US, after the /"
+    "=_CreateTrades(ABB3,ABD12:ABJ12,ABD21:ABJ21,ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_unit of trade 8 at row 1 is 'DOLLAR/lots', expected a MASS unit, KG, LB, MT, ST, LT, G, OZT or CWT_US, after the /"
+    "=_CreateTrades(ABB3,ABD12:ABJ12,ABD22:ABJ22,ABB9,ZU1)" = "#ERROR _CreateTrades: trade_rows cell (1, 7) is blank, expected text"
+    "=_CreateTrades(ABB3,ABD12:ABJ12,ABD13:ABJ13,ABB14,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_unit is supplied by the template and by the ticket, expected by one of them"
+    '=_CreateTradeTemplate("fixed_float",HSTACK(ABD9:ABL9,"fixed_price_unit"),HSTACK(ABD10:ABL10,"DOLLAR"))' = "#ERROR _CreateTradeTemplate: ValueError: fixed_price_unit is 'DOLLAR', expected a currency unit and a quantity unit joined by one /, such as DOLLAR/MT"
+    '=_CreateQuoteTemplate("fixed_float",HSTACK(XQ47:XX47,"fixed_price_unit"),HSTACK(XQ50:XX50,"DOLLAR/MT"),ZU1)' = "#ERROR _CreateQuoteTemplate: ValueError: fixed_price_unit is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_key, settlement_frequency, nearby"
     # The Gas Daily schedule: a creator over three contract months, their codes and the first and
     # last day of gas of each, in DG to DI, and over the first row alone, read back through
     # util_ReadHandle; a first-date column one row long and a last-date column one row short, the
@@ -1892,7 +1936,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(PV6),5,19)" = "90"
     "=INDEX(util_ReadHandle(PV6),3,14)" = "46328"
     "=INDEX(util_ReadHandle(PV6),5,14)" = "46316"
-    "=COLUMNS(util_ReadHandle(PV6))"    = "25"
+    "=COLUMNS(util_ReadHandle(PV6))"    = "26"
     "=ROWS(util_ReadHandle(QE14))"      = "31"
     "=INDEX(_ReportValues(QE15),3,1)"   = "580"
     '=ROUND(INDEX(_ReportRisk(QE15,"nominal_delta","year"),4,2),6)' = "0.29"
@@ -2538,7 +2582,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(WJ24,"all","day"),7,1)' = "46756"
     '=INDEX(_ReportRisk(WJ24,"all","day"),7,6)' = "-0.095"
     "=ROWS(util_ReadHandle(WJ22))"       = "3"
-    "=COLUMNS(util_ReadHandle(WJ22))"    = "27"
+    "=COLUMNS(util_ReadHandle(WJ22))"    = "28"
     "=INDEX(util_ReadHandle(WJ22),1,6)"  = "second_schedule_method"
     "=INDEX(util_ReadHandle(WJ22),3,6)"  = "lastday"
     "=INDEX(util_ReadHandle(WJ22),1,14)" = "fixed_price"
@@ -2576,7 +2620,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(WJ32),3,1)"  = "0"
     "=INDEX(_ReportReserves(WJ32),3,4)"  = "-40"
     "=INDEX(_ReportReserves(WJ32),3,5)"  = "USD"
-    "=COLUMNS(util_ReadHandle(WJ30))"    = "28"
+    "=COLUMNS(util_ReadHandle(WJ30))"    = "29"
     "=INDEX(util_ReadHandle(WJ30),1,17)" = "cva_reserve"
     "=INDEX(util_ReadHandle(WJ30),3,17)" = "-40"
     # the group's payment, NPV and DV01 once, the trade's; since two-index-one-price.md no leg
@@ -3819,6 +3863,45 @@ $cells = [ordered]@{
     "AAP39" = '=_CreateQuoteTemplate("fixed_float",AAR38:AAY38,AAR39:AAY39,ZU1)'
     "AAR41" = "cleared"; "AAS41" = "financial"; "AAT41" = "lastday"; "AAU41" = "month"; "AAV41" = "+5bd"; "AAW41" = "NK2"; "AAX41" = "monthly"; "AAY41" = "1"
     "AAP41" = '=_CreateQuoteTemplate("fixed_float",AAR38:AAY38,AAR41:AAY41,ZU1)'
+    # A fixed price in a unit of its own, issue #273: a premium index quoted in dollars a pound
+    # in ABB3, over the ROLL index's schedule, holiday calendar and valuation day, its three
+    # specifications in ABD1:ABH3, a lot of 55,116 pounds, a pound and a tonne; its history in
+    # ABB6 over the ROLL index's days, typed below, and its market in ABB8, N26 at 0.95; a
+    # cleared template in ABB9 that leaves the quantity unit to each row; the ticket's headers
+    # in ABD12:ABJ12, fixed_price_unit its last, and four rows of N26 under them; the batch,
+    # its preparation and its values in ABB10:ABB12; the second row with no unit column in
+    # ABB13; a template whose unit is DOLLAR/MT in ABB14 and the first row under it in ABB15;
+    # and rows 18 to 22 for the creator to refuse, the last with no unit in its cell.
+    "ABD1" = "lots"; "ABE1" = "55116"; "ABF1" = "LB"; "ABG1" = "0"; "ABH1" = "0"
+    "ABD2" = "lb"; "ABE2" = "1"; "ABF2" = "LB"; "ABG2" = "0"; "ABH2" = "0"
+    "ABD3" = "mt"; "ABE3" = "1"; "ABF3" = "MT"; "ABG3" = "0"; "ABH3" = "0"
+    "ABB1" = '=_CreateIndexConventions("DOLLAR","LB","DOLLAR","MASS","LB")'
+    "ABB2" = "=_CreateContractSpecifications(EI1:EM1,ABD1:ABH3)"
+    "ABB3" = '=_CreateIndex("AUP","A sample aluminium premium, dollars a pound",XV1,ABB1,ABB2,"XV2","lots",ZU1)'
+    "ABB4" = "=_CreateCalendar(XV6,ABB3)"
+    "ABB6" = "=_CreateMarketHistory(ABB4,ABB5)"
+    "ABD5" = "0.95"; "ABD6" = "0.96"; "ABD7" = "0.97"
+    "ABB7" = '=_CreatePriceVector("AUP",ABD5:ABD7)'
+    "ABB8" = "=_CreateMarket(ABB6,ABB7)"
+    "ABD9" = "quantity_per"; "ABE9" = "settlement_frequency"; "ABF9" = "nearby"; "ABG9" = "schedule_method"; "ABH9" = "route"; "ABI9" = "settlement_method"; "ABJ9" = "clearing_house"; "ABK9" = "payment_day"; "ABL9" = "payment_holiday_key"
+    "ABD10" = "month"; "ABE10" = "monthly"; "ABF10" = "1"; "ABG10" = "lastday"; "ABH10" = "cleared"; "ABI10" = "financial"; "ABJ10" = "CME Clearing"; "ABK10" = "+2bd"; "ABL10" = "XV2"
+    "ABB9" = '=_CreateTradeTemplate("fixed_float",ABD9:ABL9,ABD10:ABL10)'
+    "ABD12" = "trade_id"; "ABE12" = "trade_date"; "ABF12" = "contract_code"; "ABG12" = "quantity"; "ABH12" = "quantity_unit"; "ABI12" = "fixed_price"; "ABJ12" = "fixed_price_unit"
+    "ABD13" = "1"; "ABE13" = "1-Jun-2026"; "ABF13" = "N26"; "ABG13" = "50"; "ABH13" = "mt"; "ABI13" = "1870"; "ABJ13" = "DOLLAR/MT"
+    "ABD14" = "2"; "ABE14" = "1-Jun-2026"; "ABF14" = "N26"; "ABG14" = "275578"; "ABH14" = "lb"; "ABI14" = "0.91"; "ABJ14" = "DOLLAR/LB"
+    "ABD15" = "3"; "ABE15" = "1-Jun-2026"; "ABF15" = "N26"; "ABG15" = "2"; "ABH15" = "lots"; "ABI15" = "1870"; "ABJ15" = "DOLLAR/MT"
+    "ABD16" = "4"; "ABE16" = "1-Jun-2026"; "ABF16" = "N26"; "ABG16" = "50"; "ABH16" = "mt"; "ABI16" = "91"; "ABJ16" = "CENT/LB"
+    "ABB10" = "=_CreateTrades(ABB3,ABD12:ABJ12,ABD13:ABJ16,ABB9,ZU1)"
+    "ABB11" = "=_PrepareTrades(ABB10,ABB6)"
+    "ABB12" = "=_EvaluateTrades(ABB11,ABB8)"
+    "ABB13" = "=_CreateTrades(ABB3,ABD12:ABI12,ABD14:ABI14,ABB9,ZU1)"
+    "ABB14" = '=_CreateTradeTemplate("fixed_float",HSTACK(ABD9:ABL9,"fixed_price_unit"),HSTACK(ABD10:ABL10,"DOLLAR/MT"))'
+    "ABB15" = "=_CreateTrades(ABB3,ABD12:ABI12,ABD13:ABI13,ABB14,ZU1)"
+    "ABD18" = "5"; "ABE18" = "1-Jun-2026"; "ABF18" = "N26"; "ABG18" = "2"; "ABH18" = "lots"; "ABI18" = "1870"; "ABJ18" = "USD/MT"
+    "ABD19" = "6"; "ABE19" = "1-Jun-2026"; "ABF19" = "N26"; "ABG19" = "2"; "ABH19" = "lots"; "ABI19" = "1870"; "ABJ19" = "DOLLAR-MT"
+    "ABD20" = "7"; "ABE20" = "1-Jun-2026"; "ABF20" = "N26"; "ABG20" = "2"; "ABH20" = "lots"; "ABI20" = "1870"; "ABJ20" = "DOLLAR/BBL"
+    "ABD21" = "8"; "ABE21" = "1-Jun-2026"; "ABF21" = "N26"; "ABG21" = "2"; "ABH21" = "lots"; "ABI21" = "1870"; "ABJ21" = "DOLLAR/lots"
+    "ABD22" = "9"; "ABE22" = "1-Jun-2026"; "ABF22" = "N26"; "ABG22" = "2"; "ABH22" = "lots"; "ABI22" = "1870"
     # The Gas Daily schedule: three contract months of Henry Hub Gas Daily, the first and last day
     # of gas of each, a fourth first date for a column one row long, a copy of the last-date column
     # with a blank, a code over a number, and two creator cells, over the three rows and over the
@@ -4690,6 +4773,9 @@ while ($rollDay -ge [datetime]"2026-05-18") {
 $rollRows = $rollRow - 1
 $cells["XV8"] = "=_CreateFuturesFixings(XX1:XX$rollRows,XY1:XZ$rollRows,XV5)"
 $cells["XV10"] = "=_CreateFuturesFixings(XX1:XX$rollRows,XY1:XY$rollRows,XV5)"
+# The premium index's fixings, issue #273: the ROLL index's days and its prompt settles, the
+# two sharing a schedule and a valuation day; no observation of the premium's ticket has fixed.
+$cells["ABB5"] = "=_CreateFuturesFixings(XX1:XX$rollRows,XY1:XY$rollRows,ABB3)"
 
 # --- the two builds ----------------------------------------------------------
 # The add-in is built once and loaded twice, each time in a hidden Excel of our own and each

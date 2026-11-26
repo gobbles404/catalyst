@@ -1268,7 +1268,9 @@ namespace Catalyst.Host.Tests
             Assert.StartsWith(Pid + ":trades:Henry Hub NYMEX:", trades);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
             Assert.Equal(8, spill.GetLength(0));
-            Assert.Equal(22, spill.GetLength(1));  // settlement_frequency, then nearby last since nearby-selection.md
+            Assert.Equal(23, spill.GetLength(1));  // settlement_frequency, nearby, and since #273 the fixed price's unit last
+            Assert.Equal("fixed_price_unit", spill[0, 22]);
+            Assert.Equal("DOLLAR/MMBTU", spill[2, 22]);  // no unit typed: the unit the index quotes in
             Assert.Equal("row", spill[0, 0]);
             Assert.Equal("covered_days", spill[0, 15]);
             Assert.Equal("component_quantity", spill[0, 16]);
@@ -1301,7 +1303,7 @@ namespace Catalyst.Host.Tests
             var financial = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key"), Row("NYMEX NG", "month", "monthly", 1.0, "lastday", "cleared", "financial", "TEST", "+2bd", holidays));
             var strip = (object[,])Seam.Call("util_ReadHandle", (string)Trades(ng, Row("trade_date", "contract_code", "quantity", "fixed_price"), Row(46289.0, "Z26-F27", 3.0, 3.2), financial));
             Assert.Equal(4, strip.GetLength(0));
-            Assert.Equal(24, strip.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
+            Assert.Equal(25, strip.GetLength(1));  // payment_holiday_key, then since #273 the fixed price's unit last
             Assert.Equal("payment_date", strip[0, 12]);
             Assert.Equal("+2bd", strip[2, 11]);
             Assert.Equal(46356.0, strip[2, 12]);
@@ -1709,7 +1711,8 @@ namespace Catalyst.Host.Tests
             Assert.StartsWith(Pid + ":trades:KEYED:", trades);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
             var paid = Heading(spill, "payment_date");
-            var last = spill.GetLength(1) - 1;
+            var last = spill.GetLength(1) - 2;  // the key, before the fixed price's unit, the last column since #273
+            Assert.Equal("fixed_price_unit", spill[0, last + 1]);
             Assert.Equal(46356.0, spill[2, paid]);
             Assert.Equal(46357.0, spill[3, paid]);
             Assert.Equal(46358.0, spill[4, paid]);
@@ -2024,7 +2027,7 @@ namespace Catalyst.Host.Tests
             var rows = new object[,] { { 1.0, 46153.0, "n26", 2.0, 70.0 }, { 2.0, 46153.0, "q26", -1.0, 72.0 } };
             var trades = (string)Trades(index, headers, rows, template);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
-            Assert.Equal(25, spill.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
+            Assert.Equal(26, spill.GetLength(1));  // payment_holiday_key, then since #273 the fixed price's unit last
             Assert.Equal("penultimate", spill[2, 4]);
             Assert.Equal("payment_date", spill[0, 13]);
             Assert.Equal(46195.0, spill[2, 13]);
@@ -2170,7 +2173,7 @@ namespace Catalyst.Host.Tests
             var rows = new object[,] { { 3.0, 46289.0, "X26-Z26", 100.0, 3.0 }, { 4.0, 46289.0, "Z26", 110.0, 3.0 } };
             var spill = (object[,])Seam.Call("util_ReadHandle", (string)Trades(ng, headers, rows, template));
             Assert.Equal(5, spill.GetLength(0));
-            Assert.Equal(22, spill.GetLength(1));
+            Assert.Equal(23, spill.GetLength(1));
             Assert.Equal("covered_days", spill[0, 15]);
             Assert.Equal("int64", spill[1, 15]);
             Assert.Equal("component_quantity", spill[0, 16]);
@@ -2217,7 +2220,7 @@ namespace Catalyst.Host.Tests
             var rows = new object[,] { { 16.0, 46346.0, start, end, 2000.0, 0.25 }, { 17.0, 46346.0, first, last, 2200.0, 0.25 } };
             var trades = (string)Trades(index, headers, rows, template);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
-            Assert.Equal(25, spill.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
+            Assert.Equal(26, spill.GetLength(1));  // payment_holiday_key, then since #273 the fixed price's unit last
             Assert.Equal("Z26", spill[2, 3]);
             Assert.Equal("start_date", spill[0, 15]);
             Assert.Equal(46371.0, spill[2, 15]);
@@ -2729,6 +2732,81 @@ namespace Catalyst.Host.Tests
             Assert.Equal(81.0, alone[33, 4]);
         }
 
+        // A fixed price in a unit of its own, issue #273. A premium index quoted in dollars a pound,
+        // with a lot of 55,116 pounds, a pound and a tonne, its delta in lots; four rows of G27 in one
+        // ticket, each its own quantity word and its own fixed_price_unit: 50 tonnes at 1,870 dollars
+        // a tonne, 275,578 pounds at 0.91 a pound, two lots at 1,870 a tonne and 50 tonnes at 91
+        // cents a pound. The readback's last column is each row's unit and the price stands as
+        // entered; the fixed legs are 93,500, 250,775.98, 93,500.74 and 100,310.33; with G27 at 0.95
+        // a pound the batch is worth 37,871.60 on a shade under eleven lots. A row with no unit typed
+        // reads back the unit the index quotes in, and a template's one unit is every row's. Then the
+        // refusals, the library's words and the seam's.
+        [Fact]
+        public void a_fixed_price_takes_a_unit_of_its_own_and_reads_it_back()
+        {
+            var schedule = Seam.Call("_CreateFuturesSchedule", Column("F27", "G27", "H27"), Column(46385.0, 46414.0, 46442.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0);
+            var conventions = Seam.Call("_CreateIndexConventions", "DOLLAR", "LB", "DOLLAR", "MASS", "LB");
+            var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "lots", 55116.0, "LB", 0.0, 0.0 }, { "lb", 1.0, "LB", 0.0, 0.0 }, { "mt", 1.0, "MT", 0.0, 0.0 } });
+            var index = (string)Seam.Call("_CreateIndex", "AUP", "A sample aluminium premium, dollars a pound", schedule, conventions, specifications, Key(holidays), "lots", Calendars());
+            Assert.StartsWith(Pid + ":index:AUP:", index);
+            var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46391.0, 0.5), index);
+            var history = (string)Seam.Call("_CreateMarketHistory", calendar, (string)Seam.Call("_CreateFuturesFixings", Column(46387.0, 46386.0), Column(0.93, 0.92), index));
+            var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "AUP", Column(0.95, 0.96)));
+            var fields = Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key");
+            var template = (string)Template("_CreateTradeTemplate", "fixed_float", fields, Row("month", "monthly", 1.0, "lastday", "cleared", "financial", "CME Clearing", "+2bd", holidays));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "fixed_price_unit");
+            var plain = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price");
+            var rows = new object[,] { { 1.0, 46371.0, "G27", 50.0, "mt", 1870.0, "DOLLAR/MT" }, { 2.0, 46371.0, "G27", 275578.0, "lb", 0.91, "DOLLAR/LB" }, { 3.0, 46371.0, "G27", 2.0, "lots", 1870.0, "DOLLAR/MT" }, { 4.0, 46371.0, "G27", 50.0, "mt", 91.0, "CENT/LB" } };
+            var trades = (string)Trades(index, headers, rows, template);
+            Assert.StartsWith(Pid + ":trades:AUP:", trades);
+            var spill = (object[,])Seam.Call("util_ReadHandle", trades);
+            var last = spill.GetLength(1) - 1;
+            Assert.Equal(6, spill.GetLength(0));
+            Assert.Equal("fixed_price_unit", spill[0, last]);
+            Assert.Equal("str", spill[1, last]);
+            Assert.Equal("payment_holiday_key", spill[0, last - 1]);
+            Assert.Equal("DOLLAR/MT", spill[2, last]);
+            Assert.Equal("DOLLAR/LB", spill[3, last]);
+            Assert.Equal("DOLLAR/MT", spill[4, last]);
+            Assert.Equal("CENT/LB", spill[5, last]);
+            var price = Heading(spill, "fixed_price");
+            Assert.Equal(1870.0, spill[2, price]);  // as entered, never restated
+            Assert.Equal(0.91, spill[3, price]);
+            Assert.Equal(91.0, spill[5, price]);
+            var offset = Heading(spill, "offset");
+            Assert.Equal(-93500.0, spill[2, offset]);  // 50 tonnes at 1,870, to the cent
+            Assert.Equal(-250775.98, (double)spill[3, offset], 6);
+            Assert.Equal(-93500.7370228008, (double)spill[4, offset], 6);  // 110,232 pounds are 50.0004 tonnes
+            Assert.Equal(-100310.3292941193, (double)spill[5, offset], 6);  // 50 tonnes are 110,231.13 pounds, at 0.91
+            var results = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", trades, history), market, ExcelMissing.Value);
+            var values = (object[,])Seam.Call("_ReportValues", results);
+            Assert.Equal("cleared_mark", values[0, 0]);
+            Assert.Equal(37871.60275871356, (double)values[2, 0], 6);
+            Assert.Equal(0.0, values[2, 1]);
+            var delta = (object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year");
+            Assert.Equal("Total", delta[3, 0]);
+            Assert.Equal(10.999932182757778, (double)delta[3, 1], 9);  // 606,272.26 pounds in lots of 55,116
+            // No unit typed: the index's own, said beside the price.
+            var unitless = (object[,])Seam.Call("util_ReadHandle", (string)Trades(index, plain, Row(2.0, 46371.0, "G27", 275578.0, "lb", 0.91), template));
+            Assert.Equal("DOLLAR/LB", unitless[2, unitless.GetLength(1) - 1]);
+            Assert.Equal(-250775.98, (double)unitless[2, Heading(unitless, "offset")], 6);
+            // A template's one unit, every row's; and never the template and the ticket both.
+            var tonnes = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_key", "fixed_price_unit"), Row("month", "monthly", 1.0, "lastday", "cleared", "financial", "CME Clearing", "+2bd", holidays, "DOLLAR/MT"));
+            var byTemplate = (object[,])Seam.Call("util_ReadHandle", (string)Trades(index, plain, Row(1.0, 46371.0, "G27", 50.0, "mt", 1870.0), tonnes));
+            Assert.Equal("DOLLAR/MT", byTemplate[2, byTemplate.GetLength(1) - 1]);
+            Assert.Equal(-93500.0, byTemplate[2, Heading(byTemplate, "offset")]);
+            Assert.Equal("#ERROR _CreateTrades: ValueError: fixed_price_unit is supplied by the template and by the ticket, expected by one of them", Trades(index, headers, Row(1.0, 46371.0, "G27", 50.0, "mt", 1870.0, "DOLLAR/MT"), tonnes));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: fixed_price_unit of trade 5 at row 1 is 'USD/MT', expected DOLLAR or CENT before the /", Trades(index, headers, Row(5.0, 46371.0, "G27", 2.0, "lots", 1870.0, "USD/MT"), template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: fixed_price_unit row 1 is 'DOLLAR-MT', expected a currency unit and a quantity unit joined by one /, such as DOLLAR/MT", Trades(index, headers, Row(6.0, 46371.0, "G27", 2.0, "lots", 1870.0, "DOLLAR-MT"), template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: fixed_price_unit of trade 7 at row 1 is 'DOLLAR/BBL', expected a MASS unit, KG, LB, MT, ST, LT, G, OZT or CWT_US, after the /", Trades(index, headers, Row(7.0, 46371.0, "G27", 2.0, "lots", 1870.0, "DOLLAR/BBL"), template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: fixed_price_unit of trade 8 at row 1 is 'DOLLAR/lots', expected a MASS unit, KG, LB, MT, ST, LT, G, OZT or CWT_US, after the /", Trades(index, headers, Row(8.0, 46371.0, "G27", 2.0, "lots", 1870.0, "DOLLAR/lots"), template));
+            Assert.Equal("#ERROR _CreateTrades: trade_rows cell (1, 7) is blank, expected text", Trades(index, headers, Row(9.0, 46371.0, "G27", 2.0, "lots", 1870.0, ExcelEmpty.Value), template));
+            Assert.Equal("#ERROR _CreateTradeTemplate: ValueError: fixed_price_unit is 'DOLLAR', expected a currency unit and a quantity unit joined by one /, such as DOLLAR/MT", Seam.Call("_CreateTradeTemplate", "fixed_float", Row("fixed_price_unit"), Row("DOLLAR")));
+            Assert.StartsWith("#ERROR _CreateTradeTemplate: fields cell (1, 1) is text 'fixed_price_unit', expected a field of float_float: ", (string)Seam.Call("_CreateTradeTemplate", "float_float", Row("fixed_price_unit"), Row("DOLLAR/MT")));
+            Assert.StartsWith("#ERROR _CreateQuoteTemplate: ValueError: fixed_price_unit is a field of booking alone, expected one a quote template holds: ", (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", Row("route", "fixed_price_unit"), Row("cleared", "DOLLAR/MT"), ExcelMissing.Value));
+        }
+
         // The nearby on a trade, nearby-selection.md's second slice. Two rows over the two days across
         // M26's expiry, one lot of 10,000 against 80 each, the first row's nearby 1 and the second's 2
         // in a ticket column: one batch, one payment group, one history two settles wide and one
@@ -2771,7 +2849,7 @@ namespace Catalyst.Host.Tests
             Assert.StartsWith(Pid + ":trades:ROLL:", trades);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
             Assert.Equal(4, spill.GetLength(0));
-            Assert.Equal(spill.GetLength(1) - 2, Heading(spill, "nearby"));  // after settlement_frequency, and the payment calendar key last since payment-calendar-keys.md
+            Assert.Equal(spill.GetLength(1) - 3, Heading(spill, "nearby"));  // after settlement_frequency; then the payment calendar key, and since #273 the fixed price's unit last
             Assert.Equal("int64", spill[1, Heading(spill, "nearby")]);
             Assert.Equal(1.0, spill[2, Heading(spill, "nearby")]);
             Assert.Equal(2.0, spill[3, Heading(spill, "nearby")]);
@@ -3689,7 +3767,7 @@ namespace Catalyst.Host.Tests
             var trades = (string)Trades(index, headers, rows, template);
             Assert.StartsWith(Pid + ":trades:RESERVES:", trades);
             var batch = (object[,])Seam.Call("util_ReadHandle", trades);
-            Assert.Equal(26, batch.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
+            Assert.Equal(27, batch.GetLength(1));  // payment_holiday_key, then since #273 the fixed price's unit last
             Assert.Equal("broker", batch[0, 8]);
             Assert.Equal("ION", batch[2, 8]);
             Assert.Equal("offset", batch[0, 22]);
@@ -3756,7 +3834,7 @@ namespace Catalyst.Host.Tests
             var marketedRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 15.0 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 20.0 }, { 1003.0, 46346.0, "Z26-F27", 1.0, "LOT", 0.25, 25.0 }, { 1004.0, 46346.0, "Z26", 0.0, "LOT", 0.25, 5.0 } };
             var marketed = (string)Trades(index, marketedHeaders, marketedRows, template);
             var marketedTable = (object[,])Seam.Call("util_ReadHandle", marketed);
-            Assert.Equal(27, marketedTable.GetLength(1));  // a cleared batch names no curve; payment_holiday_key last since payment-calendar-keys.md
+            Assert.Equal(28, marketedTable.GetLength(1));  // a cleared batch names no curve; payment_holiday_key, then since #273 the fixed price's unit last
             Assert.Equal("marketing_reserve", marketedTable[0, 15]);
             Assert.Equal("entered_contract_code", marketedTable[0, 16]);
             Assert.Equal(15.0, (double)marketedTable[2, 15], 9);
@@ -3808,7 +3886,7 @@ namespace Catalyst.Host.Tests
             var cvaRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 25.0 }, { 1002.0, 46346.0, "Z26-F27", -2.0, "LOT", 0.25, -40.0 }, { 1003.0, 46346.0, "Z26", 0.0, "LOT", 0.25, 0.0 } };
             var cva = (string)Trades(index, cvaHeaders, cvaRows, template);
             var cvaTable = (object[,])Seam.Call("util_ReadHandle", cva);
-            Assert.Equal(27, cvaTable.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
+            Assert.Equal(28, cvaTable.GetLength(1));  // payment_holiday_key, then since #273 the fixed price's unit last
             Assert.Equal("cva_reserve", cvaTable[0, 15]);
             Assert.Equal("entered_contract_code", cvaTable[0, 16]);
             Assert.Equal(25.0, (double)cvaTable[2, 15], 9);
@@ -3866,7 +3944,7 @@ namespace Catalyst.Host.Tests
             var bilateral = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "settlement_frequency", "nearby", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_key"), Row("month", "monthly", 1.0, "lastday", "bilateral", "financial", "ACME Trading", "SOFR", "+2bd", pays));
             var faced = (string)Trades(index, headers, rows, bilateral);
             var facedTable = (object[,])Seam.Call("util_ReadHandle", faced);
-            Assert.Equal(26, facedTable.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
+            Assert.Equal(27, facedTable.GetLength(1));  // payment_holiday_key, then since #273 the fixed price's unit last
             Assert.Equal("counterparty", facedTable[0, 7]);
             Assert.Equal("ACME Trading", facedTable[2, 7]);
             Assert.Equal("discount_curve_key", facedTable[0, 8]);  // after the counterparty, since named-curves-slice-3.md
@@ -3982,7 +4060,7 @@ namespace Catalyst.Host.Tests
             var trades = (string)Trades(index, headers, rows, template);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
             Assert.Equal(5, spill.GetLength(0));
-            Assert.Equal(25, spill.GetLength(1));  // payment_holiday_key last, since payment-calendar-keys.md
+            Assert.Equal(26, spill.GetLength(1));  // payment_holiday_key, then since #273 the fixed price's unit last
             Assert.Equal("payment_date", spill[0, 13]);
             Assert.Equal("entered_contract_code", spill[0, 14]);
             Assert.Equal("start_date", spill[0, 15]);
