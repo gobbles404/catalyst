@@ -33,6 +33,7 @@ from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index_conventions import CURRENCY, a_unit_of, listed
 from catalyst.index_definitions.kind import with_holiday_calendar
+from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.trades.observations import Observations
 from catalyst.trades.reserves import Reserves, reserves
@@ -43,6 +44,7 @@ from catalyst.trades.terms import (
     PriceUnit,
     ResolvedTrades,
     Route,
+    TradeSchedule,
     booked_words,
     named_trade,
     onetime_components,
@@ -1065,7 +1067,7 @@ def _the_references(
 
 
 def observation_references(
-    schedule: FuturesSchedule | IfercSchedule,
+    schedule: TradeSchedule,
     holiday_calendar: HolidayCalendar | None,
     observations: Observations,
     contract: NDArray[np.intp],
@@ -1100,6 +1102,23 @@ def observation_references(
                     "prices once, on that day"
                 )
             return own_contract
+        case PublishedSchedule() as published:
+            # The month the print counts toward, read off the schedule's row for that print: one
+            # search of the schedule's dates, each day given being a print's date, else refused.
+            # No calendar is read, a published index having no holiday calendar.
+            listed = published.publication_date
+            rows = np.searchsorted(listed, observations.date)
+            unlisted = rows >= listed.size
+            inside = ~unlisted
+            unlisted[inside] = listed[rows[inside]] != observations.date[inside]
+            if unlisted.any():
+                j = int(unlisted.argmax())
+                raise ValueError(
+                    f"{named(int(observations.component[j]))} observes "
+                    f"{observations.date[j]}, expected the publication date of one of the "
+                    "index's prints; a published index prices on its prints alone"
+                )
+            return published.contract[rows]
         case FuturesSchedule():
             pass
         case _:

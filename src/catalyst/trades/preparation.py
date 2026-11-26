@@ -19,6 +19,7 @@ from catalyst.globals.payments import compensated, time_fractions
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index_conventions import IndexConventions
+from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market.market_history import MarketHistory
 from catalyst.trades.display_axes import EarlyRisk, PeriodAxis, early_risk, period_axis
@@ -29,7 +30,7 @@ from catalyst.trades.encoding import (
     group_words,
     position_counts,
 )
-from catalyst.trades.terms import Route, price_words
+from catalyst.trades.terms import Route, TradeSchedule, price_words
 
 PREPARED_SLOTS = "prepared_slots"  # slots placed on the calendar and told live from fixed
 FIXINGS_READ = "fixings_read"  # settles read off the history, one per fixed slot
@@ -169,7 +170,7 @@ def _the_slot_rows(leg: EncodedLeg, calendar: Calendar) -> NDArray[np.intp]:
 
 
 def calendar_rows(
-    schedule: FuturesSchedule | IfercSchedule,
+    schedule: TradeSchedule,
     days: NDArray[np.datetime64],
     calendar: Calendar,
     named: Callable[[int], str],
@@ -194,6 +195,10 @@ def calendar_rows(
                 )
             return rows
         case IfercSchedule():
+            return np.searchsorted(calendar.dates, days).astype(np.intp)
+        case PublishedSchedule():
+            # The row whose publication date is the day given: a published calendar's rows are
+            # its schedule's prints, and every day given is a print's date by the encoding's rule.
             return np.searchsorted(calendar.dates, days).astype(np.intp)
         case _:
             assert_never(schedule)

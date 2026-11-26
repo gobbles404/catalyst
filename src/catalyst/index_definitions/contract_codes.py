@@ -12,6 +12,7 @@ from numpy.typing import NDArray
 
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
+from catalyst.index_definitions.published_schedule import PublishedSchedule
 
 # The exchanges' month letters, January to December, and the same in lowercase, the two
 # spellings a code's letter is read in; the ten digits a year is written with.
@@ -86,10 +87,14 @@ def first_day_of(contract: str) -> np.datetime64:
     return np.datetime64(f"{year}-{month:02d}-01", "D")
 
 
-def schedule_months(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.int64]:
+def schedule_months(
+    schedule: FuturesSchedule | IfercSchedule | PublishedSchedule,
+) -> NDArray[np.int64]:
     """The month of every code of the schedule, as numpy counts months, one read per code: a
     code that is no contract code is refused by row, and so are two rows for one month, since a
-    month resolved to two rows would name no contract. The resolution reads them once,
+    month resolved to two rows would name no contract. A published schedule's codes are its
+    months, each once, whatever number of prints a month has, so a row here is a month's place
+    among them. The resolution reads them once,
     resolves the ticket's periods against them and hands them to the terms, which keep them for
     the encoding's contract-month axes since #186; since #198 the contract-price interpolation
     reads them once to place its anchors and the months between."""

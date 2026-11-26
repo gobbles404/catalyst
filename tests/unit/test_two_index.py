@@ -46,6 +46,7 @@ from catalyst.index_definitions.futures_schedule import futures_schedule
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import CASHFLOW, FIXED_FLOAT
 from catalyst.market.market import Market
@@ -737,6 +738,39 @@ def test_the_pair_is_two_distinct_indexes_of_one_quoting_on_a_financial_settleme
     assert refused({**BILATERAL, "second_schedule_method": "asian"}) == (
         "second_schedule_method of trade 1 at row 1 is 'asian', expected 'lastday' on an IFERC "
         "index; an IFERC month has one index, published once"
+    )
+
+
+# A published index books a fixed_float of its own and no pair: diesel against heating oil
+# averages on different days, and is not built.
+def test_a_pair_with_a_published_index_on_either_leg_is_refused() -> None:
+    weekly = index_on(
+        "P",
+        "Index P",
+        published_schedule(
+            ("G27",) * 4, dates("2027-02-01", "2027-02-08", "2027-02-15", "2027-02-22")
+        ),
+        index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
+        contract_specifications(
+            ("LOT", "MMBTU"),
+            numbers(10_000.0, 1.0),
+            ("MMBTU", "MMBTU"),
+            numbers(0.0, 0.0),
+            numbers(0.0, 0.0),
+            UNITS,
+        ),
+        None,
+        "LOT",
+        UNITS,
+    )
+    assert refused(indexes=(A, weekly)) == (
+        "index 2 'P' is a published index, expected a futures or an IFERC index with two "
+        "indexes; a pair on a published index is not built"
+    )
+    averaged = {**BILATERAL, "schedule_method": "asian"}
+    assert refused(averaged, indexes=(weekly, B)) == (
+        "index 1 'P' is a published index, expected a futures or an IFERC index with two "
+        "indexes; a pair on a published index is not built"
     )
 
 

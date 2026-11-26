@@ -27,6 +27,7 @@ from catalyst.index_definitions.futures_schedule import futures_schedule
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT
 from catalyst.instruments.fields import DatesOrTexts
@@ -35,6 +36,7 @@ from catalyst.market.market_history import MarketHistory, market_history
 from catalyst.market_data.futures_fixings import futures_fixings
 from catalyst.market_data.iferc_fixings import iferc_fixings
 from catalyst.market_data.price_vector import price_vector
+from catalyst.market_data.published_fixings import published_fixings
 from catalyst.trades.encoding import Encoded, encoded
 from catalyst.trades.evaluation import trade_results
 from catalyst.trades.observations import Observations, observations, observed
@@ -1571,3 +1573,148 @@ def test_an_iferc_batchs_preparation_and_tick_allocate_by_month_not_by_trade() -
     assert least_peak(lambda: trade_results(small_prep, (quoted,), WorkCounter())) <= (
         KEYWORD_CALL + 2 * SLACK + COMPENSATED
     )
+
+
+# --- a batch on a published index, issue #271 ------------------------------------------------
+# The same 25 months on a published index: a print every Monday, counted toward the month the
+# Monday falls in, four or five a month, 2,500 MMBtu a lot, no pricing calendar; the payment two
+# business days after the month's last print. Every trade averages its month's prints, an equal
+# share each. Valued on 10 March 2027 a print is fixed when it is dated before that day.
+def every_monday() -> NDArray[np.datetime64]:
+    """Every Monday from the first month's first day through the last month's last."""
+    days: NDArray[np.datetime64] = np.arange(
+        MONTHS[0].astype("datetime64[D]"),
+        (MONTHS[-1] + np.timedelta64(1, "M")).astype("datetime64[D]"),
+        dtype="datetime64[D]",
+    )
+    return days[np.is_busday(days, weekmask="Mon")]
+
+
+PRINT_DAYS: NDArray[np.datetime64] = every_monday()
+PRINT_MONTH: NDArray[np.intp] = (PRINT_DAYS.astype("datetime64[M]") - MONTHS[0]).astype(np.intp)
+LAST_PRINT: NDArray[np.datetime64] = PRINT_DAYS[
+    np.searchsorted(PRINT_MONTH, np.arange(len(CODES)), side="right") - 1
+]
+PRINT_PAYS: NDArray[np.datetime64] = np.busday_offset(
+    LAST_PRINT, 2, roll="backward", holidays=HOLIDAYS
+)
+WEEKLY = index_on(
+    "weekly",
+    "Sample published index",
+    published_schedule(tuple(CODES[int(m)] for m in PRINT_MONTH), PRINT_DAYS),
+    index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
+    contract_specifications(
+        ("lot",), np.array([2_500.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
+    ),
+    None,
+    "lot",
+    UNITS,
+)
+
+
+def published_terms(components: int, contracts: int) -> ResolvedTrades:
+    """That many single-month asian trades spread over the first contracts, lots and prices
+    varying, cleared and financial, each paying its month's day."""
+    rows = np.arange(components, dtype=np.intp) % contracts
+    return resolved_trades(
+        FIXED_FLOAT,
+        WEEKLY,
+        np.zeros(components, dtype=np.intp),
+        Route.CLEARED,
+        Settlement.FINANCIAL,
+        one_choice(METHODS, ScheduleMethod.ASIAN, components),
+        one_choice(BASES, QuantityPer.MONTH, components),
+        one_choice(FREQUENCIES, SettlementFrequency.MONTHLY, components),
+        np.ones(components, dtype=np.intp),
+        None,
+        None,
+        None,
+        np.repeat(np.datetime64("2026-09-24", "D"), components),
+        np.arange(components, dtype=np.intp),
+        rows,
+        np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
+        *month_bounds(SCHEDULE_MONTHS[rows]),
+        3.0 + (np.arange(components) % 7) / 100,
+        PaymentTerms(
+            DatesOrTexts.of_texts(("+2bd",) * components),
+            (PAYMENT_CALENDAR,) * components,
+            PRINT_PAYS[rows],
+        ),
+    )
+
+
+def published_history(as_of: str = AS_OF) -> MarketHistory:
+    """The published index's history valued on that day, a price for every print dated before
+    it, newest first as the desk keeps them."""
+    cal = calendar(valuation_date(np.datetime64(as_of, "D"), 0.5), WEEKLY)
+    fixed = np.flatnonzero(cal.is_fixed)[::-1]
+    return market_history(cal, published_fixings(PRINT_DAYS[fixed], 3.0 + fixed / 100, WEEKLY))
+
+
+def published_market(history: MarketHistory) -> Market:
+    """A quote for every month from the month of the first print still to come through the last."""
+    cal = history.calendar
+    remaining = len(CODES) - int(cal.contract[cal.first_unfixed])
+    return market(history, price_vector("weekly", 3.5 + np.arange(remaining) / 100))
+
+
+@pytest.mark.parametrize(("components", "contracts"), [(5, 2), (2_000, 24)], ids=IDS)
+def test_a_published_batch_observes_each_months_prints_and_runs_the_kernel_on_their_slots(
+    call_profile: CallProfile, components: int, contracts: int
+) -> None:
+    # Every print of a component's month is an observation of it, found by two searches of the
+    # schedule's column of months and never by a date or a calendar; one slot a print, shared by
+    # every component of its month, referencing that month; one group a month. The preparation
+    # reads one fixing per print dated before the valuation day and the tick one quote per month
+    # with a print still to come, however many trades and prints stand behind them.
+    terms = published_terms(components, contracts)
+    assert call_profile(lambda: observed_of(terms)) == {
+        "observed": 1,
+        "trade_schedule_of": 1,
+        "supported_on_published": 1,  # the methods' fact the observations read on this kind
+        "_whole_months": 1,
+        "observations": 1,
+    }
+    prints = contracts > PRINT_MONTH  # the prints of the months the batch holds
+    per_month = np.bincount(PRINT_MONTH[prints], minlength=contracts)
+    held = np.bincount(np.arange(components) % contracts, minlength=contracts)
+    fixed = prints & (np.datetime64(AS_OF, "D") > PRINT_DAYS)
+    live_months = np.unique(PRINT_MONTH[prints & ~fixed]).size
+    counter = WorkCounter()
+    obs = observed_of(terms)
+    assert obs.date.size == int((held * per_month).sum())
+    enc = encoded(terms, (obs,), UNITS, counter)
+    history = published_history()
+    prep = prepared_trades(enc, (history,), counter)
+    quoted = published_market(history)
+    trade_results(prep, (quoted,), counter)
+    assert counter.freeze().as_dict() == {
+        "display_periods": display_periods(prep),
+        "encoded_components": components,
+        "encoded_groups": contracts,
+        "encoded_observations": int((held * per_month).sum()),
+        "encoded_slots": int(np.count_nonzero(prints)),
+        "reserved_fee_components": components,
+        "prepared_slots": int(np.count_nonzero(prints)),
+        "fixings_read": int(np.count_nonzero(fixed)),
+        "kernel": 1,
+        "live_prices_read": live_months,
+    }
+    np.testing.assert_array_equal(enc.legs[0].slot_date, PRINT_DAYS[prints])
+    np.testing.assert_array_equal(enc.legs[0].slot_reference, PRINT_MONTH[prints])
+    np.testing.assert_array_equal(enc.payment_date, PRINT_PAYS[:contracts])
+    # The encoding, the preparation and the tick run the functions an IFERC batch's run: the
+    # kind is read once, where the reference and the calendar row of a day are found.
+    assert (
+        call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter())) == IFERC_ENCODING_LEDGER
+    )
+    assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
+        "trade_results": 1,
+        "_the_markets": 1,
+        "_the_contributions": 1,
+        "compensated": 1,
+        "_cleared_leg": 1,
+        "Market.live_prices": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }

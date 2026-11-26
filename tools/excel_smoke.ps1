@@ -1812,6 +1812,27 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AAL8),5,4)" = "TRUE"
     "=INDEX(util_ReadHandle(AAL8),6,5)" = "unfixed"
     "=_CreateMarketHistory(AAH8,AAL1)"  = "#ERROR _CreateMarketHistory: ValueError: fixings publication_date 2026-09-14 is a print not yet fixed in calendar, expected a price for fixed prints alone; a print is fixed from the day after its date"
+    # A fixed_float on a published index, issue #271's worked example, over the index in AAP3,
+    # the schedule of AAH1 with a reporting lot of one gallon: 40,000 gallons of September
+    # against a fixed 3.10, booked in AAP6 under an asian template, paid five business days
+    # after the month's last print. Valued on Wednesday the 16th in AAP13, two prints fixed and
+    # two live at 3.50: 8,000 and 20,000 gallons, 10,000 on each live print. On Tuesday the 15th
+    # in AAP20, Monday's print fixed at the stand-in: 11,000 and 20,000. On Monday the 14th in
+    # AAP27, that day's print still live: 11,000 and 30,000. A lastday template is refused.
+    '=MID(AAP6,FIND(":",AAP6)+1,18)' = "trades:DOE Diesel:"
+    "=INDEX(util_ReadHandle(AAP6),3,5)"  = "asian"
+    "=INDEX(util_ReadHandle(AAP6),3,14)" = "46300"
+    "=INDEX(_ReportValues(AAP13),3,1)"   = "8000"
+    '=INDEX(_ReportRisk(AAP13,"nominal_delta","year"),4,2)' = "20000"
+    '=INDEX(_ReportRisk(AAP13,"nominal_delta","month"),5,2)' = "20000"
+    '=INDEX(_ReportRisk(AAP13,"nominal_delta","day"),6,2)' = "0"
+    '=INDEX(_ReportRisk(AAP13,"nominal_delta","day"),7,2)' = "10000"
+    '=INDEX(_ReportRisk(AAP13,"nominal_delta","day"),8,2)' = "10000"
+    "=INDEX(_ReportValues(AAP20),3,1)"   = "11000"
+    '=INDEX(_ReportRisk(AAP20,"nominal_delta","year"),4,2)' = "20000"
+    "=INDEX(_ReportValues(AAP27),3,1)"   = "11000"
+    '=INDEX(_ReportRisk(AAP27,"nominal_delta","year"),4,2)' = "30000"
+    "=_CreateTrades(AAP3,IS1:IW1,AAR5:AAV5,AAP29,ZU1)" = "#ERROR _CreateTrades: ValueError: schedule_method of trade 1001 at row 1 is 'lastday', expected 'asian' on a published index; a published month is the average of its prints"
     # The Gas Daily schedule: a creator over three contract months, their codes and the first and
     # last day of gas of each, in DG to DI, and over the first row alone, read back through
     # util_ReadHandle; a first-date column one row long and a last-date column one row short, the
@@ -3788,6 +3809,40 @@ $cells = [ordered]@{
     "AAL6" = "=_CreatePublishedFixings(AAJ3:AAJ4,AAK3:AAK4,AAH3)"
     "AAL7" = "=_CreatePublishedFixings(AAJ2:AAJ4,AAN2:AAN4,AAH3)"
     "AAL8" = "=_CreateMarketHistory(AAH11,AAL7)"
+    # A fixed_float on a published index: conventions in dollars a gallon, one specification of
+    # one gallon under the header row of EI1:EM1, and the index over the schedule of AAH1 with
+    # that gallon its reporting lot; an asian template under the template headers of IJ1:IR1 and
+    # a lastday one for the refusal; one ticket row under the ticket headers of IS1:IW1, 40,000
+    # gallons of U26 at 3.10; then the batch valued on the 16th, on the 15th with the stand-in of
+    # AAN2, and on the 14th, each over the price vector of AAL3.
+    "AAP1" = '=_CreateIndexConventions("DOLLAR","GAL","DOLLAR","VOLUME","GAL")'
+    "AAQ1" = "gal"; "AAR1" = "1"; "AAS1" = "GAL"; "AAT1" = "0"; "AAU1" = "0"
+    "AAP2" = "=_CreateContractSpecifications(EI1:EM1,AAQ1:AAU1)"
+    "AAP3" = '=_CreateIndex("DOE Diesel","U.S. national retail diesel - EIA weekly",AAH1,AAP1,AAP2,,"gal")'
+    "AAR3" = "gal"; "AAS3" = "month"; "AAT3" = "asian"; "AAU3" = "cleared"; "AAV3" = "financial"; "AAW3" = "TEST_CLEARER"; "AAX3" = "+5bd"; "AAY3" = "NK2"; "AAZ3" = "monthly"
+    "AAP5" = '=_CreateTradeTemplate("fixed_float",HSTACK(IJ1:IR1,"nearby"),HSTACK(AAR3:AAZ3,1))'
+    "AAR5" = "1001"; "AAS5" = "20-Aug-2026"; "AAT5" = "U26"; "AAU5" = "40000"; "AAV5" = "3.1"
+    "AAP6" = "=_CreateTrades(AAP3,IS1:IW1,AAR5:AAV5,AAP5,ZU1)"
+    "AAP8" = "=_CreateCalendar(AAH4,AAP3)"
+    "AAP9" = "=_CreatePublishedFixings(AAJ2:AAJ4,AAK2:AAK4,AAP3)"
+    "AAP10" = "=_CreateMarketHistory(AAP8,AAP9)"
+    "AAP11" = "=_CreateMarket(AAP10,AAL3)"
+    "AAP12" = "=_PrepareTrades(AAP6,AAP10)"
+    "AAP13" = "=_EvaluateTrades(AAP12,AAP11)"
+    "AAP15" = "=_CreateCalendar(AAH10,AAP3)"
+    "AAP16" = "=_CreatePublishedFixings(AAJ2:AAJ4,AAN2:AAN4,AAP3)"
+    "AAP17" = "=_CreateMarketHistory(AAP15,AAP16)"
+    "AAP18" = "=_CreateMarket(AAP17,AAL3)"
+    "AAP19" = "=_PrepareTrades(AAP6,AAP17)"
+    "AAP20" = "=_EvaluateTrades(AAP19,AAP18)"
+    "AAP22" = "=_CreateCalendar(AAH7,AAP3)"
+    "AAP23" = "=_CreatePublishedFixings(AAJ3:AAJ4,AAK3:AAK4,AAP3)"
+    "AAP24" = "=_CreateMarketHistory(AAP22,AAP23)"
+    "AAP25" = "=_CreateMarket(AAP24,AAL3)"
+    "AAP26" = "=_PrepareTrades(AAP6,AAP24)"
+    "AAP27" = "=_EvaluateTrades(AAP26,AAP25)"
+    "AAR29" = "gal"; "AAS29" = "month"; "AAT29" = "lastday"; "AAU29" = "cleared"; "AAV29" = "financial"; "AAW29" = "TEST_CLEARER"; "AAX29" = "+5bd"; "AAY29" = "NK2"; "AAZ29" = "monthly"
+    "AAP29" = '=_CreateTradeTemplate("fixed_float",HSTACK(IJ1:IR1,"nearby"),HSTACK(AAR29:AAZ29,1))'
     # The Gas Daily schedule: three contract months of Henry Hub Gas Daily, the first and last day
     # of gas of each, a fourth first date for a column one row long, a copy of the last-date column
     # with a blank, a code over a number, and two creator cells, over the three rows and over the

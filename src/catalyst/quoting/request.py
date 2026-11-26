@@ -40,6 +40,7 @@ from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.kind import Kind, named
+from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import NONE
@@ -76,6 +77,7 @@ from catalyst.trades.terms import (
     Route,
     Settlement,
     SettlementFrequency,
+    TradeSchedule,
     frequency_rules,
     month_bounds,
     nearby_rules,
@@ -164,7 +166,7 @@ class Request:
     priced."""
 
     index: Index
-    schedule: FuturesSchedule | IfercSchedule
+    schedule: TradeSchedule
     terms: Terms
     period: Period
     observations: Observations
@@ -381,13 +383,19 @@ def the_curve(
             assert_never(terms.route)
 
 
-def the_method(terms: Terms, schedule: FuturesSchedule | IfercSchedule) -> None:
+def the_method(terms: Terms, schedule: TradeSchedule) -> None:
     """The terms against the index's kind, the batch's rules: on an IFERC index a financial
     settlement and lastday, the month's index being published once; on a futures index a physical
     settlement with lastday alone, the other three methods settling on a price other than the
-    expiry's settle."""
+    expiry's settle. A published index books and values trades and is not quoted yet, so it is
+    refused here by name, before any of its prints is read."""
     method = terms.method
     match schedule:
+        case PublishedSchedule():
+            raise ValueError(
+                "index is a published index, expected a futures or an IFERC index for a quote; "
+                "a quote on a published index is not built"
+            )
         case IfercSchedule():
             if terms.settlement is Settlement.PHYSICAL:
                 raise ValueError(
@@ -429,7 +437,7 @@ def the_period(
     first_day: np.datetime64,
     last_day: np.datetime64,
     frequency: SettlementFrequency,
-    schedule: FuturesSchedule | IfercSchedule,
+    schedule: TradeSchedule,
     period_of: Callable[[], str],
     counter: WorkCounter,
 ) -> Period:
@@ -470,7 +478,7 @@ def the_period(
 
 def the_request(
     index: Index,
-    schedule: FuturesSchedule | IfercSchedule,
+    schedule: TradeSchedule,
     terms: Terms,
     period: Period,
     counter: WorkCounter,

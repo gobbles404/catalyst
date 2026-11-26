@@ -39,6 +39,7 @@ from catalyst.index_definitions.holiday_calendars import (
 )
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
+from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT, FLOAT_FLOAT, FieldType
@@ -67,10 +68,12 @@ from catalyst.trades.terms import (
     Route,
     Settlement,
     SettlementFrequency,
+    TradeSchedule,
     frequency_rules,
     marketing_reserves,
     month_bounds,
     named_trade,
+    pair_kinds,
     payments_after_observations,
     price_words,
     reporting_lot_of,
@@ -325,6 +328,7 @@ def resolved(
     schedules = [(months, _schedule_of(index, paired))]
     second = None
     if paired:
+        pair_kinds(index, indexes[1])
         second = _the_second_schedule(indexes[1], counter)
         schedules.append((second[1], _schedule_of(indexes[1], True)))
     periods = _the_periods(fields, tuple(schedules), onetime_rows, contract_days(schedule))
@@ -837,7 +841,7 @@ def resolve_periods(
     return RowPeriods(occurrence, contracts, start, end, window, (entered, codes), len(spans))
 
 
-def contract_days(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.datetime64]:
+def contract_days(schedule: TradeSchedule) -> NDArray[np.datetime64]:
     """The day each contract of the schedule prices on last: a futures contract's expiry, an IFERC
     month's publication day; what a onetime window's contract is found by, since the review of
     onetime-averaging.md's third slice, the first contract pricing on or after the window's first
@@ -849,6 +853,13 @@ def contract_days(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.datet
             return schedule.future_expiry
         case IfercSchedule():
             return schedule.publication_date
+        case PublishedSchedule():
+            # The date of each month's last print, one search of the column that says each
+            # print's month; never searched in turn, a window on a published index being refused
+            # by the frequency's rules first, as on an IFERC one.
+            months = np.arange(len(schedule.codes), dtype=np.intp)
+            last = np.searchsorted(schedule.contract, months, side="right") - 1
+            return schedule.publication_date[last]
         case _:
             assert_never(schedule)
 
