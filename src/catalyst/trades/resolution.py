@@ -51,6 +51,7 @@ from catalyst.trades.template import (
     TradeTemplate,
     months_of,
     payment_rule_of,
+    price_unit_of,
     quantity_per_of,
     route_of,
     schedule_method_of,
@@ -254,6 +255,14 @@ def resolved(
     handed to the kernel as given and read for their meaning by the encoding, which has the
     unit tables.
 
+    A fixed_float's fixed price takes a unit of its own since #273, fixed_price_unit, optional
+    and each row's own: the template's one text or the ticket's column, each distinct text read
+    once for its form, a currency unit and a quantity unit joined by one slash, the first row
+    from the top that breaks it named, and handed to the kernel as the batch's distinct units
+    with each row's place among them. Left out of both, nothing is handed and the kernel takes
+    the unit the index quotes in. What the two codes mean is the encoding's to read, as a
+    spread price's are.
+
     Then the kernel's rules, through resolved_trades: whole quantities, zero included, and finite
     prices, each named by its trade, a financial settlement with penultimate, last3day and asian,
     the first row of them named under a physical one, and each component's quantity formed once
@@ -288,16 +297,23 @@ def resolved(
     frequencies, by_frequency = _each_distinct(
         fields, "settlement_frequency", settlement_frequency_of
     )
-    price_unit = None
+    price_units, price_unit = None, None
     if spread:
         # The trade IDs are read for a refusal's words alone, so only where a row is refused.
         spread_rules(
             route, fields.labels("broker"), lambda i: named_trade(fields.ids("trade_id"), i)
         )
-        price_unit = PriceUnit(
-            fields.one_text("spread_price_currency_unit"),
-            fields.one_text("spread_price_quantity_unit"),
+        price_units = (
+            PriceUnit(
+                fields.one_text("spread_price_currency_unit"),
+                fields.one_text("spread_price_quantity_unit"),
+            ),
         )
+    elif fields.has("fixed_price_unit"):
+        # Each row's own since #273, the template's one or the ticket's column, each distinct
+        # text read once for its form; left out of both, the kernel takes the index's unit.
+        read_units, price_unit = _each_distinct(fields, "fixed_price_unit", price_unit_of)
+        price_units = tuple(read_units)
     _the_conditions(fields, route, settlement)
     _the_leg_fields(fields, paired)
     specification = np.array(specifications, dtype=np.intp)[by_unit]
@@ -400,6 +416,7 @@ def resolved(
         payment_holiday_key=fields.labels("payment_holiday_key"),  # bound above, kept to show
         schedule_month=months,
         second_leg=second_leg,
+        price_units=price_units,
         price_unit=price_unit,
     )
     return terms, legs, periods.entered

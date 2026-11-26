@@ -1570,7 +1570,8 @@ FIELDS = (
     "trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, "
     "settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, "
     "quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, "
-    "payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, "
+    "fixed_price_unit"
 )
 
 
