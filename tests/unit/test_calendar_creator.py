@@ -392,6 +392,54 @@ def test_a_gas_daily_gap_and_iferc_months_out_of_order_are_refused_in_the_librar
     )
 
 
+# The published schedule page's sample, the four Mondays of September 2026 between the last
+# print of August and the first of October, valued on Wednesday 16 September: the prints dated
+# before that day have fixed, the 14th's among them, and each row shows the month it counts
+# toward.
+AUG_31, SEP_7, SEP_14, SEP_21, SEP_28, OCT_5 = 46265.0, 46272.0, 46279.0, 46286.0, 46293.0, 46300.0
+SEP_16 = 46281.0
+
+
+def a_published_schedule() -> str:
+    text = bridge.call(
+        "_CreatePublishedSchedule",
+        [
+            column("Q26", "U26", "U26", "U26", "U26", "V26"),
+            column(AUG_31, SEP_7, SEP_14, SEP_21, SEP_28, OCT_5),
+        ],
+    )
+    assert isinstance(text, str) and text.startswith(f"{PID}:published_schedule:"), text
+    return text
+
+
+def test_a_published_calendar_is_created_from_two_handles_and_read_back_print_by_print() -> None:
+    made = a_calendar(a_valuation(SEP_16), an_index(a_published_schedule()))
+    kinds, slots, joined = read(made)
+    assert rows((kinds, slots, joined)) == [
+        HEADERS,
+        TYPES,
+        [AUG_31, "Q26", 1.0, 1.0],
+        [SEP_7, "U26", 1.0, 1.0],
+        [SEP_14, "U26", 1.0, 1.0],
+        [SEP_21, "U26", 1.0, 0.0],
+        [SEP_28, "U26", 1.0, 0.0],
+        [OCT_5, "V26", 1.0, 0.0],
+    ]
+    assert (kinds[2:, 0] == NUMBER_CODE).all()
+    assert (kinds[2:, 1] == TEXT_CODE).all()
+    assert (kinds[2:, 2:] == BOOLEAN_CODE).all()
+
+
+# A print dated the valuation day is still live: Monday's price is fixed from Tuesday.
+def test_a_published_print_dated_the_valuation_day_reads_back_unfixed() -> None:
+    on_the_day = rows(read(a_calendar(a_valuation(SEP_14), an_index(a_published_schedule()))))
+    assert [row[3] for row in on_the_day[2:]] == [1.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+    the_day_after = rows(
+        read(a_calendar(a_valuation(SEP_14 + 1), an_index(a_published_schedule())))
+    )
+    assert [row[3] for row in the_day_after[2:]] == [1.0, 1.0, 1.0, 0.0, 0.0, 0.0]
+
+
 def test_a_failed_construction_of_the_other_kinds_publishes_no_object_and_no_handle() -> None:
     valuation, index = a_valuation(SEP_25), an_index(a_gas_daily_schedule())
     gapped = an_index(

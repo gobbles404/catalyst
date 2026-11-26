@@ -32,7 +32,7 @@ def _CreateCalendar(
         "it; a futures index needs two contracts or more.",
     ],
 ) -> Handle[Calendar]:
-    """Creates the calendar of one index, one row per day it prices, or per month for an index
-    published monthly, each with its contract and whether it has fixed, and shows its handle,
-    the text other formulas take as the calendar."""
+    """Creates the calendar of one index, one row per period it prices, a day, a month or a
+    published print, each with its contract and whether it has fixed, and shows its handle, the
+    text other formulas take as the calendar."""
     return calendar(valuation_date, index)

@@ -34,6 +34,7 @@ from catalyst.index_definitions.holiday_calendars import (
 from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
 from catalyst.index_definitions.index import Index, index
 from catalyst.index_definitions.index_conventions import IndexConventions, index_conventions
+from catalyst.index_definitions.published_schedule import PublishedSchedule, published_schedule
 from catalyst.instrumentation.work_counts import WorkCounter
 
 # The worksheet functions this module registers, named here so that their leading underscore
@@ -47,6 +48,7 @@ __all__ = [
     "_CreateIfercSchedule",
     "_CreateIndex",
     "_CreateIndexConventions",
+    "_CreatePublishedSchedule",
 ]
 
 
@@ -143,6 +145,25 @@ def _CreateGasDailySchedule(
 
 
 @excel_function
+def _CreatePublishedSchedule(
+    contract_code: Annotated[
+        TextColumn,
+        "The column of contract codes, one per print, such as A2:A5 holding U26 four times: the "
+        "month each print counts toward, a month's prints in consecutive rows.",
+    ],
+    publication_date: Annotated[
+        DateColumn,
+        "The column of dates the publisher puts on each print, beside the codes, such as B2:B5, "
+        "one per code, oldest first; a print is fixed from the day after its date.",
+    ],
+) -> Handle[PublishedSchedule]:
+    """Creates a published schedule from the dated prints of one index, each print's date and
+    the contract month it counts toward, and shows its handle, the text other formulas take as
+    the schedule."""
+    return published_schedule(contract_code, publication_date)
+
+
+@excel_function
 def _CreateIndexConventions(
     quote_currency_unit: Annotated[
         str, "The currency unit a price of the index is quoted in: DOLLAR or CENT."
@@ -187,8 +208,8 @@ def _CreateIndex(
     ],
     schedule: Annotated[
         Handle[object],
-        "The index's schedule handle, futures, IFERC or Gas Daily: the cell showing its creator's "
-        "result, such as B2, or a name for it.",
+        "The index's schedule handle, futures, IFERC, Gas Daily or published: the cell showing "
+        "its creator's result, such as B2, or a name for it.",
     ],
     index_conventions: Annotated[
         Handle[IndexConventions],
@@ -204,7 +225,7 @@ def _CreateIndex(
         str | None,
         "The market's holiday calendar with a futures schedule, by key: one calendar's name, "
         "such as NYMEX, or several joined by +, such as NYMEX+ICE, closed when any is; left out "
-        "for an IFERC or Gas Daily schedule.",
+        "for any other schedule.",
     ] = None,
     reporting_lot: Annotated[
         str | None,

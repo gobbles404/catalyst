@@ -714,14 +714,14 @@ def trade_schedule_of(index: Index) -> FuturesSchedule | IfercSchedule:
     """The schedule of an index a fixed_float is booked on, typed as the kind rule found it: a
     futures schedule, whose rows' expiry days settle the contracts, or since #167 an IFERC
     schedule, whose rows' publication days print each month's index, the traded basis; a Gas
-    Daily index is refused, in the resolution of a batch and in the kernel alike. The steps
-    that read a day off the schedule dispatch on which it is."""
+    Daily or a published index is refused, in the resolution of a batch and in the kernel alike.
+    The steps that read a day off the schedule dispatch on which it is."""
     match index.kind:
         case Kind.FUTURES:
             return cast(FuturesSchedule, index.schedule)  # what the kind just said
         case Kind.IFERC:
             return cast(IfercSchedule, index.schedule)
-        case Kind.GAS_DAILY:
+        case Kind.GAS_DAILY | Kind.PUBLISHED:
             raise ValueError(
                 f"index is {described(index.kind, 'index')}, expected a futures or an IFERC "
                 "index for a fixed_float"

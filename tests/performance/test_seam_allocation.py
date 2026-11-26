@@ -353,6 +353,30 @@ def test_a_gas_daily_schedule_keeps_a_copy_of_each_date_column() -> None:
     )
 
 
+def published_columns(months: int, prints: int = 4) -> tuple[Cells, Cells]:
+    """The code of its month and the date of each print, for that many months of that many
+    prints a week apart, as the sheet sends them: one row per print, a month's code on every
+    print of it."""
+    codes = Cells.from_rows([[f"c{i}"] for i in range(months) for _ in range(prints)])
+    dates = Cells.from_rows([[46161.0 + 7 * i] for i in range(months * prints)])
+    return codes, dates
+
+
+# A published schedule keeps two arrays a print long, its copy of the dates and each print's
+# month, 16 bytes a print, and on the way pays the date column's conversion and its look as the
+# IFERC schedule does, the codes as one column to compare, let go before the two kept arrays are
+# made, and a flag per row: measured 19,806 bytes at 480 prints on 2026-11-24, 41 a print, and
+# 183,966 at 4,800, 38 a print, 5 above the IFERC schedule's 33 a month at that length for the
+# second array kept. It grows by the print and never by a print's place in its month.
+def test_a_published_schedule_keeps_its_dates_and_each_prints_month() -> None:
+    months = 120
+    codes, dates = published_columns(months)
+    assert (
+        least_peak(lambda: ENTRY["_CreatePublishedSchedule"](codes, dates))
+        <= 42 * 4 * months + 2 * SLACK
+    )
+
+
 # Five texts kept as they arrived, the record and its entry: measured 281 bytes on 2026-09-16,
 # and 1,162 for reading them back as a three-row table of fifteen text cells.
 def test_a_creator_of_index_conventions_and_its_reader_stay_small() -> None:
@@ -636,6 +660,20 @@ def test_the_other_two_calendars_keep_four_columns_per_period() -> None:
     iferc_index = an_index(iferc)
     assert (
         least_peak(lambda: ENTRY["_CreateCalendar"](valuation, iferc_index)) <= 80 * 120 + 2 * SLACK
+    )
+
+
+# A published calendar makes two flags a print long and nothing else: its dates and each
+# print's month are the schedule's own read-only arrays, held and not copied, and no code is
+# looked at, the schedule's order having been checked when the schedule was made. Measured
+# 1,576 bytes at 480 prints on 2026-11-24 and 10,216 at 4,800, 2 bytes a print, against the
+# 10,504 an IFERC calendar of 120 months pays for its copy, its rows and its set of codes.
+def test_a_published_calendar_makes_two_flags_a_print_and_copies_no_column() -> None:
+    valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
+    months = 120
+    index = an_index(ENTRY["_CreatePublishedSchedule"](*published_columns(months)))
+    assert (
+        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, index)) <= 4 * 4 * months + 2 * SLACK
     )
 
 

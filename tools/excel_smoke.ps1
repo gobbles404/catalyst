@@ -279,7 +279,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EB3),3,4)" = "3"
     '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1)' = "#ERROR _CreateIndex: ValueError: holiday_key is missing, expected a holiday calendar's key with a futures schedule"
     '=_CreateIndex(EC4,"Henry Hub natural gas - Platts Gas Daily",DK1,AP1,BY1,"AM1",,ZU1)' = "#ERROR _CreateIndex: ValueError: holiday_key is 'AM1', expected none with a Gas Daily schedule"
-    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AM1,AP1,BY1)' = "#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule"
+    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AM1,AP1,BY1)' = "#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC, Gas Daily or published schedule"
     '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1)' = "#ERROR _CreateIndex: contract_specifications is missing, expected contract specifications handle"
     '=_CreateIndex(C2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,"AM1",,ZU1)' = "#ERROR _CreateIndex: name is blank, expected text"
     '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,"AM1","LOT",ZU1)' = "#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the specifications: 'lots', 'gal'"
@@ -1720,6 +1720,55 @@ $formulas = [ordered]@{
     "=_CreateIfercSchedule(DA6:DA7,DC2:DC3)" = "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is number 46023.0, expected text"
     "=_CreateIfercSchedule(DA2:DA4)" = "#ERROR _CreateIfercSchedule: publication_date is missing, expected column of dates"
     "=_CreateIfercSchedule(DA2:DA4,DC2:DD2)" = "#ERROR _CreateIfercSchedule: publication_date is 1x2 array, expected column of dates"
+    # The published schedule: a creator over six prints of three months, the code of the month
+    # each counts toward and its date, in AAA and AAB, and over one print alone, read back through
+    # util_ReadHandle a row per print, the creator's own form. A publication column one row short,
+    # a month whose code returns after another began and a date listed twice, the library's words;
+    # a blank among the dates, a number among the codes, the dates left out and a row where a
+    # column is expected, the seam's.
+    '=MID(AAH1,FIND(":",AAH1)+1,19)' = "published_schedule:"
+    '=MID(AAH2,FIND(":",AAH2)+1,19)' = "published_schedule:"
+    "=INDEX(util_ReadHandle(AAH1),1,1)" = "contract_code"
+    "=INDEX(util_ReadHandle(AAH1),1,2)" = "publication_date"
+    "=INDEX(util_ReadHandle(AAH1),2,2)" = "datetime64[D]"
+    "=INDEX(util_ReadHandle(AAH1),3,1)" = "Q26"
+    "=INDEX(util_ReadHandle(AAH1),4,1)" = "U26"
+    "=INDEX(util_ReadHandle(AAH1),7,1)" = "U26"
+    "=INDEX(util_ReadHandle(AAH1),7,2)" = "46293"
+    "=INDEX(util_ReadHandle(AAH1),8,1)" = "V26"
+    "=ROWS(util_ReadHandle(AAH1))"      = "8"
+    "=COLUMNS(util_ReadHandle(AAH1))"   = "2"
+    "=ROWS(util_ReadHandle(AAH2))"      = "3"
+    "=_CreatePublishedSchedule(AAA2:AAA7,AAB2:AAB6)" = "#ERROR _CreatePublishedSchedule: ValueError: publication_date has 5 dates, expected 6, one per contract_code"
+    "=_CreatePublishedSchedule(AAD2:AAD7,AAB2:AAB7)" = "#ERROR _CreatePublishedSchedule: ValueError: contract_code row 4 is 'U26', a month whose prints ended at row 2, expected each month's prints in consecutive rows"
+    "=_CreatePublishedSchedule(AAA2:AAA7,AAE2:AAE7)" = "#ERROR _CreatePublishedSchedule: ValueError: publication_date row 3 is 2026-09-07, expected a date after row 2's 2026-09-07"
+    "=_CreatePublishedSchedule(AAA2:AAA4,AAC2:AAC4)" = "#ERROR _CreatePublishedSchedule: publication_date cell (2, 1) is blank, expected date"
+    "=_CreatePublishedSchedule(AAF2:AAF3,AAB2:AAB3)" = "#ERROR _CreatePublishedSchedule: contract_code cell (2, 1) is number 46023.0, expected text"
+    "=_CreatePublishedSchedule(AAA2:AAA7)" = "#ERROR _CreatePublishedSchedule: publication_date is missing, expected column of dates"
+    "=_CreatePublishedSchedule(AAA2:AAA7,AAB2:AAC2)" = "#ERROR _CreatePublishedSchedule: publication_date is 1x2 array, expected column of dates"
+    # The published index over the schedule in AAH1: its kind, its contracts the three months of
+    # its six prints, no holiday calendar, and a key given refused. Its calendar valued on
+    # Wednesday 16 September 2026 in AAH5, a row per print on the month it counts toward, the
+    # prints dated before that day fixed, the 14th's among them, and the prompt the month of the
+    # first print still to come; valued on Monday the 14th in AAH8, that day's own print is live.
+    '=MID(AAH3,FIND(":",AAH3)+1,17)' = "index:DOE Diesel:"
+    "=INDEX(util_ReadHandle(AAH3),3,3)" = "published"
+    "=INDEX(util_ReadHandle(AAH3),3,4)" = "3"
+    "=INDEX(util_ReadHandle(AAH3),3,6)" = "FALSE"
+    '=_CreateIndex("DOE Diesel","U.S. national retail diesel - EIA weekly",AAH1,AP1,BY1,"AM1",,ZU1)' = "#ERROR _CreateIndex: ValueError: holiday_key is 'AM1', expected none with a published schedule"
+    '=MID(AAH5,FIND(":",AAH5)+1,9)' = "calendar:"
+    "=ROWS(util_ReadHandle(AAH5))"      = "8"
+    "=INDEX(util_ReadHandle(AAH5),3,2)" = "Q26"
+    "=INDEX(util_ReadHandle(AAH5),5,1)" = "46279"
+    "=INDEX(util_ReadHandle(AAH5),5,2)" = "U26"
+    "=INDEX(util_ReadHandle(AAH5),5,3)" = "TRUE"
+    "=INDEX(util_ReadHandle(AAH5),5,4)" = "TRUE"
+    "=INDEX(util_ReadHandle(AAH5),6,4)" = "FALSE"
+    "=INDEX(util_ReadHandle(AAH5),8,2)" = "V26"
+    "=util_ReadPrompt(AAH5)"            = "U26"
+    "=INDEX(util_ReadHandle(AAH8),4,4)" = "TRUE"
+    "=INDEX(util_ReadHandle(AAH8),5,4)" = "FALSE"
+    "=util_ReadPrompt(AAH8)"            = "U26"
     # The Gas Daily schedule: a creator over three contract months, their codes and the first and
     # last day of gas of each, in DG to DI, and over the first row alone, read back through
     # util_ReadHandle; a first-date column one row long and a last-date column one row short, the
@@ -3657,6 +3706,26 @@ $cells = [ordered]@{
     "DA6" = "V26"; "DA7" = "46023"
     "DE1" = "=_CreateIfercSchedule(DA2:DA4,DC2:DC4)"
     "DE2" = "=_CreateIfercSchedule(DA2,DC2)"
+    # The published schedule: six weekly prints of three months, the last of August, the four
+    # Mondays of September 2026 and the first of October, the code of its month beside each date;
+    # a copy of the first dates with a blank, codes whose month returns after another began, dates
+    # with one listed twice, a code over a number; two creator cells, over the six rows and over
+    # one print alone; the index over the first, with the conventions in AP1 and the
+    # specifications in BY1; and its calendar valued on Wednesday 16 September and on Monday the
+    # 14th.
+    "AAA2" = "Q26"; "AAB2" = "31-Aug-2026"; "AAC2" = "31-Aug-2026"; "AAD2" = "U26"; "AAE2" = "31-Aug-2026"; "AAF2" = "U26"
+    "AAA3" = "U26"; "AAB3" = "7-Sep-2026";                          "AAD3" = "U26"; "AAE3" = "7-Sep-2026";  "AAF3" = "46023"
+    "AAA4" = "U26"; "AAB4" = "14-Sep-2026"; "AAC4" = "14-Sep-2026"; "AAD4" = "V26"; "AAE4" = "7-Sep-2026"
+    "AAA5" = "U26"; "AAB5" = "21-Sep-2026";                         "AAD5" = "U26"; "AAE5" = "21-Sep-2026"
+    "AAA6" = "U26"; "AAB6" = "28-Sep-2026";                         "AAD6" = "U26"; "AAE6" = "28-Sep-2026"
+    "AAA7" = "V26"; "AAB7" = "5-Oct-2026";                          "AAD7" = "V26"; "AAE7" = "5-Oct-2026"
+    "AAH1" = "=_CreatePublishedSchedule(AAA2:AAA7,AAB2:AAB7)"
+    "AAH2" = "=_CreatePublishedSchedule(AAA3,AAB3)"
+    "AAH3" = '=_CreateIndex("DOE Diesel","U.S. national retail diesel - EIA weekly",AAH1,AP1,BY1)'
+    "AAH4" = "=_CreateValuationDate(DATE(2026,9,16),0.5)"
+    "AAH5" = "=_CreateCalendar(AAH4,AAH3)"
+    "AAH7" = "=_CreateValuationDate(DATE(2026,9,14),0.5)"
+    "AAH8" = "=_CreateCalendar(AAH7,AAH3)"
     # The Gas Daily schedule: three contract months of Henry Hub Gas Daily, the first and last day
     # of gas of each, a fourth first date for a column one row long, a copy of the last-date column
     # with a blank, a code over a number, and two creator cells, over the three rows and over the

@@ -34,6 +34,7 @@ from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import IndexConventions
+from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.market.market import Market, market
 from catalyst.market.market_history import MarketHistory
 from catalyst.market_data.futures_fixings import FuturesFixings
@@ -171,6 +172,27 @@ def test_a_gas_daily_schedule_spills_its_three_columns_under_two_heading_rows() 
     ]
     assert kinds.shape == (5, 3)
     assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE, NUMBER_CODE]] * 3
+
+
+# Serials for 31 August, the four Mondays of September and 5 October 2026: six prints of three
+# months, spilled a row per print in the creator's own form, each month's code on every print
+# of it, so the spill fed back to the creator makes the same schedule.
+def test_a_published_schedule_spills_a_row_per_print_under_two_heading_rows() -> None:
+    codes = Cells.from_rows([["Q26"], ["U26"], ["U26"], ["U26"], ["U26"], ["V26"]])
+    published = Cells.from_rows([[46265.0], [46272.0], [46279.0], [46286.0], [46293.0], [46300.0]])
+    kinds, slots, joined = read(bridge.call("_CreatePublishedSchedule", [codes, published]))
+    assert rows((kinds, slots, joined)) == [
+        ["contract_code", "publication_date"],
+        ["str", "datetime64[D]"],
+        ["Q26", 46265.0],
+        ["U26", 46272.0],
+        ["U26", 46279.0],
+        ["U26", 46286.0],
+        ["U26", 46293.0],
+        ["V26", 46300.0],
+    ]
+    assert kinds.shape == (8, 2)
+    assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE]] * 6
 
 
 def an_index(schedule: object, holidays: object = MISSING) -> str:
@@ -1292,6 +1314,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         GasDailySchedule,
         HolidayCalendar,
         IfercSchedule,
+        PublishedSchedule,
         IndexConventions,
         ContractSpecifications,
         Index,

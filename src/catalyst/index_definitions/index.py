@@ -24,7 +24,10 @@ from catalyst.index_definitions.kind import (
     with_holiday_calendar,
     without_holiday_key,
 )
+from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.instrumentation.work_counts import WorkCounter
+
+type Schedule = FuturesSchedule | IfercSchedule | GasDailySchedule | PublishedSchedule
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +57,7 @@ class Index:
     description a reader who does not know the desk's short names would understand, kept as
     typed and read for nothing but the readback; the kind, read off the schedule;
     the four objects themselves, kept by reference and unchanged: the schedule, the holiday
-    calendar, a futures index's own and None on the other two, the conventions and the
+    calendar, a futures index's own and None on the other kinds, the conventions and the
     specifications, whose lot units are units of the conventions' quantity type, the one fact
     read across two of them; and the reporting lot, the specification a batch's delta is reported
     in lots of with its conversions resolved once, None when the index was made without one, as an
@@ -64,7 +67,7 @@ class Index:
     name: str
     display_name: str
     kind: Kind
-    schedule: FuturesSchedule | IfercSchedule | GasDailySchedule
+    schedule: Schedule
     holiday_calendar: HolidayCalendar | None
     conventions: IndexConventions
     specifications: ContractSpecifications
@@ -94,7 +97,7 @@ def index(
     here in the library's words, since the seam names no kind for it. A futures index names
     its holiday calendar by key, one name of the collection or several joined by a plus sign,
     bound here once by the step every reader of a key shares, calendar_of, and held by
-    reference, so nothing later looks a name up; the other two leave the key out, and one
+    reference, so nothing later looks a name up; the other kinds leave the key out, and one
     given is refused before it is looked up. Then each lot unit of the specifications is a
     unit of the conventions'
     quantity type, read from the tables passed in: a barrel row and a gallon row both stand
@@ -131,7 +134,7 @@ def index(
         if reporting_lot is None
         else _the_reporting_lot(reporting_lot, conventions, specifications, units)
     )
-    typed = cast(FuturesSchedule | IfercSchedule | GasDailySchedule, schedule)  # what the kind said
+    typed = cast(Schedule, schedule)  # what the kind said
     return Index(name, display_name, kind, typed, calendar, conventions, specifications, lot)
 
 
@@ -171,7 +174,7 @@ def _the_reporting_lot(
 @singledispatch
 def _of(schedule: object) -> Kind:
     raise ValueError(
-        f"schedule is {named(schedule)}, expected a futures, IFERC or Gas Daily schedule"
+        f"schedule is {named(schedule)}, expected a futures, IFERC, Gas Daily or published schedule"
     )
 
 
@@ -190,6 +193,11 @@ def gas_daily_index(schedule: GasDailySchedule) -> Kind:
     return Kind.GAS_DAILY
 
 
+@_of.register
+def published_index(schedule: PublishedSchedule) -> Kind:
+    return Kind.PUBLISHED
+
+
 def _the_calendar(
     kind: Kind,
     holiday_key: str | None,
@@ -197,14 +205,14 @@ def _the_calendar(
     counter: WorkCounter,
 ) -> HolidayCalendar | None:
     """The holiday calendar the kind takes, holiday-keys.md: a futures index's, the one its key
-    selects from the collection, the key required; none for the other two, a key given refused
+    selects from the collection, the key required; none for the other kinds, a key given refused
     before anything is looked up."""
     match kind:
         case Kind.FUTURES:
             return with_holiday_calendar(
                 calendar_of("holiday_key", holiday_key, holiday_calendars, counter)
             )
-        case Kind.IFERC | Kind.GAS_DAILY:
+        case Kind.IFERC | Kind.GAS_DAILY | Kind.PUBLISHED:
             without_holiday_key(holiday_key, kind)
             return None
         case _:

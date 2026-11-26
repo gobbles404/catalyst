@@ -29,6 +29,7 @@ from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index, index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.kind import Kind
+from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market_data.futures_fixings import futures_fixings
 
@@ -66,6 +67,10 @@ GAS_DAILY = gas_daily_schedule(
     ("U26", "V26", "X26"),
     dates("2026-09-01", "2026-10-01", "2026-11-01"),
     dates("2026-09-30", "2026-10-31", "2026-11-30"),
+)
+PUBLISHED = published_schedule(
+    ("U26", "U26", "U26", "U26", "V26"),
+    dates("2026-09-07", "2026-09-14", "2026-09-21", "2026-09-28", "2026-10-05"),
 )
 HOLIDAYS = holiday_calendar("NYMEX", dates("2026-01-01", "2026-01-19", "2026-02-16"))
 ICE = holiday_calendar("ICE", dates("2026-01-01", "2026-04-03"))
@@ -138,6 +143,41 @@ def test_the_iferc_and_gas_daily_samples_carry_no_holiday_calendar() -> None:
     assert monthly.conventions is daily.conventions is CONVENTIONS
 
 
+# A published index, its prices a listed set of dated prints: the kind read off the schedule,
+# no holiday calendar, and a key given refused before it is looked up, as on the other two.
+def test_a_published_index_reads_its_kind_off_the_schedule_and_takes_no_holiday_key() -> None:
+    weekly = index(
+        "DOE Diesel",
+        "U.S. national retail diesel - EIA weekly",
+        PUBLISHED,
+        CONVENTIONS,
+        SPECIFICATIONS,
+        None,
+        None,
+        UNITS,
+        CALENDARS,
+        WorkCounter(),
+    )
+    assert weekly.kind is Kind.PUBLISHED
+    assert weekly.schedule is PUBLISHED and weekly.holiday_calendar is None
+    counter = WorkCounter()
+    with pytest.raises(ValueError) as failure:
+        index(
+            "DOE Diesel",
+            "U.S. national retail diesel - EIA weekly",
+            PUBLISHED,
+            CONVENTIONS,
+            SPECIFICATIONS,
+            "NYMEX",
+            None,
+            UNITS,
+            CALENDARS,
+            counter,
+        )
+    assert str(failure.value) == "holiday_key is 'NYMEX', expected none with a published schedule"
+    assert counter.freeze().as_dict() == {}
+
+
 # --- what is rejected, in the order the rules run -----------------------------
 
 
@@ -165,7 +205,7 @@ def test_an_object_that_is_not_a_schedule_is_refused_naming_what_it_is() -> None
                 WorkCounter(),
             )
         assert str(failure.value) == (
-            f"schedule is {what}, expected a futures, IFERC or Gas Daily schedule"
+            f"schedule is {what}, expected a futures, IFERC, Gas Daily or published schedule"
         )
 
 
@@ -514,7 +554,12 @@ def test_making_an_index_changes_no_input_and_a_second_index_leaves_the_first() 
 def test_any_kind_of_schedule_and_any_name_make_an_index_of_that_kind(
     name: str, kind: Kind, count: int
 ) -> None:
-    schedule: object = {Kind.FUTURES: FUTURES, Kind.IFERC: IFERC, Kind.GAS_DAILY: GAS_DAILY}[kind]
+    schedule: object = {
+        Kind.FUTURES: FUTURES,
+        Kind.IFERC: IFERC,
+        Kind.GAS_DAILY: GAS_DAILY,
+        Kind.PUBLISHED: PUBLISHED,
+    }[kind]
     specifications = contract_specifications(
         tuple(f"contract {i}" for i in range(count)),
         np.full(count, 1000.0),

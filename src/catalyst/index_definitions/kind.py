@@ -16,11 +16,12 @@ class Kind(Enum):
     FUTURES = "futures"
     IFERC = "IFERC"
     GAS_DAILY = "Gas Daily"
+    PUBLISHED = "published"
 
 
 def described(kind: Kind, what: str = "calendar") -> str:
     """A calendar, a schedule or an index of that kind named in a message: a futures calendar,
-    an IFERC schedule, a Gas Daily index."""
+    an IFERC schedule, a Gas Daily index, a published index."""
     article = "an" if kind is Kind.IFERC else "a"
     return f"{article} {kind.value} {what}"
 
@@ -47,9 +48,9 @@ def with_holiday_calendar(holiday_calendar: HolidayCalendar | None) -> HolidayCa
 
 
 def without_holiday_key(holiday_key: str | None, kind: Kind) -> None:
-    """An IFERC or a Gas Daily index takes no holiday calendar, since every period of theirs
-    prices; a key given is refused before it is looked up, since nothing would read its
-    calendar: fail loudly rather than ignore."""
+    """An IFERC, a Gas Daily or a published index takes no holiday calendar, since every period
+    of theirs prices; a key given is refused before it is looked up, since nothing would read
+    its calendar: fail loudly rather than ignore."""
     if holiday_key is not None:
         raise ValueError(
             f"holiday_key is {holiday_key!r}, expected none with {described(kind, 'schedule')}"
