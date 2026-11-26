@@ -19,10 +19,12 @@ from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.market.market_history import MarketHistory, market_history
 from catalyst.market_data.futures_fixings import FuturesFixings, futures_fixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings, gas_daily_fixings
 from catalyst.market_data.iferc_fixings import IfercFixings, iferc_fixings
+from catalyst.market_data.published_fixings import PublishedFixings, published_fixings
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:
@@ -658,6 +660,141 @@ def test_an_iferc_history_that_cannot_be_made_says_why(
     assert str(failure.value) == message
 
 
+# --- a published calendar and its prints' prices -------------------------------------------
+
+
+# The published fixings page's sample: six weekly prints of three months, valued on Wednesday
+# 16 September 2026, when the prints dated 31 August and 7 and 14 September have fixed.
+PUBLISHED_PRINTS = dates(
+    "2026-08-31", "2026-09-07", "2026-09-14", "2026-09-21", "2026-09-28", "2026-10-05"
+)
+PUBLISHED_INDEX = an_index(
+    published_schedule(("Q26", "U26", "U26", "U26", "U26", "V26"), PUBLISHED_PRINTS),
+    None,
+    "DOE Diesel",
+)
+
+
+def a_published_calendar(as_of: str = "2026-09-16", fraction: float = 0.5) -> Calendar:
+    return calendar(valuation_date(day(as_of), fraction), PUBLISHED_INDEX)
+
+
+def priced_on(*pairs: tuple[str, float], over: Index = PUBLISHED_INDEX) -> PublishedFixings:
+    """Published fixings from date and price pairs as the desk keeps them, the newest first."""
+    dated = dates(*(date for date, _ in pairs))
+    return published_fixings(dated, np.array([price for _, price in pairs]), over)
+
+
+PUBLISHED = a_published_calendar()
+THREE_PRICES = (("2026-09-14", 3.20), ("2026-09-07", 3.00), ("2026-08-31", 2.95))
+
+
+def test_the_published_sample_prices_the_fixed_prints_and_no_other() -> None:
+    fixings = priced_on(*THREE_PRICES)
+    made = market_history(PUBLISHED, fixings)
+    assert made.calendar is PUBLISHED
+    assert made.fixed_rows.tolist() == [0, 1, 2]
+    assert made.fixing_prices.shape == (3, 1)
+    assert made.fixing_prices[:, 0].tolist() == [2.95, 3.00, 3.20]
+    # The fixings' own two arrays, read-only already: the history copies neither.
+    assert made.fixed_rows is fixings.rows
+    assert np.shares_memory(made.fixing_prices, fixings.prices)
+    assert not made.fixing_prices.flags.writeable
+
+
+def test_a_published_calendar_of_one_print_and_one_with_nothing_fixed() -> None:
+    one = an_index(published_schedule(("U26",), dates("2026-09-07")), None, "DOE Diesel")
+    made = market_history(
+        calendar(valuation_date(day("2026-09-16"), 0.5), one),
+        priced_on(("2026-09-07", 3.0), over=one),
+    )
+    assert made.fixed_rows.tolist() == [0] and made.fixing_prices[:, 0].tolist() == [3.0]
+    nothing = market_history(a_published_calendar("2026-08-15"), priced_on())
+    assert nothing.fixed_rows.size == 0 and nothing.fixing_prices.size == 0
+
+
+# A print is fixed from the day after its date: Monday's price is refused on the Monday, at any
+# fraction of the day, and required from the Tuesday.
+def test_a_price_for_the_print_dated_the_valuation_day_is_refused_and_required_the_day_after() -> (
+    None
+):
+    for fraction in (0.0, 0.5, 1.0):
+        with pytest.raises(ValueError) as failure:
+            market_history(a_published_calendar("2026-09-14", fraction), priced_on(*THREE_PRICES))
+        assert str(failure.value) == (
+            "fixings publication_date 2026-09-14 is a print not yet fixed in calendar, "
+            "expected a price for fixed prints alone; a print is fixed from the day after its date"
+        )
+    with pytest.raises(ValueError) as missing:
+        market_history(a_published_calendar("2026-09-15"), priced_on(*THREE_PRICES[1:]))
+    assert str(missing.value) == (
+        "fixings has no price for the print dated 2026-09-14, expected a price for every fixed "
+        "print in calendar, a stand-in where its publisher has not released it"
+    )
+    # The stand-in: a price the desk enters for the fixed print its publisher has not released.
+    stood_in = market_history(
+        a_published_calendar("2026-09-15"), priced_on(("2026-09-14", 3.50), *THREE_PRICES[1:])
+    )
+    assert stood_in.fixing_prices[:, 0].tolist() == [2.95, 3.00, 3.50]
+
+
+@pytest.mark.parametrize(
+    ("pairs", "message"),
+    [
+        (
+            (("2026-09-21", 3.5), *THREE_PRICES),
+            "fixings publication_date 2026-09-21 is a print not yet fixed in calendar, "
+            "expected a price for fixed prints alone; a print is fixed from the day after its date",
+        ),
+        (
+            (("2026-10-05", 3.7), ("2026-09-21", 3.5), *THREE_PRICES),
+            "fixings publication_date 2026-09-21 is a print not yet fixed in calendar, "
+            "expected a price for fixed prints alone; a print is fixed from the day after its date",
+        ),
+        (
+            THREE_PRICES[1:],
+            "fixings has no price for the print dated 2026-09-14, expected a price for every "
+            "fixed print in calendar, a stand-in where its publisher has not released it",
+        ),
+        (
+            (THREE_PRICES[0], THREE_PRICES[2]),
+            "fixings has no price for the print dated 2026-09-07, expected a price for every "
+            "fixed print in calendar, a stand-in where its publisher has not released it",
+        ),
+        (
+            THREE_PRICES[:2],
+            "fixings has no price for the print dated 2026-08-31, expected a price for every "
+            "fixed print in calendar, a stand-in where its publisher has not released it",
+        ),
+        (
+            (),
+            "fixings has no price for the print dated 2026-08-31, expected a price for every "
+            "fixed print in calendar, a stand-in where its publisher has not released it",
+        ),
+        (
+            (("2026-09-21", 3.5), THREE_PRICES[0]),
+            "fixings publication_date 2026-09-21 is a print not yet fixed in calendar, "
+            "expected a price for fixed prints alone; a print is fixed from the day after its date",
+        ),
+    ],
+    ids=[
+        "a price for a print not yet fixed",
+        "two of them: the earliest is named",
+        "the newest fixed print without a price",
+        "a fixed print between two priced ones without a price",
+        "the oldest fixed print without a price",
+        "no price at all",
+        "the unfixed prints are checked before the missing ones",
+    ],
+)
+def test_a_published_history_that_cannot_be_made_says_why(
+    pairs: tuple[tuple[str, float], ...], message: str
+) -> None:
+    with pytest.raises(ValueError) as failure:
+        market_history(PUBLISHED, priced_on(*pairs))
+    assert str(failure.value) == message
+
+
 # --- the direction the fixings were given in ----------------------------------------------
 
 
@@ -794,7 +931,7 @@ def test_an_object_that_is_not_fixings_is_refused_naming_what_it_is() -> None:
         with pytest.raises(ValueError) as failure:
             market_history(CALENDAR, wrong)
         assert str(failure.value) == (
-            f"fixings is {what}, expected futures, IFERC or Gas Daily fixings"
+            f"fixings is {what}, expected futures, IFERC, Gas Daily or published fixings"
         )
 
 

@@ -89,7 +89,7 @@ Quoted from the declaration in `src/catalyst/excel/market.py`, which `tests/unit
 |---|---|
 | Function | Creates the market history of one index, its calendar with the price fixed on each period that has fixed, from the fixings of the calendar's market, and shows its handle, the text other formulas take as the history. |
 | `calendar` | The index's calendar handle: the cell showing _CreateCalendar's result, such as B7, or a name for it. |
-| `fixings` | The index's fixings handle, futures, IFERC or Gas Daily as the index is: the cell showing its creator's result, such as B10, or a name for it, made over the calendar's own index cell, with a price for every period of the calendar that has fixed. |
+| `fixings` | The index's fixings handle, of the index's own kind: the cell showing its creator's result, such as B10, or a name for it, made over the calendar's own index cell, with a price for every period of the calendar that has fixed. |
 
 ## The library checks
 
@@ -97,7 +97,7 @@ Two rules on what arrived, then two on the fixings against the calendar, in this
 
 | Rule | Message |
 |---|---|
-| the fixings are fixings: futures, IFERC or Gas Daily | `fixings is a holiday calendar, expected futures, IFERC or Gas Daily fixings` |
+| the fixings are fixings: futures, IFERC, Gas Daily or [published](../market-data/published-fixings.md) | `fixings is a holiday calendar, expected futures, IFERC, Gas Daily or published fixings` |
 | the fixings are over the calendar's index, the one object `_CreateIndex` made, which the calendar and the fixings both refer to; another index of the same name is another index, made from other arguments or made again after the first was released, and fixings of another kind are over another index; two `_CreateIndex` cells with the same arguments, live at once, are one index | `fixings is over another index, 'Henry Hub IFERC', expected the calendar's, 'Henry Hub NYMEX'` |
 
 With a futures calendar, two of the three rules of #84, the argument named as it is now; the third, that no fixing falls on a day the calendar closes, has nothing left to catch, since the fixings were checked against the same holiday calendar when they were made:
@@ -121,6 +121,15 @@ With an IFERC calendar, two rules, every month being priced and every code a mon
 |---|---|
 | every index is for a fixed month, one whose publication day is before the valuation date's day | `fixings contract_code 'X26' is a month not yet fixed in calendar, expected an index for fixed months alone` |
 | every fixed month of the calendar has an index | `fixings has no index for V26, expected an index for every fixed month in calendar` |
+
+With a published calendar, two rules, every print being priced and every price a print of the index, since the [fixings' creator](../market-data/published-fixings.md#the-library-checks) refuses a date the schedule does not list:
+
+| Rule | Message |
+|---|---|
+| every price is of a fixed print, one dated before the valuation date's day | `fixings publication_date 2026-09-14 is a print not yet fixed in calendar, expected a price for fixed prints alone; a print is fixed from the day after its date` |
+| every fixed print of the calendar has a price | `fixings has no price for the print dated 2026-09-14, expected a price for every fixed print in calendar, a stand-in where its publisher has not released it` |
+
+A published calendar's rows are its schedule's prints, row for row, and the fixings found each price's print when they were made, so nothing is searched here: a price for a print not yet fixed is a row at or past the count of fixed prints, which the calendar took when it was made, and with none of those every fixed print has its price when there are as many prices as fixed prints. The history holds the fixings' own two read-only arrays and copies neither. A fixed print whose publisher has not released its price takes a stand-in on the sheet, which the [fixings' page](../market-data/published-fixings.md#the-stand-in) owns; a stand-in is a price like any other here.
 
 The calendar's days are consecutive and the fixings' dates increase, so on a futures or a Gas Daily calendar a fixing's row is its day count from the calendar's first day, one subtraction over the fixings' dates; a fixing before the calendar's first day or after its last is allowed and unused, so the fixings may run longer than the calendar on either side, and the ends of the two need not meet. On an IFERC calendar a month's row is found by its code, one pass over the fixings' codes against the calendar's, and there is no side to run past: every code is a month of the index, so of the calendar, which has one row per month of the index's schedule. A fixing on a period the calendar prices but has not fixed cannot reach the last rule, since the one before has already refused it. Nothing is sorted, filled in, carried forward, interpolated or substituted, and the calendar is neither shortened nor extended: a fixed period without a fixing is a row the desk did not paste, never a price to invent, as each fixings page already decided, and the period is named so the desk can paste it. Then the two columns are made, once: the rows of the fixings that fall in the calendar, and their prices copied out of the fixings' column, both frozen. The calendar is kept by reference, its periods, contracts and flags neither copied nor changed, and the fixings are left as they were, so many histories can share one calendar. A failed call publishes nothing.
 

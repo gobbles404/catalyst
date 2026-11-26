@@ -22,12 +22,14 @@ from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.market.market import Market, market
 from catalyst.market.market_history import MarketHistory, market_history
 from catalyst.market_data.futures_fixings import futures_fixings
 from catalyst.market_data.gas_daily_fixings import gas_daily_fixings
 from catalyst.market_data.iferc_fixings import iferc_fixings
 from catalyst.market_data.price_vector import PriceVector, price_vector
+from catalyst.market_data.published_fixings import published_fixings
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:
@@ -586,6 +588,131 @@ def test_the_first_unpublished_month_is_the_first_contract_quoted(
         assert len(IFERC_SCHEDULE.codes) - first_contract == quotes
 
 
+# --- a published market ----------------------------------------------------------
+# The published fixings page's sample: six weekly prints of three months, the code of its month
+# on each, valued on a day of September 2026 with a price for every print dated before it. One
+# quote per month from the month of the first print still to come: the first quote is the price
+# of each print still to come in that month, however many of its prints have fixed.
+
+PUBLISHED_PRINTS = dates(
+    "2026-08-31", "2026-09-07", "2026-09-14", "2026-09-21", "2026-09-28", "2026-10-05"
+)
+PUBLISHED_INDEX = index_on(
+    "DOE Diesel",
+    "U.S. national retail diesel - EIA weekly",
+    published_schedule(("Q26", "U26", "U26", "U26", "U26", "V26"), PUBLISHED_PRINTS),
+    CONVENTIONS,
+    SPECIFICATIONS,
+    None,
+    None,
+    UNITS,
+)
+PUBLISHED_PRICES = np.array([2.95, 3.00, 3.20, 3.55, 3.60, 3.70])
+
+
+def a_published_history(as_of: str, *stand_ins: float) -> MarketHistory:
+    """The diesel index's history valued on that day: the page's price for every print dated
+    before it, the newest first, the newest ones replaced by the stand-ins given, the first
+    stand-in the newest print's."""
+    made = calendar(valuation_date(day(as_of), 0.5), PUBLISHED_INDEX)
+    fixed = made.first_unfixed
+    prices = PUBLISHED_PRICES[:fixed][::-1].copy()
+    prices[: len(stand_ins)] = stand_ins
+    return market_history(
+        made, published_fixings(PUBLISHED_PRINTS[:fixed][::-1], prices, PUBLISHED_INDEX)
+    )
+
+
+def test_the_published_sample_quotes_the_month_of_the_first_print_still_to_come() -> None:
+    history = a_published_history("2026-09-16")
+    assert history.fixed_rows.tolist() == [0, 1, 2]
+    assert history.fixing_prices[:, 0].tolist() == [2.95, 3.00, 3.20]
+    view = market(history, a_vector(3.50, 3.65, name="DOE Diesel"))
+    assert view.first_contract == 1 and view.last_contract == 2
+    made = history.calendar
+    live = np.flatnonzero(~made.is_fixed)
+    assert view.live_prices(made.contract[live]).tolist() == [3.50, 3.50, 3.65]
+    # September's whole-month average by hand: two prints fixed and two at the month's quote.
+    september = np.flatnonzero(made.contract == 1)
+    prices = np.where(
+        made.is_fixed[september],
+        np.array([3.00, 3.20, 0.0, 0.0]),
+        view.live_prices(made.contract[september]),
+    )
+    assert prices.mean() == pytest.approx(3.30)
+    # The quote of a month whose every print has fixed is not asked for and not held.
+    with pytest.raises(ValueError) as failure:
+        view.live_prices(np.array([0], dtype=np.intp))
+    assert str(failure.value) == (
+        "requested contract 'Q26' is before live-price coverage starting at 'U26'"
+    )
+
+
+@pytest.mark.parametrize(
+    ("as_of", "first", "fixed"),
+    [
+        ("2026-08-15", "Q26", 0),
+        ("2026-08-31", "Q26", 0),
+        ("2026-09-01", "U26", 1),
+        ("2026-09-14", "U26", 2),
+        ("2026-09-15", "U26", 3),
+        ("2026-09-28", "U26", 4),
+        ("2026-09-29", "V26", 5),
+        ("2026-10-05", "V26", 5),
+    ],
+    ids=[
+        "before any print: the first month",
+        "the first print's own date: its month, the print still live",
+        "the day after a month's only print: the next month",
+        "a Monday: that day's print still live",
+        "the Tuesday: Monday's print fixed, its month still first",
+        "a month's last print on its own date: that month still",
+        "the day after it: the next month",
+        "the last print's own date: the last month",
+    ],
+)
+def test_the_month_of_the_first_unfixed_print_is_the_first_contract_quoted(
+    as_of: str, first: str, fixed: int
+) -> None:
+    history = a_published_history(as_of)
+    assert history.fixed_rows.size == fixed
+    remaining = 3 - PUBLISHED_INDEX.schedule.codes.index(first)
+    view = market(history, a_vector(*(3.5 + i for i in range(remaining)), name="DOE Diesel"))
+    assert PUBLISHED_INDEX.schedule.codes[view.first_contract] == first
+    assert history.calendar.prompt_code() == first
+    with pytest.raises(ValueError):
+        market(history, a_vector(*(3.5 + i for i in range(remaining + 1)), name="DOE Diesel"))
+
+
+# The stand-in: on Tuesday 15 September, Monday's print has fixed and its publisher has not
+# released it, so the sheet enters the front price of the price vector in its place. The market
+# is the same market either way, a stand-in being a price like any other: the fixed side differs
+# by the one print and nothing of the live side moves.
+def test_a_stand_in_is_a_price_like_any_other_and_moves_the_one_print_alone() -> None:
+    quotes = a_vector(3.50, 3.65, name="DOE Diesel")
+    with_stand_in = market(a_published_history("2026-09-15", 3.50), quotes)
+    released = market(a_published_history("2026-09-15"), quotes)
+    assert with_stand_in.first_contract == released.first_contract == 1
+    stood, known = with_stand_in.market_history, released.market_history
+    assert stood.fixed_rows.tolist() == known.fixed_rows.tolist() == [0, 1, 2]
+    assert stood.fixing_prices[:, 0].tolist() == [2.95, 3.00, 3.50]
+    assert known.fixing_prices[:, 0].tolist() == [2.95, 3.00, 3.20]
+    # The whole-month average by hand, a quarter of the month on each print: 3.375 and 3.30.
+    assert september_average(with_stand_in) == pytest.approx(3.375)
+    assert september_average(released) == pytest.approx(3.30)
+
+
+def september_average(made: Market) -> float:
+    """September's whole-month average by hand on a market valued with two of its four prints
+    fixed: the two fixed prints' prices read off the history, rows 1 and 2 of the calendar, each
+    of U26, row 1 of the schedule, and the two prints still to come at the month's quote."""
+    rows = np.array([1, 2], dtype=np.intp)
+    month = np.array([1, 1], dtype=np.intp)
+    fixed = made.market_history.fixed_prices(rows, month)
+    live = made.live_prices(month)
+    return float((fixed.sum() + live.sum()) / 4)
+
+
 # --- the general rule ---------------------------------------------------------
 
 
@@ -691,12 +818,37 @@ def any_iferc_history(data: st.DataObject) -> MarketHistory:
     return market_history(made, indices)
 
 
+def any_published_history(data: st.DataObject) -> MarketHistory:
+    """A published history of one to eight months of one to five prints up to ten days apart,
+    valued on any day from ten days before the first print to the last print's own date, with a
+    price for every print dated before it."""
+    months = data.draw(st.integers(1, 8))
+    prints = data.draw(st.lists(st.integers(1, 5), min_size=months, max_size=months))
+    total = sum(prints)
+    gaps = np.array(
+        data.draw(st.lists(st.integers(1, 10), min_size=total, max_size=total)), dtype=np.int64
+    )
+    start = np.datetime64("2000-01-01", "D") + np.timedelta64(
+        data.draw(st.integers(0, 20_000)), "D"
+    )
+    published = start + np.cumsum(gaps).astype("timedelta64[D]")
+    codes = tuple(f"c{m}" for m, count in enumerate(prints) for _ in range(count))
+    schedule = published_schedule(codes, published)
+    as_of = published[0] + np.timedelta64(data.draw(st.integers(-10, int(gaps[1:].sum()))), "D")
+    made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
+    fixed = np.flatnonzero(made.is_fixed)[::-1]  # the newest print first, as the desk keeps them
+    prices = published_fixings(published[fixed], 100.0 + fixed.astype(np.float64), made.index)
+    return market_history(made, prices)
+
+
 @settings(deadline=None)
 @given(data=st.data())
 def test_every_unfixed_period_of_the_other_two_kinds_has_its_contracts_quote(
     data: st.DataObject,
 ) -> None:
-    history = data.draw(st.sampled_from((any_gas_daily_history, any_iferc_history)))(data)
+    history = data.draw(
+        st.sampled_from((any_gas_daily_history, any_iferc_history, any_published_history))
+    )(data)
     made = history.calendar
     assert not made.is_fixed.all()
     fixed = int(np.count_nonzero(made.is_fixed))

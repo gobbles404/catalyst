@@ -31,9 +31,9 @@ def _CreateMarketHistory(
     ],
     fixings: Annotated[
         Handle[object],
-        "The index's fixings handle, futures, IFERC or Gas Daily as the index is: the cell "
-        "showing its creator's result, such as B10, or a name for it, made over the calendar's "
-        "own index cell, with a price for every period of the calendar that has fixed.",
+        "The index's fixings handle, of the index's own kind: the cell showing its creator's "
+        "result, such as B10, or a name for it, made over the calendar's own index cell, with "
+        "a price for every period of the calendar that has fixed.",
     ],
 ) -> Handle[MarketHistory]:
     """Creates the market history of one index, its calendar with the price fixed on each period

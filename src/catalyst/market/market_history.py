@@ -16,6 +16,7 @@ from catalyst.index_definitions.kind import named
 from catalyst.market_data.futures_fixings import FuturesFixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings
 from catalyst.market_data.iferc_fixings import IfercFixings
+from catalyst.market_data.published_fixings import PublishedFixings
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,13 +26,13 @@ class MarketHistory:
     fixed on, increasing, and fixing_prices[k, n] the price fixed on it for the contract n
     places after the one the calendar gives the period, any number, zero and below included.
     Column 0 is the calendar's own contract's price, the prompt future's settle on a futures
-    day, a month's index, a flow day's print; since nearby-selection.md a futures history has a
-    column more for each further nearby its fixings carry, the second nearby's settle in
-    column 1, every one of a contract the schedule lists, and an IFERC or a Gas Daily history
-    is the same record one column wide. The rows are exactly the calendar's fixed and priced
-    periods, is_fixed and is_priced both, every one and no other, so a period absent from
-    fixed_rows has no price, a futures weekend or holiday or a period not yet fixed, and no
-    number stands for absence."""
+    day, a month's index, a flow day's print, a published print's price; since
+    nearby-selection.md a futures history has a column more for each further nearby its
+    fixings carry, the second nearby's settle in column 1, every one of a contract the schedule
+    lists, and an IFERC, a Gas Daily or a published history is the same record one column wide.
+    The rows are exactly the calendar's fixed and priced periods, is_fixed and is_priced both,
+    every one and no other, so a period absent from fixed_rows has no price, a futures weekend
+    or holiday or a period not yet fixed, and no number stands for absence."""
 
     calendar: Calendar
     fixed_rows: NDArray[np.intp]
@@ -106,7 +107,8 @@ def market_history(calendar: Calendar, fixings: object) -> MarketHistory:
     The calendar decides the periods and the fixings supply the prices on them. Every fixing is
     on the fixed side, as the calendar decides it for its market: a futures settle before the
     valuation date's day, a Gas Daily print for a flow day on or before it, an index for a month
-    published before it, inside the calendar or out, whatever fraction of the day has elapsed.
+    published before it, a published print dated before it, inside the calendar or out,
+    whatever fraction of the day has elapsed.
     Every fixed and priced period has its fixing, the first and the last as much as the periods
     between, since a period without one is a row the desk did not paste, never a price to carry
     forward or interpolate. No fixing can fall on a day the calendar closes, both having been
@@ -129,7 +131,9 @@ def market_history(calendar: Calendar, fixings: object) -> MarketHistory:
 
 @singledispatch
 def _bind(fixings: object, calendar: Calendar) -> MarketHistory:
-    raise ValueError(f"fixings is {named(fixings)}, expected futures, IFERC or Gas Daily fixings")
+    raise ValueError(
+        f"fixings is {named(fixings)}, expected futures, IFERC, Gas Daily or published fixings"
+    )
 
 
 def _over_the_calendars_index(calendar: Calendar, index: Index) -> None:
@@ -225,6 +229,42 @@ def iferc_history(fixings: IfercFixings, calendar: Calendar) -> MarketHistory:
         )
     order = np.argsort(rows)
     return _frozen(calendar, rows[order], fixings.prices[order][:, None])
+
+
+@_bind.register
+def published_history(fixings: PublishedFixings, calendar: Calendar) -> MarketHistory:
+    """Two rules by print, every print being priced and every price a print of the index, so of
+    the calendar: every price is of a print already fixed, and every fixed print has its price.
+
+    A published calendar's rows are its schedule's prints, row for row, so the row the fixings
+    found each price's print at when they were made is its row here and nothing is searched
+    again. The fixed prints are the calendar's first rows, counted when the calendar was made,
+    and the fixings' prints increase, each once: so a price for a print not yet fixed is a row at
+    or past that count, the earliest named, and with none of those the fixed prints all have a
+    price when there are as many prices as fixed prints, the first without one named otherwise.
+    A print is fixed from the day after its date whether or not its publisher has released its
+    price, so on a day before the release the sheet supplies a stand-in, as the page says; a
+    stand-in is a price like any other here, and the refusal of a fixed print without one says
+    so. The rows and the prices are the fixings' own two read-only arrays, held and not copied.
+    """
+    _over_the_calendars_index(calendar, fixings.index)
+    rows = fixings.rows
+    fixed = calendar.first_unfixed  # the fixed prints are the calendar's first rows
+    unfixed = rows >= fixed
+    if unfixed.any():
+        k = int(rows[int(unfixed.argmax())])  # the earliest print with a price it should not have
+        raise ValueError(
+            f"fixings publication_date {calendar.dates[k]} is a print not yet fixed in calendar, "
+            "expected a price for fixed prints alone; a print is fixed from the day after its date"
+        )
+    if rows.size != fixed:
+        gap = rows != np.arange(rows.size)
+        k = int(gap.argmax()) if gap.any() else rows.size  # the first fixed print without a price
+        raise ValueError(
+            f"fixings has no price for the print dated {calendar.dates[k]}, expected a price for "
+            "every fixed print in calendar, a stand-in where its publisher has not released it"
+        )
+    return _frozen(calendar, rows, fixings.prices[:, None])
 
 
 def _every_fixed_day(calendar: Calendar, rows: NDArray[np.intp]) -> None:

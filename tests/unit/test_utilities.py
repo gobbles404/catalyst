@@ -12,7 +12,13 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 from test_create_trades import seam_calendars, seam_key
-from test_market import a_vector, any_gas_daily_history, any_history, any_iferc_history
+from test_market import (
+    a_vector,
+    any_gas_daily_history,
+    any_history,
+    any_iferc_history,
+    any_published_history,
+)
 
 from catalyst.calendar.calendar import Calendar
 from catalyst.excel import bridge
@@ -41,6 +47,7 @@ from catalyst.market_data.futures_fixings import FuturesFixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings
 from catalyst.market_data.iferc_fixings import IfercFixings
 from catalyst.market_data.price_vector import PriceVector
+from catalyst.market_data.published_fixings import PublishedFixings
 from catalyst.quoting.rfq import Rfq
 from catalyst_probes import probe
 
@@ -1321,6 +1328,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         FuturesFixings,
         GasDailyFixings,
         IfercFixings,
+        PublishedFixings,
         MarketHistory,
         PriceVector,
         Market,
@@ -1331,8 +1339,8 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
 # --- the market's daily view, for any calendar -------------------------------------
 
 
-# For any history of any of the three kinds, a futures one of two to eight contracts with any
-# holidays or a Gas Daily or an IFERC one of one to eight months, valued on any day from before
+# For any history of any kind, a futures one of two to eight contracts with any holidays, a Gas
+# Daily, an IFERC or a published one of one to eight months, valued on any day from before
 # its calendar to its last period, with any number of quotes from the first unfixed period's
 # contract's alone to one per remaining contract: the rows are the calendar's own spill through
 # the last period of the last contract quoted, every one and no other, and the fifth cell is
@@ -1344,9 +1352,11 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
 def test_every_day_of_a_market_shows_its_fixing_its_prompts_quote_or_closed(
     data: st.DataObject,
 ) -> None:
-    history = data.draw(st.sampled_from((any_history, any_gas_daily_history, any_iferc_history)))(
-        data
-    )
+    history = data.draw(
+        st.sampled_from(
+            (any_history, any_gas_daily_history, any_iferc_history, any_published_history)
+        )
+    )(data)
     calendar = history.calendar
     first = int(calendar.contract[int(np.count_nonzero(calendar.is_fixed))])
     count = data.draw(st.integers(1, len(calendar.index.schedule.codes) - first))

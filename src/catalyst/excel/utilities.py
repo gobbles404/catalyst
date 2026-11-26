@@ -56,6 +56,7 @@ from catalyst.market_data.gas_daily_fixings import GasDailyFixings
 from catalyst.market_data.iferc_fixings import IfercFixings
 from catalyst.market_data.interpolated_contracts import interpolate_contracts
 from catalyst.market_data.price_vector import PriceVector
+from catalyst.market_data.published_fixings import PublishedFixings
 from catalyst.quoting.rfq import Rfq
 from catalyst.quoting.template import QuoteTemplate
 from catalyst.trades.aggregation import AggregateResults
@@ -333,6 +334,19 @@ def iferc_fixings_table(obj: IfercFixings) -> MixedArray:
     # the fixings were made.
     return MixedArray.table(
         [("contract_code", "price"), ("str", "float64")], obj.codes[::-1], obj.prices[::-1]
+    )
+
+
+@shown.register
+def published_fixings_table(obj: PublishedFixings) -> MixedArray:
+    # Newest first, as the creator takes them: each price's date is its print's, one take of
+    # the schedule's dates over the prints kept, read from the last back, a date beside its own
+    # price, so the spill pasted back into the creator makes the same fixings.
+    listed = cast(PublishedSchedule, obj.index.schedule).publication_date
+    return MixedArray.table(
+        [("publication_date", "price"), ("datetime64[D]", "float64")],
+        listed[obj.rows[::-1]],
+        obj.prices[::-1],
     )
 
 

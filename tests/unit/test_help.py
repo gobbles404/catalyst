@@ -530,6 +530,33 @@ def test_the_gas_daily_fixings_creator_explains_itself() -> None:
     ]
 
 
+def test_the_published_fixings_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreatePublishedFixings"]
+    assert not hidden
+    assert description == (
+        "Creates the published fixings of one index from the dates of its prints that have a "
+        "price, newest first, and the price of each, checked against the dates of its index's "
+        "schedule, and shows its handle, the text other formulas take as the fixings."
+    )
+    assert arguments == [
+        (
+            "publication_date",
+            "The column of dates on the prints that have a price, newest first, such as A2:A4 "
+            "holding 14-Sep-2026 down to 31-Aug-2026, each a date of the index's schedule.",
+        ),
+        (
+            "price",
+            "The column of prices beside the dates, such as B2:B4, one per date; a stand-in where "
+            "a print has fixed and its publisher has not released it.",
+        ),
+        (
+            "index",
+            "The index handle: the cell showing _CreateIndex's result, such as D3, or a name for "
+            "it; a published index, whose schedule the dates are checked against.",
+        ),
+    ]
+
+
 def test_the_price_vector_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreatePriceVector"]
     assert not hidden
@@ -662,10 +689,9 @@ def test_the_market_history_creator_explains_itself() -> None:
         ),
         (
             "fixings",
-            "The index's fixings handle, futures, IFERC or Gas Daily as the index is: the cell "
-            "showing its creator's result, such as B10, or a name for it, made over the "
-            "calendar's own index cell, with a price for every period of the calendar that has "
-            "fixed.",
+            "The index's fixings handle, of the index's own kind: the cell showing its creator's "
+            "result, such as B10, or a name for it, made over the calendar's own index cell, "
+            "with a price for every period of the calendar that has fixed.",
         ),
     ]
 
