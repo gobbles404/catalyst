@@ -12,6 +12,7 @@ from collections.abc import Mapping
 
 import numpy as np
 import pytest
+from published_fixtures import fixings_by_code
 from test_bilateral_kernel import CLOSE, curve_of, curve_set
 from test_create_trades import an_index, created, key_of, seam_key, with_calendars
 from test_onetime_average import (
@@ -37,7 +38,6 @@ from catalyst.globals.valuation_date import valuation_date
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market.market import Market
 from catalyst.market.market_history import market_history
-from catalyst.market_data.iferc_fixings import iferc_fixings
 from catalyst.quoting.quote import quote, quote_by_dates
 from catalyst.quoting.template import QuoteTemplate
 from catalyst.trades.evaluation import trade_results
@@ -327,7 +327,7 @@ def test_the_dates_and_the_terms_are_refused_by_name() -> None:
         end=START,
     )
     # The kernel's rule over the frequency, the quote named in the trade's place: the basis, the
-    # method, a physical settlement and an IFERC index under onetime; period under monthly.
+    # method, a physical settlement and a published index under onetime; period under monthly.
     refused(
         "quantity_per of the quote is 'month', expected 'period' or 'calday' under "
         "settlement_frequency = onetime; month says nothing of a window, period is its total "
@@ -352,11 +352,11 @@ def test_the_dates_and_the_terms_are_refused_by_name() -> None:
         template=terms("monthly", "period"),
     )
     cal = calendar(valuation_date(day("2026-11-15"), 0.5), WAHA)
-    waha = quoted(market_history(cal, iferc_fixings(("X26",), numbers(0.5), WAHA)), -0.4, -0.3)
+    waha = quoted(market_history(cal, fixings_by_code(("X26",), numbers(0.5), WAHA)), -0.4, -0.3)
     refused(
-        "settlement_frequency of the quote is 'onetime', expected 'monthly' on an IFERC index; "
-        "an IFERC month has one index, published once, and a onetime period averages the "
-        "pricing days of a futures index",
+        "settlement_frequency of the quote is 'onetime', expected 'monthly' on a published "
+        "index; one average across months would weight each month by its number of prints, "
+        "and a strip settles month by month",
         waha,
         terms(method="lastday", payment=RULE),
         start=day("2026-12-01"),

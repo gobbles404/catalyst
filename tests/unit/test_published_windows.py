@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from holiday_fixtures import index_on
 from numpy.typing import NDArray
-from test_create_trades import created, key_of
+from test_create_trades import created, key_of, refused
 from test_quote import WEEKENDS_ONLY, financial
 from test_rfq import request
 
@@ -210,6 +210,29 @@ def test_a_strip_by_code_observes_each_months_own_prints() -> None:
     assert mark_of(dated("2026-09-01", "2026-10-31")) == pytest.approx(
         40_000 * (1.15 + 1.9), rel=1e-12
     )
+
+
+# --- lastday, a month's one print ----------------------------------------------------------------
+
+
+# Under lastday a row is a whole month holding one print, and the prints are counted as the row
+# was entered. V26 by its code holds two prints here and is refused by its count; October typed
+# as two dates holds one, dated the 5th, and is that print at October's quote.
+def test_lastday_counts_a_months_prints_as_the_row_was_entered() -> None:
+    last = {**TEMPLATE, "schedule_method": "lastday"}
+    assert refused(WEEKLY, {**BOOKED, "contract_code": ["V26"]}, last) == (
+        "schedule_method of trade 1001 at row 1 is 'lastday' on V26, a month of 2 prints, "
+        "expected a month of one print; lastday is a month's one print, and asian averages "
+        "several"
+    )
+    window: dict[str, list[object]] = {
+        **BOOKED,
+        "start_date": ["2026-10-01"],
+        "end_date": ["2026-10-31"],
+    }
+    october = created(WEEKLY, window, last)[0]
+    assert observed_days(october) == [[PRINTS[5]]]
+    assert mark_of(october) == pytest.approx(40_000 * (OCTOBER - 3.10), rel=1e-12)
 
 
 # --- a request for quote -------------------------------------------------------------------------

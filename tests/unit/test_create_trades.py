@@ -33,9 +33,9 @@ from catalyst.index_definitions.holiday_calendars import (
     calendar_of,
     collect_holiday_calendars,
 )
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT, NONE, FieldType, Instrument
 from catalyst.instruments.fields import DatesOrTexts, FieldValues
@@ -2009,7 +2009,7 @@ def test_the_index_must_be_a_futures_index_with_one_contract_per_month() -> None
         UNITS,
     )
     assert refused(daily) == (
-        "index is a Gas Daily index, expected a futures, IFERC or published index for a fixed_float"
+        "index is a Gas Daily index, expected a futures or a published index for a fixed_float"
     )
     labelled = an_index(contracts=(("X26", "2026-10-28"), ("c1", "2026-11-25")))
     assert refused(labelled) == (
@@ -2993,16 +2993,17 @@ def test_the_asian_and_pen_share_one_december_axis_of_22_days_one_month_and_one_
 
 
 # --- an IFERC basis future, iferc-basis-futures.md ------------------------------------------
-# The ticket's Waha-like index as the kernel tests have it: X26, Z26 and F27 published on the
-# first business day of their months, a 2,500 MMBtu LOT and a bare MMBTU, the LOT reported, no
-# pricing calendar; the payment calendar closing New Year's Day; the template cleared, financial,
+# The ticket's Waha-like index as the kernel tests have it, a published index of one print a
+# month: X26, Z26 and F27 published on the first business day of their months, a 2,500 MMBtu
+# LOT and a bare MMBTU, the LOT reported, no pricing calendar; the payment calendar closing New
+# Year's Day; the template cleared, financial,
 # lastday, LOT a month at +2bd from publication, iferc-publication-payment-anchor.md; WAH001, 1 LOT
 # of Z26 at -0.50 booked 30 November.
 
 WAHA = index_on(
     "WAHA",
     "Waha basis - ICE",
-    iferc_schedule(("X26", "Z26", "F27"), dates("2026-11-02", "2026-12-01", "2027-01-04")),
+    published_schedule(("X26", "Z26", "F27"), dates("2026-11-02", "2026-12-01", "2027-01-04")),
     index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("LOT", "MMBTU"),
@@ -3039,7 +3040,7 @@ WAHA_TICKET: dict[str, list[object]] = {
 
 
 def test_an_iferc_basis_future_observes_publication_day_and_pays_from_it() -> None:
-    # The terms hold the IFERC schedule; Z26 is row 1 covering the whole of December; the one
+    # The terms hold the published schedule; Z26 is row 1 covering the whole of December; the one
     # observation is 1 December, the publication day, and the payment 3 December, two business
     # days after it; the encoding a 2,500 MMBtu exposure with a
     # fixed leg of 1,250, one slot on 1 December referencing Z26; the counts one of each and the
@@ -3139,22 +3140,21 @@ def test_iferc_payment_counts_from_publication_on_the_payment_calendar() -> None
     )
 
 
-def test_an_iferc_batch_is_financial_lastday_whole_months_on_a_reporting_index_or_says_why() -> (
-    None
-):
+def test_a_monthly_batch_is_financial_whole_months_on_a_reporting_index_or_says_why() -> None:
     physical = {
         key: value
         for key, value in WAHA_TEMPLATE.items()
         if key not in ("payment_day", "payment_holiday_key")
     }
     assert refused(WAHA, WAHA_TICKET, {**physical, "settlement_method": "physical"}) == (
-        "settlement_method is 'physical', expected 'financial' on an IFERC index; an IFERC basis "
-        "future is cash settled on its month's published index"
+        "settlement_method is 'physical', expected 'financial' on a published index; nothing is "
+        "delivered against a published price"
     )
-    assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "schedule_method": "asian"}) == (
-        "schedule_method of trade 1001 at row 1 is 'asian', expected 'lastday' on an IFERC "
-        "index; an IFERC month has one index, published once"
-    )
+    # asian on a month of one print is that print whole, the observation lastday takes.
+    averaged, _ = created(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "schedule_method": "asian"})
+    np.testing.assert_array_equal(averaged.encoded.legs[0].observations.date, dates("2026-12-01"))
+    np.testing.assert_array_equal(averaged.encoded.legs[0].observations.weight, [1.0])
+    np.testing.assert_array_equal(averaged.encoded.payment_date, dates("2026-12-03"))
     two: dict[str, list[object]] = {
         "trade_id": [1001, 1002],
         "trade_date": ["2026-11-30", "2026-11-30"],
@@ -3165,8 +3165,8 @@ def test_an_iferc_batch_is_financial_lastday_whole_months_on_a_reporting_index_o
     }
     by_row = {key: value for key, value in WAHA_TEMPLATE.items() if key != "schedule_method"}
     assert refused(WAHA, two, by_row) == (
-        "schedule_method of trade 1002 at row 2 is 'penultimate', expected 'lastday' on an "
-        "IFERC index; an IFERC month has one index, published once"
+        "schedule_method of trade 1002 at row 2 is 'penultimate', expected 'asian' or 'lastday' "
+        "on a published index; a published month is the average of its prints, or its one print"
     )
     part: dict[str, list[object]] = {
         **{key: value for key, value in WAHA_TICKET.items() if key != "contract_code"},
@@ -3175,8 +3175,8 @@ def test_an_iferc_batch_is_financial_lastday_whole_months_on_a_reporting_index_o
     }
     assert refused(WAHA, part, WAHA_TEMPLATE) == (
         "Z26 of trade 1001 at row 1 is covered from 2026-12-01 to 2026-12-15, part of its "
-        "month, expected the whole month under lastday; an IFERC month's index is one price for "
-        "the whole month"
+        "month, expected the whole month under lastday; under lastday a month's one print is the "
+        "price of the whole month"
     )
     assert refused(WAHA, {**WAHA_TICKET, "contract_code": ["G27"]}, WAHA_TEMPLATE) == (
         "contract_code row 1 is 'G27', expected months the index's schedule has a contract for; "
@@ -3479,7 +3479,7 @@ def test_an_iferc_chain_counts_from_publication_and_may_not_pay_on_that_day() ->
 LATE = index_on(
     "LATE",
     "Waha basis - ICE, published on the fourth",
-    iferc_schedule(("Z25", "Z26"), dates("2025-12-01", "2026-12-04")),
+    published_schedule(("Z25", "Z26"), dates("2025-12-01", "2026-12-04")),
     WAHA.conventions,
     WAHA.specifications,
     None,

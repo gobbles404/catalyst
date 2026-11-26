@@ -21,8 +21,8 @@ from catalyst.index_definitions.contract_specifications import contract_specific
 from catalyst.index_definitions.futures_schedule import futures_schedule
 from catalyst.index_definitions.holiday_calendar import holiday_calendar
 from catalyst.index_definitions.holiday_calendars import collect_holiday_calendars
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.instruments.definitions import FIXED_FLOAT
 from catalyst.instruments.fields import DatesOrTexts, FieldValues
@@ -1291,18 +1291,18 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
     }
 
 
-# --- an IFERC ticket, iferc-basis-futures.md ------------------------------------------------
-# The same 25 months on an IFERC index, each published on the first business day of its month;
-# the ticket's rows resolve against it as against the futures index, the lastday method the one
-# an IFERC index takes, and each payment counts from the publication day since
-# iferc-publication-payment-anchor.md.
-IFERC_PUBLICATION = np.busday_offset(
+# --- a ticket on a monthly published index, iferc-basis-futures.md ---------------------------
+# The same 25 months on a published index of one print a month, Inside FERC's shape, each
+# published on the first business day of its month; the ticket's rows resolve against it as
+# against the futures index, under lastday, a month's one print, and each payment counts
+# from the publication day, iferc-publication-payment-anchor.md.
+MONTHLY_PUBLICATION = np.busday_offset(
     MONTHS.astype("datetime64[D]"), 0, roll="forward", holidays=HOLIDAYS
 )
 BASIS = index_on(
     "basis",
     "Sample basis index",
-    iferc_schedule(CODES, IFERC_PUBLICATION),
+    published_schedule(CODES, MONTHLY_PUBLICATION),
     index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot",), np.array([2_500.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
@@ -1311,50 +1311,70 @@ BASIS = index_on(
     "lot",
     UNITS,
 )
-# The IFERC resolution's functions are the futures lastday resolution's but the two that read
-# the days: no pricing calendar typed and no days made, the payment anchored on each component's
-# last observation, its publication day, by the same search. Its numpy loses the unique over
-# the components' methods with its sort, hash, nonzero, ravel and flatten, a look and three
-# conversions, and gains one look, the publication days against the components' own.
-# On an IFERC index the observations read no calendar and make no days, and the one fact read is
-# the methods' IFERC support, by the terms and then by the observations.
-IFERC_RESOLUTION = {
+# The published resolution's functions are the futures lastday resolution's but the two that
+# read the days: no pricing calendar typed and no days made, the payment anchored on each
+# component's last observation, its publication date, by the same search. Its numpy loses the
+# unique over the components' methods with its sort, hash, nonzero, ravel and flatten, a look
+# and three conversions. On a published index the observations read no calendar and make no
+# days: the methods' fact is read by the terms, in the published kind's own rule, and then by the
+# observations, which find each component's run of prints, one here.
+MONTHLY_RESOLUTION = {
     name: count
-    for name, count in {**resolution_ledger(1), **WHOLE_MONTHS, "supported_on_iferc": 2}.items()
+    for name, count in {
+        **resolution_ledger(1),
+        **WHOLE_MONTHS,
+        "supported_on_published": 2,
+        "_the_published_method": 1,
+        "_the_prints": 1,
+    }.items()
     if name
     not in ("_the_days", "with_holiday_calendar", "requires_whole_month", "counts_back_from_expiry")
 }
-IFERC_RESOLUTION_NUMPY = {
+MONTHLY_RESOLUTION_NUMPY = {
     name: count
     for name, count in {
         **resolution_numpy(1),
         **WHOLE_MONTHS_NUMPY,
-        "ndarray.any": 33,  # one fewer: the IFERC rule is read as every row supported, one all
-        "numpy.arange": 5,  # the components counted off for the anchor search, the futures' own
-        # since iferc-publication-payment-anchor.md, beside the observations' places
+        # The kind's rule read as every row supported, one all, and the published observations'
+        # looks: a lastday row among them, whether any component was entered as dates, a
+        # component with no print, a lastday month of several.
+        "ndarray.any": 37,
         "ndarray.all": 3,  # in place of any row other than lastday, since the rule has one owner
         "ndarray.nonzero": 3,
         "ndarray.ravel": 3,
         "ndarray.flatten": 9,
         "numpy.asanyarray": 22,
+        # The published observations, a batch's worth whatever its rows: each component's run of
+        # prints found, two searches of the schedule's months and none of its dates where no
+        # row is dated, then counted off and laid out, a place, a date and a share per
+        # observation. A month of one print goes the road a month of five does, where the
+        # dedicated IFERC kind gathered one date per component: any 33, cumsum 14, repeat 1,
+        # searchsorted 1, arange 5, empty 33, reduce 38 and no sum before issue #271's step 5.
+        "ndarray.searchsorted": 4,
+        "ndarray.repeat": 5,
+        "ndarray.cumsum": 15,
+        "ndarray.sum": 1,
+        "numpy.arange": 7,
+        "numpy.empty": 32,
+        "ufunc.reduce": 43,
     }.items()
     if name not in ("ndarray.sort", "numpy._unique_hash")
 }
 
 
 @pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
-def test_an_iferc_ticket_resolves_like_a_futures_one_without_the_days(
+def test_a_monthly_published_ticket_resolves_like_a_futures_one_without_the_days(
     call_profile: CallProfile, numpy_calls: CallProfile, rows: int, contracts: int
 ) -> None:
     ticket, template = a_ticket(rows, contracts), a_template()
     counter = WorkCounter()
     terms, (observations,), _ = resolved((BASIS,), ticket, template, counter, CALENDARS)
-    np.testing.assert_array_equal(observations.date, IFERC_PUBLICATION[terms.legs[0].contract])
+    np.testing.assert_array_equal(observations.date, MONTHLY_PUBLICATION[terms.legs[0].contract])
     np.testing.assert_array_equal(observations.weight, np.ones(rows))
     assert terms.payment is not None
     np.testing.assert_array_equal(
         terms.payment.date,
-        np.busday_offset(IFERC_PUBLICATION[terms.legs[0].contract], 2, holidays=HOLIDAYS),
+        np.busday_offset(MONTHLY_PUBLICATION[terms.legs[0].contract], 2, holidays=HOLIDAYS),
     )
     assert counter.freeze().as_dict() == {
         "holiday_keys_bound": 1,  # the batch's one key, payment-calendar-keys.md
@@ -1367,14 +1387,14 @@ def test_an_iferc_ticket_resolves_like_a_futures_one_without_the_days(
     }
     by_distinct = {
         name: (count if name not in resolution_ledger(1) else resolution_ledger(contracts)[name])
-        for name, count in IFERC_RESOLUTION.items()
+        for name, count in MONTHLY_RESOLUTION.items()
     }
     assert (
         call_profile(lambda: resolved((BASIS,), ticket, template, WorkCounter(), CALENDARS))
         == by_distinct
     )
     numpy = {
-        **IFERC_RESOLUTION_NUMPY,
+        **MONTHLY_RESOLUTION_NUMPY,
         "generic.astype": 2 * contracts,
     }
     assert (

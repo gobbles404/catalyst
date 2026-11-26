@@ -13,9 +13,9 @@ from catalyst.globals.unit_conversions import UNITS
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import gas_daily_schedule
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
+from catalyst.index_definitions.published_schedule import published_schedule
 from catalyst.market_data.futures_fixings import futures_fixings
 
 EPOCH = np.datetime64("1899-12-30")
@@ -162,10 +162,10 @@ def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() 
     with pytest.raises(ValueError) as failure:
         futures_fixings(DATES, SETTLES[:2], gas_daily)
     assert str(failure.value) == "index is a Gas Daily index, expected a futures index"
-    iferc = index_on(
+    monthly = index_on(
         "Henry Hub IFERC",
         "Henry Hub natural gas - Inside FERC monthly index",
-        iferc_schedule(("V26",), dates("2026-10-01")),
+        published_schedule(("V26",), dates("2026-10-01")),
         CONVENTIONS,
         SPECIFICATIONS,
         None,
@@ -173,8 +173,8 @@ def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() 
         UNITS,
     )
     with pytest.raises(ValueError) as failure:
-        futures_fixings(DATES, SETTLES, iferc)
-    assert str(failure.value) == "index is an IFERC index, expected a futures index"
+        futures_fixings(DATES, SETTLES, monthly)
+    assert str(failure.value) == "index is a published index, expected a futures index"
 
 
 def test_the_fixings_keep_their_index() -> None:

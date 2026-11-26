@@ -24,7 +24,6 @@ from numpy.typing import NDArray
 from catalyst.index_definitions.contract_codes import schedule_months
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
-from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index, ReportingLot
 from catalyst.index_definitions.kind import Kind, described
 from catalyst.index_definitions.published_schedule import PublishedSchedule
@@ -34,12 +33,11 @@ from catalyst.trades.schedule_methods import (
     METHODS,
     ScheduleMethod,
     permits_physical_settlement,
-    supported_on_iferc,
     supported_on_published,
 )
 
 # The schedule of an index a fixed_float is booked on, as trade_schedule_of types it.
-type TradeSchedule = FuturesSchedule | IfercSchedule | PublishedSchedule
+type TradeSchedule = FuturesSchedule | PublishedSchedule
 
 
 class Route(Enum):
@@ -339,12 +337,13 @@ def resolved_trades(
     index's own into the batch's one leg, since two-index-fixed-float.md, and the trade's own
     into the record.
 
-    The index is a futures or, since #167, an IFERC index, since a fixed_float's contract is a row
-    of a futures schedule, its final price the settlement on that row's expiry day, or a row of an
-    IFERC schedule, its final price the month's index on that row's publication day, the traded
-    basis; a Gas Daily index is refused by name. An IFERC index takes a financial settlement and
-    the lastday method alone, the first row of another method named, since an IFERC month has
-    one index, published once. The index was made with a reporting
+    The index is a futures or a published index, since a fixed_float's contract is a row of a
+    futures schedule, its final price the settlement on that row's expiry day, or a month of a
+    published schedule, its final price the average of the month's prints or, where the month
+    has one print, that print, a traded basis on a monthly index such as Inside FERC's; a Gas
+    Daily index is refused by name. A published index takes a financial settlement and the
+    asian or the lastday method, the first row of another method named, and with two indexes
+    lastday alone. The index was made with a reporting
     lot, since the batch's delta is a count of that lot and a batch without one could not report
     its risk. The occurrences are the ticket's
     rows: one date each, and one trade ID, a whole number of at most 15 digits the caller read
@@ -396,9 +395,9 @@ def resolved_trades(
     quotes in the first's quote currency and quote quantity units and settles in the first's
     currency, since the two entered prices add into one, and no conversion between differently
     quoted legs is invented; the settlement is financial, a two-index physical delivery being
-    outside this version; then the leg's own rules, the index a futures or an IFERC one made
-    with a reporting lot, its specification rows and methods per occurrence, its methods
-    under its own kind, lastday alone on an IFERC index, and its contract rows per component,
+    outside this version; then the leg's own rules, the index a futures or a published one
+    made with a reporting lot, its specification rows and methods per occurrence, its methods
+    under its own kind, lastday alone on a published index, and its contract rows per component,
     named second_schedule_method and second_contract in a refusal, the fields they came from.
     The trade's facts are checked once, whatever the legs, the one fixed price among them
     since two-index-one-price.md: the outright price of the deal, the price of the sum of the
@@ -455,7 +454,7 @@ def resolved_trades(
         second_leg is not None,
         partial(named_trade, trade_ids),
     )
-    _the_method(schedule_method, settlement, trade_ids, index.kind)
+    _the_method(schedule_method, settlement, trade_ids, index.kind, paired=second_leg is not None)
     _the_clearing_house(settlement, clearing_house, trade_ids)
     _the_components(occurrence, quantity, start_date, end_date, trade_ids, occurrences, settlement)
     onetime = settlement_frequency[occurrence] == FREQUENCIES.index(SettlementFrequency.ONETIME)
@@ -679,7 +678,6 @@ def _the_second_leg(
             f"index 2 is another index named {index.name!r}, the name of index 1, expected one "
             "index for one name"
         )
-    pair_kinds(first, index)
     mine, theirs = index.conventions, first.conventions
     if subtracted:
         spread_pair(first, index)
@@ -702,7 +700,14 @@ def _the_second_leg(
     schedule = trade_schedule_of(index)
     lot = reporting_lot_of(index)
     _the_leg_selections(index, second.specification, second.schedule_method, occurrences, "second_")
-    _the_method(second.schedule_method, settlement, trade_ids, index.kind, "second_schedule_method")
+    _the_method(
+        second.schedule_method,
+        settlement,
+        trade_ids,
+        index.kind,
+        "second_schedule_method",
+        paired=True,
+    )
     _the_contract_column(second.contract, occurrence, len(schedule.codes), "second_contract")
     return _the_leg(
         index,
@@ -716,37 +721,22 @@ def _the_second_leg(
     )
 
 
-def pair_kinds(first: Index, second: Index) -> None:
-    """The kinds of index a pair is built on, the kernel's rule, applied by the resolution
-    before the second leg's periods are read so that a refused pair is refused in these words:
-    a published index books a fixed_float of its own and no pair, its months averaging on its
-    own prints' dates, so either leg on one is refused naming which."""
-    for which, each in (("index 1", first), ("index 2", second)):
-        if each.kind is Kind.PUBLISHED:
-            raise ValueError(
-                f"{which} {each.name!r} is a published index, expected a futures or an IFERC "
-                "index with two indexes; a pair on a published index is not built"
-            )
-
-
 def trade_schedule_of(index: Index) -> TradeSchedule:
     """The schedule of an index a fixed_float is booked on, typed as the kind rule found it: a
-    futures schedule, whose rows' expiry days settle the contracts; since #167 an IFERC
-    schedule, whose rows' publication days print each month's index, the traded basis; or a
-    published schedule, whose prints a month averages; a Gas Daily index is refused, in the
+    futures schedule, whose rows' expiry days settle the contracts, or a published
+    schedule, whose prints a month averages, the one print of a monthly index such as
+    Inside FERC's among them; a Gas Daily index is refused, in the
     resolution of a batch and in the kernel alike. The steps that read a day off the schedule
     dispatch on which it is."""
     match index.kind:
         case Kind.FUTURES:
             return cast(FuturesSchedule, index.schedule)  # what the kind just said
-        case Kind.IFERC:
-            return cast(IfercSchedule, index.schedule)
         case Kind.PUBLISHED:
             return cast(PublishedSchedule, index.schedule)
         case Kind.GAS_DAILY:
             raise ValueError(
-                f"index is {described(index.kind, 'index')}, expected a futures, IFERC or "
-                "published index for a fixed_float"
+                f"index is {described(index.kind, 'index')}, expected a futures or a published "
+                "index for a fixed_float"
             )
         case _:
             assert_never(index.kind)
@@ -806,7 +796,7 @@ def frequency_rules(
     a refused onetime row is refused in these words and never in an observation's, and since
     dated-quotes.md by a quote and a request for quote over their template's one set of terms.
     A onetime period, one average over every pricing day of the row's window, is priced on a
-    futures index alone, an IFERC month having one index published once; on one index, a pair's
+    futures index alone, a published index settling month by month; on one index, a pair's
     onetime period not being built; under a financial settlement, since it is cash settled on
     its average; under the asian method, the expiry-based methods taking their contract's month;
     and in a quantity of period, the window's total, or calday, never month, which says nothing
@@ -820,12 +810,6 @@ def frequency_rules(
 
     onetime = settlement_frequency == FREQUENCIES.index(SettlementFrequency.ONETIME)
     if onetime.any():
-        if kind is Kind.IFERC:
-            raise ValueError(
-                f"settlement_frequency of {first(onetime)} is 'onetime', expected 'monthly' on an "
-                "IFERC index; an IFERC month has one index, published once, and a onetime period "
-                "averages the pricing days of a futures index"
-            )
         if kind is Kind.PUBLISHED:
             raise ValueError(
                 f"settlement_frequency of {first(onetime)} is 'onetime', expected 'monthly' on a "
@@ -893,7 +877,7 @@ def nearby_rules(
 ) -> None:
     """Each occurrence's nearby with the terms it stands under, since nearby-selection.md, the
     kernel's rule. A nearby above 1, a contract after the day's prompt, is priced on a futures
-    index alone, an IFERC month having one index and no contract after it to count; on one
+    index alone, a published print counting toward its own month with no contract to roll; on one
     index, a later nearby on a pair not being built; under a financial settlement, a physical
     position delivering its own contract; and under the asian method, the expiry-based methods
     taking their own contract's days. Everywhere else the nearby is 1. The first occurrence
@@ -902,11 +886,6 @@ def nearby_rules(
     if not later.any():
         return
     k = int(later.argmax())
-    if kind is Kind.IFERC:
-        raise ValueError(
-            f"nearby of {named(k)} is {int(nearby[k])}, expected 1 on an IFERC index; an IFERC "
-            "month has one index, published once, and no contract after the prompt to count"
-        )
     if kind is Kind.PUBLISHED:
         raise ValueError(
             f"nearby of {named(k)} is {int(nearby[k])}, expected 1 on a published index; a "
@@ -985,23 +964,37 @@ def _the_published_method(
     settlement: Settlement,
     trade_ids: NDArray[np.int64] | None,
     field: str,
+    paired: bool,
 ) -> None:
     """Each occurrence's method with the batch's settlement on a published index: the
     settlement is financial, nothing being delivered against a published price, and every
-    row's method is asian, the average of the prints that count toward its month, the first row
-    of another method refused by its method and its row."""
+    row's method is asian, the average of the prints its period covers, or lastday, the one
+    print of a month that has one, which the observations hold it to. With two indexes the
+    method is lastday alone: a pair on averaged prints is not built, the two legs averaging on
+    different days. The first row of another method is refused by its method and its row."""
     if settlement is Settlement.PHYSICAL:
         raise ValueError(
             "settlement_method is 'physical', expected 'financial' on a published index; "
             "nothing is delivered against a published price"
         )
+    if paired:
+        single = schedule_method == METHODS.index(ScheduleMethod.LASTDAY)
+        if not single.all():
+            i = int((~single).argmax())
+            raise ValueError(
+                f"{field} of {named_trade(trade_ids, i)} is "
+                f"{METHODS[int(schedule_method[i])].value!r}, expected 'lastday' on a published "
+                "index with two indexes; a pair on a published index's averaged prints is not "
+                "built"
+            )
+        return
     supported = supported_on_published(schedule_method)
     if not supported.all():
         i = int((~supported).argmax())
         raise ValueError(
             f"{field} of {named_trade(trade_ids, i)} is "
-            f"{METHODS[int(schedule_method[i])].value!r}, expected 'asian' on a published "
-            "index; a published month is the average of its prints"
+            f"{METHODS[int(schedule_method[i])].value!r}, expected 'asian' or 'lastday' on a "
+            "published index; a published month is the average of its prints, or its one print"
         )
 
 
@@ -1011,34 +1004,18 @@ def _the_method(
     trade_ids: NDArray[np.int64] | None,
     kind: Kind,
     field: str = "schedule_method",
+    paired: bool = False,
 ) -> None:
-    """Each occurrence's method with the batch's settlement and the index's kind. On an IFERC
-    index, since #167, the settlement is financial, an IFERC basis future being cash settled on
-    its month's published index, and every row's method is lastday, the one observation of that
-    index, the first row of another method refused by its method and its row. On a futures
+    """Each occurrence's method with the batch's settlement and the index's kind. On a
+    published index the published kind's own rule, _the_published_method. On a futures
     index: a penultimate future is cash settled
     against the settle on the business day before its contract's expiry, a last3day future
     against the average of its last three pricing days and an asian future against the average
     of its month's pricing days, so a physical settlement is refused with the first row that
     chose any of the three, named by its label and its row; lastday settles either way, and a
     physical batch is lastday rows alone."""
-    if kind is Kind.IFERC:
-        if settlement is Settlement.PHYSICAL:
-            raise ValueError(
-                "settlement_method is 'physical', expected 'financial' on an IFERC index; an "
-                "IFERC basis future is cash settled on its month's published index"
-            )
-        supported = supported_on_iferc(schedule_method)
-        if not supported.all():
-            i = int((~supported).argmax())
-            raise ValueError(
-                f"{field} of {named_trade(trade_ids, i)} is "
-                f"{METHODS[int(schedule_method[i])].value!r}, expected 'lastday' on an IFERC "
-                "index; an IFERC month has one index, published once"
-            )
-        return
     if kind is Kind.PUBLISHED:
-        _the_published_method(schedule_method, settlement, trade_ids, field)
+        _the_published_method(schedule_method, settlement, trade_ids, field, paired)
         return
     match settlement:
         case Settlement.FINANCIAL:

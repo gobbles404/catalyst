@@ -1,8 +1,9 @@
 """Two index legs on a fixed_float at one outright price, two-index-fixed-float.md and
 two-index-one-price.md: a pair of synthetic indexes, A a futures index with a 10,000 MMBTU
-reporting lot and B an IFERC index with a 2,500 MMBTU one, each defining one MMBTU per entered
-unit, through resolution, encoding, preparation and evaluation; the hand-priced acceptance
-table at the outright price, its cleared version, the outright price moved, the F27 lifecycle,
+reporting lot and B a monthly published index, Inside FERC's shape, with a 2,500 MMBTU one,
+each defining one MMBTU per entered unit, through resolution, encoding, preparation and
+evaluation; the hand-priced acceptance table at the outright price, its cleared version, the
+outright price moved, the F27 lifecycle,
 the bump check of the analytic rate risk, and the rules of the pair: the second leg's method
 and no second price, distinct indexes of one quoting, one quantity on both legs, the later
 observation anchoring one shared payment, histories and markets matched by identity whatever
@@ -43,7 +44,6 @@ from catalyst.globals.unit_conversions import UNITS
 from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.published_schedule import published_schedule
@@ -70,7 +70,8 @@ def close(actual: NDArray[np.float64] | None, expected: list[float]) -> None:
 # --- the pair -------------------------------------------------------------------------------------
 # A: a futures index, X26 to J27, F27 expiring 29 December 2026 and G27 27 January 2027, the
 # pricing holidays Christmas and New Year's Day; LOT 10,000 MMBTU reported, MMBTU one each, the
-# fees a cent of brokerage and half a cent of clearing per MMBTU. B: an IFERC index, Z26 to H27,
+# fees a cent of brokerage and half a cent of clearing per MMBTU. B: a published index of one
+# print a month, Inside FERC's shape, Z26 to H27,
 # F27 publishing 4 January 2027 and G27 1 February, J27 unused; LOT 2,500 MMBTU reported;
 # fees of half a
 # dollar per MMBTU, which the pair never charges, the first leg's being the deal's.
@@ -131,7 +132,7 @@ def iferc(
     return index_on(
         name,
         f"Index {name}",
-        iferc_schedule(
+        published_schedule(
             ("Z26", "F27", "G27", "H27", "J27"),
             dates("2026-12-01", "2027-01-04", "2027-02-01", "2027-03-01", "2027-04-01"),
         ),
@@ -736,14 +737,16 @@ def test_the_pair_is_two_distinct_indexes_of_one_quoting_on_a_financial_settleme
         "physical settlement is outside this version"
     )
     assert refused({**BILATERAL, "second_schedule_method": "asian"}) == (
-        "second_schedule_method of trade 1 at row 1 is 'asian', expected 'lastday' on an IFERC "
-        "index; an IFERC month has one index, published once"
+        "second_schedule_method of trade 1 at row 1 is 'asian', expected 'lastday' on a "
+        "published index with two indexes; a pair on a published index's averaged prints is "
+        "not built"
     )
 
 
-# A published index books a fixed_float of its own and no pair: diesel against heating oil
-# averages on different days, and is not built.
-def test_a_pair_with_a_published_index_on_either_leg_is_refused() -> None:
+# A pair takes a published leg under lastday, a month's one print, as B's are. A published
+# index of several prints a month books a fixed_float of its own and no pair: its months
+# average, diesel against heating oil averaging on different days, and that is not built.
+def test_a_pair_takes_a_published_leg_under_lastday_on_months_of_one_print() -> None:
     weekly = index_on(
         "P",
         "Index P",
@@ -764,13 +767,14 @@ def test_a_pair_with_a_published_index_on_either_leg_is_refused() -> None:
         UNITS,
     )
     assert refused(indexes=(A, weekly)) == (
-        "index 2 'P' is a published index, expected a futures or an IFERC index with two "
-        "indexes; a pair on a published index is not built"
+        "second_schedule_method of trade 1 at row 1 is 'lastday' on G27, a month of 4 prints, "
+        "expected a month of one print; lastday is a month's one print, and asian averages "
+        "several"
     )
     averaged = {**BILATERAL, "schedule_method": "asian"}
     assert refused(averaged, indexes=(weekly, B)) == (
-        "index 1 'P' is a published index, expected a futures or an IFERC index with two "
-        "indexes; a pair on a published index is not built"
+        "schedule_method of trade 1 at row 1 is 'asian', expected 'lastday' on a published "
+        "index with two indexes; a pair on a published index's averaged prints is not built"
     )
 
 
@@ -1189,7 +1193,7 @@ SEAM = {
     name: bridge.entry(name)
     for name in (
         "_CreateFuturesSchedule",
-        "_CreateIfercSchedule",
+        "_CreatePublishedSchedule",
         "_CreateHolidayCalendar",
         "_CreateIndexConventions",
         "_CreateContractSpecifications",
@@ -1197,7 +1201,7 @@ SEAM = {
         "_CreateValuationDate",
         "_CreateCalendar",
         "_CreateFuturesFixings",
-        "_CreateIfercFixings",
+        "_CreatePublishedFixings",
         "_CreateMarketHistory",
         "_CreatePriceVector",
         "_CreateMarket",
@@ -1258,11 +1262,11 @@ def under(table: list[list[object]], heading: str) -> list[object]:
 
 def the_sheet() -> dict[str, Any]:
     """The ticket's pair on a sheet, the host test's cells: A a futures index over F27, G27 and
-    H27, 1 January 2027 closed, and B an IFERC index over Z26 to J27, both defining the NYMEX NG
-    lot of 10,000 MMBTU; valued on 4 January 2027, A's two December settles and B's Z26 index
-    behind the histories, A quoted 3.50 and 3.60 and B -0.38, -0.40 and -0.42, SOFR at 0.95 a
-    year on; a bilateral template carrying the second leg's method and the ticket's one row,
-    G27 for one lot at the outright 3.00."""
+    H27, 1 January 2027 closed, and B a monthly published index over Z26 to J27, both defining
+    the NYMEX NG lot of 10,000 MMBTU; valued on 4 January 2027, A's two December settles and
+    B's Z26 index behind the histories, A quoted 3.50 and 3.60 and B -0.38, -0.40 and -0.42,
+    SOFR at 0.95 a year on; a bilateral template carrying the second leg's method and the
+    ticket's one row, G27 for one lot at the outright 3.00."""
     conventions = SEAM["_CreateIndexConventions"]("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU")
     specs = SEAM["_CreateContractSpecifications"](
         across("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
@@ -1284,7 +1288,7 @@ def the_sheet() -> dict[str, Any]:
         "NYMEX NG",
         seam_calendars(),
     )
-    b_schedule = SEAM["_CreateIfercSchedule"](
+    b_schedule = SEAM["_CreatePublishedSchedule"](
         down("Z26", "F27", "G27", "H27", "J27"),
         down(
             *(
@@ -1295,7 +1299,7 @@ def the_sheet() -> dict[str, Any]:
     )
     b = SEAM["_CreateIndex"](
         "B",
-        "Pair leg B, an IFERC index",
+        "Pair leg B, a monthly published index",
         b_schedule,
         conventions,
         specs,
@@ -1311,7 +1315,8 @@ def the_sheet() -> dict[str, Any]:
         ),
     )
     hist_b = SEAM["_CreateMarketHistory"](
-        SEAM["_CreateCalendar"](date, b), SEAM["_CreateIfercFixings"](down("Z26"), down(-0.30), b)
+        SEAM["_CreateCalendar"](date, b),
+        SEAM["_CreatePublishedFixings"](down(serial("2026-12-01")), down(-0.30), b),
     )
     market_a = SEAM["_CreateMarket"](hist_a, SEAM["_CreatePriceVector"]("A", down(3.50, 3.60)))
     market_b = SEAM["_CreateMarket"](

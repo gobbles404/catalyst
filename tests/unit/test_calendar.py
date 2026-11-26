@@ -15,7 +15,6 @@ from catalyst.index_definitions.contract_specifications import contract_specific
 from catalyst.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
-from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.kind import Kind
@@ -638,78 +637,6 @@ def test_the_longest_gas_daily_calendar_a_sheet_shows_is_made_and_one_day_longer
     )
 
 
-# --- an IFERC schedule: one row per month, dated by its publication day ----------------
-
-
-def an_iferc_schedule(*months: tuple[str, str]) -> IfercSchedule:
-    codes = tuple(code for code, _ in months)
-    published = dates(*(publication for _, publication in months))
-    return iferc_schedule(codes, published)
-
-
-# The IFERC schedule page's sample, three months of one index, valued on 15 November 2026,
-# when one of the three has been published.
-V26_IFERC = ("V26", "2026-10-01")
-X26_IFERC = ("X26", "2026-11-02")
-IFERC = an_iferc_schedule(V26_IFERC, X26_IFERC, ("Z26", "2026-12-01"))
-NOV_15 = valuation_date(day("2026-11-15"), 0.5)
-
-
-def test_the_iferc_sample_is_one_row_per_month_dated_by_its_publication_day() -> None:
-    made = calendar(NOV_15, an_index(IFERC, None))
-    assert made.index.kind is Kind.IFERC
-    assert [str(date) for date in made.dates] == ["2026-10-01", "2026-11-02", "2026-12-01"]
-    assert codes_of(made) == ["V26", "X26", "Z26"]
-    assert made.contract.tolist() == [0, 1, 2]
-    assert made.is_priced.all()
-    assert made.is_fixed.tolist() == [True, True, False]
-    assert made.first_unfixed == 2
-    assert made.index.schedule is IFERC and made.index.holiday_calendar is None
-
-
-def test_an_iferc_month_is_fixed_the_day_after_its_publication_day() -> None:
-    on_the_day = calendar(valuation_date(day("2026-11-02"), 1.0), an_index(IFERC, None))
-    assert on_the_day.is_fixed.tolist() == [True, False, False]
-    assert on_the_day.first_unfixed == 1
-    the_day_after = calendar(valuation_date(day("2026-11-03"), 0.0), an_index(IFERC, None))
-    assert the_day_after.is_fixed.tolist() == [True, True, False]
-    before_any = calendar(valuation_date(day("2026-10-01"), 0.5), an_index(IFERC, None))
-    assert not before_any.is_fixed.any()
-
-
-def test_an_iferc_schedule_of_one_month_is_a_calendar() -> None:
-    one = calendar(NOV_15, an_index(an_iferc_schedule(V26_IFERC), None))
-    assert codes_of(one) == ["V26"] and one.is_fixed.tolist() == [True]
-    assert one.dates.tolist() == [day("2026-10-01")]
-
-
-@pytest.mark.parametrize(
-    ("schedule", "message"),
-    [
-        (
-            an_iferc_schedule(V26_IFERC, ("V26", "2026-11-02")),
-            "contract_code row 2 is 'V26', already given at row 1",
-        ),
-        (
-            an_iferc_schedule(X26_IFERC, V26_IFERC),
-            "publication_date row 2 is 2026-10-01, expected a date after row 1's 2026-11-02",
-        ),
-        (
-            an_iferc_schedule(V26_IFERC, ("X26", "2026-10-01")),
-            "publication_date row 2 is 2026-10-01, expected a date after row 1's 2026-10-01",
-        ),
-        (iferc_schedule((), dates()), "index has 0 contracts, expected at least 1"),
-    ],
-    ids=["a code twice", "publication days out of order", "two publication days equal", "no month"],
-)
-def test_an_iferc_schedule_that_cannot_make_a_calendar_says_why(
-    schedule: IfercSchedule, message: str
-) -> None:
-    with pytest.raises(ValueError) as failure:
-        calendar(NOV_15, an_index(schedule, None))
-    assert str(failure.value) == message
-
-
 # --- a published schedule: one row per print, dated by its publication date --------------
 
 
@@ -730,6 +657,9 @@ PUBLISHED = a_published_schedule(
     ("V26", "2026-10-05"),
 )
 SEP_16 = valuation_date(day("2026-09-16"), 0.5)
+# One print a month, the shape of a monthly index such as Inside FERC's: three months, each
+# published on the first business day of its month.
+MONTHLY = a_published_schedule(("V26", "2026-10-01"), ("X26", "2026-11-02"), ("Z26", "2026-12-01"))
 
 
 def test_the_published_sample_is_one_row_per_print_on_the_month_it_counts_toward() -> None:
@@ -829,34 +759,6 @@ def test_every_flow_day_of_gas_daily_months_laid_end_to_end_is_one_row_on_its_mo
 
 @settings(deadline=None)
 @given(data=st.data())
-def test_every_iferc_month_is_one_row_dated_by_its_publication_day(data: st.DataObject) -> None:
-    count = data.draw(st.integers(1, 40))
-    codes = tuple(
-        data.draw(
-            st.lists(st.text(min_size=1, max_size=6), unique=True, min_size=count, max_size=count)
-        )
-    )
-    gaps = np.array(
-        data.draw(st.lists(st.integers(1, 60), min_size=count, max_size=count)), dtype=np.int64
-    )
-    start = np.datetime64("2000-01-01", "D") + np.timedelta64(
-        data.draw(st.integers(0, 20_000)), "D"
-    )
-    published = start + np.cumsum(gaps).astype("timedelta64[D]")
-    schedule = iferc_schedule(codes, published)
-    as_of = start + np.timedelta64(data.draw(st.integers(-10, 2500)), "D")
-    made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
-    assert np.array_equal(made.dates, published)
-    assert made.dates is not schedule.publication_date
-    assert made.contract.tolist() == list(range(count))
-    assert made.is_priced.all()
-    assert np.array_equal(made.is_fixed, published < as_of)
-    for column in (made.dates, made.contract, made.is_priced, made.is_fixed):
-        assert not column.flags.writeable
-
-
-@settings(deadline=None)
-@given(data=st.data())
 def test_every_published_print_is_one_row_on_its_month_dated_by_its_publication_date(
     data: st.DataObject,
 ) -> None:
@@ -897,10 +799,10 @@ def test_every_published_print_is_one_row_on_its_month_dated_by_its_publication_
 # The ticket's examples, each kind's own rule: on a futures calendar the contract prompt on the
 # valuation day, the expiring one on its expiry day and the next from the day after; on a Gas
 # Daily calendar the month of the day after the valuation day, the next month from a month's
-# last day; on an IFERC calendar the first month not yet published, the month itself on its
-# publication day; on a published calendar the month of the first print dated on or after the
-# valuation day. Nothing here is a new rule: it is the row the calendar counted and the
-# contract on it, read as the market reads them.
+# last day; on a published calendar the month of the first print dated on or after the
+# valuation day, on one of one print a month the first month not yet published. Nothing here
+# is a new rule: it is the row the calendar counted and the contract on it, read as the market
+# reads them.
 @pytest.mark.parametrize(
     ("schedule", "holidays", "as_of", "code"),
     [
@@ -916,22 +818,12 @@ def test_every_published_print_is_one_row_on_its_month_dated_by_its_publication_
         (GAS_DAILY, None, "2026-10-31", "X26"),
         (GAS_DAILY, None, "2026-11-29", "X26"),
         (GAS_DAILY, None, "2026-08-15", "U26"),
-        (
-            an_iferc_schedule(("U26", "2026-09-01"), ("V26", "2026-10-01")),
-            None,
-            "2026-09-01",
-            "U26",
-        ),
-        (
-            an_iferc_schedule(("U26", "2026-09-01"), ("V26", "2026-10-01")),
-            None,
-            "2026-09-02",
-            "V26",
-        ),
-        (IFERC, None, "2026-11-15", "Z26"),
-        (IFERC, None, "2026-11-02", "X26"),
-        (IFERC, None, "2026-12-01", "Z26"),
-        (IFERC, None, "2026-09-15", "V26"),
+        (MONTHLY, None, "2026-10-01", "V26"),
+        (MONTHLY, None, "2026-10-02", "X26"),
+        (MONTHLY, None, "2026-11-15", "Z26"),
+        (MONTHLY, None, "2026-11-02", "X26"),
+        (MONTHLY, None, "2026-12-01", "Z26"),
+        (MONTHLY, None, "2026-09-15", "V26"),
         (PUBLISHED, None, "2026-09-16", "U26"),
         (PUBLISHED, None, "2026-09-28", "U26"),
         (PUBLISHED, None, "2026-09-29", "V26"),
@@ -952,12 +844,12 @@ def test_every_published_print_is_one_row_on_its_month_dated_by_its_publication_
         "Gas Daily, the second month's last day: the third month",
         "Gas Daily, the day before the last flow day: the last month",
         "Gas Daily, before the calendar: the first month",
-        "IFERC, the publication day: the month publishing, not yet fixed",
-        "IFERC, the day after publication: the next month",
-        "IFERC, two months published: the third",
-        "IFERC, the second publication day: the second month",
-        "IFERC, the last publication day: the last month",
-        "IFERC, before any publication: the first month",
+        "monthly, the publication day: the month publishing, not yet fixed",
+        "monthly, the day after publication: the next month",
+        "monthly, two months published: the third",
+        "monthly, the second publication day: the second month",
+        "monthly, the last publication day: the last month",
+        "monthly, before any publication: the first month",
         "published, two of a month's four prints fixed: that month",
         "published, a month's last print on its own date: that month still",
         "published, the day after a month's last print: the next month",
@@ -978,7 +870,7 @@ def test_the_fraction_of_the_valuation_day_changes_the_prompt_code_of_no_kind() 
     for schedule, holidays, as_of in (
         (SCHEDULE, CLOSED_MAY_25, "2026-06-22"),
         (GAS_DAILY, None, "2026-09-30"),
-        (IFERC, None, "2026-11-02"),
+        (MONTHLY, None, "2026-11-02"),
         (PUBLISHED, None, "2026-09-28"),
     ):
         codes = {
@@ -995,13 +887,13 @@ def test_the_fraction_of_the_valuation_day_changes_the_prompt_code_of_no_kind() 
     [
         (SCHEDULE, CLOSED_MAY_25, "2026-07-22"),
         (GAS_DAILY, None, "2026-11-30"),
-        (IFERC, None, "2026-12-02"),
+        (MONTHLY, None, "2026-12-02"),
         (PUBLISHED, None, "2026-10-06"),
     ],
     ids=[
         "futures, the day after the last expiry",
         "Gas Daily, the last flow day",
-        "IFERC, the day after the last publication",
+        "monthly, the day after the last publication",
         "published, the day after the last print",
     ],
 )

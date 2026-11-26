@@ -16,7 +16,7 @@ from test_market import (
     a_vector,
     any_gas_daily_history,
     any_history,
-    any_iferc_history,
+    any_monthly_history,
     any_published_history,
 )
 
@@ -37,7 +37,6 @@ from catalyst.index_definitions.contract_specifications import ContractSpecifica
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
-from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import IndexConventions
 from catalyst.index_definitions.published_schedule import PublishedSchedule
@@ -45,7 +44,6 @@ from catalyst.market.market import Market, market
 from catalyst.market.market_history import MarketHistory
 from catalyst.market_data.futures_fixings import FuturesFixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings
-from catalyst.market_data.iferc_fixings import IfercFixings
 from catalyst.market_data.price_vector import PriceVector
 from catalyst.market_data.published_fixings import PublishedFixings
 from catalyst.quoting.rfq import Rfq
@@ -144,23 +142,6 @@ def test_a_schedule_spills_its_columns_with_the_options_last() -> None:
         ["m26", 46161.0],
         ["n26", 46195.0],
     ]
-
-
-# Serials for 1 October, 2 November and 1 December 2026, the days three IFERC contract months'
-# indices print.
-def test_an_iferc_schedule_spills_its_two_columns_under_two_heading_rows() -> None:
-    codes = Cells.from_rows([["V26"], ["X26"], ["Z26"]])
-    published = Cells.from_rows([[46296.0], [46328.0], [46357.0]])
-    kinds, slots, joined = read(bridge.call("_CreateIfercSchedule", [codes, published]))
-    assert rows((kinds, slots, joined)) == [
-        ["contract_code", "publication_date"],
-        ["str", "datetime64[D]"],
-        ["V26", 46296.0],
-        ["X26", 46328.0],
-        ["Z26", 46357.0],
-    ]
-    assert kinds.shape == (5, 2)
-    assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE]] * 3
 
 
 # Serials for the first and last days of September, October and November 2026, three contract
@@ -338,9 +319,10 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
 
 
 # A Gas Daily calendar of one month, September 2026, valued on the 2nd with a print on the 2nd
-# and the 1st, given newest first, and an IFERC calendar of two months valued on 15 October with
-# October's index: the same five columns in the calendar's order, the oldest period first, a
-# number on each fixed period and the word unfixed on the rest, no period being closed.
+# and the 1st, given newest first, and a published calendar of two months of one print each,
+# valued on 15 October with October's price: the same five columns in the calendar's order, the
+# oldest period first, a number on each fixed period and the word unfixed on the rest, no period
+# being closed.
 def test_the_other_two_histories_spill_the_same_five_columns() -> None:
     month = bridge.call(
         "_CreateGasDailySchedule",
@@ -368,20 +350,20 @@ def test_the_other_two_histories_spill_the_same_five_columns() -> None:
     assert kinds[2].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE, NUMBER_CODE]
     assert kinds[4].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE, TEXT_CODE]
     months = bridge.call(
-        "_CreateIfercSchedule",
+        "_CreatePublishedSchedule",
         [
             Cells.from_rows([["V26"], ["X26"]]),
             Cells.from_rows([[46296.0], [46328.0]]),
         ],
     )
     henry = an_index(months, MISSING)
-    iferc = bridge.call(
+    monthly = bridge.call(
         "_CreateCalendar", [bridge.call("_CreateValuationDate", [46310.0, 0.5]), henry]
     )
     indices = bridge.call(
-        "_CreateIfercFixings", [Cells.from_rows([["V26"]]), Cells.from_rows([[1.85]]), henry]
+        "_CreatePublishedFixings", [Cells.from_rows([[46296.0]]), Cells.from_rows([[1.85]]), henry]
     )
-    kinds, slots, joined = read(bridge.call("_CreateMarketHistory", [iferc, indices]))
+    kinds, slots, joined = read(bridge.call("_CreateMarketHistory", [monthly, indices]))
     assert rows((kinds, slots, joined)) == [
         ["date", "contract", "is_priced", "is_fixed", "fixing_price"],
         ["datetime64[D]", "str", "bool", "bool", "float64"],
@@ -415,39 +397,39 @@ def test_gas_daily_fixings_spill_flow_days_as_serials_and_prices_exactly() -> No
     assert kinds[2:].tolist() == [[NUMBER_CODE, NUMBER_CODE]] * 4
 
 
-# Four months of Waha IFERC, the newest month in the first row as the desk keeps them and the
-# creator takes them, and an index beside each, a zero and a negative among four kept in their
-# places: the spill shows the months newest first, as they went in, over a schedule that lists
-# them the other way, the creator having kept them oldest first.
-def test_iferc_fixings_spill_codes_as_text_and_prices_exactly() -> None:
-    codes = Cells.from_rows([["J26"], ["H26"], ["G26"], ["F26"]])
+# Four months of Waha IFERC, one print a month, the newest print in the first row as the desk
+# keeps them and the creator takes them, and a price beside each, a zero and a negative among
+# four kept in their places: the spill shows the prints newest first, as they went in, over a
+# schedule that lists them the other way, the creator having kept them oldest first.
+def test_published_fixings_spill_dates_and_prices_exactly() -> None:
+    published = Cells.from_rows([[46113.0], [46083.0], [46055.0], [46027.0]])
     prices = Cells.from_rows([[1.60], [-0.5], [0.0], [1.85]])
     months = bridge.call(
-        "_CreateIfercSchedule",
+        "_CreatePublishedSchedule",
         [
             Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]]),
             Cells.from_rows([[46027.0], [46055.0], [46083.0], [46113.0]]),
         ],
     )
-    made = bridge.call("_CreateIfercFixings", [codes, prices, an_index(months, MISSING)])
+    made = bridge.call("_CreatePublishedFixings", [published, prices, an_index(months, MISSING)])
     kinds, slots, joined = read(made)
     assert rows((kinds, slots, joined)) == [
-        ["contract_code", "price"],
-        ["str", "float64"],
-        ["J26", 1.60],
-        ["H26", -0.5],
-        ["G26", 0.0],
-        ["F26", 1.85],
+        ["publication_date", "price"],
+        ["datetime64[D]", "float64"],
+        [46113.0, 1.60],
+        [46083.0, -0.5],
+        [46055.0, 0.0],
+        [46027.0, 1.85],
     ]
     assert kinds.shape == (6, 2)
-    assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE]] * 4
+    assert kinds[2:].tolist() == [[NUMBER_CODE, NUMBER_CODE]] * 4
 
 
 # A Gas Daily market over one month, September 2026, valued on the 2nd with two prints, given
 # newest first, and the balance-of-month quote: the market's rows run in the calendar's order,
-# the prints on the 1st and 2nd, the quote on every later day, every cell a number. An IFERC
-# market over two months valued on 15 October with October's index and November's quote: the
-# index on the published row and the quote on the other.
+# the prints on the 1st and 2nd, the quote on every later day, every cell a number. A
+# published market over two months of one print each, valued on 15 October with October's
+# price and November's quote: the price on the published row and the quote on the other.
 def test_the_other_two_markets_spill_the_same_five_columns() -> None:
     month = bridge.call(
         "_CreateGasDailySchedule",
@@ -476,20 +458,20 @@ def test_the_other_two_markets_spill_the_same_five_columns() -> None:
     assert {row[4] for row in shown_rows[4:]} == {2.95}
     assert (kinds[2:, 4] == NUMBER_CODE).all()
     months = bridge.call(
-        "_CreateIfercSchedule",
+        "_CreatePublishedSchedule",
         [
             Cells.from_rows([["V26"], ["X26"]]),
             Cells.from_rows([[46296.0], [46328.0]]),
         ],
     )
     henry = an_index(months, MISSING)
-    iferc = bridge.call(
+    monthly = bridge.call(
         "_CreateCalendar", [bridge.call("_CreateValuationDate", [46310.0, 0.5]), henry]
     )
     indices = bridge.call(
-        "_CreateIfercFixings", [Cells.from_rows([["V26"]]), Cells.from_rows([[1.85]]), henry]
+        "_CreatePublishedFixings", [Cells.from_rows([[46296.0]]), Cells.from_rows([[1.85]]), henry]
     )
-    history = bridge.call("_CreateMarketHistory", [iferc, indices])
+    history = bridge.call("_CreateMarketHistory", [monthly, indices])
     quote = bridge.call("_CreatePriceVector", ["sample", 2.20])
     kinds, slots, joined = read(bridge.call("_CreateMarket", [history, quote]))
     assert rows((kinds, slots, joined)) == [
@@ -665,8 +647,8 @@ def a_futures_calendar(serial: float) -> str:
 # The prompt code, through the seam, on each kind: the contract prompt on the valuation day on
 # a futures calendar, the expiring contract on its expiry day and the next from the day after,
 # the first contract before the calendar begins; the month of the day after the valuation day
-# on a Gas Daily calendar; the first month not yet published on an IFERC one, the month itself on
-# its publication day. Text in the cell, the schedule's own spelling.
+# on a Gas Daily calendar; the first month not yet published on a published one of one print a
+# month, the month itself on its publication day. Text in the cell, the schedule's own spelling.
 def test_the_prompt_code_reads_the_first_contract_quoted_on_each_kind() -> None:
     for serial, code in ((46168.0, "n26"), (46195.0, "n26"), (46196.0, "q26"), (46150.0, "n26")):
         assert bridge.call("util_ReadPrompt", [a_futures_calendar(serial)]) == code
@@ -680,7 +662,7 @@ def test_the_prompt_code_reads_the_first_contract_quoted_on_each_kind() -> None:
     )
     assert bridge.call("util_ReadPrompt", [september]) == "U26"
     months = bridge.call(
-        "_CreateIfercSchedule",
+        "_CreatePublishedSchedule",
         [
             Cells.from_rows([["V26"], ["X26"]]),
             Cells.from_rows([[46296.0], [46328.0]]),
@@ -688,10 +670,10 @@ def test_the_prompt_code_reads_the_first_contract_quoted_on_each_kind() -> None:
     )
     henry = an_index(months, MISSING)
     for serial, code in ((46296.0, "V26"), (46297.0, "X26"), (46328.0, "X26")):
-        iferc = bridge.call(
+        monthly = bridge.call(
             "_CreateCalendar", [bridge.call("_CreateValuationDate", [serial, 0.5]), henry]
         )
-        assert bridge.call("util_ReadPrompt", [iferc]) == code
+        assert bridge.call("util_ReadPrompt", [monthly]) == code
 
 
 # A calendar whose every period has fixed: the library's words, through the seam, for each kind.
@@ -711,7 +693,7 @@ def test_a_calendar_with_no_unfixed_period_has_no_prompt_code_through_the_seam()
     )
     assert bridge.call("util_ReadPrompt", [ended]) == message
     published = bridge.call(
-        "_CreateIfercSchedule",
+        "_CreatePublishedSchedule",
         [Cells.from_rows([["V26"]]), Cells.from_rows([[46296.0]])],
     )
     after = bridge.call(
@@ -1218,7 +1200,7 @@ def test_a_kind_without_a_table_fails_rather_than_guessing_its_columns() -> None
 
 
 # One row of what an index holds: the name and the kind as text, the two counts as numbers and
-# the holiday flag a boolean, for a futures index with its calendar and an IFERC one without.
+# the holiday flag a boolean, for a futures index with its calendar and a published one without.
 def test_an_index_spills_one_row_of_what_it_holds() -> None:
     schedule = bridge.call(
         "_CreateFuturesSchedule",
@@ -1282,7 +1264,7 @@ def test_an_index_spills_one_row_of_what_it_holds() -> None:
         TEXT_CODE,
     ]
     month = bridge.call(
-        "_CreateIfercSchedule",
+        "_CreatePublishedSchedule",
         [Cells.from_rows([["V26"]]), Cells.from_rows([[46296.0]])],
     )
     kinds, slots, joined = read(
@@ -1303,7 +1285,7 @@ def test_an_index_spills_one_row_of_what_it_holds() -> None:
     assert rows((kinds, slots, joined))[2] == [
         "Henry Hub IFERC",
         "Henry Hub natural gas - Inside FERC monthly index",
-        "IFERC",
+        "published",
         1.0,
         1.0,
         0.0,
@@ -1320,14 +1302,12 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         FuturesSchedule,
         GasDailySchedule,
         HolidayCalendar,
-        IfercSchedule,
         PublishedSchedule,
         IndexConventions,
         ContractSpecifications,
         Index,
         FuturesFixings,
         GasDailyFixings,
-        IfercFixings,
         PublishedFixings,
         MarketHistory,
         PriceVector,
@@ -1340,7 +1320,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
 
 
 # For any history of any kind, a futures one of two to eight contracts with any holidays, a Gas
-# Daily, an IFERC or a published one of one to eight months, valued on any day from before
+# Daily, a monthly or a published one of one to eight months, valued on any day from before
 # its calendar to its last period, with any number of quotes from the first unfixed period's
 # contract's alone to one per remaining contract: the rows are the calendar's own spill through
 # the last period of the last contract quoted, every one and no other, and the fifth cell is
@@ -1354,7 +1334,7 @@ def test_every_day_of_a_market_shows_its_fixing_its_prompts_quote_or_closed(
 ) -> None:
     history = data.draw(
         st.sampled_from(
-            (any_history, any_gas_daily_history, any_iferc_history, any_published_history)
+            (any_history, any_gas_daily_history, any_monthly_history, any_published_history)
         )
     )(data)
     calendar = history.calendar

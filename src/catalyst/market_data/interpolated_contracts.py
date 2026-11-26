@@ -53,7 +53,7 @@ def interpolate_contracts(
     """The one way to make InterpolatedContracts: the rules, checked once, in this order, the
     first failure being the message; then one interpolation.
 
-    The index is a futures index, whose schedule has a futures expiry per contract; an IFERC or a
+    The index is a futures index, whose schedule has a futures expiry per contract; a published or a
     Gas Daily index is refused by kind rather than given a publication or a flow date. The prices
     are one per anchor and the anchors at least two; each label is a contract code, F26 or f26,
     or the month as CME's feeds spell it, 202601, read whole, no other label; each price is

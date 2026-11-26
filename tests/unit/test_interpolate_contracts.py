@@ -193,7 +193,7 @@ def refused(ix: Index, anchors: tuple[str, ...], *prices: float) -> str:
 
 def test_the_rules_refuse_in_order_naming_the_row_the_month_or_the_contract() -> None:
     assert refused(WAHA, ("F27", "G27"), 1.0, 2.0) == (
-        "index is an IFERC index, expected a futures index, whose schedule has a futures expiry "
+        "index is a published index, expected a futures index, whose schedule has a futures expiry "
         "per contract"
     )
     assert refused(CL, ("J27", "M27"), 70.0) == (

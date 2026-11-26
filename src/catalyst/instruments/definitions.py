@@ -149,8 +149,8 @@ FIXED_FLOAT = Instrument(
             FieldType.CODE,
             "asian, lastday, penultimate, last3day",
             "A library rule selected by the trade; all four are built on a futures index, asian "
-            "averaging the month's pricing days; lastday alone on an IFERC index, its published "
-            "month",
+            "averaging the month's pricing days; on a published index asian, the average of the "
+            "month's prints, or lastday where the month has one print",
             quote_allowed=True,
             quote_required=True,
         ),
@@ -285,7 +285,7 @@ FIXED_FLOAT = Instrument(
             FieldType.CODE,
             "asian, lastday, penultimate, last3day",
             "The second index's method, the same choices as schedule_method under the second "
-            "index's kind, lastday alone on an IFERC index; required with two indexes and "
+            "index's kind, lastday alone on a published index; required with two indexes and "
             "refused with one",
         ),
         Field(
@@ -300,8 +300,8 @@ FIXED_FLOAT = Instrument(
             "A date is the row's one payment day, every component of the row paying on it as "
             "entered, never rolled, after the row's last observation; a rule is applied in order "
             "from each component's last observation day, business days on the payment calendar: "
-            "the expiry under lastday on a futures index, the publication day on an IFERC one; "
-            "the payment must be after it; +1bd for PHH, +2bd for Waha",
+            "the expiry under lastday on a futures index, the last publication date on a "
+            "published one; the payment must be after it; +1bd for PHH, +2bd for Waha",
             quote_allowed=True,
             quote_required_when="settlement_method = financial",
         ),
@@ -358,8 +358,8 @@ FIXED_FLOAT = Instrument(
             "across the row's start_date and end_date, every pricing day it covers averaged "
             "together on the window's one quantity, booked under asian on one futures index, "
             "financially settled, with quantity_per = period or calday; a quote, a request for "
-            "quote, two indexes, a physical settlement, an IFERC index or another method refuse "
-            "onetime by name",
+            "quote, two indexes, a physical settlement, a published index or another method "
+            "refuse onetime by name",
             quote_allowed=True,
             quote_required=True,
         ),
@@ -374,7 +374,7 @@ FIXED_FLOAT = Instrument(
             "expiry, 2 the next the schedule lists and so on, found afresh for every day by the "
             "calendar's own roll, the expiry day the expiring contract's; a number above 1 is "
             "booked and quoted under asian on one futures index, financially settled, and refused "
-            "by name under another method, on an IFERC index, with two indexes and under a "
+            "by name under another method, on a published index, with two indexes and under a "
             "physical settlement",
             quote_allowed=True,
             quote_required=True,
@@ -416,8 +416,8 @@ FLOAT_FLOAT = Instrument(
             FieldType.CODE,
             "asian, lastday, penultimate, last3day",
             "The first index's method, a library rule selected by the trade; all four are built "
-            "on a futures index, asian averaging the month's pricing days; lastday alone on an "
-            "IFERC index, its published month",
+            "on a futures index, asian averaging the month's pricing days; lastday alone on a "
+            "published index, a month's one print",
         ),
         Field(
             "route",
@@ -528,7 +528,7 @@ FLOAT_FLOAT = Instrument(
             FieldType.CODE,
             "asian, lastday, penultimate, last3day",
             "The second index's method, the same choices as schedule_method under the second "
-            "index's kind, lastday alone on an IFERC index",
+            "index's kind, lastday alone on a published index",
         ),
         _as_booked("payment_day"),
         _as_booked("payment_holiday_key"),

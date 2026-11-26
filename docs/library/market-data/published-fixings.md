@@ -1,6 +1,6 @@
 # _CreatePublishedFixings
 
-The published fixings of one index: the price of each print that has one, price beside the print's publication date, as the desk keeps a series, the newest at the top, and the index they are the fixings of. They are the fixings of a [published index](../index-definitions/published-schedule.md), one whose price is a listed set of dated prints, weekly retail diesel the first; the design and its decisions are [issue #271](https://github.com/gobbles404/catalyst/issues/271). They stand beside the [futures](futures-fixings.md), [IFERC](iferc-fixings.md) and [Gas Daily](gas-daily-fixings.md) fixings. The [market history](../market/market-history.md) binds them to the index's calendar, the [market](../market/market.md) adds the quotes of the prints still to come, and [util_ReadHandle](../utilities/read-handle.md) spills them. The code is `src/catalyst/market_data/published_fixings.py`, the record and its builder, and `src/catalyst/excel/market_data.py`, the worksheet function.
+The published fixings of one index: the price of each print that has one, price beside the print's publication date, as the desk keeps a series, the newest at the top, and the index they are the fixings of. They are the fixings of a [published index](../index-definitions/published-schedule.md), one whose price is a listed set of dated prints, weekly retail diesel and Inside FERC's monthly index among them; the design and its decisions are [issue #271](https://github.com/gobbles404/catalyst/issues/271). They stand beside the [futures](futures-fixings.md) and [Gas Daily](gas-daily-fixings.md) fixings. The [market history](../market/market-history.md) binds them to the index's calendar, the [market](../market/market.md) adds the quotes of the prints still to come, and [util_ReadHandle](../utilities/read-handle.md) spills them. The code is `src/catalyst/market_data/published_fixings.py`, the record and its builder, and `src/catalyst/excel/market_data.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -47,6 +47,19 @@ Bound to the index's calendar valued that day, `_CreateMarketHistory` shows each
 
 One quote per month, from the month of the first print still to come: a month's quote is the price of each of its prints still to come, however many of its prints have fixed. A whole-month quote already holds the fixed prints, so it is converted on the sheet before it is entered: with N prints in the month, k of them fixed, and a whole-month quote Q, the price to enter is `(N*Q - sum(fixed)) / (N-k)`.
 
+## A monthly index
+
+The fixings of an index that prints once a month are entered the same way: the day each month's index was published and the price printed that day, the newest month at the top. The date is the one on the month's row of the [schedule](../index-definitions/published-schedule.md#a-monthly-index), so no contract code is typed. Waha's Inside FERC index over the schedule page's three months, on 15 November 2026, the prices illustrative and not published values:
+
+| | A | B | C |
+|---|---|---|---|
+| 1 | publication_date | price | |
+| 2 | 2-Nov-2026 | -0.45 | |
+| 3 | 1-Oct-2026 | -0.60 | |
+| 4 | `=_CreatePublishedFixings(A2:A3, B2:B3, D3)` | shows `30512:published_fixings:Waha IFERC:53` | D3 holding the index |
+
+A price is any number, and Waha has printed below zero. A month is fixed from the day after its index is published. So on 15 November the history shows October's and November's prices and `unfixed` on December, and the market's first quote is December's. A month has one print, so its quote is the whole month's price and nothing is converted.
+
 ## The stand-in
 
 A print is fixed from the day after its date, and its publisher has not always released it by then. The Energy Information Administration releases Monday's diesel price on Tuesday around 10 a.m. Eastern, and on Wednesday after a Monday federal holiday. From the day after the print's date until the release, the history asks for a price the publisher has not given.
@@ -81,7 +94,7 @@ Four rules, in this order, the first failure being the message. Rows count as th
 
 | Rule | Message |
 |---|---|
-| the index is a published index | `index is an IFERC index, expected a published index` |
+| the index is a published index | `index is a futures index, expected a published index` |
 | the price column has one row per date | `price has 2 prices, expected 3, one per publication_date` |
 | each date is before the row above, which keeps the newest first and refuses a date given twice | `publication_date row 2 is 2026-09-07, expected a date before row 1's 2026-08-31` |
 | each date is the publication date of one of the index's prints | `publication_date row 1 is 2026-09-15, expected the publication date of one of the index's prints` |
@@ -108,4 +121,4 @@ The examples and properties are `tests/unit/test_published_fixings.py`; the hist
 
 ## Not here
 
-A trade that averages a month's prints, a print's exposure leaving the day after its date whether its price is a stand-in or the published one: [_CreateTrades](../trades/create-trades.md#the-library-checks). The IFERC fixings moving onto this kind, entered by publication date in place of contract code: the last step of [issue #271](https://github.com/gobbles404/catalyst/issues/271). A release date, and telling a stand-in from a published price: the library holds one date per print, by the owner's decision on the issue. A whole-month quote as a market input: converted on the sheet, as above. A history valued before the schedule's first print has fixed: it needs fixings of no rows, a column the sheet cannot paste, so that calendar has no history until its first print fixes, as an IFERC calendar has none before its first index. Rounding of a month's average, and fetching prices. Pricing and risk.
+A trade that averages a month's prints or takes a month's one print, a print's exposure leaving the day after its date whether its price is a stand-in or the published one: [_CreateTrades](../trades/create-trades.md#the-library-checks). A release date, and telling a stand-in from a published price: the library holds one date per print, by the owner's decision on the issue. A whole-month quote as a market input: converted on the sheet, as above. A history valued before the schedule's first print has fixed: it needs fixings of no rows, a column the sheet cannot paste, so that calendar has no history until its first print fixes, a monthly index's until its first month is published. Rounding of a month's average, and fetching prices. Pricing and risk.

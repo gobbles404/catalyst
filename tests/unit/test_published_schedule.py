@@ -44,7 +44,8 @@ def test_a_one_row_schedule_is_a_schedule_of_one_month() -> None:
     assert np.array_equal(schedule.publication_date, dates("2026-08-31"))
 
 
-# One print a month is the IFERC shape: every row its own month.
+# One print a month is the shape of a monthly index such as Inside FERC's: every row its
+# own month.
 def test_one_print_a_month_is_a_month_per_row() -> None:
     codes = tuple(f"{letter}27" for letter in "FGHJKMNQUVXZ")
     published = dates(*(f"2027-{month:02d}-01" for month in range(1, 13)))

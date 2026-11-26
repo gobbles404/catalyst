@@ -57,8 +57,8 @@ pid:kind:count
 | index | `30512:index:WTI:31` | its own `name` |
 | calendar | `30512:calendar:WTI:32` | `index.name` |
 | futures fixings | `30512:futures_fixings:WTI:33` | `index.name` |
-| IFERC fixings | `30512:iferc_fixings:HNG:41` | `index.name` |
 | Gas Daily fixings | `30512:gas_daily_fixings:HNG:45` | `index.name` |
+| published fixings | `30512:published_fixings:HNG:41` | `index.name` |
 | market history | `30512:market_history:WTI:34` | `calendar.index.name` |
 | price vector | `30512:price_vector:WTI:35` | `index_name`, the text typed to `_CreatePriceVector` since #112 |
 | market | `30512:market:WTI:36` | `market_history.calendar.index.name` |

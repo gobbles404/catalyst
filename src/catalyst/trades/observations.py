@@ -20,7 +20,6 @@ from numpy.typing import NDArray
 from catalyst.calendar.calendar import open_days
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
-from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.kind import with_holiday_calendar
 from catalyst.index_definitions.published_schedule import PublishedSchedule
@@ -29,7 +28,6 @@ from catalyst.trades.schedule_methods import (
     ScheduleMethod,
     counts_back_from_expiry,
     requires_whole_month,
-    supported_on_iferc,
     supported_on_published,
 )
 from catalyst.trades.terms import TradeSchedule, trade_schedule_of
@@ -177,40 +175,30 @@ def observed(
     if method.size != count:
         raise ValueError(f"method has {method.size}, expected {count}, one per component")
     match schedule:
-        case IfercSchedule():
-            # Since #167: one observation per component, the month's index on its publication
-            # day with the whole weight, lastday alone and the whole month; no pricing calendar
-            # is read, an IFERC index having none.
-            lastday = supported_on_iferc(method)
-            if not lastday.all():
-                k = int((~lastday).argmax())
-                raise ValueError(
-                    f"{field} of {named(k)} is {METHODS[int(method[k])].value!r}, "
-                    "expected 'lastday' on an IFERC index; an IFERC month has one index, "
-                    "published once"
-                )
-            _whole_months(schedule, contract, start, end, method, lastday, named, IFERC_WHOLE)
-            return observations(
-                np.arange(count, dtype=np.intp),
-                schedule.publication_date[contract],
-                np.ones(count),
-                count,
-            )
         case PublishedSchedule():
-            # The prints a component covers, an equal share each, asian alone and no calendar
-            # read. A component entered as a contract code takes the prints that count toward
-            # its month, the schedule's rows on its contract, one run found by two searches of
-            # the column that says each print's month, so no date is compared. One entered as
-            # two dates is a window: the prints dated from its first day to its last, two
-            # searches of the schedule's dates, each print pricing off the month its own row
-            # names. A window holding no print is refused.
-            averaged = supported_on_published(method)
-            if not averaged.all():
-                k = int((~averaged).argmax())
+            # The prints a component covers, an equal share each, and no calendar read. A
+            # component entered as a contract code takes the prints that count toward its month,
+            # the schedule's rows on its contract, one run found by two searches of the column
+            # that says each print's month, so no date is compared. One entered as two dates is
+            # a window: the prints dated from its first day to its last, two searches of the
+            # schedule's dates, each print pricing off the month its own row names. A window
+            # holding no print is refused. Under lastday a component covers its whole month and
+            # holds one print, the month of a monthly index such as Inside FERC's: a part of a
+            # month and several prints are refused, the second by its count, since no one print
+            # is the month's.
+            supported = supported_on_published(method)
+            if not supported.all():
+                k = int((~supported).argmax())
                 raise ValueError(
                     f"{field} of {named(k)} is {METHODS[int(method[k])].value!r}, "
-                    "expected 'asian' on a published index; a published month is the average "
-                    "of its prints"
+                    "expected 'asian' or 'lastday' on a published index; a published month "
+                    "is the average of its prints, or its one print"
+                )
+            lastday = method == METHODS.index(ScheduleMethod.LASTDAY)
+            single = bool(lastday.any())
+            if single:
+                _whole_months(
+                    schedule, contract, start, end, method, lastday, named, PUBLISHED_LASTDAY
                 )
             first, prints = _the_prints(schedule, contract, start, end, dated)
             if (prints == 0).any():
@@ -221,6 +209,16 @@ def observed(
                     "a print dated in the days it covers; a published index prices on its "
                     "prints alone"
                 )
+            if single:
+                several = lastday & (prints > 1)
+                if several.any():
+                    k = int(several.argmax())
+                    raise ValueError(
+                        f"{field} of {named(k)} is 'lastday' on "
+                        f"{schedule.codes[int(contract[k])]}, a month of {int(prints[k])} "
+                        "prints, expected a month of one print; lastday is a month's one "
+                        "print, and asian averages several"
+                    )
             total = int(prints.sum())
             place = np.arange(total) - np.repeat(np.cumsum(prints) - prints, prints)
             place += np.repeat(first, prints)
@@ -330,7 +328,7 @@ def _the_days(
 FUTURES_WHOLE = (
     "the expiry-based methods take the contract's month entire, and a part of it prices under asian"
 )
-IFERC_WHOLE = "an IFERC month's index is one price for the whole month"
+PUBLISHED_LASTDAY = "under lastday a month's one print is the price of the whole month"
 
 
 def _the_prints(

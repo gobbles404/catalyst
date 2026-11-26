@@ -41,7 +41,6 @@ from catalyst.index_definitions.futures_schedule import FuturesSchedule
 from catalyst.index_definitions.gas_daily_schedule import GasDailySchedule
 from catalyst.index_definitions.holiday_calendar import HolidayCalendar
 from catalyst.index_definitions.holiday_calendars import HolidayCalendars
-from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import IndexConventions
 from catalyst.index_definitions.periods import end_date, start_date
@@ -53,7 +52,6 @@ from catalyst.market.market import Market
 from catalyst.market.market_history import MarketHistory
 from catalyst.market_data.futures_fixings import FuturesFixings
 from catalyst.market_data.gas_daily_fixings import GasDailyFixings
-from catalyst.market_data.iferc_fixings import IfercFixings
 from catalyst.market_data.interpolated_contracts import interpolate_contracts
 from catalyst.market_data.price_vector import PriceVector
 from catalyst.market_data.published_fixings import PublishedFixings
@@ -138,18 +136,6 @@ def futures_schedule_table(obj: FuturesSchedule) -> MixedArray:
         obj.codes,
         obj.future_expiry,
         obj.option_expiry,
-    )
-
-
-@shown.register
-def iferc_schedule_table(obj: IfercSchedule) -> MixedArray:
-    return MixedArray.table(
-        [
-            ("contract_code", "publication_date"),
-            ("str", "datetime64[D]"),
-        ],
-        obj.codes,
-        obj.publication_date,
     )
 
 
@@ -249,8 +235,8 @@ def market_history_table(obj: MarketHistory) -> MixedArray:
     # a futures history holds a settle of: nearby_N_contract, the code of the contract N less
     # one places after the day's prompt, the contract that settle is of, on every day, a dash
     # where the schedule lists none; and nearby_N_fixing_price, its settle where the day is
-    # fixed and priced and the same words elsewhere. A history of the prompt alone, and an
-    # IFERC or a Gas Daily one, spills the five columns it always did.
+    # fixed and priced and the same words elsewhere. A history of the prompt alone, and a
+    # Gas Daily or a published one, spills the five columns it always did.
     calendar = obj.calendar
     words = np.empty(calendar.dates.size, dtype=object)
     words[:] = "closed"
@@ -322,18 +308,6 @@ def gas_daily_fixings_table(obj: GasDailyFixings) -> MixedArray:
         [("flow_date", "price"), ("datetime64[D]", "float64")],
         obj.dates[::-1],
         obj.prices[::-1],
-    )
-
-
-@shown.register
-def iferc_fixings_table(obj: IfercFixings) -> MixedArray:
-    # Newest first, as the creator takes them: the columns are kept oldest first, and each is
-    # read here from its last row back, the codes as a tuple the other way up and the prices
-    # through a view, each price beside its own code, so the spill pasted back into the creator
-    # makes the same fixings. No code is resolved and no day is read: the order was settled when
-    # the fixings were made.
-    return MixedArray.table(
-        [("contract_code", "price"), ("str", "float64")], obj.codes[::-1], obj.prices[::-1]
     )
 
 

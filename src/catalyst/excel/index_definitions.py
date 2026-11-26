@@ -31,7 +31,6 @@ from catalyst.index_definitions.holiday_calendars import (
     HolidayCalendars,
     collect_holiday_calendars,
 )
-from catalyst.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
 from catalyst.index_definitions.index import Index, index
 from catalyst.index_definitions.index_conventions import IndexConventions, index_conventions
 from catalyst.index_definitions.published_schedule import PublishedSchedule, published_schedule
@@ -45,7 +44,6 @@ __all__ = [
     "_CreateFuturesSchedule",
     "_CreateGasDailySchedule",
     "_CreateHolidayCalendar",
-    "_CreateIfercSchedule",
     "_CreateIndex",
     "_CreateIndexConventions",
     "_CreatePublishedSchedule",
@@ -102,23 +100,6 @@ def _CollectHolidayCalendars(
     are and nothing of their days combined, and shows its handle, the text other formulas take
     as the collection a holiday key selects from."""
     return collect_holiday_calendars(calendar_handles, WorkCounter())
-
-
-@excel_function
-def _CreateIfercSchedule(
-    contract_code: Annotated[
-        TextColumn,
-        "The column of contract codes, such as A2:A4 holding V26 to Z26, one per contract month.",
-    ],
-    publication_date: Annotated[
-        DateColumn,
-        "The column of dates the index is published, beside the codes, such as B2:B4, one per "
-        "code, the day each month is observed and the day its payment counts from.",
-    ],
-) -> Handle[IfercSchedule]:
-    """Creates an IFERC schedule from the contract months of one index and the day each month's
-    index is published, and shows its handle, the text other formulas take as the schedule."""
-    return iferc_schedule(contract_code, publication_date)
 
 
 @excel_function
@@ -208,8 +189,8 @@ def _CreateIndex(
     ],
     schedule: Annotated[
         Handle[object],
-        "The index's schedule handle, futures, IFERC, Gas Daily or published: the cell showing "
-        "its creator's result, such as B2, or a name for it.",
+        "The index's schedule handle, futures, Gas Daily or published: the cell showing its "
+        "creator's result, such as B2, or a name for it.",
     ],
     index_conventions: Annotated[
         Handle[IndexConventions],

@@ -1109,52 +1109,6 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
     }
 
 
-# --- the fifth index definition: three columns in, one publication out ---------------
-
-
-def iferc_columns(contracts: int) -> tuple[Cells, Cells]:
-    """Codes and the day each month's index is published, for that many contract months, as the
-    sheet sends them: the codes and the third date column of schedule_columns."""
-    codes, _, _, publications = schedule_columns(contracts)
-    return codes, publications
-
-
-# Ten years of IFERC contract months: the text column handed over as it is, one look and two
-# conversions for the date column, the builder's one copy and one publication. Nineteen calls
-# across fifteen functions, the accept rule once per argument: the futures schedule's ledger
-# without options, column for column, the date column here being the publication day, since
-# iferc-publication-payment-anchor.md.
-def test_an_iferc_schedule_is_two_columns_in_and_one_publication_out(
-    call_profile: CallProfile, numpy_calls: CallProfile
-) -> None:
-    codes, publications = iferc_columns(120)
-    PATH["_CreateIfercSchedule"](codes, publications)
-    assert call_profile(lambda: PATH["_CreateIfercSchedule"](codes, publications)) == {
-        "Registered.run": 1,
-        "_arguments": 1,
-        "_validate": 2,
-        "_text_column": 1,
-        "_date_column": 1,
-        "_one_column": 2,
-        "_shape": 2,
-        "_texts": 1,
-        "_dates": 1,
-        "_not_dates": 1,
-        "_as_days": 1,
-        "_CreateIfercSchedule": 1,
-        "iferc_schedule": 1,
-        "_one_per_code": 1,
-        "_publish": 1,
-    }
-    assert numpy_calls(lambda: PATH["_CreateIfercSchedule"](codes, publications)) == {
-        "ndarray.any": 1,  # one look at the date column, for the calendar
-        "ndarray.astype": 2,  # the date column on its way to days
-        "numpy.array": 1,  # the one copy the schedule keeps
-        "ndarray.setflags": 1,  # frozen
-        "ufunc.reduce": 1,
-    }
-
-
 # --- the sixth index definition: three columns in, one publication out ---------------
 
 
@@ -1166,8 +1120,8 @@ def gas_daily_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
     return codes, first, last
 
 
-# Ten years of Gas Daily contract months: the IFERC schedule's ledger to the call, three
-# columns of the same kinds through the same rules and a builder of the same shape.
+# Ten years of Gas Daily contract months: three columns, the codes as text and two of dates,
+# through the rules a futures schedule's go through, and a builder of the same shape.
 def test_a_gas_daily_schedule_is_three_columns_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -1211,8 +1165,8 @@ def published_columns(months: int, prints: int = 4) -> tuple[Cells, Cells]:
     return codes, dates
 
 
-# Ten years of weekly prints, 480 rows of 120 months: the two columns through the rules the
-# IFERC schedule's go through, then the builder's own work, which is by column and never by
+# Ten years of weekly prints, 480 rows of 120 months: the two columns through the rules a
+# futures schedule's go through, then the builder's own work, which is by column and never by
 # print. One comparison down the codes finds the row each month begins on; one down the dates
 # holds them in order; one sum gives each print its month. The months' codes are looked at once
 # each for a month given twice, a set of 120, and no print's code is read again.
@@ -1396,8 +1350,8 @@ def index_parts() -> tuple[object, object, object, object]:
 # publication: twenty-four calls across ten functions, the reporting lot left out validated as
 # missing, and not one numpy call, no copy and no look at the schedule, whatever its length. The
 # lot-unit rule of #115 is one lookup per row of the specifications and calls nothing the ledger
-# counts. An IFERC index leaves the holiday calendar out, one handle fewer through the text rule
-# and the lookup, and runs the other holiday rule: twenty-two calls across ten functions.
+# counts. A published index leaves the holiday calendar out, one handle fewer through the text
+# rule and the lookup, and runs the other holiday rule: twenty-two calls across ten functions.
 def test_an_index_is_two_texts_and_four_handles_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -1458,44 +1412,8 @@ def test_an_index_is_two_texts_and_four_handles_in_and_one_publication_out(
         )
         == {}
     )
-    months = PATH["_CreateIfercSchedule"](*iferc_columns(120))
-    PATH["_CreateIndex"](
-        "Henry Hub IFERC",
-        "Henry Hub natural gas - Inside FERC monthly index",
-        months,
-        conventions,
-        specifications,
-        MISSING,
-        MISSING,
-        MISSING,
-    )
-    assert call_profile(
-        lambda: PATH["_CreateIndex"](
-            "Henry Hub IFERC",
-            "Henry Hub natural gas - Inside FERC monthly index",
-            months,
-            conventions,
-            specifications,
-            MISSING,
-            MISSING,
-            MISSING,
-        )
-    ) == {
-        "Registered.run": 1,
-        "_arguments": 1,
-        "_validate": 8,
-        "_text": 5,
-        "_resolve": 3,
-        "_CreateIndex": 1,
-        "index": 1,
-        "WorkCounter.__init__": 1,
-        "iferc_index": 1,
-        "_the_calendar": 1,
-        "without_holiday_key": 1,
-        "_publish": 1,
-    }
-    # A published index is an IFERC index's ledger with its own dispatch: no key and no
-    # calendar, and nothing of the schedule's 480 prints looked at.
+    # A published index: no key and no calendar, and nothing of the schedule's 480 prints
+    # looked at.
     prints = PATH["_CreatePublishedSchedule"](*published_columns(120))
     weekly = (
         "DOE Diesel",
@@ -1799,41 +1717,6 @@ def test_a_gas_daily_calendar_is_an_index_and_a_valuation_date_in_and_four_colum
     }
 
 
-# Ten years of IFERC months: two handles as above, the IFERC builder's one look at the order of
-# the publication days, its one copy of them, the months' rows in one arange, the priced flag
-# in one empty, the fixed flag, and one publication. Fifteen calls across twelve functions.
-def test_an_iferc_calendar_is_an_index_and_a_valuation_date_in_and_four_columns_out(
-    call_profile: CallProfile, numpy_calls: CallProfile
-) -> None:
-    valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
-    schedule = PATH["_CreateIfercSchedule"](*iferc_columns(120))
-    index = an_index(schedule)
-    PATH["_CreateCalendar"](valuation, index)
-    assert call_profile(lambda: PATH["_CreateCalendar"](valuation, index)) == {
-        "Registered.run": 1,
-        "_arguments": 1,
-        "_validate": 2,
-        "_text": 2,
-        "_resolve": 2,
-        "_CreateCalendar": 1,
-        "calendar": 1,
-        "_iferc_calendar": 1,
-        "_at_least_one": 1,
-        "_each_code_once": 1,
-        "_frozen": 1,
-        "_publish": 1,
-    }
-    assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, index)) == {
-        "ndarray.any": 1,
-        "numpy.array": 1,
-        "numpy.arange": 1,
-        "numpy.empty": 1,  # the priced flag, true throughout
-        "ndarray.setflags": 4,
-        "numpy.count_nonzero": 1,  # the fixed periods counted
-        "ufunc.reduce": 1,
-    }
-
-
 # Ten years of weekly prints, 480 rows: two handles as above and the least a calendar can do.
 # The schedule's order was checked when the schedule was made, so the builder looks at nothing
 # of it: no code is counted, no date compared with the one above, and neither column is copied,
@@ -1980,56 +1863,6 @@ def test_a_gas_daily_history_is_two_handles_in_and_the_calendar_kept(
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
 
 
-def iferc_history_sources() -> tuple[object, object]:
-    """The two handles an IFERC history takes: the calendar of the ten years of months
-    iferc_columns lays out, valued after the last month's publication day so that every month
-    has fixed, and an index for each of them."""
-    valuation = PATH["_CreateValuationDate"](49740.0, 0.5)
-    schedule = PATH["_CreateIfercSchedule"](*iferc_columns(120))
-    index = an_index(schedule)
-    made = PATH["_CreateCalendar"](valuation, index)
-    fixings = PATH["_CreateIfercFixings"](*iferc_fixing_columns(120), index)
-    return made, fixings
-
-
-# Ten years of months, every one published, and their indices: two handles as above, the
-# builder's dispatch to the IFERC binder, its one comparison of the fixings' index with the
-# calendar's, one pass over the codes for their rows, every code a month of the index since the
-# fixings' creator refused any other, the rows of the months in one array, two looks, an index
-# for a month not yet fixed and a fixed month without one, the months covered in one zeros, the
-# rows put in the calendar's order by one argsort, the two columns frozen, and one publication.
-# Fourteen calls across eleven functions, the accept rule once per argument; no arange and no
-# searchsorted.
-def test_an_iferc_history_is_two_handles_in_and_the_calendar_kept(
-    call_profile: CallProfile, numpy_calls: CallProfile
-) -> None:
-    made, fixings = iferc_history_sources()
-    PATH["_CreateMarketHistory"](made, fixings)
-    assert call_profile(lambda: PATH["_CreateMarketHistory"](made, fixings)) == {
-        "Registered.run": 1,
-        "_arguments": 1,
-        "_validate": 2,
-        "_text": 2,
-        "_resolve": 2,
-        "_CreateMarketHistory": 1,
-        "market_history": 1,
-        "iferc_history": 1,
-        "_over_the_calendars_index": 1,
-        "_frozen": 1,
-        "_publish": 1,
-    }
-    calls = numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings))
-    assert calls == {
-        "numpy.array": 1,  # the row of each index's month
-        "ndarray.any": 2,  # the builder's two looks
-        "numpy.zeros": 1,  # the months covered
-        "ndarray.argsort": 1,  # the calendar's order
-        "ndarray.setflags": 2,  # the two columns frozen
-        "ufunc.reduce": 2,
-    }
-    assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
-
-
 def published_fixing_columns(count: int) -> tuple[Cells, Cells]:
     """The dates of the first so many prints published_columns lays out, as the sheet sends
     them, the newest in the first row, and a price beside each."""
@@ -2155,21 +1988,6 @@ def gas_daily_market_sources() -> tuple[object, object]:
     )
 
 
-def iferc_market_sources() -> tuple[object, object]:
-    """The two handles an IFERC market takes: the calendar of the ten years of months
-    iferc_columns lays out, valued on 11 September 2026 with four months published and an index
-    for each, and a vector of 116 quotes, one per month still to publish."""
-    valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
-    schedule = PATH["_CreateIfercSchedule"](*iferc_columns(120))
-    index = an_index(schedule)
-    made = PATH["_CreateCalendar"](valuation, index)
-    fixings = PATH["_CreateIfercFixings"](*iferc_fixing_columns(4), index)
-    history = PATH["_CreateMarketHistory"](made, fixings)
-    return history, PATH["_CreatePriceVector"](
-        "sample", Cells.from_rows([[2.0 + i] for i in range(116)])
-    )
-
-
 def published_market_sources() -> tuple[object, object]:
     """The two handles a published market takes: the calendar of the ten years of weekly prints
     published_columns lays out, valued on 11 September 2026 with seventeen prints fixed and a
@@ -2228,13 +2046,13 @@ def stopping_early(
     )
 
 
-# The same ledger over a Gas Daily history, a year of flow days with four quotes, over an IFERC
-# one, ten years of months with 116, and over a published one, ten years of weekly prints with
-# 116: the kind of the calendar is read by nothing here.
+# The same ledger over a Gas Daily history, a year of flow days with four quotes, and over a
+# published one, ten years of weekly prints with 116: the kind of the calendar is read by
+# nothing here.
 @pytest.mark.parametrize(
     "sources",
-    [gas_daily_market_sources, iferc_market_sources, published_market_sources],
-    ids=["a Gas Daily market", "an IFERC market", "a published market"],
+    [gas_daily_market_sources, published_market_sources],
+    ids=["a Gas Daily market", "a published market"],
 )
 def test_a_market_over_the_other_two_calendars_costs_the_same(
     sources: Callable[[], tuple[object, object]],
@@ -2250,15 +2068,15 @@ def test_a_market_over_the_other_two_calendars_costs_the_same(
 # A vector that stops before the schedule does costs what a whole one costs to take: the same
 # eleven calls and no numpy call, the count compared with the contracts that remain and nothing
 # looked along, over ten years of days with the first quote of 117, a year of flow days with the
-# balance of the month alone, and ten years of months with twelve quotes of 116.
+# balance of the month alone, and ten years of weekly prints with twelve quotes of 116.
 @pytest.mark.parametrize(
     "sources",
     [
         lambda: stopping_early(lambda: market_sources(121, 30), 1),
         lambda: stopping_early(gas_daily_market_sources, 1),
-        lambda: stopping_early(iferc_market_sources, 12),
+        lambda: stopping_early(published_market_sources, 12),
     ],
-    ids=["ten years of days, one quote of 117", "a Gas Daily market", "an IFERC market"],
+    ids=["ten years of days, one quote of 117", "a Gas Daily market", "a published market"],
 )
 def test_a_market_whose_quotes_stop_early_costs_the_same(
     sources: Callable[[], tuple[object, object]],
@@ -2284,18 +2102,18 @@ def test_a_market_whose_quotes_stop_early_costs_the_same(
     [
         lambda: market_sources(13, 30),
         gas_daily_market_sources,
-        iferc_market_sources,
+        published_market_sources,
         lambda: stopping_early(lambda: market_sources(121, 30), 1),
         lambda: stopping_early(gas_daily_market_sources, 1),
-        lambda: stopping_early(iferc_market_sources, 12),
+        lambda: stopping_early(published_market_sources, 12),
     ],
     ids=[
         "a futures market",
         "a Gas Daily market",
-        "an IFERC market",
+        "a published market",
         "a futures market stopping early",
         "a Gas Daily market stopping early",
-        "an IFERC market stopping early",
+        "a published market stopping early",
     ],
 )
 def test_reading_a_market_back_rebuilds_nothing(
@@ -2431,58 +2249,6 @@ def test_published_fixings_are_two_columns_and_an_index_in_and_one_publication_o
         "numpy.array": 1,  # the one copy, of the prices
         "ndarray.setflags": 2,  # each price's print and the prices, frozen
         "ufunc.reduce": 3,
-    }
-
-
-# --- the IFERC fixings: two columns in, the codes kept and the prices copied ---------------
-
-
-def iferc_fixing_columns(count: int) -> tuple[Cells, Cells]:
-    """That many contract months' indices as the sheet sends them, the newest month in the first
-    row: the codes of schedule_columns from the last back to the first, since the schedule's
-    publication days increase down the column, and a price beside each."""
-    newest_first = range(count - 1, -1, -1)
-    return (
-        Cells.from_rows([[f"c{i}"] for i in newest_first]),
-        Cells.from_rows([[2.0 + i / 100] for i in newest_first]),
-    )
-
-
-# Ten years of monthly indices, newest first: the text column handed over as it is, the number
-# column accepted on the host's summary alone, the index by handle through its text rule and
-# one lookup, the builder's kind check and count, its one pass over the codes against the
-# index's months and for repeats, the rows of the codes' months as one array and one look at
-# the days they published, its one copy of the prices, and one publication. Eighteen calls
-# across fourteen functions, the accept rule once per argument, as before the order rule; on
-# numpy the rows, the look and its reduce beside the copy and its freeze, where the copy and
-# the freeze were all.
-def test_iferc_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
-    call_profile: CallProfile, numpy_calls: CallProfile
-) -> None:
-    codes, prices = iferc_fixing_columns(120)
-    index = an_index(PATH["_CreateIfercSchedule"](*iferc_columns(120)))
-    PATH["_CreateIfercFixings"](codes, prices, index)
-    assert call_profile(lambda: PATH["_CreateIfercFixings"](codes, prices, index)) == {
-        "Registered.run": 1,
-        "_arguments": 1,
-        "_validate": 3,
-        "_text": 1,  # the handle's text rule
-        "_resolve": 1,  # and its one lookup
-        "_text_column": 1,
-        "_column": 1,
-        "_one_column": 2,
-        "_shape": 2,
-        "_texts": 1,
-        "_numbers": 1,
-        "_CreateIfercFixings": 1,
-        "iferc_fixings": 1,
-        "_publish": 1,
-    }
-    assert numpy_calls(lambda: PATH["_CreateIfercFixings"](codes, prices, index)) == {
-        "ndarray.any": 1,  # one look, at the order of the publication days
-        "numpy.array": 2,  # the rows of the codes' months, and the one copy the fixings keep
-        "ndarray.setflags": 1,  # frozen
-        "ufunc.reduce": 1,
     }
 
 

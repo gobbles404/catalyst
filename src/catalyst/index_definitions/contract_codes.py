@@ -11,7 +11,6 @@ import numpy as np
 from numpy.typing import NDArray
 
 from catalyst.index_definitions.futures_schedule import FuturesSchedule
-from catalyst.index_definitions.iferc_schedule import IfercSchedule
 from catalyst.index_definitions.published_schedule import PublishedSchedule
 
 # The exchanges' month letters, January to December, and the same in lowercase, the two
@@ -88,7 +87,7 @@ def first_day_of(contract: str) -> np.datetime64:
 
 
 def schedule_months(
-    schedule: FuturesSchedule | IfercSchedule | PublishedSchedule,
+    schedule: FuturesSchedule | PublishedSchedule,
 ) -> NDArray[np.int64]:
     """The month of every code of the schedule, as numpy counts months, one read per code: a
     code that is no contract code is refused by row, and so are two rows for one month, since a

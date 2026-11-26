@@ -17,8 +17,8 @@ from numpy.typing import NDArray
 
 class ScheduleMethod(Enum):
     """Which observations set a contract's final price. lastday, the settlement on the contract's
-    last trading day, or on an IFERC index the month's index on its publication day, the one
-    method an IFERC index takes since #167; penultimate, the settlement on the business day before
+    last trading day, or on a published index the one print of a month that has one;
+    penultimate, the settlement on the business day before
     the last trading day; last3day, the average of the settlements on the last trading day and the
     two business days before it, each a third; and asian, the average of the settles on every
     pricing day the component covers, its contract's calendar month or the booked part of it, each
@@ -36,26 +36,22 @@ METHOD_NAMES: Final = np.array([member.value for member in METHODS], dtype=objec
 METHOD_NAMES.setflags(write=False)
 
 
-def supported_on_iferc(method: NDArray[np.intp]) -> NDArray[np.bool_]:
-    """lastday alone: an IFERC month has one index, published once, so the one observation is the
-    month's index on its publication day. The terms refuse a batch with any other method on an
-    IFERC index, and the observations read the same rule before making the month's day."""
-    return method == METHODS.index(ScheduleMethod.LASTDAY)
-
-
 def supported_on_published(method: NDArray[np.intp]) -> NDArray[np.bool_]:
-    """asian alone: a published month is the average of the prints that count toward it, an
-    equal share each. penultimate and last3day count business days back from an expiry, and a
-    published index has neither; lastday is refused until the IFERC index, one print a month,
-    moves onto the published kind. The terms refuse a batch with any other method on a published
-    index, and the observations read the same rule before making a month's prints."""
-    return method == METHODS.index(ScheduleMethod.ASIAN)
+    """asian and lastday: a published month is the average of the prints that count toward it,
+    an equal share each, under asian; and under lastday it is its one print, the month of a
+    monthly index such as Inside FERC's, the method a trade on such an index is booked under.
+    penultimate and last3day count business days back from an expiry, and a published index
+    has neither. The terms refuse a batch with any other method on a published index, and the
+    observations read the same rule and then hold lastday to a whole month of one print."""
+    return (method == METHODS.index(ScheduleMethod.ASIAN)) | (
+        method == METHODS.index(ScheduleMethod.LASTDAY)
+    )
 
 
 def permits_physical_settlement(method: NDArray[np.intp]) -> NDArray[np.bool_]:
     """lastday alone, on a futures index: a penultimate, last3day or asian future is cash settled
     on a price other than the expiry's settle, so a physical batch is lastday rows alone. The
-    terms apply it; an IFERC index takes a financial settlement whatever the method."""
+    terms apply it; a published index takes a financial settlement whatever the method."""
     return method == METHODS.index(ScheduleMethod.LASTDAY)
 
 

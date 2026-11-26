@@ -1624,7 +1624,8 @@ $quotes = {
 
 # --- pairs ----------------------------------------------------------------------------------------
 # A pair of indexes, two-index-fixed-float.md: A a futures index over F27, G27 and H27 with 1 January
-# 2027 closed and B an IFERC index over Z26 to J27, one NYMEX NG specification between them, in J5
+# 2027 closed and B a published index of one print a month over Z26 to J27, its Z26 price typed by
+# its publication date, one NYMEX NG specification between them, in J5
 # and J6; the ticket's row, G27 for one lot at the outright 3.00, two-index-one-price.md, bilateral
 # on SOFR paying 4 January 2028, booked over the column J5:J6 in J22, prepared over the histories
 # J13:J14 in J23 and valued over the markets J17:K17, a row, in J24: twenty-four creators, the mark
@@ -1657,7 +1658,7 @@ $pairs = {
     Put $state $sheet "A11" "4-Jan-2027"
     Put $state $sheet "A12" "31-Dec-2026"; Put $state $sheet "B12" "3.6"
     Put $state $sheet "A13" "30-Dec-2026"; Put $state $sheet "B13" "3.58"
-    Put $state $sheet "A14" "Z26"; Put $state $sheet "B14" "-0.3"
+    Put $state $sheet "A14" "1-Dec-2026"; Put $state $sheet "B14" "-0.3"
     Put $state $sheet "A15" "3.5"; Put $state $sheet "A16" "3.6"
     Put $state $sheet "B15" "-0.38"; Put $state $sheet "B16" "-0.4"; Put $state $sheet "B17" "-0.42"
     Put $state $sheet "D4" "date"; Put $state $sheet "E4" "discount_factor"
@@ -1673,13 +1674,13 @@ $pairs = {
     Put $state $sheet "J3" '=_CreateIndexConventions("DOLLAR","MMBTU","DOLLAR","ENERGY","MMBTU")'
     Put $state $sheet "J4" "=_CreateContractSpecifications(D1:H1,D2:H2)"
     Put $state $sheet "J5" '=_CreateIndex("A","Pair leg A, a futures index",J1,J3,J4,"PAYS","NYMEX NG",K2)'
-    Put $state $sheet "J7" "=_CreateIfercSchedule(A5:A9,B5:B9)"
-    Put $state $sheet "J6" '=_CreateIndex("B","Pair leg B, an IFERC index",J7,J3,J4,,"NYMEX NG")'
+    Put $state $sheet "J7" "=_CreatePublishedSchedule(A5:A9,B5:B9)"
+    Put $state $sheet "J6" '=_CreateIndex("B","Pair leg B, a monthly published index",J7,J3,J4,,"NYMEX NG")'
     Put $state $sheet "J8" "=_CreateValuationDate(A11,0.5)"
     Put $state $sheet "J9" "=_CreateCalendar(J8,J5)"
     Put $state $sheet "J10" "=_CreateCalendar(J8,J6)"
     Put $state $sheet "J11" "=_CreateFuturesFixings(A12:A13,B12:B13,J5)"
-    Put $state $sheet "J12" "=_CreateIfercFixings(A14,B14,J6)"
+    Put $state $sheet "J12" "=_CreatePublishedFixings(A14,B14,J6)"
     Put $state $sheet "J13" "=_CreateMarketHistory(J9,J11)"
     Put $state $sheet "J14" "=_CreateMarketHistory(J10,J12)"
     Put $state $sheet "K13" "=J14"; Put $state $sheet "K14" "=J13"
@@ -1758,7 +1759,7 @@ $pairs = {
     Check "and the reads show #REF!, no number" ((Text $state $sheet "J25") -eq "#REF!") (Text $state $sheet "J25")
     $c = Settle $state $sheet { param($c) $c.Live -eq 17 }
     Check "B's index, calendar, fixings, history and market and the batch, preparation and results are released; seventeen live, nothing published" ($c.Live -eq 17 -and $c.Released -eq 18 -and $c.Published -eq 35) $c.Text
-    Put $state $sheet "J6" '=_CreateIndex("B","Pair leg B, an IFERC index",J7,J3,J4,,"NYMEX NG")'
+    Put $state $sheet "J6" '=_CreateIndex("B","Pair leg B, a monthly published index",J7,J3,J4,,"NYMEX NG")'
     Check "the index typed back rebuilds the batch" ((Text $state $sheet "J22").StartsWith("${id}:trades:A+B:")) (Text $state $sheet "J22")
     Check "and the mark reads 475 again" ((Text $state $sheet "J25") -eq "475") (Text $state $sheet "J25")
     $c = Settle $state $sheet { param($c) $c.Live -eq 25 }

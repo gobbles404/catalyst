@@ -24,7 +24,6 @@ from catalyst.globals.valuation_date import valuation_date
 from catalyst.index_definitions.contract_codes import schedule_months
 from catalyst.index_definitions.contract_specifications import contract_specifications
 from catalyst.index_definitions.futures_schedule import futures_schedule
-from catalyst.index_definitions.iferc_schedule import iferc_schedule
 from catalyst.index_definitions.index import Index
 from catalyst.index_definitions.index_conventions import index_conventions
 from catalyst.index_definitions.published_schedule import published_schedule
@@ -34,7 +33,6 @@ from catalyst.instruments.fields import DatesOrTexts
 from catalyst.market.market import Market, market
 from catalyst.market.market_history import MarketHistory, market_history
 from catalyst.market_data.futures_fixings import futures_fixings
-from catalyst.market_data.iferc_fixings import iferc_fixings
 from catalyst.market_data.price_vector import price_vector
 from catalyst.market_data.published_fixings import published_fixings
 from catalyst.trades.encoding import Encoded, encoded
@@ -1369,21 +1367,22 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
     }
 
 
-# --- an IFERC basis batch, iferc-basis-futures.md -------------------------------------------
-# The same 25 months on an IFERC index: each month's index published on the first business day
+# --- a basis batch on a monthly published index, iferc-basis-futures.md ----------------------
+# The same 25 months on a published index of one print a month, Inside FERC's shape, booked
+# under lastday: each month's index published on the first business day
 # of it, 2,500 MMBtu a lot, no pricing calendar; the payment two business days after publication
 # on the payment calendar, since iferc-publication-payment-anchor.md. The
 # first month is a month like any other, so the rows begin at 0. Valued on 10 March 2027 the
 # months of October 2026 to March 2027, rows 0 to 5, have published: a batch over 24 contracts has
 # six fixed and eighteen live, and one over two contracts two fixed and none live.
-IFERC_PUBLICATION = np.busday_offset(
+MONTHLY_PUBLICATION = np.busday_offset(
     MONTHS.astype("datetime64[D]"), 0, roll="forward", holidays=HOLIDAYS
 )
-IFERC_PAYS = np.busday_offset(IFERC_PUBLICATION, 2, roll="backward", holidays=HOLIDAYS)
+MONTHLY_PAYS = np.busday_offset(MONTHLY_PUBLICATION, 2, roll="backward", holidays=HOLIDAYS)
 BASIS = index_on(
     "basis",
     "Sample basis index",
-    iferc_schedule(CODES, IFERC_PUBLICATION),
+    published_schedule(CODES, MONTHLY_PUBLICATION),
     index_conventions("DOLLAR", "MMBTU", "DOLLAR", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot",), np.array([2_500.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
@@ -1394,7 +1393,7 @@ BASIS = index_on(
 )
 
 
-def iferc_terms(components: int, contracts: int) -> ResolvedTrades:
+def monthly_terms(components: int, contracts: int) -> ResolvedTrades:
     """That many single-month lastday trades spread over the first contracts, lots and prices
     varying, cleared and financial, each paying its month's day."""
     rows = np.arange(components, dtype=np.intp) % contracts
@@ -1420,42 +1419,41 @@ def iferc_terms(components: int, contracts: int) -> ResolvedTrades:
         PaymentTerms(
             DatesOrTexts.of_texts(("+3bd",) * components),
             (PAYMENT_CALENDAR,) * components,
-            IFERC_PAYS[rows],
+            MONTHLY_PAYS[rows],
         ),
     )
 
 
-def iferc_history(as_of: str = AS_OF) -> MarketHistory:
-    """The IFERC index's history valued on that day, an index for every published month, newest
-    first as the desk keeps them."""
+def monthly_history(as_of: str = AS_OF) -> MarketHistory:
+    """The monthly index's history valued on that day, a price for every published month,
+    newest first as the desk keeps them."""
     cal = calendar(valuation_date(np.datetime64(as_of, "D"), 0.5), BASIS)
     published = np.flatnonzero(cal.is_fixed)[::-1]
     return market_history(
-        cal,
-        iferc_fixings(tuple(CODES[int(i)] for i in published), 3.0 + published / 100, BASIS),
+        cal, published_fixings(MONTHLY_PUBLICATION[published], 3.0 + published / 100, BASIS)
     )
 
 
-def iferc_market(history: MarketHistory) -> Market:
+def monthly_market(history: MarketHistory) -> Market:
     """A quote for every month from the first unpublished through the last."""
     cal = history.calendar
     remaining = len(CODES) - int(cal.contract[cal.first_unfixed])
     return market(history, price_vector("basis", 3.5 + np.arange(remaining) / 100))
 
 
-# The IFERC encoding runs the futures encoding's functions but the three that read a pricing
-# calendar and a day's contract, which an IFERC index has none of: the reference is the component's
-# own month, checked against its publication day in one comparison.
-IFERC_ENCODING_LEDGER = {
+# The published encoding runs the futures encoding's functions but the three that read a
+# pricing calendar and a day's contract, which a published index has none of: the reference
+# is the month the day's print counts toward, found by one search of the schedule's dates.
+PUBLISHED_ENCODING_LEDGER = {
     name: count
     for name, count in ENCODING_LEDGER.items()
     if name
     not in ("with_holiday_calendar", "open_days", "contract_on", "requires_booked_reference")
 }
-# The IFERC preparation's numpy beside the futures': one look fewer, no slot before the calendar
-# to refuse since the first month is a month, and one search more, each slot's row found among
-# the publication days instead of counted off the calendar's first day.
-IFERC_PREPARATION_NUMPY = {
+# The published preparation's numpy beside the futures': one look fewer, no slot before the
+# calendar to refuse since the first print is a print, and one search more, each slot's row
+# found among the publication dates instead of counted off the calendar's first day.
+PUBLISHED_PREPARATION_NUMPY = {
     **PREPARATION_NUMPY,
     "ndarray.any": 8,
     "ndarray.searchsorted": 4,
@@ -1464,7 +1462,7 @@ IFERC_PREPARATION_NUMPY = {
 
 
 @pytest.mark.parametrize(("components", "contracts", "fixed"), [(5, 2, 2), (2_000, 24, 6)], ids=IDS)
-def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly_rows(
+def test_a_monthly_batch_observes_once_a_component_and_runs_the_kernel_on_monthly_rows(
     call_profile: CallProfile, numpy_calls: CallProfile, components: int, contracts: int, fixed: int
 ) -> None:
     # One observation per component on its month's publication day: the observations through the
@@ -1473,20 +1471,21 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
     # one fixing read per published month and the tick one quote per month still to publish,
     # through the same functions as a futures batch's but the calendar's, and the same numpy but
     # the boundary look and the row search.
-    terms = iferc_terms(components, contracts)
+    terms = monthly_terms(components, contracts)
     assert call_profile(lambda: observed_of(terms)) == {
         "observed": 1,
         "trade_schedule_of": 1,
-        "supported_on_iferc": 1,  # the methods' fact the observations read on an IFERC index
-        "_whole_months": 1,
+        "supported_on_published": 1,  # the methods' fact the observations read on this kind
+        "_whole_months": 1,  # lastday's rule, a component its whole month
+        "_the_prints": 1,  # each component's run of prints, one here
         "observations": 1,
     }
     counter = WorkCounter()
     obs = observed_of(terms)
     enc = encoded(terms, (obs,), UNITS, counter)
-    history = iferc_history()
+    history = monthly_history()
     prep = prepared_trades(enc, (history,), counter)
-    quoted = iferc_market(history)
+    quoted = monthly_market(history)
     trade_results(prep, (quoted,), counter)
     assert counter.freeze().as_dict() == {
         "display_periods": display_periods(prep),
@@ -1500,11 +1499,12 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
         "kernel": 1,
         "live_prices_read": contracts - fixed,
     }
-    np.testing.assert_array_equal(enc.legs[0].slot_date, IFERC_PUBLICATION[:contracts])
+    np.testing.assert_array_equal(enc.legs[0].slot_date, MONTHLY_PUBLICATION[:contracts])
     np.testing.assert_array_equal(enc.legs[0].slot_reference, np.arange(contracts))
-    np.testing.assert_array_equal(enc.payment_date, IFERC_PAYS[:contracts])
+    np.testing.assert_array_equal(enc.payment_date, MONTHLY_PAYS[:contracts])
     assert (
-        call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter())) == IFERC_ENCODING_LEDGER
+        call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter()))
+        == PUBLISHED_ENCODING_LEDGER
     )
     assert call_profile(lambda: prepared_trades(enc, (history,), WorkCounter())) == {
         "prepared_trades": 1,
@@ -1528,7 +1528,7 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
         "WorkCounter.hit": 3,
     }
     numpy = numpy_calls(lambda: prepared_trades(enc, (history,), WorkCounter()))
-    assert numpy == IFERC_PREPARATION_NUMPY, numpy
+    assert numpy == PUBLISHED_PREPARATION_NUMPY, numpy
     assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
         "_the_markets": 1,  # two-index-fixed-float.md: the markets matched to the legs by history
@@ -1548,20 +1548,20 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
     }
 
 
-# Memory: an IFERC batch's slots, groups, references, days and months are all its contracts, so
+# Memory: a monthly batch's slots, groups, references, days and months are all its contracts, so
 # its preparation allocates by contract and not by trade. Measured on 2026-10-09: five trades over
 # two months 4,416 bytes and two thousand over twenty-four 8,880, about 203 a month more for 400
 # times the trades; the tick 1,210 and 1,080, the quotes and their gather.
-def test_an_iferc_batchs_preparation_and_tick_allocate_by_month_not_by_trade() -> None:
-    history = iferc_history()
-    small = encoded(iferc_terms(5, 2), (observed_of(iferc_terms(5, 2)),), UNITS, WorkCounter())
+def test_a_monthly_batchs_preparation_and_tick_allocate_by_month_not_by_trade() -> None:
+    history = monthly_history()
+    small = encoded(monthly_terms(5, 2), (observed_of(monthly_terms(5, 2)),), UNITS, WorkCounter())
     big = encoded(
-        iferc_terms(2_000, 24), (observed_of(iferc_terms(2_000, 24)),), UNITS, WorkCounter()
+        monthly_terms(2_000, 24), (observed_of(monthly_terms(2_000, 24)),), UNITS, WorkCounter()
     )
     small_peak = least_peak(lambda: prepared_trades(small, (history,), WorkCounter()))
     big_peak = least_peak(lambda: prepared_trades(big, (history,), WorkCounter()))
     assert big_peak <= small_peak + 230 * 22 + SLACK
-    quoted = iferc_market(history)
+    quoted = monthly_market(history)
     big_prep = prepared_trades(big, (history,), WorkCounter())
     # Since #190 the finite check keeps two boolean temporaries over the live slots for a moment;
     # since #197 the record holds the cross-gamma's six fields, 48 bytes, None and 0.0 here.
@@ -1703,10 +1703,11 @@ def test_a_published_batch_observes_each_months_prints_and_runs_the_kernel_on_th
     np.testing.assert_array_equal(enc.legs[0].slot_date, PRINT_DAYS[prints])
     np.testing.assert_array_equal(enc.legs[0].slot_reference, PRINT_MONTH[prints])
     np.testing.assert_array_equal(enc.payment_date, PRINT_PAYS[:contracts])
-    # The encoding, the preparation and the tick run the functions an IFERC batch's run: the
+    # The encoding, the preparation and the tick run the functions a monthly batch's run: the
     # kind is read once, where the reference and the calendar row of a day are found.
     assert (
-        call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter())) == IFERC_ENCODING_LEDGER
+        call_profile(lambda: encoded(terms, (obs,), UNITS, WorkCounter()))
+        == PUBLISHED_ENCODING_LEDGER
     )
     assert call_profile(lambda: trade_results(prep, (quoted,), WorkCounter())) == {
         "trade_results": 1,
