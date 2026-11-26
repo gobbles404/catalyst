@@ -1308,8 +1308,10 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
     # every label is: 829,418 before and 850,058 after at 2,500 rows on 2026-11-21; and 341, a
     # one-byte mask a component, which were entered as two dates and not as a code, held while
     # the batch is made for a published index to select its prints by: 852,580 at 2,500 rows
-    # on 2026-11-24.
-    assert peak <= 341 * rows + 2 * SLACK
+    # on 2026-11-24; and since #273 349, each row's place among the batch's price units held
+    # as one whole number of eight bytes, as every selection of a row is, here the first for
+    # every row, the unit the index quotes in: 872,935 at 2,500 rows on 2026-11-26.
+    assert peak <= 349 * rows + 2 * SLACK
 
 
 # A key of two names makes its union and keeps nothing of it, holiday-keys.md: a date shifted

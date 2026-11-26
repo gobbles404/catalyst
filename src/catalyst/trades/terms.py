@@ -4,7 +4,8 @@ tests supply them in Python. One instrument for the batch, one route and one set
 its legs, one index each, one or since two-index-fixed-float.md two; then the occurrences,
 the ticket's rows, each with its date, the specification of
 the index its quantity counts, its schedule method and its quantity basis, so that one batch
-mixes units, methods and bases row by row, its clearing house, its counterparty and its broker
+mixes units, methods and bases row by row, since #273 the unit its price is in, its clearing
+house, its counterparty and its broker
 where given and the marketing reserve it booked; then the components, one per contract month
 an occurrence holds, each with its occurrence, its contract, its signed quantity as entered,
 the days it covers within its
@@ -127,13 +128,21 @@ ELECTRICITY: Final = frozenset({"MWH", "KWH"})
 
 @dataclass(frozen=True, slots=True)
 class PriceUnit:
-    """The unit a float_float's spread price is in, since float-float-units.md, typed on the
-    batch and never taken from an index: the currency unit and the quantity unit it is per, two
-    codes of the unit tables as entered, DOLLAR and BBL for dollars a barrel. Held as given by the
-    terms; the encoding, which has the tables, reads the two for their meaning once."""
+    """The unit a batch's one price is in: the currency unit and the quantity unit it is per, two
+    codes of the unit tables as entered, DOLLAR and BBL for dollars a barrel. A float_float's
+    spread price's, since float-float-units.md, typed on the batch and never taken from an index;
+    and since #273 a fixed_float's fixed price's, each row's own, typed as one text, `DOLLAR/MT`,
+    or the index's quote unit where the batch types none. Held as given by the terms; the
+    encoding, which has the tables, reads the two codes for their meaning once."""
 
     currency_unit: str
     quantity_unit: str
+
+    @property
+    def code(self) -> str:
+        """The unit as the sheet spells it, the currency unit over the quantity unit:
+        `DOLLAR/MT`."""
+        return f"{self.currency_unit}/{self.quantity_unit}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,13 +239,17 @@ class ResolvedTrades:
     quantity under month and the entered quantity times the covered days under calday, formed
     once here, the one quantity the encoding converts and nothing later scales again, and
     price[k], since two-index-one-price.md the trade's own: the one price agreed for the
-    deal in the quote unit its indexes share, each occurrence's entered price on every component
-    of its row, finite, a fixed_float's fixed_price, the outright price of the sum of two
+    deal, each occurrence's entered price on every component of its row, finite, as entered
+    and never restated, a fixed_float's fixed_price, the outright price of the sum of two
     indexes where the batch is on a pair and the index's price where it is on one, and since
     float-float-spread.md a float_float's spread_price, paid against the first index's price
-    less the second's, in price_unit, since float-float-units.md the unit the batch typed for
-    it, one for the batch, which neither index need quote in, and None for a fixed_float, whose
-    price is in its indexes' one unit. Then
+    less the second's. Then the units those prices are in: price_units, the batch's distinct
+    units, and per occurrence price_unit[i], the place of the row's unit among them. A
+    float_float's is one for the batch, since float-float-units.md the unit the batch typed,
+    which neither index need quote in; a fixed_float's is each row's own since #273, dollars a
+    tonne beside dollars a pound on one index, and where the batch typed none the one unit its
+    indexes quote in, resolved here into the same record so that a reader never asks which it
+    was. Then
     payment, the terms a financial settlement pays by and the days they give, one day per
     component shared by every leg, and None for a physical one, which pays on no day.
 
@@ -270,7 +283,8 @@ class ResolvedTrades:
     covered_days: NDArray[np.int64]
     component_quantity: NDArray[np.float64]
     price: NDArray[np.float64]
-    price_unit: PriceUnit | None
+    price_units: tuple[PriceUnit, ...]
+    price_unit: NDArray[np.intp]
     marketing_reserve: NDArray[np.float64] | None
     cva_reserve: NDArray[np.float64] | None
     payment: PaymentTerms | None
@@ -330,7 +344,8 @@ def resolved_trades(
     discount_curve_key: tuple[str, ...] | None = None,
     payment_holiday_key: tuple[str, ...] | None = None,
     second_leg: LegInputs | None = None,
-    price_unit: PriceUnit | None = None,
+    price_units: tuple[PriceUnit, ...] | None = None,
+    price_unit: NDArray[np.intp] | None = None,
 ) -> ResolvedTrades:
     """The one way to make ResolvedTrades: the rules of the first fixed_float profile, checked once,
     in this order, the first failure being the message; then the columns copied and frozen, the
@@ -408,17 +423,24 @@ def resolved_trades(
     spread_legs and spread_rules: two legs, the bilateral route and no named broker. Its one
     price is its spread_price, named so in a refusal, and its second leg is the subtracted
     one, the leg whose amounts the encoding signs; a fixed_float subtracts no leg. Since
-    float-float-units.md the spread price has its unit, price_unit, present exactly on a
-    float_float, spread_unit, and its two legs are held to the spread's pair rules where a
+    float-float-units.md the spread price has its unit, typed and one for the batch,
+    spread_unit, and its two legs are held to the spread's pair rules where a
     fixed_float's are held to one unit, spread_pair: one measure, one settlement currency unit
     and quote quantity units both of heat or both of electricity, each leg quoting in its own
     currency and quantity units otherwise.
+
+    The units of the prices, since #273, _the_price_units: price_units, the batch's distinct
+    units, and price_unit, each occurrence's place among them, one per occurrence and in range,
+    the first out of range refused by its row. A fixed_float given none is priced in the unit
+    its index quotes in, the default resolved here once into the same two columns; one unit
+    given without places is every occurrence's. The codes are kept as given and read for their
+    meaning by the encoding, which has the unit tables.
     """
     spread = instrument is FLOAT_FLOAT
     if spread:
         spread_legs(1 if second_leg is None else 2)
         spread_rules(route, broker, partial(named_trade, trade_ids))
-    spread_unit(spread, price_unit)
+    spread_unit(spread, price_units)
     schedule = trade_schedule_of(index)
     lot = reporting_lot_of(index)
     occurrences = _the_occurrences(
@@ -461,6 +483,7 @@ def resolved_trades(
     _the_monthly_components(start_date, end_date, onetime, trade_ids, occurrence)
     _the_contract_column(contract, occurrence, len(schedule.codes), "contract")
     _the_prices(price, occurrence, trade_ids, price_words(instrument)[0])
+    units, unit_of_occurrence = _the_price_units(index, price_units, price_unit, occurrences)
     legs = (
         _the_leg(
             index, schedule, lot, specification, schedule_method, contract, schedule_month, False
@@ -504,7 +527,8 @@ def resolved_trades(
         days,
         _the_component_quantity(quantity_per, quantities, days, trade_ids, occurrence),
         _frozen_numbers(price),
-        price_unit,
+        units,
+        unit_of_occurrence,
         None if marketing_reserve is None else _frozen_numbers(marketing_reserve),
         None if cva_reserve is None else _frozen_numbers(cva_reserve),
         pays,
@@ -556,21 +580,64 @@ def spread_rules(route: Route, broker: tuple[str, ...] | None, named: Callable[[
                 )
 
 
-def spread_unit(spread: bool, price_unit: PriceUnit | None) -> None:
-    """The unit of the batch's one price, since float-float-units.md, present exactly on a
-    float_float: a spread price is in the unit the batch typed for it and no index's, so a
-    float_float without one is refused, and a fixed_float's price is in its indexes' one unit,
-    so one with a unit of its own is refused, each by name."""
-    if spread and price_unit is None:
+def spread_unit(spread: bool, price_units: tuple[PriceUnit, ...] | None) -> None:
+    """A float_float's rule over the unit of its one price, since float-float-units.md: typed
+    and one for the batch. A spread price is in the unit the batch typed for it and no index's,
+    so a float_float without one is refused, and so is one with several, the spread price's
+    unit being a fact of the batch and not of a row. A fixed_float's fixed price takes a unit a
+    row since #273, or none, and nothing is asked of it here."""
+    if not spread:
+        return
+    if price_units is None:
         raise ValueError(
-            "price_unit is None, expected the spread price's currency unit and quantity unit "
+            "price_units is None, expected the spread price's currency unit and quantity unit "
             "with a float_float; a spread price's unit is typed, never taken from an index"
         )
-    if not spread and price_unit is not None:
+    if len(price_units) != 1:
         raise ValueError(
-            f"price_unit is {price_unit.currency_unit} per {price_unit.quantity_unit}, expected "
-            "none with a fixed_float; its price is in the unit its indexes quote in"
+            f"price_units are {len(price_units)}, expected one with a float_float; a spread "
+            "price's unit is one for the batch"
         )
+
+
+def _the_price_units(
+    index: Index,
+    price_units: tuple[PriceUnit, ...] | None,
+    price_unit: NDArray[np.intp] | None,
+    occurrences: int,
+) -> tuple[tuple[PriceUnit, ...], NDArray[np.intp]]:
+    """The units a batch's prices are in and each occurrence's place among them, since #273, as
+    the terms hold them: the units as given and the places copied and frozen. Given no units,
+    the batch is priced in the unit its first index quotes in, the fixed_float's default,
+    resolved here once into the record an entered unit makes, so that nothing later asks
+    whether a unit was typed. Given no places, the one unit is every occurrence's, a
+    float_float's and a batch of one unit's, and several units without places are refused,
+    since no row could say which is its own. Places given are one per occurrence and each a
+    position among the units, the first out of range refused by its row."""
+    if price_units is None:
+        conventions = index.conventions
+        price_units = (PriceUnit(conventions.quote_currency_unit, conventions.quote_quantity_unit),)
+    if price_unit is None:
+        if len(price_units) != 1:
+            raise ValueError(
+                f"price_unit is None with {len(price_units)} price units, expected each "
+                "occurrence's position among them"
+            )
+        places = np.zeros(occurrences, dtype=np.intp)
+        places.setflags(write=False)
+        return price_units, places
+    _the_choices(
+        (
+            (
+                "price_unit",
+                price_unit,
+                len(price_units),
+                "a price unit, its position among price_units",
+            ),
+        ),
+        occurrences,
+    )
+    return price_units, _frozen_rows(price_unit)
 
 
 def spread_pair(first: Index, second: Index) -> None:

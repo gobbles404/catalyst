@@ -272,10 +272,10 @@ FIXED_FLOAT = Instrument(
             NONE,
             FieldType.NUMBER,
             "no fixed list",
-            "A finite number in the index's quote units, the same for every month of a strip; "
-            "with two indexes given to _CreateTrades the one outright price of the deal, the "
-            "price of the sum of the two indexes in the quote unit they share, never a price "
-            "per index",
+            "A finite number in the unit fixed_price_unit names, the index's quote units where "
+            "that field is left out, the same for every month of a strip; with two indexes "
+            "given to _CreateTrades the one outright price of the deal, the price of the sum "
+            "of the two indexes, never a price per index",
         ),
         Field(
             "second_schedule_method",
@@ -378,6 +378,22 @@ FIXED_FLOAT = Instrument(
             "physical settlement",
             quote_allowed=True,
             quote_required=True,
+        ),
+        # Last, since #273, so that no column a sheet already reads off the definition moves.
+        Field(
+            "fixed_price_unit",
+            "The unit the fixed price is in, a currency unit over the quantity unit it is per",
+            False,
+            NONE,
+            FieldType.CODE,
+            "a currency unit, a slash and a unit of the index's measure: DOLLAR/MT, CENT/LB, "
+            "DOLLAR/BBL",
+            "Two codes of the unit tables joined by one slash, exactly as coded, no spaces: "
+            "DOLLAR or CENT, then a unit of the index's quantity type, never a specification's "
+            "name; 1870 with DOLLAR/MT is 1,870 dollars a tonne whatever the quantity unit and "
+            "whatever the index quotes in; each row its own, and a ticket column holds one on "
+            "every row; left out of the template and the ticket, every fixed price is in the "
+            "index's quote units; a booking's alone, a quote answering in the index's",
         ),
     ),
 )

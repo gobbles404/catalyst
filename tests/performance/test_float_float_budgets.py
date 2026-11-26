@@ -129,9 +129,10 @@ def test_a_spread_runs_a_pairs_functions_and_its_own_two_rules(
         "spread_rules": 2,
         "_Fields.labels": 1,  # the brokers, asked for by the rule: none here, the field absent
         # Once for the brokers, and once each among the required fields for the second index's
-        # method, always required of a spread, and the spread price's two units.
-        "_Fields.has": 4,
-        "FieldValues.has": 1,
+        # method, always required of a spread, and the spread price's two units; one fewer since
+        # #273, a pair looking for its fixed price's unit, in the template and then the ticket,
+        # where a spread looks for none.
+        "_Fields.has": 3,
         # float-float-units.md, the spread price's unit, whatever the rows: its two fields read
         # into the template and out of it as the batch's one each,
         "field_value": 2,
@@ -150,7 +151,9 @@ def test_a_spread_runs_a_pairs_functions_and_its_own_two_rules(
         "UnitConversions.factor": 3,
         "UnitConversions.category": 3,
     }
-    assert set(theirs) <= set(mine)
+    # The one function of a pair's a spread does not run, since #273: what a fixed price
+    # multiplies, where a spread makes its spread price's coefficient.
+    assert set(theirs) - set(mine) == {"_the_fixed_coefficient"}
     # The pair's numpy calls and the coefficient's own: a row of sizes per leg, the flags down
     # round each conversion and the product, and one look that every coefficient is finite.
     # No sort, no unique and no pass over the rows but that product and that look.

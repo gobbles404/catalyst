@@ -46,7 +46,7 @@ from catalyst.index_definitions.index_conventions import IndexConventions
 from catalyst.index_definitions.periods import end_date, start_date
 from catalyst.index_definitions.published_schedule import PublishedSchedule
 from catalyst.instrumentation.work_counts import WorkCounter
-from catalyst.instruments.definitions import FieldType, Instrument
+from catalyst.instruments.definitions import FLOAT_FLOAT, FieldType, Instrument
 from catalyst.instruments.fields import DatesOrTexts
 from catalyst.market.market import Market
 from catalyst.market.market_history import MarketHistory
@@ -631,9 +631,9 @@ def trades_table(obj: Trades) -> MixedArray:
     )
     text("quantity_per", tuple(BASIS_NAMES[terms.quantity_per[rows]]))
     numbers(price_words(terms.instrument)[0], "float64", terms.price)
-    if terms.price_unit is not None:  # a float_float's spread price's unit, as typed
-        text("spread_price_currency_unit", (terms.price_unit.currency_unit,) * n)
-        text("spread_price_quantity_unit", (terms.price_unit.quantity_unit,) * n)
+    if terms.instrument is FLOAT_FLOAT:  # its spread price's unit, as typed, one for the batch
+        text("spread_price_currency_unit", (terms.price_units[0].currency_unit,) * n)
+        text("spread_price_quantity_unit", (terms.price_units[0].quantity_unit,) * n)
     if terms.payment is not None:
         headers.append("payment_day")  # as the ticket or the template wrote, each kind its own
         types.append("date or text")

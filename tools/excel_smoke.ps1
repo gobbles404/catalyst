@@ -741,7 +741,7 @@ $formulas = [ordered]@{
     # Since template-based-quoting.md three rows more: what a quote template may hold, what a quote always
     # requires, and the condition that otherwise requires it.
     '=ROWS(_ShowInstrument("fixed_float"))'       = "10"
-    '=COLUMNS(_ShowInstrument("fixed_float"))'    = "24"
+    '=COLUMNS(_ShowInstrument("fixed_float"))'    = "25"
     '=INDEX(_ShowInstrument("fixed_float"),8,1)'  = "quote_allowed"
     '=INDEX(_ShowInstrument("fixed_float"),8,2)'  = "FALSE"
     '=INDEX(_ShowInstrument("fixed_float"),8,7)'  = "TRUE"
@@ -763,7 +763,7 @@ $formulas = [ordered]@{
     '=COLUMNS(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2))'  = "6"
     '=CountFieldRows("fixed_float",EP4:EQ4,EP5:EQ7)'        = "3"
     '=EchoFieldRow("Future",EP1:EU1,EP2:EU2)' = "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'"
-    '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EQ7)' = "#ERROR EchoFieldRow: values is 3x2 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EP7)' = "#ERROR EchoFieldRow: values is 3x1 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP7:EQ8)' = "#ERROR EchoFieldRow: values is 2x2 array, expected one row of field values"
@@ -2405,7 +2405,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(UF8),1,13)" = "discount_curve_key"
     "=INDEX(util_ReadHandle(UF8),5,13)" = "SOFR"
     '=_ReportRisk(UF8,"delta","day")' = "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk"
-    "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit"
     "=_EvaluateCashflows(UF5,UF6,UQ5)" = "#ERROR _EvaluateCashflows: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2027-01-04, the valuation date; a curve is never rebased"
     "=_EvaluateCashflows(UF5)" = "#ERROR _EvaluateCashflows: valuation_date is missing, expected valuation date handle"
     "=_EvaluateCashflows(UF5,UF6)" = "#ERROR _EvaluateCashflows: discount_curve_set is missing, expected discount curve set handle"
@@ -2604,7 +2604,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(WJ26,"dv01","year"),4,2)' = "-0.095"
     "=_CreateTrades(WJ5:WK6,WL4:WP4,WL5:WP5,WJ21,ZU1)" = "#ERROR _CreateTrades: indexes is 2x2 array, expected one cell, one row or one column of index handles"
     "=_CreateTrades(WJ5,WL4:WP4,WL5:WP5,WJ21,ZU1)"     = "#ERROR _CreateTrades: ValueError: second_schedule_method is 'lastday', expected none unless two indexes"
-    "=_CreateTrades(WJ5:WJ6,WL4:WQ4,WL5:WQ5,WJ21,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 6) is text 'second_fixed_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "=_CreateTrades(WJ5:WJ6,WL4:WQ4,WL5:WQ5,WJ21,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 6) is text 'second_fixed_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit"
     "=_PrepareTrades(WJ22,WJ13)"      = "#ERROR _PrepareTrades: ValueError: histories are 1, expected 2, one per leg of the trades"
     "=_PrepareTrades(WJ22,WK15:WK16)" = "#ERROR _PrepareTrades: ValueError: history 2 is over index 'A' as history 1 is, expected one history per index of the trades"
     "=_EvaluateTrades(WJ23,WJ17,WJ20)" = "#ERROR _EvaluateTrades: ValueError: markets are 1, expected 2, one per leg of the trades"
@@ -2660,7 +2660,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(WJ38),5,7)"  = "-1"
     "=_CreateTrades(WJ5,WL10:WP10,WL11:WP11,WJ33,ZU1)" = "#ERROR _CreateTrades: ValueError: indexes are 1, expected two with a float_float; a spread is the first index's price less the second's"
     "=_CreateTrades(WJ5:WJ6,WL4:WP4,WL5:WP5,WJ33,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'fixed_price', expected a field of float_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, spread_price, spread_price_currency_unit, spread_price_quantity_unit, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
-    "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ21,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ21,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit"
     "=_CreateTrades(WJ5:WJ6,WL10:WQ10,WL11:WQ11,WJ33,ZU1)" = "#ERROR _CreateTrades: ValueError: broker of trade 1 at row 1 is 'ICAP', expected none on a float_float; a brokered spread is not built"
     "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ39,ZU1)" = "#ERROR _CreateTrades: ValueError: route is 'cleared', expected 'bilateral' on a float_float; a cleared spread is not built"
     '=_CreateQuoteTemplate("float_float",WP1,WP2,ZU1)' = "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'float_float', expected one a quote prices: 'fixed_float'"
@@ -2718,7 +2718,7 @@ $formulas = [ordered]@{
     "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ26,ZU1)" = "#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'EUR', expected DOLLAR or CENT"
     "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ27,ZU1)" = "#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     "=_CreateTrades(VSTACK(YJ7,WJ5),YL4:YP4,YL5:YP5,YJ19,ZU1)" = "#ERROR _CreateTrades: ValueError: index 2 'A' measures ENERGY, expected VOLUME as index 1 'RB'; a spread across two measures needs a density or a heat content, which the unit tables do not carry"
-    '=_CreateTradeTemplate("fixed_float",HSTACK("route","spread_price_currency_unit"),HSTACK("bilateral","DOLLAR"))' = "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
+    '=_CreateTradeTemplate("fixed_float",HSTACK("route","spread_price_currency_unit"),HSTACK("bilateral","DOLLAR"))' = "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit"
     # A closed physical contract past its expiry, expired-physical-cash.md: one LOT of Z26 bought
     # at 3.00 and sold at 3.10 through ION under one clearing house, in ZJ19. On the expiry day,
     # 18 November, the 1,000 is the mark, ZJ21; the day after it is cash, ZJ23, whatever the

@@ -347,7 +347,7 @@ namespace Catalyst.Host.Tests
             yield return new object[] { "CountFieldRows", new object[] { "fixed_float", Row("quantity", "fixed_price"), new object[,] { { 1.0, 3.1 }, { 2.0, 3.2 }, { 3.0, 3.3 } } }, 3.0 };
             yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values" };
-            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby" };
+            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields cell (1, 2) is text 'quantity', already given at cell (1, 1)" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "fixed_price"), Row("ten", "eleven") }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("trade_date"), 46164.5 }, "#ERROR EchoFieldRow: values cell (1, 1) is number 46164.5, expected date" };
@@ -821,7 +821,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _CreateCashflows: cashflow_rows cell (1, 3) is text '+5bd', expected date", Seam.Call("_CreateCashflows", Row("trade_date", "amount", "payment_day"), Row(46391.0, 1.0, "+5bd"), template));
             Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk", Seam.Call("_ReportRisk", results, "delta", "day"));
             var fixedFloat = Template("_CreateTradeTemplate", "fixed_float", Row("route"), Row("cleared"));
-            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
+            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
             Assert.Equal("#ERROR _CreateCashflows: ValueError: template is of instrument 'fixed_float', expected cashflow, the one instrument whose cashflows are built", Seam.Call("_CreateCashflows", Row("trade_date"), Row(46391.0), fixedFloat));
         }
 
@@ -1163,7 +1163,7 @@ namespace Catalyst.Host.Tests
         }
 
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;
-        // the shown fixed_float spills ten rows by twenty-three columns, the seven rows of booking and since
+        // the shown fixed_float spills ten rows by twenty-five columns, the seven rows of booking and since
         // template-based-quoting.md the three of quoting, the labels down the first column, the fields across
         // the first row and the required, quote_allowed and quote_required rows booleans, every other cell text.
         [Fact]
@@ -1199,7 +1199,9 @@ namespace Catalyst.Host.Tests
             Assert.Equal(false, spread[8, 6]);
             var shown = (object[,])Seam.Call("_ShowInstrument", "fixed_float");
             Assert.Equal(10, shown.GetLength(0));
-            Assert.Equal(24, shown.GetLength(1));  // twenty-three fields, nearby last since nearby-selection.md
+            Assert.Equal(25, shown.GetLength(1));  // twenty-four fields, the fixed price's unit last since #273
+            Assert.Equal("fixed_price_unit", shown[0, 24]);
+            Assert.Equal(false, shown[2, 24]);  // optional: left out, the index's quote unit
             Assert.Equal("field", shown[0, 0]);
             Assert.Equal("trade_id", shown[0, 1]);
             Assert.Equal("start_date", shown[0, 4]);
@@ -1212,7 +1214,7 @@ namespace Catalyst.Host.Tests
             Assert.Equal("marketing_reserve", shown[0, 20]);
             Assert.Equal("cva_reserve", shown[0, 21]);  // signed, since cva-reserve.md
             Assert.Equal("settlement_frequency", shown[0, 22]);  // since onetime-averaging.md
-            Assert.Equal("nearby", shown[0, 23]);  // last, since nearby-selection.md
+            Assert.Equal("nearby", shown[0, 23]);  // since nearby-selection.md
             Assert.Equal("required", shown[2, 0]);
             Assert.Equal(false, shown[2, 1]);
             Assert.Equal(true, shown[2, 2]);

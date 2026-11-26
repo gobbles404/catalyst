@@ -18,7 +18,7 @@ from numpy.typing import NDArray
 from test_bilateral_kernel import curve_of, curve_set
 from test_create_trades import a_template, a_ticket, seam_calendars, seam_key, the_calendars
 from test_float_float import BILATERAL as GAS_SPREAD
-from test_float_float import FIELDS, NTO, PAN, TEMPLATE_FIELDS
+from test_float_float import FIXED_FIELDS, NTO, PAN, TEMPLATE_FIELDS
 from test_float_float import TICKET as GAS_TICKET
 from test_float_float import booked as booked_gas
 from test_float_float import valued as valued_gas
@@ -189,7 +189,8 @@ def test_the_hand_table_rb_less_wti_both_legs_live() -> None:
     batch = booked()
     terms = batch.resolved
     assert terms.instrument is FLOAT_FLOAT and terms.descriptor == "RB-WTI"
-    assert terms.price_unit == PriceUnit("DOLLAR", "BBL")
+    assert terms.price_units == (PriceUnit("DOLLAR", "BBL"),)
+    assert terms.price_unit.tolist() == [0]  # the one unit, every row's
     rb, wti = batch.encoded.legs
     assert rb.quote_quantity.tolist() == [42_000.0]  # gallons, RB's own quote unit
     assert wti.quote_quantity.tolist() == [-1_000.0]  # barrels, WTI's, the subtracted leg
@@ -537,7 +538,7 @@ def test_a_gas_spread_typed_in_its_indexes_unit_is_the_first_slices_to_the_last_
     strip: dict[str, list[object]] = {**GAS_TICKET, "contract_code": ["G27-H27"]}
     for ticket in (GAS_TICKET, strip):
         batch = booked_gas(ticket=ticket)
-        assert batch.resolved.price_unit == PriceUnit("DOLLAR", "MMBTU")
+        assert batch.resolved.price_units == (PriceUnit("DOLLAR", "MMBTU"),)
         first = batch.encoded.legs[0]
         np.testing.assert_array_equal(
             batch.encoded.offset, -first.coefficient * batch.resolved.price
@@ -619,7 +620,8 @@ def test_the_spread_prices_unit_is_required_typed_and_one_for_the_batch() -> Non
     by_row = {k: v for k, v in CRACK.items() if k != "spread_price_quantity_unit"}
     two: dict[str, list[object]] = {k: [*v, *v] for k, v in TICKET.items()}
     agreed = booked(by_row, {**two, "spread_price_quantity_unit": ["BBL", "BBL"]})
-    assert agreed.resolved.price_unit == PriceUnit("DOLLAR", "BBL")
+    assert agreed.resolved.price_units == (PriceUnit("DOLLAR", "BBL"),)
+    assert agreed.resolved.price_unit.tolist() == [0, 0]
     assert agreed.encoded.offset.tolist() == [-15_000.0, -15_000.0]
     assert refused(by_row, {**two, "spread_price_quantity_unit": ["BBL", "GAL"]}) == (
         "spread_price_quantity_unit row 2 is 'GAL', expected 'BBL' as at row 1; a batch has one "
@@ -675,7 +677,7 @@ def test_electricity_against_heat_is_refused_and_two_heat_units_convert() -> Non
         "indexes quote in, MWH or KWH"
     )
     power = booked({**GAS_SPREAD, "spread_price_quantity_unit": "MWH"}, GAS_TICKET, (PJM, ERCOT))
-    assert power.resolved.price_unit == PriceUnit("DOLLAR", "MWH")
+    assert power.resolved.price_units == (PriceUnit("DOLLAR", "MWH"),)
     # Two units of heat are a conversion like any other: 10,000 MMBTU is 100,000 therms, at
     # 0.40 a therm 40,000, less A's 35,000, less 1,000 of spread price.
     therms = booked(GAS_SPREAD, GAS_TICKET, (NBP, A))
@@ -694,20 +696,24 @@ def test_a_quantity_unit_is_one_amount_on_both_indexes_in_the_spread_prices_unit
     assert refused({**CRACK, "quantity_unit": "GAL"}).startswith("quantity_unit is 'GAL', expected")
 
 
-def test_the_kernel_holds_a_price_unit_exactly_on_a_float_float() -> None:
-    spread_unit(True, PriceUnit("DOLLAR", "BBL"))
-    spread_unit(False, None)
+def test_the_kernel_holds_a_float_float_to_one_typed_price_unit() -> None:
+    # A spread price's unit is typed and one for the batch; a fixed_float's fixed price takes a
+    # unit a row since #273, or none, and this rule asks nothing of it.
+    barrel, gallon = PriceUnit("DOLLAR", "BBL"), PriceUnit("DOLLAR", "GAL")
+    spread_unit(True, (barrel,))
+    for units in (None, (barrel,), (barrel, gallon)):
+        spread_unit(False, units)
     with pytest.raises(ValueError) as missing:
         spread_unit(True, None)
     assert str(missing.value) == (
-        "price_unit is None, expected the spread price's currency unit and quantity unit with a "
+        "price_units is None, expected the spread price's currency unit and quantity unit with a "
         "float_float; a spread price's unit is typed, never taken from an index"
     )
-    with pytest.raises(ValueError) as extra:
-        spread_unit(False, PriceUnit("DOLLAR", "BBL"))
-    assert str(extra.value) == (
-        "price_unit is DOLLAR per BBL, expected none with a fixed_float; its price is in the unit "
-        "its indexes quote in"
+    with pytest.raises(ValueError) as several:
+        spread_unit(True, (barrel, gallon))
+    assert str(several.value) == (
+        "price_units are 2, expected one with a float_float; a spread price's unit is one for "
+        "the batch"
     )
 
 
@@ -877,5 +883,5 @@ def test_the_sheet_refuses_a_spread_price_with_no_unit_or_a_wrong_one(
         "fixed_float", across("route", "spread_price_currency_unit"), across("bilateral", "DOLLAR")
     ) == (
         "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', "
-        f"expected a field of fixed_float: {FIELDS.format(price='fixed_price')}"
+        f"expected a field of fixed_float: {FIXED_FIELDS}"
     )

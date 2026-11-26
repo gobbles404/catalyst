@@ -777,6 +777,8 @@ FIELDS = (
 SPREAD_FIELDS = FIELDS.format(
     price="spread_price, spread_price_currency_unit, spread_price_quantity_unit"
 )
+# A fixed_float's own list: its fixed price, and last, since #273, that price's unit.
+FIXED_FIELDS = FIELDS.format(price="fixed_price") + ", fixed_price_unit"
 TEMPLATE_FIELDS = (
     "spread_price_currency_unit",
     "spread_price_quantity_unit",
@@ -883,7 +885,7 @@ def test_the_sheet_refuses_what_a_spread_does_not_book(sheet: dict[str, Any]) ->
     )
     assert create(both, sheet["headers"], sheet["row"], the_sheet()["template"]) == (
         "#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of "
-        f"fixed_float: {FIELDS.format(price='fixed_price')}"
+        f"fixed_float: {FIXED_FIELDS}"
     )
     assert SEAM["_CreateTradeTemplate"](
         "float_float", across("route", "fixed_price"), across("bilateral", 3.0)
