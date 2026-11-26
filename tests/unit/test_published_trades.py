@@ -3,10 +3,12 @@
 leaving the day after its date, the stand-in, a month's roll, a strip settled month by month,
 the payment counted from the last publication date, and every field value the kind refuses."""
 
+import os
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from test_create_trades import seam_calendars, seam_key
 from test_trade_valuation import (
     ENTRY,
     NG_HEADERS,
@@ -24,6 +26,7 @@ from test_trade_valuation import (
 
 from catalyst.excel import bridge
 
+PID = os.getpid()  # leads every handle this Python publishes
 DIESEL = "DOE Diesel"
 # Weekly prints from the last of August to the end of December 2026, each dated its Monday and
 # counted toward the month the Monday falls in: August one here, September and October four,
@@ -139,8 +142,15 @@ def state(
     )
     history = str(ENTRY["_CreateMarketHistory"](calendar, fixings))
     market = a_market(history, DIESEL, *quotes)
+    if trades == "":
+        return market
     prepared = ENTRY["_PrepareTrades"](trades, history)
     return str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
+
+
+def market_on(diesel: dict[str, Any], as_of: str, quotes: tuple[float, ...]) -> str:
+    """The diesel market valued on that day over those quotes, with every published price."""
+    return state(diesel, "", as_of, quotes)
 
 
 def risk(results: str, bucket: str) -> list[list[object]]:
@@ -345,38 +355,178 @@ def test_a_field_value_a_published_index_does_not_take_is_refused_by_its_message
     assert booked(diesel, **changed) == f"#ERROR _CreateTrades: ValueError: {message}"
 
 
-# A part of a month, booked by two dates, waits for date windows; a month the schedule does not
-# list names no prints.
-def test_a_part_of_a_month_and_a_month_the_schedule_lacks_are_refused(
+# --- a part of a month: a window of dates -------------------------------------------------------
+
+DATED = ("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price")
+
+
+def by_dates(
+    diesel: dict[str, Any], start: str, end: str, price: float = 3.10, **changed: object
+) -> str:
+    """40,000 gallons booked from one date to another, a field of the template changed."""
+    line = [1001.0, serial("2026-08-20"), serial(start), serial(end), 40_000.0, price]
+    return booked(diesel, line, headers=DATED, **changed)
+
+
+# A window selects prints by their publication dates. The balance of September from the 16th
+# holds the prints dated the 21st and the 28th, an equal share each, and its dates stay put as
+# the valuation day advances: on the 22nd the 21st's print has fixed and the 28th's is live.
+def test_a_booked_balance_of_month_averages_the_prints_dated_in_its_window(
     diesel: dict[str, Any],
 ) -> None:
-    headers = ("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price")
-    dated = [
-        1001.0,
-        serial("2026-08-20"),
-        serial("2026-09-16"),
-        serial("2026-09-30"),
-        40_000.0,
-        3.1,
+    balance = by_dates(diesel, "2026-09-16", "2026-09-30")
+    assert by_header(balance, "payment_date") == [serial("2026-10-05")]
+    on_the_16th = state(diesel, balance, "2026-09-16", SEPTEMBER)
+    value, cash, delta = valued(on_the_16th)
+    assert value == pytest.approx(40_000.0 * (3.50 - 3.10)) and cash == 0.0
+    assert delta == pytest.approx(40_000.0)
+    assert risk(on_the_16th, "day")[4:] == [
+        [serial("2026-09-21"), 20_000.0],
+        [serial("2026-09-28"), 20_000.0],
     ]
-    assert booked(diesel, dated, headers=headers) == (
-        f"#ERROR _CreateTrades: ValueError: U26 of {TRADE} is covered from 2026-09-16 to "
-        "2026-09-30, part of its month, expected the whole month under asian; a published month "
-        "averages every print that counts toward it, and a part of a month is not built"
+    on_the_22nd = state(diesel, balance, "2026-09-22", SEPTEMBER)
+    value, _, delta = valued(on_the_22nd)
+    assert value == pytest.approx(40_000.0 * ((3.55 + 3.50) / 2 - 3.10))
+    assert delta == pytest.approx(20_000.0)
+    assert [line[0] for line in risk(on_the_22nd, "day")[4:]] == [
+        serial("2026-09-21"),
+        serial("2026-09-28"),
+    ]
+    # The whole month beside it holds all four prints: 8,000 against the balance's 16,000.
+    whole = valued(state(diesel, booked(diesel), "2026-09-16", SEPTEMBER))
+    assert whole[0] == pytest.approx(8_000.0) and whole[2] == pytest.approx(20_000.0)
+
+
+# A print dated before the window's first day is outside it: a window from Tuesday the 15th
+# leaves out Monday the 14th's print, live or fixed. A whole month typed as two dates holds the
+# prints dated in it, on this schedule the month's own four; test_published_windows.py has a
+# schedule where they differ. A window across a month end is a part of each month, each paid
+# from its own last print.
+def test_a_window_holds_the_prints_dated_in_it_and_splits_at_a_month_end(
+    diesel: dict[str, Any],
+) -> None:
+    from_tuesday = by_dates(diesel, "2026-09-15", "2026-09-30")
+    on_the_14th = state(diesel, from_tuesday, "2026-09-14", SEPTEMBER)
+    assert [line[0] for line in risk(on_the_14th, "day")[4:]] == [
+        serial("2026-09-21"),
+        serial("2026-09-28"),
+    ]
+    whole = by_dates(diesel, "2026-09-01", "2026-09-30")
+    assert valued(state(diesel, whole, "2026-09-16", SEPTEMBER))[0] == pytest.approx(8_000.0)
+    across = by_dates(diesel, "2026-09-16", "2026-10-15")
+    assert by_header(across, "booked_period") == ["U26", "V26"]
+    assert by_header(across, "payment_date") == [serial("2026-10-05"), serial("2026-10-19")]
+    results = state(diesel, across, "2026-09-16", SEPTEMBER)
+    assert [line[0] for line in risk(results, "day")[4:]] == [
+        serial("2026-09-21"),
+        serial("2026-09-28"),
+        serial("2026-10-05"),
+        serial("2026-10-12"),
+    ]
+
+
+# quantity_per sets the window's volume: 1,000 gallons a calendar day over the fifteen days
+# from the 16th to the 30th is 15,000, shared equally by the window's two prints.
+def test_a_calday_window_counts_its_own_days(diesel: dict[str, Any]) -> None:
+    daily = booked(
+        diesel,
+        [1001.0, serial("2026-08-20"), serial("2026-09-16"), serial("2026-09-30"), 1_000.0, 3.1],
+        headers=DATED,
+        quantity_per="calday",
     )
-    # The whole month typed as two dates is the month.
-    whole = [
-        1001.0,
-        serial("2026-08-20"),
-        serial("2026-09-01"),
-        serial("2026-09-30"),
-        40_000.0,
-        3.1,
-    ]
-    by_dates = booked(diesel, whole, headers=headers)
-    assert by_header(by_dates, "payment_date") == [serial("2026-10-05")]
+    assert by_header(daily, "covered_days") == [15.0]
+    assert by_header(daily, "component_quantity") == [15_000.0]
+    results = state(diesel, daily, "2026-09-16", SEPTEMBER)
+    assert [line[1] for line in risk(results, "day")[4:]] == [7_500.0, 7_500.0]
+
+
+# A window that holds no print prices on nothing, and a month the schedule does not list names
+# no prints.
+def test_a_window_with_no_print_and_a_month_the_schedule_lacks_are_refused(
+    diesel: dict[str, Any],
+) -> None:
+    assert by_dates(diesel, "2026-09-01", "2026-09-06") == (
+        f"#ERROR _CreateTrades: ValueError: U26 of {TRADE} has no print from 2026-09-01 to "
+        "2026-09-06, expected a print dated in the days it covers; a published index prices on "
+        "its prints alone"
+    )
     unlisted = booked(diesel, [1001.0, serial("2026-08-20"), "F27", 40_000.0, 3.1])
     assert unlisted.startswith("#ERROR _CreateTrades: ValueError:")
+
+
+# --- quotes: a quote and the same trade booked agree --------------------------------------------
+
+QUOTE_FIELDS = (
+    "route",
+    "settlement_method",
+    "schedule_method",
+    "quantity_per",
+    "payment_day",
+    "payment_holiday_key",
+    "settlement_frequency",
+    "nearby",
+)
+
+
+def a_quote_template(diesel: dict[str, Any], method: str = "asian") -> object:
+    values = ("cleared", "financial", method, "month", "+5bd", seam_key(diesel["pays"]))
+    return bridge.entry("_CreateQuoteTemplate")(
+        "fixed_float", row(*QUOTE_FIELDS), row(*values, "monthly", 1.0), seam_calendars()
+    )
+
+
+# The issue's worked example as quotes on Wednesday 16 September: the whole month at 3.30, the
+# balance of the month at 3.50, by a label and by two dates alike, under either pricing word on
+# a cleared quote. A trade booked at its quote is worth nothing on that market.
+def test_a_quote_and_the_same_trade_booked_agree(diesel: dict[str, Any]) -> None:
+    market = market_on(diesel, "2026-09-16", SEPTEMBER)
+    template = a_quote_template(diesel)
+    none = bridge.MISSING
+    for pricing in ("flat", "ftc"):
+        assert ENTRY["_Quote"](market, "U26", template, pricing, none) == pytest.approx(3.30)
+        assert ENTRY["_Quote"](market, "BALU26", template, pricing, none) == pytest.approx(3.50)
+        assert ENTRY["_QuoteByDates"](
+            market, serial("2026-09-16"), serial("2026-09-30"), template, pricing, none
+        ) == pytest.approx(3.50)
+        assert ENTRY["_QuoteByDates"](
+            market, serial("2026-09-01"), serial("2026-09-30"), template, pricing, none
+        ) == pytest.approx(3.30)
+    month = cast(float, ENTRY["_Quote"](market, "U26", template, "flat", none))
+    at_quote = booked(diesel, [1001.0, serial("2026-08-20"), "U26", 40_000.0, month])
+    assert valued(state(diesel, at_quote, "2026-09-16", SEPTEMBER))[0] == pytest.approx(
+        0.0, abs=1e-6
+    )
+    balance = cast(float, ENTRY["_Quote"](market, "BALU26", template, "flat", none))
+    booked_balance = by_dates(diesel, "2026-09-16", "2026-09-30", balance)
+    assert valued(state(diesel, booked_balance, "2026-09-16", SEPTEMBER))[0] == pytest.approx(
+        0.0, abs=1e-6
+    )
+    # A method other than asian is refused in a quote as in a batch.
+    assert ENTRY["_Quote"](market, "U26", a_quote_template(diesel, "lastday"), "flat", none) == (
+        "#ERROR _Quote: ValueError: schedule_method is 'lastday', expected 'asian' on a published "
+        "index; a published month is the average of its prints"
+    )
+
+
+# A saved request for quote over two months: its one price the months' averaged by quantity,
+# and its fit-to-curve prices each month's own price moved by one amount to the agreed price.
+def test_a_request_for_quote_prices_each_month_on_its_own_prints(diesel: dict[str, Any]) -> None:
+    market = market_on(diesel, "2026-09-16", SEPTEMBER)
+    rfq = ENTRY["_CreateRFQ"](
+        diesel["index"],
+        row("contract_code", "quantity"),
+        rows(["U26", 40_000.0], ["V26", 40_000.0]),
+        a_quote_template(diesel),
+    )
+    assert str(rfq).startswith(f"{PID}:rfq:{DIESEL}:")
+    for pricing in ("flat", "ftc"):
+        assert ENTRY["_QuoteRFQ"](market, rfq, pricing, bridge.MISSING) == pytest.approx(
+            (3.30 + 3.65) / 2
+        )
+    prices = spilled(ENTRY["_QuoteFTCPrices"](market, rfq, 3.50, 4.0))
+    numbers = [cell for line in prices for cell in line if isinstance(cell, float)]
+    assert any(cell == pytest.approx(3.325) for cell in numbers)  # September, moved by 0.025
+    assert any(cell == pytest.approx(3.675) for cell in numbers)  # October, by the same
 
 
 # A batch stands on the prints the history has: valued before the first print of its month is

@@ -1333,8 +1333,11 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
     # 811,252 at 2,500 rows; since nearby-selection.md 332, each row's nearby held as one whole
     # number of eight bytes, 829,917 at 2,500 rows; since payment-calendar-keys.md 340, each
     # row's payment calendar key kept to be read back, one reference of eight bytes a row as
-    # every label is: 829,418 before and 850,058 after at 2,500 rows on 2026-11-21.
-    assert peak <= 340 * rows + 2 * SLACK
+    # every label is: 829,418 before and 850,058 after at 2,500 rows on 2026-11-21; and 341, a
+    # one-byte mask a component, which were entered as two dates and not as a code, held while
+    # the batch is made for a published index to select its prints by: 852,580 at 2,500 rows
+    # on 2026-11-24.
+    assert peak <= 341 * rows + 2 * SLACK
 
 
 # A key of two names makes its union and keeps nothing of it, holiday-keys.md: a date shifted

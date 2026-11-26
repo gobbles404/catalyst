@@ -124,6 +124,7 @@ def observed(
     named: Callable[[int], str],
     field: str = "schedule_method",
     booked: Callable[[int], str] | None = None,
+    dated: NDArray[np.bool_] | None = None,
 ) -> Observations:
     """The observations the schedule methods give a batch's components, each component's method
     its occurrence's, a position among METHODS, each component a row of the index's futures
@@ -162,7 +163,15 @@ def observed(
     whichever the calendar gives under asian. The method is the resolution's to read before any
     payment is counted, so that a payment day counts from the component's last observation;
     a refusal names the field it came from, schedule_method or since two-index-fixed-float.md
-    a second leg's second_schedule_method."""
+    a second leg's second_schedule_method.
+
+    `dated` says which components were entered as two dates, one flag per component or one
+    for them all, and none when every component was entered as a contract code. It is read on
+    a published index alone, where the two differ: a code selects the prints whose rows name
+    its month, whatever their dates, and two dates select the prints dated from the first to
+    the last, whatever month their rows name, a window that fills a calendar month as much as
+    a part of one. The caller says which, from how the row or the quote was entered; it is
+    never read off the component's days."""
     schedule = trade_schedule_of(index)
     count = contract.size
     if method.size != count:
@@ -188,10 +197,13 @@ def observed(
                 count,
             )
         case PublishedSchedule():
-            # Every print that counts toward the component's month, an equal share each: the
-            # month's prints are the schedule's rows on its contract, one run, found by two
-            # searches of the column that says each print's month, so no date is compared and
-            # no calendar read. asian alone, and the whole month.
+            # The prints a component covers, an equal share each, asian alone and no calendar
+            # read. A component entered as a contract code takes the prints that count toward
+            # its month, the schedule's rows on its contract, one run found by two searches of
+            # the column that says each print's month, so no date is compared. One entered as
+            # two dates is a window: the prints dated from its first day to its last, two
+            # searches of the schedule's dates, each print pricing off the month its own row
+            # names. A window holding no print is refused.
             averaged = supported_on_published(method)
             if not averaged.all():
                 k = int((~averaged).argmax())
@@ -200,9 +212,15 @@ def observed(
                     "expected 'asian' on a published index; a published month is the average "
                     "of its prints"
                 )
-            _whole_months(schedule, contract, start, end, method, averaged, named, PUBLISHED_WHOLE)
-            first = np.searchsorted(schedule.contract, contract, side="left")
-            prints = np.searchsorted(schedule.contract, contract, side="right") - first
+            first, prints = _the_prints(schedule, contract, start, end, dated)
+            if (prints == 0).any():
+                k = int((prints == 0).argmax())
+                label = schedule.codes[int(contract[k])] if booked is None else booked(k)
+                raise ValueError(
+                    f"{label} of {named(k)} has no print from {start[k]} to {end[k]}, expected "
+                    "a print dated in the days it covers; a published index prices on its "
+                    "prints alone"
+                )
             total = int(prints.sum())
             place = np.arange(total) - np.repeat(np.cumsum(prints) - prints, prints)
             place += np.repeat(first, prints)
@@ -313,10 +331,31 @@ FUTURES_WHOLE = (
     "the expiry-based methods take the contract's month entire, and a part of it prices under asian"
 )
 IFERC_WHOLE = "an IFERC month's index is one price for the whole month"
-PUBLISHED_WHOLE = (
-    "a published month averages every print that counts toward it, and a part of a month is "
-    "not built"
-)
+
+
+def _the_prints(
+    schedule: PublishedSchedule,
+    contract: NDArray[np.intp],
+    start: NDArray[np.datetime64],
+    end: NDArray[np.datetime64],
+    dated: NDArray[np.bool_] | None,
+) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
+    """The run of prints each component covers on a published schedule: the row of its first
+    print and how many follow, none where it covers no print. A component entered as a
+    contract code takes the prints that count toward its contract, by the code on their rows
+    and whatever their dates; one entered as two dates, `dated`, takes the prints dated from
+    its first day to its last, whatever month their rows name. Which it is, is the caller's
+    to say and never read off the days, since a month chosen by code and the same month typed
+    as dates are different prints wherever a schedule counts a print toward a month its date
+    is not in. Two searches of the column that says each print's month, and where any
+    component is dated two of the dates and one choice."""
+    first = np.searchsorted(schedule.contract, contract, side="left")
+    last = np.searchsorted(schedule.contract, contract, side="right")
+    if dated is not None and dated.any():
+        dates = schedule.publication_date
+        first = np.where(dated, np.searchsorted(dates, start, side="left"), first)
+        last = np.where(dated, np.searchsorted(dates, end, side="right"), last)
+    return first, last - first
 
 
 def _whole_months(

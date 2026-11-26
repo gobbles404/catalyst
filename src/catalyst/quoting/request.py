@@ -383,19 +383,32 @@ def the_curve(
             assert_never(terms.route)
 
 
+def _the_published_terms(terms: Terms) -> None:
+    """The terms a published index takes, the batch's rules in a quote's words: a financial
+    settlement, nothing being delivered against a published price, and the asian method, a
+    month being the average of its prints."""
+    if terms.settlement is Settlement.PHYSICAL:
+        raise ValueError(
+            "settlement_method is 'physical', expected 'financial' on a published index; "
+            "nothing is delivered against a published price"
+        )
+    if terms.method is not ScheduleMethod.ASIAN:
+        raise ValueError(
+            f"schedule_method is {terms.method.value!r}, expected 'asian' on a published "
+            "index; a published month is the average of its prints"
+        )
+
+
 def the_method(terms: Terms, schedule: TradeSchedule) -> None:
     """The terms against the index's kind, the batch's rules: on an IFERC index a financial
     settlement and lastday, the month's index being published once; on a futures index a physical
     settlement with lastday alone, the other three methods settling on a price other than the
-    expiry's settle. A published index books and values trades and is not quoted yet, so it is
-    refused here by name, before any of its prints is read."""
+    expiry's settle; on a published index a financial settlement and asian, a month being the
+    average of its prints."""
     method = terms.method
     match schedule:
         case PublishedSchedule():
-            raise ValueError(
-                "index is a published index, expected a futures or an IFERC index for a quote; "
-                "a quote on a published index is not built"
-            )
+            _the_published_terms(terms)
         case IfercSchedule():
             if terms.settlement is Settlement.PHYSICAL:
                 raise ValueError(
@@ -431,6 +444,10 @@ def the_method(terms: Terms, schedule: TradeSchedule) -> None:
 
 
 # --- the period and the request -------------------------------------------------------------
+
+# A quote is by code or by dates as a whole: one flag, read for every component.
+_EVERY_COMPONENT: Final = np.ones(1, dtype=np.bool_)
+_EVERY_COMPONENT.setflags(write=False)
 
 
 def the_period(
@@ -482,11 +499,14 @@ def the_request(
     terms: Terms,
     period: Period,
     counter: WorkCounter,
+    dated: bool,
 ) -> Request:
     """A quote's request from its resolved period, the steps a label and two dates share: the
     observations by the template's method over each component's days, a window's over the whole
-    of it, the quote named in a refusal and a component by what it is booked under, its code or
-    `the window`; each observation's pricing reference by the pipeline's rules, a component named
+    of it, `dated` saying whether the period is a window of dates, two dates or the balance of
+    a label, or the months a label names, which a published index selects its prints by, the
+    quote named in a refusal and a component by what it is booked under, its code or `the
+    window`; each observation's pricing reference by the pipeline's rules, a component named
     by its code or its two dates; each component's quantity, one or its calendar days; and a
     financial quote's payment days from the template, after each component's last observation.
     Work: the observations made, and the payments' as the_payments reports it."""
@@ -508,6 +528,7 @@ def the_request(
         period.last,
         lambda _: "the quote",
         booked=booked,
+        dated=_EVERY_COMPONENT if dated else None,
     )
     counter.hit(OBSERVATIONS_MADE, observations.component.size)
     references = observation_references(

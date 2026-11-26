@@ -18,7 +18,7 @@ from collections.abc import Callable
 import numpy as np
 
 from catalyst.globals.discount_curve_set import DiscountCurveSet
-from catalyst.index_definitions.periods import end_date, start_date
+from catalyst.index_definitions.periods import balance_of, end_date, start_date
 from catalyst.instrumentation.work_counts import WorkCounter
 from catalyst.market.market import Market
 from catalyst.quoting.request import (
@@ -77,6 +77,7 @@ def quote(
         lambda as_of: _the_span(contract_code, as_of),
         lambda: f"contract_code is {contract_code!r}",
         counter,
+        dated=balance_of(contract_code) is not None,
     )
 
 
@@ -115,6 +116,7 @@ def quote_by_dates(
         lambda _: _the_dates(start, end),
         lambda: f"start_date is {start} and end_date {end}",
         counter,
+        dated=True,
     )
 
 
@@ -126,10 +128,14 @@ def _priced(
     span: Callable[[np.datetime64], Span],
     period_of: Callable[[], str],
     counter: WorkCounter,
+    dated: bool,
 ) -> float:
     """The steps a label and two dates share once the pricing and the terms are read: the
     frequency's rules, the curve, the index's kind, the span read with the valuation day,
-    resolved under the frequency and priced under the pricing."""
+    resolved under the frequency and priced under the pricing. `dated` says the span is a
+    window of dates, two dates or the balance of a label, which runs from the valuation day,
+    and not the months a label names: on a published index a window takes the prints dated
+    in it and a label the prints whose rows name its months."""
     calendar = market.market_history.calendar
     index = calendar.index
     as_of = calendar.valuation_date.as_of
@@ -140,7 +146,7 @@ def _priced(
     the_method(terms, schedule)
     first_day, last_day = span(as_of)
     period = the_period(first_day, last_day, terms.frequency, schedule, period_of, counter)
-    request = the_request(index, schedule, terms, period, counter)
+    request = the_request(index, schedule, terms, period, counter, dated)
     return priced(request, market, curve, pricing, counter)
 
 

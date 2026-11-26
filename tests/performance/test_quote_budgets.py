@@ -294,7 +294,9 @@ LEDGER = {
     "_the_span": 1,
     "start_date": 1,  # the two readers the date utilities use, balance-of-period-quotes.md
     "end_date": 1,
-    "balance_of": 2,  # each reader looks for the prefix
+    # Each reader looks for the prefix, and the quote once, for whether its period is the
+    # balance of a label, a window of dates, which a published index selects its prints by.
+    "balance_of": 3,
     "period_months": 2,  # and reads the label
     "_period_months": 2,
     "_label_months": 2,
