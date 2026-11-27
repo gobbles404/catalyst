@@ -131,18 +131,13 @@ class PriceUnit:
     """The unit a batch's one price is in: the currency unit and the quantity unit it is per, two
     codes of the unit tables as entered, DOLLAR and BBL for dollars a barrel. A float_float's
     spread price's, since float-float-units.md, typed on the batch and never taken from an index;
-    and since #273 a fixed_float's fixed price's, each row's own, typed as one text, `DOLLAR/MT`,
-    or the index's quote unit where the batch types none. Held as given by the terms; the
-    encoding, which has the tables, reads the two codes for their meaning once."""
+    and since #273 a fixed_float's fixed price's, each row's own, typed as two fields as a
+    spread price's is, or the index's quote unit where the batch types neither. Held as given
+    by the terms; the encoding, which has the tables, reads the two codes for their meaning
+    once."""
 
     currency_unit: str
     quantity_unit: str
-
-    @property
-    def code(self) -> str:
-        """The unit as the sheet spells it, the currency unit over the quantity unit:
-        `DOLLAR/MT`."""
-        return f"{self.currency_unit}/{self.quantity_unit}"
 
 
 @dataclass(frozen=True, slots=True)

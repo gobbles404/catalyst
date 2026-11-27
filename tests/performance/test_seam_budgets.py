@@ -2333,11 +2333,11 @@ def test_the_shown_instrument_is_laid_out_once_per_cell(
         "_ShowInstrument": 1,
         "instrument": 1,
         "schema_cells": 1,
-        # ten rows of twenty-four fields and the labels, the fixed price's unit the last
-        # since #273: 240 of each before it
-        "schema_cells.<locals>.<genexpr>": 250,
+        # ten rows of twenty-five fields and the labels, the fixed price's two unit fields
+        # the last since #273: 240 of each before them
+        "schema_cells.<locals>.<genexpr>": 260,
         "MixedArray.cells": 1,
-        "_classify": 250,
+        "_classify": 260,
         "_mixed_out": 1,
         "_bad_mixed": 1,
     }

@@ -49,7 +49,7 @@ NAMES = "'fixed_float', 'float_float', 'cashflow'"
 # --- the definitions ------------------------------------------------------------------------
 
 
-def test_the_catalog_holds_the_fixed_float_with_its_twenty_four_fields_in_order() -> None:
+def test_the_catalog_holds_the_fixed_float_with_its_twenty_five_fields_in_order() -> None:
     assert [each.name for each in CATALOG] == ["fixed_float", "float_float", "cashflow"]
     assert FIELDS == (
         "trade_id",
@@ -75,16 +75,20 @@ def test_the_catalog_holds_the_fixed_float_with_its_twenty_four_fields_in_order(
         "cva_reserve",
         "settlement_frequency",
         "nearby",
-        "fixed_price_unit",
+        "fixed_price_currency_unit",
+        "fixed_price_quantity_unit",
     )
     by_name = {field.name: field for field in FIXED_FLOAT.fields}
-    # Since #273 the unit of the fixed price, last so that no field before it moves: optional,
-    # a code, a booking's alone, and no cell of it may be left unsupplied, so a ticket column
-    # holds a unit on every row.
-    unit = by_name["fixed_price_unit"]
-    assert (unit.required, unit.required_when, unit.type) == (False, NONE, FieldType.CODE)
-    assert not unit.quote_allowed and not unit.may_be_unsupplied
-    assert "fixed_price_unit" in by_name["fixed_price"].rule
+    # Since #273 the unit of the fixed price, last so that no field before it moves, two fields
+    # as a spread price's is: each optional, a code, a booking's alone, and no cell of either
+    # may be left unsupplied, so a ticket column holds a code on every row.
+    for name in FIELDS[-2:]:
+        unit = by_name[name]
+        assert (unit.required, unit.required_when, unit.type) == (False, NONE, FieldType.CODE)
+        assert not unit.quote_allowed and not unit.may_be_unsupplied
+        assert name in by_name["fixed_price"].rule
+    assert by_name["fixed_price_currency_unit"].options == "DOLLAR, CENT"
+    assert "fixed_price_unit" not in by_name  # one cell with a slash, cut over
     assert [field.name for field in FIXED_FLOAT.fields if field.required] == [
         "trade_date",
         "schedule_method",
@@ -135,7 +139,8 @@ def test_the_catalog_holds_the_fixed_float_with_its_twenty_four_fields_in_order(
         "settlement_method",
         "quantity_per",
         "settlement_frequency",
-        "fixed_price_unit",
+        "fixed_price_currency_unit",
+        "fixed_price_quantity_unit",
     }
     assert by_name["quantity_unit"].type is FieldType.TEXT
     assert by_name["quantity_unit"].options == "the index's specification names"
@@ -146,14 +151,13 @@ def test_the_float_float_is_the_fixed_float_with_a_spread_price_and_both_methods
     # float-float-spread.md: a fixed_float's fields in its order, spread_price where fixed_price
     # stood, the second index's method always required, and no part in a quote; since
     # float-float-units.md the spread price's two units after it, typed on every float_float;
-    # the fixed price's own unit, since #273, is no field of a spread.
+    # the fixed price's own two units, since #273, are no fields of a spread.
     names = tuple([field.name for field in FLOAT_FLOAT.fields])
     units = ("spread_price_currency_unit", "spread_price_quantity_unit")
     assert names == tuple(
         [
             mine
-            for name in FIELDS
-            if name != "fixed_price_unit"
+            for name in FIELDS[:-2]
             for mine in (("spread_price", *units) if name == "fixed_price" else (name,))
         ]
     )
@@ -396,10 +400,10 @@ def test_a_one_field_definition_shows_ten_rows_and_two_columns() -> None:
 
 def test_the_show_spills_ten_rows_and_a_column_per_field() -> None:
     shown = _ShowInstrument("fixed_float")
-    assert shown.shape == (10, 25)
-    labels = (0, 25, 50, 51, 76, 101, 126, 151, 152, 153)  # column one, among the texts
+    assert shown.shape == (10, 26)
+    labels = (0, 26, 52, 53, 79, 105, 131, 157, 158, 159)  # column one, among the texts
     assert tuple([shown.texts[i] for i in labels]) == ROWS
-    assert shown.texts[:25] == ("field", *FIELDS)
+    assert shown.texts[:26] == ("field", *FIELDS)
     # The required row and, since template-based-quoting.md, the two quote rows of booleans
     # after their labels: what a quote template may hold and what a quote always requires.
     for row, fact in ((2, "required"), (7, "quote_allowed"), (8, "quote_required")):
@@ -411,12 +415,12 @@ def test_the_show_spills_ten_rows_and_a_column_per_field() -> None:
         )
     other_rows = np.delete(shown.kinds, (2, 7, 8), axis=0)
     assert (other_rows == TEXT_CODE).all()
-    assert len(shown.texts) == 10 * 25 - 3 * 24
+    assert len(shown.texts) == 10 * 26 - 3 * 25
     assert "" not in shown.texts
 
 
 @pytest.mark.parametrize(
-    ("definition", "columns"), [(FIXED_FLOAT, 25), (FLOAT_FLOAT, 26), (CASHFLOW, 9)]
+    ("definition", "columns"), [(FIXED_FLOAT, 26), (FLOAT_FLOAT, 26), (CASHFLOW, 9)]
 )
 def test_the_show_page_shows_the_same_cells_as_the_spill(
     definition: Instrument, columns: int
@@ -445,7 +449,7 @@ def test_the_two_functions_through_the_seam_and_their_errors() -> None:
     assert kinds.shape == (4, 2)
     assert text.split("\0")[2::2] == ["fixed_float", "float_float", "cashflow"]
     kinds, slots, text = spilled(ENTRY["_ShowInstrument"]("fixed_float"))
-    assert kinds.shape == (10, 25) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
+    assert kinds.shape == (10, 26) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
     assert slots[7, 6] == 1.0 and slots[8, 6] == 1.0 and slots[7, 1] == 0.0
     assert ENTRY["_ShowInstrument"]("Future") == (
         "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: "

@@ -798,9 +798,9 @@ def _the_fixed_coefficient(
         unit = terms.price_units[int(priced_in[k])]
         raise ValueError(
             f"{terms.named(k)} has {float(coefficient[k])!r} of fixed coefficient, expected a "
-            f"finite amount of {conventions.currency_unit} per {unit.code}; its count times its "
-            "specification's size in the fixed price's unit and the currency factor outruns the "
-            "largest number"
+            f"finite amount of {conventions.currency_unit} per {unit.currency_unit}/"
+            f"{unit.quantity_unit}; its count times its specification's size in the fixed "
+            "price's unit and the currency factor outruns the largest number"
         )
     return coefficient
 
@@ -809,36 +809,37 @@ def _the_fixed_unit(
     terms: ResolvedTrades, unit: PriceUnit, row: int, units: UnitConversions
 ) -> None:
     """A fixed price's unit read for its meaning against the unit tables, since #273, the first
-    failure being the message, named by the unit's first row and its trade: the currency unit
-    a unit of the tables' currency category, DOLLAR or CENT and never the currency's own name;
-    the quantity unit a unit of the first index's quantity type, so a barrel under a mass index
-    is refused, a price across two measures needing a density the tables do not carry, and so
-    is the desk's word for a specification, a lot being a quantity and no unit a price is per;
-    and of heat or of electricity as the index quotes in, ELECTRICITY, since a megawatt hour is
-    3.412 MMBTU as energy while a price of power against fuel is struck at a heat rate. Each
-    code is matched exactly, never trimmed or re-cased."""
+    failure being the message, named by its own field, the unit's first row and its trade: the
+    currency unit a unit of the tables' currency category, DOLLAR or CENT and never the
+    currency's own name; the quantity unit a unit of the first index's quantity type, so a
+    barrel under a mass index is refused, a price across two measures needing a density the
+    tables do not carry, and so is the desk's word for a specification, a lot being a quantity
+    and no unit a price is per; and of heat or of electricity as the index quotes in,
+    ELECTRICITY, since a megawatt hour is 3.412 MMBTU as energy while a price of power against
+    fuel is struck at a heat rate. Each code is matched exactly, never trimmed or re-cased."""
     conventions = terms.legs[0].index.conventions
 
-    def refused(expected: str) -> ValueError:
+    def refused(field: str, code: str, expected: str) -> ValueError:
         """The refusal, its trade named only when its unit is refused."""
         return ValueError(
-            f"fixed_price_unit of {named_trade(terms.trade_ids, row)} is {unit.code!r}, "
-            f"expected {expected}"
+            f"{field} of {named_trade(terms.trade_ids, row)} is {code!r}, expected {expected}"
         )
 
     money = units.categories[CURRENCY].sizes
     if unit.currency_unit not in money:
-        raise refused(f"{listed(money)} before the /")
+        raise refused("fixed_price_currency_unit", unit.currency_unit, listed(money))
     measure = units.categories[conventions.quantity_type].sizes
+    per = "fixed_price_quantity_unit", unit.quantity_unit
     if unit.quantity_unit not in measure:
-        raise refused(f"{a_unit_of(conventions.quantity_type, measure)}, after the /")
+        raise refused(*per, a_unit_of(conventions.quantity_type, measure))
     electric = conventions.quote_quantity_unit in ELECTRICITY
     if (unit.quantity_unit in ELECTRICITY) != electric:
         side = [each for each in measure if (each in ELECTRICITY) == electric]
         raise refused(
-            f"a unit of {'electricity' if electric else 'heat'} after the /, as the index "
-            f"quotes in, {listed(side)}; a price of power against fuel is struck at a heat "
-            "rate, which is not built"
+            *per,
+            f"a unit of {'electricity' if electric else 'heat'} as the index quotes in, "
+            f"{listed(side)}; a price of power against fuel is struck at a heat rate, which "
+            "is not built",
         )
 
 
