@@ -313,7 +313,8 @@ REFUSED: list[tuple[str, object]] = [
     ("fixed_price", 3.0),
     ("marketing_reserve", 0.0),
     ("cva_reserve", -25.0),
-    ("fixed_price_unit", "DOLLAR/MT"),  # a booked price's unit, since #273; a quote books none
+    ("fixed_price_currency_unit", "DOLLAR"),  # a booked price's unit, since #273, which a
+    ("fixed_price_quantity_unit", "MT"),  # quote books none of
 ]
 
 

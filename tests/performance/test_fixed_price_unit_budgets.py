@@ -2,13 +2,14 @@
 with no unit typed, at 24 rows over two contracts and at 2,000 over twenty-four. A batch priced
 in the unit its index quotes in, the unit typed on every row, is encoded by the functions and
 the numpy calls of a batch that types none: the first leg's coefficient is handed back and
-nothing is converted again. A batch that mixes units reads each distinct unit once and makes one
+nothing is converted again. A batch that mixes units pairs its two unit fields in one pass,
+whichever of the template and the ticket holds each, reads each distinct pair once and makes one
 size per distinct unit and specification its rows select and one currency factor per unit, a
 handful of numbers whatever the rows, then one product over the components. Preparing and
 valuing either batch runs the same functions and the same numpy calls as the batch that types
-none, and no conversion among them. Reading a batch back shows each row's unit in one column
-more, each distinct unit spelled once. The index is a premium quoted in dollars a pound, with
-a lot of 55,116 pounds, a pound and a tonne."""
+none, and no conversion among them. Reading a batch back shows each row's unit in two columns
+more, the two fields. The index is a premium quoted in dollars a pound, with a lot of 55,116
+pounds, a pound and a tonne."""
 
 from collections.abc import Callable
 
@@ -70,23 +71,32 @@ PREMIUM = index_on(
     UNITS,
 )
 WORDS = ("lot", "lb", "mt")
-# The index's own unit and three others: four distinct units, and with three specifications
-# twelve distinct pairs of a unit and a specification once the rows have gone round both.
-MIXED = ("DOLLAR/LB", "DOLLAR/MT", "CENT/LB", "CENT/KG")
-OWN = ("DOLLAR/LB",)
+# A unit as the two fields hold it: the currency unit and the quantity unit a price is per.
+Unit = tuple[str, str]
+MONEY, PER = "fixed_price_currency_unit", "fixed_price_quantity_unit"
+# The index's own unit and three others: four distinct units, of the six their two currency
+# units and three quantity units could make, and with three specifications twelve distinct
+# pairs of a unit and a specification once the rows have gone round both.
+MIXED: tuple[Unit, ...] = (("DOLLAR", "LB"), ("DOLLAR", "MT"), ("CENT", "LB"), ("CENT", "KG"))
+OWN: tuple[Unit, ...] = (("DOLLAR", "LB"),)
 
 
-def a_template() -> TradeTemplate:
+def a_template(**more: str) -> TradeTemplate:
     """The creation budgets' template, cleared and financial, less the quantity unit, which
-    each row supplies."""
-    return trade_template(
-        one_row({k: v for k, v in TEMPLATE_FIELDS.items() if k != "quantity_unit"})
-    )
+    each row supplies, and with whatever more is given."""
+    fields = {k: v for k, v in TEMPLATE_FIELDS.items() if k != "quantity_unit"}
+    return trade_template(one_row({**fields, **more}))
 
 
-def a_ticket(rows: int, contracts: int, units: tuple[str, ...] | None) -> FieldValues:
+def a_ticket(
+    rows: int,
+    contracts: int,
+    units: tuple[Unit, ...] | None,
+    fields: tuple[str, ...] = (MONEY, PER),
+) -> FieldValues:
     """That many single-month rows, each in its own quantity word, the three in turn, and each
-    priced in the next of the units given, or in none where none is given."""
+    priced in the next of the units given, or in none where none is given; of a unit's two
+    fields the ticket holds those named, both unless a template holds one."""
     on = contract_rows(rows, contracts)
     columns: dict[str, object] = {
         "trade_date": np.repeat(np.datetime64("2026-09-24", "D"), rows),
@@ -96,12 +106,14 @@ def a_ticket(rows: int, contracts: int, units: tuple[str, ...] | None) -> FieldV
         "fixed_price": 0.90 + (np.arange(rows) % 7) / 100,
     }
     if units is not None:
-        columns["fixed_price_unit"] = tuple(units[i % len(units)] for i in range(rows))
+        for at, name in enumerate((MONEY, PER)):
+            if name in fields:
+                columns[name] = tuple(units[i % len(units)][at] for i in range(rows))
     return FieldValues(FIXED_FLOAT, rows, tuple(columns), columns)
 
 
 def terms_of(
-    rows: int, contracts: int, units: tuple[str, ...] | None
+    rows: int, contracts: int, units: tuple[Unit, ...] | None
 ) -> tuple[ResolvedTrades, tuple[Observations, ...]]:
     terms, observations, _ = resolved(
         (PREMIUM,), a_ticket(rows, contracts, units), a_template(), WorkCounter(), CALENDARS
@@ -251,13 +263,14 @@ def test_preparing_and_valuing_convert_nothing_whatever_unit_the_prices_are_in(
 
 def test_a_unit_on_every_row_costs_its_columns_read_and_nothing_per_row_beyond() -> None:
     # Creating 2,000 rows, the peak over a batch that types no unit: eight bytes a row, the
-    # places of the rows among the distinct units as the column's read found them, held while
-    # the kernel copies them, where the default makes its places once. Measured on 2026-11-26:
-    # 664,812 with no unit typed, 681,144 with the index's unit on every row and 681,656 with
-    # four units mixed, whose coefficient is made and dropped under that peak.
+    # places of the rows among the distinct units as the two columns' read found them, held
+    # while the kernel copies them, where the default makes its places once. Measured on
+    # 2026-11-27: 665,118 with no unit typed, 681,491 with the index's unit on every row and
+    # 681,850 with four units mixed, whose coefficient is made and dropped under that peak, as
+    # the two columns' texts side by side are, read and dropped before it.
     rows, contracts = 2_000, 24
 
-    def made(units: tuple[str, ...] | None) -> Callable[[], object]:
+    def made(units: tuple[Unit, ...] | None) -> Callable[[], object]:
         ticket, template = a_ticket(rows, contracts, units), a_template()
         return lambda: trades((PREMIUM,), ticket, template, UNITS, WorkCounter(), CALENDARS)
 
@@ -267,61 +280,85 @@ def test_a_unit_on_every_row_costs_its_columns_read_and_nothing_per_row_beyond()
 
 
 @pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
-def test_the_resolution_reads_each_distinct_unit_once_and_nothing_per_row(
+def test_the_resolution_pairs_the_two_fields_in_one_pass_and_nothing_per_row(
     call_profile: CallProfile, numpy_calls: CallProfile, rows: int, contracts: int
 ) -> None:
     template = a_template()
     plain = a_ticket(rows, contracts, None)
 
-    def over(units: tuple[str, ...], profile: CallProfile) -> dict[str, int]:
-        ticket = a_ticket(rows, contracts, units)
+    def over(units: tuple[Unit, ...], profile: CallProfile, split: bool = False) -> dict[str, int]:
+        """What resolving the units costs over the ticket that types none: both fields down
+        the ticket, or split, the money on the template and the rest down the ticket."""
+        ticket = a_ticket(rows, contracts, units, (PER,) if split else (MONEY, PER))
+        shared = a_template(**{MONEY: units[0][0]}) if split else template
         return more(
-            profile(lambda: resolved((PREMIUM,), ticket, template, WorkCounter(), CALENDARS)),
+            profile(lambda: resolved((PREMIUM,), ticket, shared, WorkCounter(), CALENDARS)),
             profile(lambda: resolved((PREMIUM,), plain, template, WorkCounter(), CALENDARS)),
         )
 
-    # The column read once, its distinct texts read for their form once each and named by their
-    # first rows, and the rows' places checked in range and copied; one text or four.
+    # The two columns read once each and no text of either read for a form, there being none:
+    # the pairs found and the rows' places checked in range and copied; one pair or four.
     for units in (OWN, MIXED):
         assert over(units, call_profile) == {
-            "FieldValues.texts": 1,
-            "_Fields.texts": 1,
-            "_each_distinct": 1,
-            "_distinct_texts": 1,
-            "_each_distinct.<locals>.<lambda>": len(units),
-            "_Fields.where": len(units),
-            "price_unit_of": len(units),
+            "FieldValues.texts": 2,
+            "_Fields.texts": 2,
             "_the_choices": 1,
             "_frozen_rows": 1,
         }
-        # One unique over the column and one look that every place is in range; no zeros, the
-        # places being the read's own.
-        assert over(units, numpy_calls) == {
-            "ndarray.any": 1,
-            "ndarray.argsort": 2,
-            "ndarray.astype": 1,
-            "ndarray.cumsum": 1,
-            "ndarray.flatten": 1,
-            "ndarray.reshape": 1,
-            "numpy.array": 2,
-            "numpy.asanyarray": 2,
-            "numpy.empty": 2,
-            "numpy.zeros": -1,
-            "ufunc.reduce": 1,
-        }
+        # One unique over the two columns side by side, whose rows are the pairs, and one look
+        # that every place is in range; no zeros, the places being the read's own.
+        assert over(units, numpy_calls) == PAIRED_NUMPY
+    # The money on the template: one column read from the ticket and the template's one value
+    # repeated down the rows, which asks the ticket for its row count; one question fewer of
+    # the ticket, whether it holds the field the template does. The same numpy.
+    assert over(OWN, call_profile, split=True) == {
+        "FieldValues.has": -1,
+        "FieldValues.texts": 1,
+        "_Fields.rows": 1,
+        "_Fields.texts": 2,
+        "_the_choices": 1,
+        "_frozen_rows": 1,
+    }
+    assert over(OWN, numpy_calls, split=True) == PAIRED_NUMPY
+
+
+# The numpy of pairing the two fields, the same at both sizes and for one pair or four, over a
+# ticket that types no unit: the two columns laid side by side in one array, numpy's unique
+# over its rows, which views each row as one record, sorts once and marks where the record
+# changes, and the kernel's look that every place is in range.
+PAIRED_NUMPY = {
+    "ndarray.any": 1,
+    "ndarray.argsort": 1,
+    "ndarray.astype": 1,
+    "ndarray.cumsum": 1,
+    "ndarray.flatten": 1,
+    "ndarray.reshape": 2,
+    "ndarray.tolist": 1,  # the distinct pairs, a handful
+    "ndarray.transpose": 2,
+    "ndarray.view": 2,
+    "numpy._is_view_safe_cast": 2,
+    "numpy.array": 2,
+    "numpy.asanyarray": 2,
+    "numpy.ascontiguousarray": 1,
+    "numpy.empty": 2,
+    "numpy.normalize_axis_index": 4,
+    "numpy.promote_types": 2,
+    "numpy.zeros": -1,
+    "ufunc.reduce": 2,
+}
 
 
 # --- the readback ---------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
-def test_the_readback_spells_each_distinct_unit_once_in_one_column_more(
+def test_the_readback_shows_each_rows_unit_in_two_columns_more(
     call_profile: CallProfile, numpy_calls: CallProfile, rows: int, contracts: int
 ) -> None:
-    # Measured against the readback before the column, the same batch at both sizes: one text
-    # column more, the helper that adds a column called 11 times where it was called 10, one
-    # array more, the distinct units' codes, where there were 7, and each distinct unit spelled
-    # once, whatever the rows. Nothing else moved.
+    # Measured against the readback before the unit was shown, the same batch at both sizes:
+    # two text columns more, the helper that adds a column called 12 times where it was called
+    # 10, and two arrays more, the distinct units' codes of each field, where there were 7. One
+    # unit or four, the same functions and the same numpy. Nothing else moved.
     batches = [
         trades(
             (PREMIUM,),
@@ -334,20 +371,22 @@ def test_the_readback_spells_each_distinct_unit_once_in_one_column_more(
         for units in (None, OWN, MIXED)
     ]
     omitted, typed, mixed = (call_profile(lambda b=batch: shown(b)) for batch in batches)
-    assert omitted == typed
-    assert more(mixed, omitted) == {"PriceUnit.code": 3}  # four units where there was one
-    assert (omitted["PriceUnit.code"], omitted["trades_table.<locals>.text"]) == (1, 11)
+    assert omitted == typed == mixed
+    assert omitted["trades_table.<locals>.text"] == 12
     arrays = [numpy_calls(lambda b=batch: shown(b)) for batch in batches]
     assert arrays[0] == arrays[1] == arrays[2]
-    assert arrays[0]["numpy.array"] == 8
-    assert shown(batches[2]).kinds.shape[1] == 25  # 24 before: the unit is the last column
+    assert arrays[0]["numpy.array"] == 9
+    assert shown(batches[2]).kinds.shape[1] == 26  # 24 before: the unit is the last two columns
 
 
-def test_the_readbacks_new_column_costs_its_texts_and_nothing_more() -> None:
-    # Reading 2,000 rows back: 1,433,685 bytes at the peak before the column, about 717 a row
-    # over 24 columns, and 1,500,145 with it, about 750 a row over 25, measured on 2026-11-26:
-    # 33 bytes a row for a text cell, its text joined for the way out and its place among the
-    # cells, as each text column costs. Four units mixed cost what one does, 1,500,315.
+def test_the_readbacks_new_columns_cost_their_texts_and_nothing_more() -> None:
+    # Reading 2,000 rows back: 1,433,685 bytes at the peak before the unit was shown, about 717
+    # a row over 24 columns, and 1,614,809 with its two columns, about 807 a row over 26,
+    # measured on 2026-11-27. A text cell is 33 bytes a row, its text kept for the way out and
+    # its place among the cells, as each text column costs: 66 for the two. The other 24 are a
+    # step of the tuple the texts are gathered into, which grows by a quarter at a time and
+    # stands a step up at 13 text cells a row: 243,360 bytes at its peak where 12 a row peak at
+    # 194,656. Four units mixed cost what one does, to the byte.
     rows, contracts = 2_000, 24
     peaks: list[int] = []
     for units in (None, OWN, MIXED):
@@ -361,5 +400,5 @@ def test_the_readbacks_new_column_costs_its_texts_and_nothing_more() -> None:
         )
         peaks.append(least_peak(lambda b=batch: shown(b)))
     for peak in peaks:
-        assert peak <= 751 * rows + 2 * SLACK
+        assert peak <= 808 * rows + 2 * SLACK
     assert abs(peaks[2] - peaks[0]) <= SLACK

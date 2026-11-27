@@ -1571,7 +1571,7 @@ FIELDS = (
     "settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, "
     "quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, "
     "payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, "
-    "fixed_price_unit"
+    "fixed_price_currency_unit, fixed_price_quantity_unit"
 )
 
 

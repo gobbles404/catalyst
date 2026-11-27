@@ -51,7 +51,6 @@ from catalyst.trades.template import (
     TradeTemplate,
     months_of,
     payment_rule_of,
-    price_unit_of,
     quantity_per_of,
     route_of,
     schedule_method_of,
@@ -101,6 +100,8 @@ PERIOD_FIELDS: Final = ("contract_code", "start_date", "end_date")
 # The field a second leg adds, since two-index-one-price.md the one: the second index's method;
 # the fixed price is the trade's, entered once.
 SECOND_LEG_FIELDS: Final = ("second_schedule_method",)
+# The two fields of a fixed_float's fixed price's unit, since #273: both or neither.
+FIXED_UNIT_FIELDS: Final = ("fixed_price_currency_unit", "fixed_price_quantity_unit")
 
 # The conditions of the fixed_float's required_when fields, as library rules: the field, the batch
 # fact it depends on and the value that fact must have, rendered as the definition shows them,
@@ -256,13 +257,14 @@ def resolved(
     handed to the kernel as given and read for their meaning by the encoding, which has the
     unit tables.
 
-    A fixed_float's fixed price takes a unit of its own since #273, fixed_price_unit, optional
-    and each row's own: the template's one text or the ticket's column, each distinct text read
-    once for its form, a currency unit and a quantity unit joined by one slash, the first row
-    from the top that breaks it named, and handed to the kernel as the batch's distinct units
-    with each row's place among them. Left out of both, nothing is handed and the kernel takes
-    the unit the index quotes in. What the two codes mean is the encoding's to read, as a
-    spread price's are.
+    A fixed_float's fixed price takes a unit of its own since #273, two optional fields as a
+    spread price's are, fixed_price_currency_unit and fixed_price_quantity_unit, each row's
+    own and each from the template or the ticket whatever supplies the other, so a template's
+    DOLLAR stands beside a ticket's column of LB and MT. Both or neither, _the_fixed_units: one
+    without the other is refused by the name of the one to supply, and neither hands the
+    kernel nothing, which takes the unit the index quotes in. Both are handed to the kernel as
+    the batch's distinct pairs with each row's place among them. What the two codes mean is
+    the encoding's to read, as a spread price's are.
 
     Then the kernel's rules, through resolved_trades: whole quantities, zero included, and finite
     prices, each named by its trade, a financial settlement with penultimate, last3day and asian,
@@ -310,11 +312,8 @@ def resolved(
                 fields.one_text("spread_price_quantity_unit"),
             ),
         )
-    elif fields.has("fixed_price_unit"):
-        # Each row's own since #273, the template's one or the ticket's column, each distinct
-        # text read once for its form; left out of both, the kernel takes the index's unit.
-        read_units, price_unit = _each_distinct(fields, "fixed_price_unit", price_unit_of)
-        price_units = tuple(read_units)
+    else:
+        price_units, price_unit = _the_fixed_units(fields)
     _the_conditions(fields, route, settlement)
     _the_leg_fields(fields, paired)
     specification = np.array(specifications, dtype=np.intp)[by_unit]
@@ -646,6 +645,34 @@ def _the_conditions(fields: _Fields, route: Route, settlement: Settlement) -> No
                 raise ValueError(f"{name} is missing, expected it when {condition}")
         elif fields.has(name):
             raise ValueError(f"{name} is {fields.shown(name)}, expected none unless {condition}")
+
+
+def _the_fixed_units(
+    fields: _Fields,
+) -> tuple[tuple[PriceUnit, ...], NDArray[np.intp]] | tuple[None, None]:
+    """The units a fixed_float's rows price their fixed prices in, since #273: the batch's
+    distinct pairs of a currency unit and a quantity unit, the pairs its rows hold and no
+    other, and each row's place among them, found in one pass over the two fields' texts,
+    each field the template's one value on every row or the ticket's column. Neither field
+    named by either is nothing at all, which the kernel reads as the unit the index quotes
+    in. One named without the other is refused by the name of the one to supply, since half
+    a unit says nothing and the index's unit is never taken for the other half. The codes
+    are paired as entered and read for their meaning by the encoding."""
+    money, per = FIXED_UNIT_FIELDS
+    has_money, has_per = fields.has(money), fields.has(per)
+    if not (has_money or has_per):
+        return None, None
+    if has_money != has_per:
+        held, missing = (money, per) if has_money else (per, money)
+        raise ValueError(
+            f"{missing} is missing, expected a value in the template or a column in the ticket "
+            f"beside {held}; a fixed price's unit is both fields, or neither for the index's "
+            "quote units"
+        )
+    pairs, place = np.unique(
+        np.array([fields.texts(money), fields.texts(per)]).T, axis=0, return_inverse=True
+    )
+    return tuple([PriceUnit(*pair) for pair in pairs.tolist()]), place.astype(np.intp)
 
 
 def _the_specification(

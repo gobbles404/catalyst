@@ -314,12 +314,13 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_monthly_components": 1,  # each monthly component in one calendar month
         "choice": 5,
         "_Fields.one_text": 2,  # the route and the settlement, one each for the batch
-        "_Fields.has": 26,  # the required fields, the nearby among them since
+        "_Fields.has": 27,  # the required fields, the nearby among them since
         # nearby-selection.md, the code the first period field found, and
         # since #175 the counterparty's condition and the marketing reserve looked for, since
         # slice 3 the key's condition and the key itself, since two-index-one-price.md the
         # second leg's one field and no second price, since cva-reserve.md the CVA reserve,
-        # since #273 the fixed price's unit looked for, none in this ticket
+        # since #273 the fixed price's two unit fields looked for, neither in this ticket
+        "_the_fixed_units": 1,  # that look, which hands the kernel nothing here
         "_Fields.rows": 12,  # the template's nearby repeated over the rows, nearby-selection.md;
         # the rows asked once less: the periods count their own since
         # dated-quotes.md, a request's rows resolving through the same rule
@@ -343,7 +344,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "keyed_calendar": 1,
         "calendar_key": 1,
         "calendar_named": 1,
-        "FieldValues.has": 17,  # one more since #273, the fixed price's unit, in no column
+        "FieldValues.has": 18,  # two more since #273, the fixed price's unit fields, in no column
         "FieldValues.supplied_rows": 1,  # which rows hold a code: every one, the column full
         "FieldValues.texts": 1,
         "FieldValues.numbers": 2,
@@ -953,13 +954,13 @@ def dated_ledger(contracts: int) -> dict[str, int]:
     return {
         **ledger,
         "_Fields.where": 8,  # the lag and the six batch fields, no code named
-        "_Fields.has": 27,  # the three period fields looked for, the two dates found; the
+        "_Fields.has": 28,  # the three period fields looked for, the two dates found; the
         # second leg's one field since two-index-one-price.md, the CVA reserve since
-        # cva-reserve.md, the fixed price's unit since #273
+        # cva-reserve.md, the fixed price's two unit fields since #273
         "_the_required.<locals>.<genexpr>": 3,
         "_Fields.rows": 11,  # one less since dated-quotes.md, the periods counting their own rows
         "_Fields.dates": 1,  # the trade dates; the two dates come through the periods' own read
-        "FieldValues.has": 18,
+        "FieldValues.has": 19,
         "FieldValues.dates": 3,
         "FieldValues.supplied_rows": 2,  # which rows hold a start and an end: every one
     }
@@ -1275,7 +1276,7 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "_each_distinct.<locals>.<lambda>": 10,  # likewise
         "_Fields.rows": 9,  # three fewer than the resolution's: the ticket's three columns, no
         # template value repeated
-        "FieldValues.has": 20,  # three columns more looked for, the second price no field
+        "FieldValues.has": 21,  # three columns more looked for, the second price no field
         "FieldValues.texts": 4,  # and read
         "_the_days": 4,  # the four methods present, once each
         "_with_expiries_priced": 1,  # the penultimate and last3day rows' expiries open

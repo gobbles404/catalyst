@@ -384,17 +384,18 @@ $formulas = [ordered]@{
     # refused by name.
     '=MID(XV23,FIND(":",XV23)+1,12)'     = "trades:ROLL:"
     "=ROWS(util_ReadHandle(XV23))"      = "4"
-    # The nearby the third column from the last: payment-calendar-keys.md appends each row's
-    # payment holiday key, as entered, after it, and #273 the unit of its fixed price after that.
-    "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23))-2)" = "nearby"
-    "=INDEX(util_ReadHandle(XV23),2,COLUMNS(util_ReadHandle(XV23))-2)" = "int64"
-    "=INDEX(util_ReadHandle(XV23),3,COLUMNS(util_ReadHandle(XV23))-2)" = "1"
-    "=INDEX(util_ReadHandle(XV23),4,COLUMNS(util_ReadHandle(XV23))-2)" = "2"
-    "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23))-1)" = "payment_holiday_key"
-    "=INDEX(util_ReadHandle(XV23),2,COLUMNS(util_ReadHandle(XV23))-1)" = "str"
-    "=INDEX(util_ReadHandle(XV23),3,COLUMNS(util_ReadHandle(XV23))-1)&INDEX(util_ReadHandle(XV23),4,COLUMNS(util_ReadHandle(XV23))-1)" = "XV2XV2"
-    "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23)))" = "fixed_price_unit"
-    "=INDEX(util_ReadHandle(XV23),3,COLUMNS(util_ReadHandle(XV23)))&INDEX(util_ReadHandle(XV23),4,COLUMNS(util_ReadHandle(XV23)))" = "DOLLAR/BBLDOLLAR/BBL"
+    # The nearby the fourth column from the last: payment-calendar-keys.md appends each row's
+    # payment holiday key, as entered, after it, and #273 the two units of its fixed price
+    # after that.
+    "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23))-3)" = "nearby"
+    "=INDEX(util_ReadHandle(XV23),2,COLUMNS(util_ReadHandle(XV23))-3)" = "int64"
+    "=INDEX(util_ReadHandle(XV23),3,COLUMNS(util_ReadHandle(XV23))-3)" = "1"
+    "=INDEX(util_ReadHandle(XV23),4,COLUMNS(util_ReadHandle(XV23))-3)" = "2"
+    "=INDEX(util_ReadHandle(XV23),1,COLUMNS(util_ReadHandle(XV23))-2)" = "payment_holiday_key"
+    "=INDEX(util_ReadHandle(XV23),2,COLUMNS(util_ReadHandle(XV23))-2)" = "str"
+    "=INDEX(util_ReadHandle(XV23),3,COLUMNS(util_ReadHandle(XV23))-2)&INDEX(util_ReadHandle(XV23),4,COLUMNS(util_ReadHandle(XV23))-2)" = "XV2XV2"
+    '=TEXTJOIN(" ",TRUE,TAKE(TAKE(util_ReadHandle(XV23),1),,-2))' = "fixed_price_currency_unit fixed_price_quantity_unit"
+    '=TEXTJOIN(" ",TRUE,DROP(TAKE(util_ReadHandle(XV23),,-2),2))' = "DOLLAR BBL DOLLAR BBL"
     "=ROWS(util_ReadHandle(XV24))"      = "6"
     "=INDEX(util_ReadHandle(XV24),3,1)" = "M26"
     "=INDEX(util_ReadHandle(XV24),4,1)" = "N26"
@@ -743,7 +744,7 @@ $formulas = [ordered]@{
     # Since template-based-quoting.md three rows more: what a quote template may hold, what a quote always
     # requires, and the condition that otherwise requires it.
     '=ROWS(_ShowInstrument("fixed_float"))'       = "10"
-    '=COLUMNS(_ShowInstrument("fixed_float"))'    = "25"
+    '=COLUMNS(_ShowInstrument("fixed_float"))'    = "26"
     '=INDEX(_ShowInstrument("fixed_float"),8,1)'  = "quote_allowed"
     '=INDEX(_ShowInstrument("fixed_float"),8,2)'  = "FALSE"
     '=INDEX(_ShowInstrument("fixed_float"),8,7)'  = "TRUE"
@@ -765,7 +766,7 @@ $formulas = [ordered]@{
     '=COLUMNS(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2))'  = "6"
     '=CountFieldRows("fixed_float",EP4:EQ4,EP5:EQ7)'        = "3"
     '=EchoFieldRow("Future",EP1:EU1,EP2:EU2)' = "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'"
-    '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit"
+    '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_currency_unit, fixed_price_quantity_unit"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EQ7)' = "#ERROR EchoFieldRow: values is 3x2 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EP7)' = "#ERROR EchoFieldRow: values is 3x1 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP7:EQ8)' = "#ERROR EchoFieldRow: values is 2x2 array, expected one row of field values"
@@ -805,7 +806,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW8),3,18)" = "10000"
     "=INDEX(util_ReadHandle(EW8),3,20)" = "-700000"
     "=ROWS(util_ReadHandle(EW8))"      = "5"
-    "=COLUMNS(util_ReadHandle(EW8))"   = "23"
+    "=COLUMNS(util_ReadHandle(EW8))"   = "24"
     "=INDEX(util_ReadHandle(EW13),1,13)" = "payment_date"
     "=INDEX(util_ReadHandle(EW13),3,3)"  = "q26"
     "=INDEX(util_ReadHandle(EW13),4,3)"  = "u26"
@@ -813,7 +814,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW13),3,13)" = "46226"
     "=INDEX(util_ReadHandle(EW13),4,13)" = "46258"
     "=ROWS(util_ReadHandle(EW13))"       = "4"
-    "=COLUMNS(util_ReadHandle(EW13))"    = "25"
+    "=COLUMNS(util_ReadHandle(EW13))"    = "26"
     '=_CreateTradeTemplate("Future",EW1:FC1,EW2:FC2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'float_float', 'cashflow'"
     '=_CreateTradeTemplate("fixed_float",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate, last3day or asian"
     '=_CreateTradeTemplate("fixed_float",HSTACK(FA1,EZ4),HSTACK(FA2,EZ15))' = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
@@ -975,7 +976,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(GP4),3,5)"   = "penultimate"
     "=INDEX(util_ReadHandle(GP4),3,13)"  = "+1bd"
     "=INDEX(util_ReadHandle(GP4),3,14)"  = "46195"
-    "=COLUMNS(util_ReadHandle(GP4))"     = "26"
+    "=COLUMNS(util_ReadHandle(GP4))"     = "27"
     "=INDEX(util_ReadHandle(GP5),3,1)"   = "n26"
     "=INDEX(util_ReadHandle(GP5),3,3)"   = "46192"
     "=INDEX(util_ReadHandle(GP5),3,4)"   = "46195"
@@ -1053,7 +1054,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(IS12),4,19)" = "3100"
     "=INDEX(util_ReadHandle(IS12),5,19)" = "3410"
     "=INDEX(util_ReadHandle(IS12),5,20)" = "3410"
-    "=COLUMNS(util_ReadHandle(IS12))"    = "26"
+    "=COLUMNS(util_ReadHandle(IS12))"    = "27"
     "=INDEX(_ReportValues(IY18),3,1)"    = "96.1"
     '=INDEX(_ReportRisk(IY18,"nominal_delta","year"),4,2)'      = "3255"
     "=INDEX(_ReportValues(IY20),3,1)"    = "96.1"
@@ -1414,7 +1415,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(OR23),3,19)"   = "50"
     "=INDEX(util_ReadHandle(OR23),3,20)"   = "20"
     "=INDEX(util_ReadHandle(OR23),3,23)"   = "USD"
-    "=COLUMNS(util_ReadHandle(OR16))"      = "27"
+    "=COLUMNS(util_ReadHandle(OR16))"      = "28"
     "=INDEX(util_ReadHandle(OR16),1,9)"    = "broker"
     "=INDEX(util_ReadHandle(OR16),3,9)"    = "ION"
     "=INDEX(_ReportReserves(IY16),3,1)"    = "0"
@@ -1443,7 +1444,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(OR39),3,2)"    = "24"
     "=INDEX(_ReportReserves(OR39),3,3)"    = "65"
     "=INDEX(_ReportReserves(OR39),3,5)"    = "USD"
-    "=COLUMNS(util_ReadHandle(OR37))"      = "28"
+    "=COLUMNS(util_ReadHandle(OR37))"      = "29"
     "=INDEX(util_ReadHandle(OR37),1,16)"   = "marketing_reserve"
     "=INDEX(util_ReadHandle(OR37),2,16)"   = "float64"
     "=INDEX(util_ReadHandle(OR37),3,16)"   = "15"
@@ -1465,7 +1466,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(OR67),3,1)"    = "0"
     "=INDEX(_ReportReserves(OR67),3,2)"    = "20"
     "=INDEX(_ReportValues(OR67),3,1)"      = "1260"
-    "=COLUMNS(util_ReadHandle(OR65))"      = "26"
+    "=COLUMNS(util_ReadHandle(OR65))"      = "27"
     "=INDEX(_ReportReserves(OR76),3,1)"    = "20"
     "=INDEX(_ReportReserves(OR76),3,2)"    = "20"
     "=INDEX(util_ReadHandle(OR74),1,9)"    = "broker"
@@ -1496,7 +1497,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(OR86),3,3)"    = "0"
     "=INDEX(_ReportReserves(OR86),3,4)"    = "-15"
     "=INDEX(_ReportReserves(OR86),3,5)"    = "USD"
-    "=COLUMNS(util_ReadHandle(OR84))"      = "28"
+    "=COLUMNS(util_ReadHandle(OR84))"      = "29"
     "=INDEX(util_ReadHandle(OR84),1,16)"   = "cva_reserve"
     "=INDEX(util_ReadHandle(OR84),2,16)"   = "float64"
     "=INDEX(util_ReadHandle(OR84),3,16)"   = "25"
@@ -1533,7 +1534,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(OR146),3,4)"   = "3E-308"
     "=INDEX(_ReportReserves(OR159),3,4)"   = "3E-308"
     "=INDEX(_ReportReserves(OR159),3,1)"   = "180"
-    "=COLUMNS(util_ReadHandle(OR52))"      = "27"
+    "=COLUMNS(util_ReadHandle(OR52))"      = "28"
     "=INDEX(util_ReadHandle(OR52),1,9)"    = "discount_curve_key"
     "=INDEX(util_ReadHandle(OR52),3,9)"    = "SOFR"
     "=INDEX(util_ReadHandle(OR52),1,8)"    = "counterparty"
@@ -1818,21 +1819,22 @@ $formulas = [ordered]@{
     '=_Quote(AAP11,"U26",AAP41,"flat")'    = "#ERROR _Quote: ValueError: schedule_method of the quote is 'lastday' on U26, a month of 4 prints, expected a month of one print; lastday is a month's one print, and asian averages several"
     # A fixed price in a unit of its own, issue #273, on a premium index quoted in dollars a
     # pound, ABB3: the ROLL index's schedule and days under a lot of 55,116 pounds, a pound and a
-    # tonne, its delta in lots. The ticket of ABD12:ABJ16 books four rows of N26 in ABB10, each
-    # its own quantity word and its own fixed_price_unit: 50 tonnes at 1,870 dollars a tonne,
-    # 275,578 pounds at 0.91 a pound, two lots at 1,870 a tonne and 50 tonnes at 91 cents a
-    # pound. The readback's last column is each row's unit and the price stands as entered; the
-    # fixed legs are 93,500, 250,775.98, 93,500.74 and 100,310.33. Valued in ABB12 with N26 at
-    # 0.95 a pound: 37,871.60, on a shade under eleven lots. ABB13 is the second row with no
-    # unit typed, the index's own read back; ABB15 the first row under a template whose unit is
-    # DOLLAR/MT. Then the refusals: a currency's name, a hyphen, a barrel, the row's own
-    # quantity word, a blank cell, the template and the ticket both, a template's unit of one
-    # code, and the field in a quote template.
+    # tonne, its delta in lots. The ticket of ABD12:ABK16 books four rows of N26 in ABB10, each
+    # its own quantity word and its own price unit, the currency unit and the quantity unit in
+    # two fields: 50 tonnes at 1,870 dollars a tonne, 275,578 pounds at 0.91 a pound, two lots
+    # at 1,870 a tonne and 50 tonnes at 91 cents a pound. The readback's last two columns are
+    # each row's unit and the price stands as entered; the fixed legs are 93,500, 250,775.98,
+    # 93,500.74 and 100,310.33. Valued in ABB12 with N26 at 0.95 a pound: 37,871.60, on a shade
+    # under eleven lots. ABB13 is the second row with no unit typed, the index's own read back;
+    # ABB15 the first row under a template whose unit is DOLLAR and MT; ABB17 the first two rows
+    # under a template that holds DOLLAR alone, MT and LB down the ticket. Then the refusals: a
+    # currency's name, a unit with a slash, a barrel, the row's own quantity word, a blank
+    # cell, a field from the template and the ticket both, one field without the other, the
+    # one-cell field of the first build as a field no more, and a field in a quote template.
     '=MID(ABB10,FIND(":",ABB10)+1,11)' = "trades:AUP:"
-    "=INDEX(util_ReadHandle(ABB10),1,COLUMNS(util_ReadHandle(ABB10)))" = "fixed_price_unit"
-    "=INDEX(util_ReadHandle(ABB10),2,COLUMNS(util_ReadHandle(ABB10)))" = "str"
-    "=INDEX(util_ReadHandle(ABB10),1,COLUMNS(util_ReadHandle(ABB10))-1)" = "payment_holiday_key"
-    '=TEXTJOIN(" ",TRUE,DROP(TAKE(util_ReadHandle(ABB10),,-1),2))' = "DOLLAR/MT DOLLAR/LB DOLLAR/MT CENT/LB"
+    '=TEXTJOIN(" ",TRUE,TAKE(TAKE(util_ReadHandle(ABB10),1),,-3))' = "payment_holiday_key fixed_price_currency_unit fixed_price_quantity_unit"
+    '=TEXTJOIN(" ",TRUE,TAKE(CHOOSEROWS(util_ReadHandle(ABB10),2),,-2))' = "str str"
+    '=TEXTJOIN(" ",TRUE,DROP(TAKE(util_ReadHandle(ABB10),,-2),2))' = "DOLLAR MT DOLLAR LB DOLLAR MT CENT LB"
     '=TEXTJOIN(" ",TRUE,DROP(CHOOSECOLS(util_ReadHandle(ABB10),MATCH("fixed_price",TAKE(util_ReadHandle(ABB10),1),0)),2))' = "1870 0.91 1870 91"
     '=TEXTJOIN(" ",TRUE,DROP(CHOOSECOLS(util_ReadHandle(ABB10),MATCH("quantity_unit",TAKE(util_ReadHandle(ABB10),1),0)),2))' = "mt lb lots mt"
     '=TEXT(INDEX(util_ReadHandle(ABB10),3,MATCH("offset",TAKE(util_ReadHandle(ABB10),1),0)),"0.00")' = "-93500.00"
@@ -1842,22 +1844,28 @@ $formulas = [ordered]@{
     '=TEXT(INDEX(_ReportValues(ABB12),3,1),"0.00")' = "37871.60"
     "=INDEX(_ReportValues(ABB12),3,2)" = "0"
     '=TEXT(INDEX(_ReportRisk(ABB12,"nominal_delta","year"),4,2),"0.000000")' = "10.999932"
-    "=INDEX(util_ReadHandle(ABB13),3,COLUMNS(util_ReadHandle(ABB13)))" = "DOLLAR/LB"
+    '=TEXTJOIN(" ",TRUE,TAKE(CHOOSEROWS(util_ReadHandle(ABB13),3),,-2))' = "DOLLAR LB"
     '=TEXT(INDEX(util_ReadHandle(ABB13),3,MATCH("offset",TAKE(util_ReadHandle(ABB13),1),0)),"0.00")' = "-250775.98"
-    "=INDEX(util_ReadHandle(ABB15),3,COLUMNS(util_ReadHandle(ABB15)))" = "DOLLAR/MT"
+    '=TEXTJOIN(" ",TRUE,TAKE(CHOOSEROWS(util_ReadHandle(ABB15),3),,-2))' = "DOLLAR MT"
     '=TEXT(INDEX(util_ReadHandle(ABB15),3,MATCH("offset",TAKE(util_ReadHandle(ABB15),1),0)),"0.00")' = "-93500.00"
-    '=INDEX(_ShowInstrument("fixed_float"),1,25)' = "fixed_price_unit"
-    '=INDEX(_ShowInstrument("fixed_float"),3,25)' = "FALSE"
-    '=INDEX(_ShowInstrument("fixed_float"),5,25)' = "code"
-    '=INDEX(_ShowInstrument("fixed_float"),8,25)' = "FALSE"
-    "=_CreateTrades(ABB3,ABD12:ABJ12,ABD18:ABJ18,ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_unit of trade 5 at row 1 is 'USD/MT', expected DOLLAR or CENT before the /"
-    "=_CreateTrades(ABB3,ABD12:ABJ12,ABD19:ABJ19,ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_unit row 1 is 'DOLLAR-MT', expected a currency unit and a quantity unit joined by one /, such as DOLLAR/MT"
-    "=_CreateTrades(ABB3,ABD12:ABJ12,ABD20:ABJ20,ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_unit of trade 7 at row 1 is 'DOLLAR/BBL', expected a MASS unit, KG, LB, MT, ST, LT, G, OZT or CWT_US, after the /"
-    "=_CreateTrades(ABB3,ABD12:ABJ12,ABD21:ABJ21,ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_unit of trade 8 at row 1 is 'DOLLAR/lots', expected a MASS unit, KG, LB, MT, ST, LT, G, OZT or CWT_US, after the /"
-    "=_CreateTrades(ABB3,ABD12:ABJ12,ABD22:ABJ22,ABB9,ZU1)" = "#ERROR _CreateTrades: trade_rows cell (1, 7) is blank, expected text"
-    "=_CreateTrades(ABB3,ABD12:ABJ12,ABD13:ABJ13,ABB14,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_unit is supplied by the template and by the ticket, expected by one of them"
-    '=_CreateTradeTemplate("fixed_float",HSTACK(ABD9:ABL9,"fixed_price_unit"),HSTACK(ABD10:ABL10,"DOLLAR"))' = "#ERROR _CreateTradeTemplate: ValueError: fixed_price_unit is 'DOLLAR', expected a currency unit and a quantity unit joined by one /, such as DOLLAR/MT"
-    '=_CreateQuoteTemplate("fixed_float",HSTACK(XQ47:XX47,"fixed_price_unit"),HSTACK(XQ50:XX50,"DOLLAR/MT"),ZU1)' = "#ERROR _CreateQuoteTemplate: ValueError: fixed_price_unit is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_key, settlement_frequency, nearby"
+    '=TEXTJOIN(" ",TRUE,TAKE(TAKE(util_ReadHandle(ABB16),1),,-1))' = "fixed_price_currency_unit"
+    '=TEXTJOIN(" ",TRUE,DROP(TAKE(util_ReadHandle(ABB17),,-2),2))' = "DOLLAR MT DOLLAR LB"
+    '=TEXTJOIN(" ",TRUE,TEXT(DROP(CHOOSECOLS(util_ReadHandle(ABB17),MATCH("offset",TAKE(util_ReadHandle(ABB17),1),0)),2),"0.00"))' = "-93500.00 -250775.98"
+    '=TEXTJOIN(" ",TRUE,TAKE(TAKE(_ShowInstrument("fixed_float"),1),,-2))' = "fixed_price_currency_unit fixed_price_quantity_unit"
+    '=TEXTJOIN(" ",TRUE,TAKE(CHOOSEROWS(_ShowInstrument("fixed_float"),3),,-2))' = "FALSE FALSE"
+    '=TEXTJOIN(" ",TRUE,TAKE(CHOOSEROWS(_ShowInstrument("fixed_float"),5),,-2))' = "code code"
+    '=TEXTJOIN(" ",TRUE,TAKE(CHOOSEROWS(_ShowInstrument("fixed_float"),8),,-2))' = "FALSE FALSE"
+    "=_CreateTrades(ABB3,ABD12:ABK12,ABD18:ABK18,ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_currency_unit of trade 5 at row 1 is 'USD', expected DOLLAR or CENT"
+    "=_CreateTrades(ABB3,ABD12:ABK12,ABD19:ABK19,ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_currency_unit of trade 6 at row 1 is 'DOLLAR/MT', expected DOLLAR or CENT"
+    "=_CreateTrades(ABB3,ABD12:ABK12,ABD20:ABK20,ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_quantity_unit of trade 7 at row 1 is 'BBL', expected a MASS unit, KG, LB, MT, ST, LT, G, OZT or CWT_US"
+    "=_CreateTrades(ABB3,ABD12:ABK12,ABD21:ABK21,ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_quantity_unit of trade 8 at row 1 is 'lots', expected a MASS unit, KG, LB, MT, ST, LT, G, OZT or CWT_US"
+    "=_CreateTrades(ABB3,ABD12:ABK12,ABD22:ABK22,ABB9,ZU1)" = "#ERROR _CreateTrades: trade_rows cell (1, 8) is blank, expected text"
+    "=_CreateTrades(ABB3,ABD12:ABK12,ABD13:ABK13,ABB14,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_currency_unit is supplied by the template and by the ticket, expected by one of them"
+    "=_CreateTrades(ABB3,ABD12:ABI12,ABD13:ABI13,ABB16,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_quantity_unit is missing, expected a value in the template or a column in the ticket beside fixed_price_currency_unit; a fixed price's unit is both fields, or neither for the index's quote units"
+    "=_CreateTrades(ABB3,HSTACK(ABD12:ABI12,ABK12),HSTACK(ABD13:ABI13,ABK13),ABB9,ZU1)" = "#ERROR _CreateTrades: ValueError: fixed_price_currency_unit is missing, expected a value in the template or a column in the ticket beside fixed_price_quantity_unit; a fixed price's unit is both fields, or neither for the index's quote units"
+    '=_CreateTradeTemplate("fixed_float",HSTACK(ABD9:ABL9,"fixed_price_unit"),HSTACK(ABD10:ABL10,"DOLLAR/MT"))' = "#ERROR _CreateTradeTemplate: fields cell (1, 10) is text 'fixed_price_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_currency_unit, fixed_price_quantity_unit"
+    '=_CreateTrades(ABB3,HSTACK(ABD12:ABI12,"fixed_price_unit"),HSTACK(ABD13:ABI13,"DOLLAR/MT"),ABB9,ZU1)' = "#ERROR _CreateTrades: fields cell (1, 7) is text 'fixed_price_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_currency_unit, fixed_price_quantity_unit"
+    '=_CreateQuoteTemplate("fixed_float",HSTACK(XQ47:XX47,"fixed_price_quantity_unit"),HSTACK(XQ50:XX50,"MT"),ZU1)' = "#ERROR _CreateQuoteTemplate: ValueError: fixed_price_quantity_unit is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_key, settlement_frequency, nearby"
     # The Gas Daily schedule: a creator over three contract months, their codes and the first and
     # last day of gas of each, in DG to DI, and over the first row alone, read back through
     # util_ReadHandle; a first-date column one row long and a last-date column one row short, the
@@ -1936,7 +1944,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(PV6),5,19)" = "90"
     "=INDEX(util_ReadHandle(PV6),3,14)" = "46328"
     "=INDEX(util_ReadHandle(PV6),5,14)" = "46316"
-    "=COLUMNS(util_ReadHandle(PV6))"    = "26"
+    "=COLUMNS(util_ReadHandle(PV6))"    = "27"
     "=ROWS(util_ReadHandle(QE14))"      = "31"
     "=INDEX(_ReportValues(QE15),3,1)"   = "580"
     '=ROUND(INDEX(_ReportRisk(QE15,"nominal_delta","year"),4,2),6)' = "0.29"
@@ -2449,7 +2457,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(UF8),1,13)" = "discount_curve_key"
     "=INDEX(util_ReadHandle(UF8),5,13)" = "SOFR"
     '=_ReportRisk(UF8,"delta","day")' = "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk"
-    "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit"
+    "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_currency_unit, fixed_price_quantity_unit"
     "=_EvaluateCashflows(UF5,UF6,UQ5)" = "#ERROR _EvaluateCashflows: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2027-01-04, the valuation date; a curve is never rebased"
     "=_EvaluateCashflows(UF5)" = "#ERROR _EvaluateCashflows: valuation_date is missing, expected valuation date handle"
     "=_EvaluateCashflows(UF5,UF6)" = "#ERROR _EvaluateCashflows: discount_curve_set is missing, expected discount curve set handle"
@@ -2582,7 +2590,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(WJ24,"all","day"),7,1)' = "46756"
     '=INDEX(_ReportRisk(WJ24,"all","day"),7,6)' = "-0.095"
     "=ROWS(util_ReadHandle(WJ22))"       = "3"
-    "=COLUMNS(util_ReadHandle(WJ22))"    = "28"
+    "=COLUMNS(util_ReadHandle(WJ22))"    = "29"
     "=INDEX(util_ReadHandle(WJ22),1,6)"  = "second_schedule_method"
     "=INDEX(util_ReadHandle(WJ22),3,6)"  = "lastday"
     "=INDEX(util_ReadHandle(WJ22),1,14)" = "fixed_price"
@@ -2620,7 +2628,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(WJ32),3,1)"  = "0"
     "=INDEX(_ReportReserves(WJ32),3,4)"  = "-40"
     "=INDEX(_ReportReserves(WJ32),3,5)"  = "USD"
-    "=COLUMNS(util_ReadHandle(WJ30))"    = "29"
+    "=COLUMNS(util_ReadHandle(WJ30))"    = "30"
     "=INDEX(util_ReadHandle(WJ30),1,17)" = "cva_reserve"
     "=INDEX(util_ReadHandle(WJ30),3,17)" = "-40"
     # the group's payment, NPV and DV01 once, the trade's; since two-index-one-price.md no leg
@@ -2648,7 +2656,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(WJ26,"dv01","year"),4,2)' = "-0.095"
     "=_CreateTrades(WJ5:WK6,WL4:WP4,WL5:WP5,WJ21,ZU1)" = "#ERROR _CreateTrades: indexes is 2x2 array, expected one cell, one row or one column of index handles"
     "=_CreateTrades(WJ5,WL4:WP4,WL5:WP5,WJ21,ZU1)"     = "#ERROR _CreateTrades: ValueError: second_schedule_method is 'lastday', expected none unless two indexes"
-    "=_CreateTrades(WJ5:WJ6,WL4:WQ4,WL5:WQ5,WJ21,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 6) is text 'second_fixed_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit"
+    "=_CreateTrades(WJ5:WJ6,WL4:WQ4,WL5:WQ5,WJ21,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 6) is text 'second_fixed_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_currency_unit, fixed_price_quantity_unit"
     "=_PrepareTrades(WJ22,WJ13)"      = "#ERROR _PrepareTrades: ValueError: histories are 1, expected 2, one per leg of the trades"
     "=_PrepareTrades(WJ22,WK15:WK16)" = "#ERROR _PrepareTrades: ValueError: history 2 is over index 'A' as history 1 is, expected one history per index of the trades"
     "=_EvaluateTrades(WJ23,WJ17,WJ20)" = "#ERROR _EvaluateTrades: ValueError: markets are 1, expected 2, one per leg of the trades"
@@ -2704,7 +2712,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(WJ38),5,7)"  = "-1"
     "=_CreateTrades(WJ5,WL10:WP10,WL11:WP11,WJ33,ZU1)" = "#ERROR _CreateTrades: ValueError: indexes are 1, expected two with a float_float; a spread is the first index's price less the second's"
     "=_CreateTrades(WJ5:WJ6,WL4:WP4,WL5:WP5,WJ33,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'fixed_price', expected a field of float_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, spread_price, spread_price_currency_unit, spread_price_quantity_unit, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby"
-    "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ21,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit"
+    "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ21,ZU1)" = "#ERROR _CreateTrades: fields cell (1, 5) is text 'spread_price', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_currency_unit, fixed_price_quantity_unit"
     "=_CreateTrades(WJ5:WJ6,WL10:WQ10,WL11:WQ11,WJ33,ZU1)" = "#ERROR _CreateTrades: ValueError: broker of trade 1 at row 1 is 'ICAP', expected none on a float_float; a brokered spread is not built"
     "=_CreateTrades(WJ5:WJ6,WL10:WP10,WL11:WP11,WJ39,ZU1)" = "#ERROR _CreateTrades: ValueError: route is 'cleared', expected 'bilateral' on a float_float; a cleared spread is not built"
     '=_CreateQuoteTemplate("float_float",WP1,WP2,ZU1)' = "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'float_float', expected one a quote prices: 'fixed_float'"
@@ -2817,7 +2825,7 @@ $formulas = [ordered]@{
     "=_CreateTrades(VSTACK(YJ7,ACB2),ACD1:ACI1,ACD2:ACI2,ACB16,ZU1)" = "#ERROR _CreateTrades: ValueError: schedule_method of trade 1 at row 1 is 'last3day', expected 'asian' under settlement_frequency = onetime; a onetime period averages every pricing day it covers, and the expiry-based methods take their contract's month"
     "=_CreateTrades(VSTACK(YJ7,ACB2),ACD1:ACI1,ACD2:ACI2,ACB17,ZU1)" = "#ERROR _CreateTrades: ValueError: quantity_per of trade 1 at row 1 is 'month', expected 'period' or 'calday' under settlement_frequency = onetime; month says nothing of a window, period is its total and calday its days"
     '=_CreateTrades(VSTACK(YJ7,ACB2),HSTACK(ACD1:ACH1,"fixed_price"),ACD2:ACI2,ACB18,ZU1)' = "#ERROR _CreateTrades: ValueError: settlement_frequency of trade 1 at row 1 is 'onetime', expected 'monthly' with two indexes on a fixed_float; a onetime period on two indexes is built for a float_float alone"
-    '=_CreateTradeTemplate("fixed_float",HSTACK("route","spread_price_currency_unit"),HSTACK("bilateral","DOLLAR"))' = "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit"
+    '=_CreateTradeTemplate("fixed_float",HSTACK("route","spread_price_currency_unit"),HSTACK("bilateral","DOLLAR"))' = "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_currency_unit, fixed_price_quantity_unit"
     # A closed physical contract past its expiry, expired-physical-cash.md: one LOT of Z26 bought
     # at 3.00 and sold at 3.10 through ION under one clearing house, in ZJ19. On the expiry day,
     # 18 November, the 1,000 is the mark, ZJ21; the day after it is cash, ZJ23, whatever the
@@ -3923,10 +3931,12 @@ $cells = [ordered]@{
     # specifications in ABD1:ABH3, a lot of 55,116 pounds, a pound and a tonne; its history in
     # ABB6 over the ROLL index's days, typed below, and its market in ABB8, N26 at 0.95; a
     # cleared template in ABB9 that leaves the quantity unit to each row; the ticket's headers
-    # in ABD12:ABJ12, fixed_price_unit its last, and four rows of N26 under them; the batch,
-    # its preparation and its values in ABB10:ABB12; the second row with no unit column in
-    # ABB13; a template whose unit is DOLLAR/MT in ABB14 and the first row under it in ABB15;
-    # and rows 18 to 22 for the creator to refuse, the last with no unit in its cell.
+    # in ABD12:ABK12, the fixed price's two unit fields its last, and four rows of N26 under
+    # them; the batch, its preparation and its values in ABB10:ABB12; the second row with no
+    # unit column in ABB13; a template whose unit is DOLLAR and MT in ABB14 and the first row
+    # under it in ABB15; a template that holds DOLLAR alone in ABB16 and the first two rows
+    # under it in ABB17, their quantity units down the ticket; and rows 18 to 22 for the
+    # creator to refuse, the last with no quantity unit in its cell.
     "ABD1" = "lots"; "ABE1" = "55116"; "ABF1" = "LB"; "ABG1" = "0"; "ABH1" = "0"
     "ABD2" = "lb"; "ABE2" = "1"; "ABF2" = "LB"; "ABG2" = "0"; "ABH2" = "0"
     "ABD3" = "mt"; "ABE3" = "1"; "ABF3" = "MT"; "ABG3" = "0"; "ABH3" = "0"
@@ -3941,22 +3951,24 @@ $cells = [ordered]@{
     "ABD9" = "quantity_per"; "ABE9" = "settlement_frequency"; "ABF9" = "nearby"; "ABG9" = "schedule_method"; "ABH9" = "route"; "ABI9" = "settlement_method"; "ABJ9" = "clearing_house"; "ABK9" = "payment_day"; "ABL9" = "payment_holiday_key"
     "ABD10" = "month"; "ABE10" = "monthly"; "ABF10" = "1"; "ABG10" = "lastday"; "ABH10" = "cleared"; "ABI10" = "financial"; "ABJ10" = "CME Clearing"; "ABK10" = "+2bd"; "ABL10" = "XV2"
     "ABB9" = '=_CreateTradeTemplate("fixed_float",ABD9:ABL9,ABD10:ABL10)'
-    "ABD12" = "trade_id"; "ABE12" = "trade_date"; "ABF12" = "contract_code"; "ABG12" = "quantity"; "ABH12" = "quantity_unit"; "ABI12" = "fixed_price"; "ABJ12" = "fixed_price_unit"
-    "ABD13" = "1"; "ABE13" = "1-Jun-2026"; "ABF13" = "N26"; "ABG13" = "50"; "ABH13" = "mt"; "ABI13" = "1870"; "ABJ13" = "DOLLAR/MT"
-    "ABD14" = "2"; "ABE14" = "1-Jun-2026"; "ABF14" = "N26"; "ABG14" = "275578"; "ABH14" = "lb"; "ABI14" = "0.91"; "ABJ14" = "DOLLAR/LB"
-    "ABD15" = "3"; "ABE15" = "1-Jun-2026"; "ABF15" = "N26"; "ABG15" = "2"; "ABH15" = "lots"; "ABI15" = "1870"; "ABJ15" = "DOLLAR/MT"
-    "ABD16" = "4"; "ABE16" = "1-Jun-2026"; "ABF16" = "N26"; "ABG16" = "50"; "ABH16" = "mt"; "ABI16" = "91"; "ABJ16" = "CENT/LB"
-    "ABB10" = "=_CreateTrades(ABB3,ABD12:ABJ12,ABD13:ABJ16,ABB9,ZU1)"
+    "ABD12" = "trade_id"; "ABE12" = "trade_date"; "ABF12" = "contract_code"; "ABG12" = "quantity"; "ABH12" = "quantity_unit"; "ABI12" = "fixed_price"; "ABJ12" = "fixed_price_currency_unit"; "ABK12" = "fixed_price_quantity_unit"
+    "ABD13" = "1"; "ABE13" = "1-Jun-2026"; "ABF13" = "N26"; "ABG13" = "50"; "ABH13" = "mt"; "ABI13" = "1870"; "ABJ13" = "DOLLAR"; "ABK13" = "MT"
+    "ABD14" = "2"; "ABE14" = "1-Jun-2026"; "ABF14" = "N26"; "ABG14" = "275578"; "ABH14" = "lb"; "ABI14" = "0.91"; "ABJ14" = "DOLLAR"; "ABK14" = "LB"
+    "ABD15" = "3"; "ABE15" = "1-Jun-2026"; "ABF15" = "N26"; "ABG15" = "2"; "ABH15" = "lots"; "ABI15" = "1870"; "ABJ15" = "DOLLAR"; "ABK15" = "MT"
+    "ABD16" = "4"; "ABE16" = "1-Jun-2026"; "ABF16" = "N26"; "ABG16" = "50"; "ABH16" = "mt"; "ABI16" = "91"; "ABJ16" = "CENT"; "ABK16" = "LB"
+    "ABB10" = "=_CreateTrades(ABB3,ABD12:ABK12,ABD13:ABK16,ABB9,ZU1)"
     "ABB11" = "=_PrepareTrades(ABB10,ABB6)"
     "ABB12" = "=_EvaluateTrades(ABB11,ABB8)"
     "ABB13" = "=_CreateTrades(ABB3,ABD12:ABI12,ABD14:ABI14,ABB9,ZU1)"
-    "ABB14" = '=_CreateTradeTemplate("fixed_float",HSTACK(ABD9:ABL9,"fixed_price_unit"),HSTACK(ABD10:ABL10,"DOLLAR/MT"))'
+    "ABB14" = '=_CreateTradeTemplate("fixed_float",HSTACK(ABD9:ABL9,ABJ12:ABK12),HSTACK(ABD10:ABL10,"DOLLAR","MT"))'
     "ABB15" = "=_CreateTrades(ABB3,ABD12:ABI12,ABD13:ABI13,ABB14,ZU1)"
-    "ABD18" = "5"; "ABE18" = "1-Jun-2026"; "ABF18" = "N26"; "ABG18" = "2"; "ABH18" = "lots"; "ABI18" = "1870"; "ABJ18" = "USD/MT"
-    "ABD19" = "6"; "ABE19" = "1-Jun-2026"; "ABF19" = "N26"; "ABG19" = "2"; "ABH19" = "lots"; "ABI19" = "1870"; "ABJ19" = "DOLLAR-MT"
-    "ABD20" = "7"; "ABE20" = "1-Jun-2026"; "ABF20" = "N26"; "ABG20" = "2"; "ABH20" = "lots"; "ABI20" = "1870"; "ABJ20" = "DOLLAR/BBL"
-    "ABD21" = "8"; "ABE21" = "1-Jun-2026"; "ABF21" = "N26"; "ABG21" = "2"; "ABH21" = "lots"; "ABI21" = "1870"; "ABJ21" = "DOLLAR/lots"
-    "ABD22" = "9"; "ABE22" = "1-Jun-2026"; "ABF22" = "N26"; "ABG22" = "2"; "ABH22" = "lots"; "ABI22" = "1870"
+    "ABB16" = '=_CreateTradeTemplate("fixed_float",HSTACK(ABD9:ABL9,ABJ12),HSTACK(ABD10:ABL10,"DOLLAR"))'
+    "ABB17" = "=_CreateTrades(ABB3,HSTACK(ABD12:ABI12,ABK12),HSTACK(ABD13:ABI14,ABK13:ABK14),ABB16,ZU1)"
+    "ABD18" = "5"; "ABE18" = "1-Jun-2026"; "ABF18" = "N26"; "ABG18" = "2"; "ABH18" = "lots"; "ABI18" = "1870"; "ABJ18" = "USD"; "ABK18" = "MT"
+    "ABD19" = "6"; "ABE19" = "1-Jun-2026"; "ABF19" = "N26"; "ABG19" = "2"; "ABH19" = "lots"; "ABI19" = "1870"; "ABJ19" = "DOLLAR/MT"; "ABK19" = "MT"
+    "ABD20" = "7"; "ABE20" = "1-Jun-2026"; "ABF20" = "N26"; "ABG20" = "2"; "ABH20" = "lots"; "ABI20" = "1870"; "ABJ20" = "DOLLAR"; "ABK20" = "BBL"
+    "ABD21" = "8"; "ABE21" = "1-Jun-2026"; "ABF21" = "N26"; "ABG21" = "2"; "ABH21" = "lots"; "ABI21" = "1870"; "ABJ21" = "DOLLAR"; "ABK21" = "lots"
+    "ABD22" = "9"; "ABE22" = "1-Jun-2026"; "ABF22" = "N26"; "ABG22" = "2"; "ABH22" = "lots"; "ABI22" = "1870"; "ABJ22" = "DOLLAR"
     # The Gas Daily schedule: three contract months of Henry Hub Gas Daily, the first and last day
     # of gas of each, a fourth first date for a column one row long, a copy of the last-date column
     # with a blank, a code over a number, and two creator cells, over the three rows and over the

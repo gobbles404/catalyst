@@ -3,11 +3,11 @@ template's row and taken, last and required, by every batch of trades whose tick
 rest. The template retains the definition, the fields its row named and its own values and no
 index, so one template serves every compatible index. It reads each value it holds for the rule
 intrinsic to its field, a code from its list, a payment day as the date it holds or as a rule
-of one or more date instructions read whole, a finite price, since #273 a fixed price's unit
-for its form, two codes joined by a slash, a quantity by its settlement's
+of one or more date instructions read whole, a finite price, a quantity by its settlement's
 rule where the row names the settlement and as any finite number where it does not,
 and leaves the rules that need the ticket or the index, which fields are required, whether the
-two overlap, the schedule, whether a
+two overlap, the schedule, what a unit code means, whether a fixed price's two unit fields
+are both there, since the ticket may hold the one a template leaves out, whether a
 contract code is the period of any row, to the resolution of a batch: since #172 a template's
 contract_code is text the seam typed and nothing more until a row without dates uses it, and a
 period field's cell may hold nothing, the header then owning the field for every batch while no
@@ -32,7 +32,6 @@ from catalyst.instruments.definitions import FieldType, Instrument
 from catalyst.instruments.fields import FieldValues, selected
 from catalyst.trades.schedule_methods import ScheduleMethod
 from catalyst.trades.terms import (
-    PriceUnit,
     QuantityPer,
     Route,
     Settlement,
@@ -204,21 +203,6 @@ def price_of(where: str, number: float) -> float:
     return number
 
 
-def price_unit_of(where: str, text: str) -> PriceUnit:
-    """The unit of a fixed price from its one text, since #273: a currency unit and a quantity
-    unit joined by one slash, `DOLLAR/MT` dollars a tonne, each side holding something and no
-    second slash, split exactly where the slash stands, nothing trimmed and no case changed.
-    The form alone is read here, in a template as in a ticket; what the two codes mean waits
-    for the index and the unit tables, when a batch is made."""
-    currency_unit, slash, quantity_unit = text.partition("/")
-    if not (currency_unit and slash and quantity_unit) or "/" in quantity_unit:
-        raise ValueError(
-            f"{where} is {text!r}, expected a currency unit and a quantity unit joined by one "
-            "/, such as DOLLAR/MT"
-        )
-    return PriceUnit(currency_unit, quantity_unit)
-
-
 def trade_id_of(where: str, number: float) -> int:
     """A trade ID by the kernel's rule, a whole number of at most 15 digits, named by its field,
     since #168: the one integer a template holds, read once here and repeated for every row."""
@@ -288,7 +272,6 @@ READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
         # payment-calendar-keys.md.
         "payment_holiday_key": calendar_key,
         "currency": currency_of,  # the cashflow instrument's, since #200
-        "fixed_price_unit": price_unit_of,  # the form; the codes wait for the index, #273
     }
 )
 NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float | int]]] = MappingProxyType(

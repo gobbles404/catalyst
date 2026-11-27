@@ -67,6 +67,7 @@ from catalyst.trades.template import DayOrRule, TradeTemplate
 from catalyst.trades.terms import (
     BASIS_NAMES,
     FREQUENCY_NAMES,
+    ResolvedTrades,
     booked_words,
     period_words,
     price_words,
@@ -584,7 +585,7 @@ def trades_table(obj: Trades) -> MixedArray:
     # float-float-spread.md, shows its one price under its own name, spread_price, in the same
     # place, and offset is its spread leg; since float-float-units.md the spread price's two
     # units follow it, as the batch typed them, on every row; a fixed_float's fixed price's
-    # unit, since #273, is each row's own and the last column.
+    # unit, since #273, is each row's own and the last two columns.
     terms, encoding = obj.resolved, obj.encoded
     leg, leg_encoding = terms.legs[0], encoding.legs[0]  # the first leg's, the batch's own
     paired = len(terms.legs) > 1
@@ -665,15 +666,27 @@ def trades_table(obj: Trades) -> MixedArray:
     # that no column before it moves: each row's key as entered, where the batch settles
     # financially.
     labels("payment_holiday_key", terms.payment_holiday_key)
-    # fixed_price_unit after it, since #273, appended the same way: the unit each row's fixed
-    # price is in, the currency unit over the quantity unit, DOLLAR/MT, the row's own where it
-    # typed one and the unit the index quotes in where the batch typed none, so that the price
-    # as entered never stands without its unit. A float_float shows its spread price's two
-    # units beside the price, above, and no such column.
+    # The fixed price's unit after it, since #273, appended the same way, the two fields in the
+    # definition's order: the currency unit and the quantity unit each row's fixed price is in,
+    # DOLLAR and MT, the row's own where the batch typed them and the two the index quotes in
+    # where it typed neither, so that the price as entered never stands without its unit. A
+    # float_float shows its spread price's two units beside the price, above, and no such
+    # columns.
     if terms.instrument is not FLOAT_FLOAT:
-        codes = np.array([unit.code for unit in terms.price_units], dtype=object)
-        text("fixed_price_unit", tuple(codes[terms.price_unit[rows]]))
+        currency_units, quantity_units = _fixed_price_units(terms)
+        text("fixed_price_currency_unit", currency_units)
+        text("fixed_price_quantity_unit", quantity_units)
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
+
+
+def _fixed_price_units(terms: ResolvedTrades) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Each component's fixed price's currency unit and quantity unit, since #273: the batch's
+    distinct units' two codes, each gathered by the place of the component's row among the
+    units, one gather a field."""
+    priced_in = terms.price_unit[terms.occurrence]
+    currency_units = np.array([unit.currency_unit for unit in terms.price_units], dtype=object)
+    quantity_units = np.array([unit.quantity_unit for unit in terms.price_units], dtype=object)
+    return tuple(currency_units[priced_in]), tuple(quantity_units[priced_in])
 
 
 def _entered_by_component(entered: DatesOrTexts, rows: NDArray[np.intp]) -> DatesOrTexts:

@@ -1,12 +1,14 @@
-"""A fixed price in a unit of its own, issue #273: fixed_price_unit, one text such as
-`DOLLAR/MT`, each row's own, on a fixed_float whose index quotes in another unit. A synthetic
+"""A fixed price in a unit of its own, issue #273: two fields, fixed_price_currency_unit and
+fixed_price_quantity_unit, DOLLAR and MT for dollars a tonne, each row's own and each from the
+template or the ticket, on a fixed_float whose index quotes in another unit. A synthetic
 premium index quoted in dollars a pound and settled in dollars, defining a pound, a tonne and a
 lot of 55,116 pounds, its delta reported in tonnes; the issue's three ways of writing one trade,
-priced by hand; a quantity and a price each in a unit of its own; the default, the index's quote
-unit, to the last bit; indexes that quote in cents a pound, dollars a tonne, cents a gallon and
-dollars per MMBTU; the lifecycle, a strip, a pair and a closed physical contract; and what is
-refused, by the field and the row. Every expected number is the issue's or hand arithmetic
-here; the production code is never asked for one."""
+priced by hand; a quantity and a price each in a unit of its own; the two fields from one
+source or split between the two; the default, the index's quote unit, to the last bit; indexes
+that quote in cents a pound, dollars a tonne, cents a gallon and dollars per MMBTU; the
+lifecycle, a strip, a pair and a closed physical contract; and what is refused, by the field
+and the row. Every expected number is the issue's or hand arithmetic here; the production code
+is never asked for one."""
 
 import re
 from collections.abc import Mapping, Sequence
@@ -134,12 +136,15 @@ CLEARED: dict[str, object] = {
     "route": "cleared",
     "clearing_house": "CME Clearing",
 }
-# A row as a test writes it: quantity, quantity_unit, fixed_price and fixed_price_unit, the
-# last None on every row for a ticket without the column.
-Row = tuple[float, str, float, str | None]
-A_ROW: Row = (LB_PER_MT, "LB", 0.20, "DOLLAR/LB")
-B_ROW: Row = (1.0, "MT", 0.20 * LB_PER_MT, "DOLLAR/MT")
-C_ROW: Row = (1.0, "MT", 20.0, "CENT/LB")
+MONEY, PER = "fixed_price_currency_unit", "fixed_price_quantity_unit"
+# A row as a test writes it: quantity, quantity_unit, fixed_price and the price's unit, its
+# currency unit and the quantity unit it is per, the last None on every row for a ticket
+# without the two columns.
+Unit = tuple[str, str]
+Row = tuple[float, str, float, Unit | None]
+A_ROW: Row = (LB_PER_MT, "LB", 0.20, ("DOLLAR", "LB"))
+B_ROW: Row = (1.0, "MT", 0.20 * LB_PER_MT, ("DOLLAR", "MT"))
+C_ROW: Row = (1.0, "MT", 20.0, ("CENT", "LB"))
 # The issue's table, each of the three alone: one tonne bought at 20 cents a pound, the market
 # at 25, one payment a year on at a factor of 0.95.
 FIXED = 440.9245243697552
@@ -158,9 +163,10 @@ def ticket(*rows: Row, code: str = "G27", **more: list[object]) -> dict[str, lis
         "quantity_unit": [word for _, word, _, _ in rows],
         "fixed_price": [price for _, _, price, _ in rows],
     }
-    units = [unit for _, _, _, unit in rows]
-    if any(unit is not None for unit in units):
-        columns["fixed_price_unit"] = list(units)
+    units = [unit for _, _, _, unit in rows if unit is not None]
+    if units:
+        columns[MONEY] = [money for money, _ in units]
+        columns[PER] = [per for _, per in units]
     return {**columns, **more}
 
 
@@ -239,11 +245,12 @@ def test_the_three_ways_in_one_batch_are_three_times_one_trade() -> None:
     batch = booked(A_ROW, B_ROW, C_ROW)
     terms = batch.resolved
     # The batch's distinct units, and each row's place among them.
-    assert [terms.price_units[int(i)].code for i in terms.price_unit] == [
-        "DOLLAR/LB",
-        "DOLLAR/MT",
-        "CENT/LB",
+    assert [terms.price_units[int(i)] for i in terms.price_unit] == [
+        PriceUnit("DOLLAR", "LB"),
+        PriceUnit("DOLLAR", "MT"),
+        PriceUnit("CENT", "LB"),
     ]
+    assert len(terms.price_units) == 3  # the pairs the rows hold: no cents a tonne among them
     assert terms.price.tolist() == [0.20, 0.20 * LB_PER_MT, 20.0]  # as entered, never restated
     assert fixed_legs(batch) == pytest.approx([FIXED] * 3, **CLOSE)
     results = valued(batch)
@@ -260,7 +267,7 @@ def test_two_of_them_double_and_one_against_another_sold_cancels() -> None:
     both = valued(booked(A_ROW, B_ROW))
     close(both.payment_amount, [2 * NET])
     assert both.mark == pytest.approx(2 * MARK, **CLOSE)
-    sold_b: Row = (-1.0, "MT", 0.20 * LB_PER_MT, "DOLLAR/MT")
+    sold_b: Row = (-1.0, "MT", 0.20 * LB_PER_MT, ("DOLLAR", "MT"))
     flat = valued(booked(A_ROW, sold_b))
     (floating,) = flat.legs
     # The same trade bought in pounds and sold in tonnes: nothing left, to the roundoff of the
@@ -286,7 +293,7 @@ def test_the_cleared_trade_has_the_same_payment_and_mark_undiscounted() -> None:
 def test_a_tonne_trade_at_a_tonne_price_is_exact() -> None:
     # 50 tonnes at 1,870 dollars a tonne is 93,500 dollars and not a cent of roundoff, on an
     # index that quotes per pound: the price is never restated in pounds.
-    batch = booked((50.0, "MT", 1870.0, "DOLLAR/MT"))
+    batch = booked((50.0, "MT", 1870.0, ("DOLLAR", "MT")))
     assert fixed_legs(batch) == [93_500.0]
     assert batch.resolved.price.tolist() == [1870.0]
     assert batch.encoded.legs[0].coefficient.tolist() == pytest.approx([50 * LB_PER_MT], **CLOSE)
@@ -296,11 +303,11 @@ def test_the_quantity_word_does_not_choose_the_prices_unit() -> None:
     # Tonnes priced per pound and lots priced per tonne: neither price is per the word the
     # quantity was entered in. Two lots are 110,232 pounds, 50.0004 tonnes.
     # 50 tonnes are 110,231.13 pounds, at 0.91 dollars: 100,310.33.
-    tonnes_at_cents_a_pound = booked((50.0, "MT", 91.0, "CENT/LB"))
+    tonnes_at_cents_a_pound = booked((50.0, "MT", 91.0, ("CENT", "LB")))
     assert fixed_legs(tonnes_at_cents_a_pound) == pytest.approx([50 * LB_PER_MT * 0.91], **CLOSE)
     assert fixed_legs(tonnes_at_cents_a_pound) == pytest.approx([100_310.3292941193], rel=1e-12)
     # 110,232 pounds are 50.0004 tonnes, at 1,870 dollars: 93,500.74.
-    lots_at_a_tonne_price = booked((2.0, "LOT", 1870.0, "DOLLAR/MT"))
+    lots_at_a_tonne_price = booked((2.0, "LOT", 1870.0, ("DOLLAR", "MT")))
     assert fixed_legs(lots_at_a_tonne_price) == pytest.approx(
         [2 * 55_116 / LB_PER_MT * 1870.0], **CLOSE
     )
@@ -311,22 +318,78 @@ def test_the_quantity_word_does_not_choose_the_prices_unit() -> None:
     assert fixed_legs(misread) == pytest.approx([50 * LB_PER_MT * 1870.0], **CLOSE)
 
 
-def test_a_unit_from_the_template_is_every_rows_and_prices_as_the_column_does() -> None:
+# --- the two fields, each from the template or the ticket -----------------------------------------
+
+TONNE = {MONEY: "DOLLAR", PER: "MT"}  # dollars a tonne, as a template's two values
+
+
+def test_a_unit_from_the_template_is_every_rows_and_prices_as_the_columns_do() -> None:
     rows: tuple[Row, ...] = ((50.0, "MT", 1870.0, None), (2.0, "LOT", 1900.0, None))
-    by_template = booked(*rows, template={**BILATERAL, "fixed_price_unit": "DOLLAR/MT"})
-    by_column = booked(*[(q, word, price, "DOLLAR/MT") for q, word, price, _ in rows])
+    by_template = booked(*rows, template={**BILATERAL, **TONNE})
+    by_column = booked(*[(q, word, price, ("DOLLAR", "MT")) for q, word, price, _ in rows])
     assert by_template.resolved.price_units == (PriceUnit("DOLLAR", "MT"),)
     assert by_template.resolved.price_unit.tolist() == [0, 0]
     np.testing.assert_array_equal(by_template.encoded.offset, by_column.encoded.offset)
     assert valued(by_template).mark == valued(by_column).mark
-    with pytest.raises(ValueError) as both:
-        booked(
-            (50.0, "MT", 1870.0, "DOLLAR/MT"),
-            template={**BILATERAL, "fixed_price_unit": "DOLLAR/MT"},
-        )
-    assert str(both.value) == (
-        "fixed_price_unit is supplied by the template and by the ticket, expected by one of them"
+
+
+def test_the_currency_on_the_template_and_the_quantity_unit_down_the_ticket() -> None:
+    # The issue's A and B with DOLLAR once on the template and LB and MT on the rows: the batch
+    # both fields typed on every row make, to the last bit.
+    all_ticket = booked(A_ROW, B_ROW)
+    plain = ticket((A_ROW[0], "LB", A_ROW[2], None), (B_ROW[0], "MT", B_ROW[2], None))
+    split = made({**plain, PER: ["LB", "MT"]}, {**BILATERAL, MONEY: "DOLLAR"})
+    assert [split.resolved.price_units[int(i)] for i in split.resolved.price_unit] == [
+        PriceUnit("DOLLAR", "LB"),
+        PriceUnit("DOLLAR", "MT"),
+    ]
+    np.testing.assert_array_equal(split.encoded.offset, all_ticket.encoded.offset)
+    one, other = valued(split), valued(all_ticket)
+    assert (one.mark, one.dv01) == (other.mark, other.dv01)
+    close(one.payment_amount, [2 * NET])
+    # And the other way round, the tonne on the template and the money down the ticket: a tonne
+    # at 440.92 dollars and at 44,092 cents.
+    turned = made(
+        {
+            **ticket((1.0, "MT", 0.20 * LB_PER_MT, None), (1.0, "MT", 20.0 * LB_PER_MT, None)),
+            MONEY: ["DOLLAR", "CENT"],
+        },
+        {**BILATERAL, PER: "MT"},
     )
+    assert fixed_legs(turned) == pytest.approx([FIXED, FIXED], **CLOSE)
+
+
+@pytest.mark.parametrize("field", [MONEY, PER])
+def test_a_field_from_the_template_and_the_ticket_is_refused_by_its_own_name(field: str) -> None:
+    with pytest.raises(ValueError) as both:
+        booked((50.0, "MT", 1870.0, ("DOLLAR", "MT")), template={**BILATERAL, field: TONNE[field]})
+    assert str(both.value) == (
+        f"{field} is supplied by the template and by the ticket, expected by one of them"
+    )
+
+
+@pytest.mark.parametrize(("held", "missing"), [(MONEY, PER), (PER, MONEY)])
+def test_one_field_without_the_other_is_refused_by_the_one_to_supply(
+    held: str, missing: str
+) -> None:
+    words = (
+        f"{missing} is missing, expected a value in the template or a column in the ticket "
+        f"beside {held}; a fixed price's unit is both fields, or neither for the index's quote "
+        "units"
+    )
+    plain = ticket((50.0, "MT", 1870.0, None), (2.0, "LOT", 1900.0, None))
+    # A template may hold one of the two, since a ticket may hold the other: it is made, and
+    # the batch whose ticket does not is refused.
+    half = {**BILATERAL, held: TONNE[held]}
+    assert held in a_template(half).names
+    one_column: dict[str, list[object]] = {**plain, held: [TONNE[held]] * 2}
+    for columns, template in ((plain, half), (one_column, BILATERAL)):
+        with pytest.raises(ValueError) as refusal:
+            made(columns, template)
+        assert str(refusal.value) == words
+    # The same half completed by the ticket is a batch.
+    whole = made({**plain, missing: [TONNE[missing]] * 2}, half)
+    assert whole.resolved.price_units == (PriceUnit("DOLLAR", "MT"),)
 
 
 # --- the default: the unit the index quotes in ----------------------------------------------------
@@ -340,7 +403,7 @@ def test_no_unit_typed_is_the_indexes_quote_unit_to_the_last_bit() -> None:
         (0.0, "MT", 0.91, None),  # a zero row, kept ready
     )
     omitted = booked(*rows)
-    typed = booked(*[(q, word, price, "DOLLAR/LB") for q, word, price, _ in rows])
+    typed = booked(*[(q, word, price, ("DOLLAR", "LB")) for q, word, price, _ in rows])
     # The omitted unit is resolved into the same record a typed one makes.
     assert (
         omitted.resolved.price_units == typed.resolved.price_units == (PriceUnit("DOLLAR", "LB"),)
@@ -359,10 +422,10 @@ def test_a_row_in_the_indexes_unit_beside_another_takes_the_first_legs_coefficie
     # A mixed batch makes every row's coefficient in its own unit, and the rows typed in the
     # index's unit come out as the first leg's coefficient to the last bit.
     batch = booked(
-        (LB_PER_MT, "LB", 0.20, "DOLLAR/LB"),
-        (50.0, "MT", 1870.0, "DOLLAR/MT"),
-        (2.0, "LOT", 0.905, "DOLLAR/LB"),
-        (7.5, "MT", 0.91, "DOLLAR/LB"),
+        (LB_PER_MT, "LB", 0.20, ("DOLLAR", "LB")),
+        (50.0, "MT", 1870.0, ("DOLLAR", "MT")),
+        (2.0, "LOT", 0.905, ("DOLLAR", "LB")),
+        (7.5, "MT", 0.91, ("DOLLAR", "LB")),
     )
     (leg,) = batch.encoded.legs
     own = [0, 2, 3]
@@ -409,7 +472,7 @@ def test_a_gallon_index_takes_a_price_per_barrel() -> None:
         measure="VOLUME",
         reports="LOT",
     )
-    for row in ((1.0, "LOT", 84.0, "DOLLAR/BBL"), (1_000.0, "BBL", 200.0, "CENT/GAL")):
+    for row in ((1.0, "LOT", 84.0, ("DOLLAR", "BBL")), (1_000.0, "BBL", 200.0, ("CENT", "GAL"))):
         batch = booked(row, index=gallons)
         assert fixed_legs(batch) == pytest.approx([84_000.0], **CLOSE)
         results = valued(batch, 210.0)
@@ -440,22 +503,22 @@ def test_heat_is_priced_in_a_unit_of_heat_and_power_in_one_of_electricity() -> N
     # 10,000 MMBTU at 30 cents a therm is 100,000 therms at 0.30: 30,000 dollars, as 3.00 a
     # MMBTU is. A megawatt hour is 3.412 MMBTU as energy, but a price of gas per megawatt hour
     # is struck at a heat rate, which is no unit conversion: refused, both ways.
-    assert fixed_legs(booked((1.0, "LOT", 30.0, "CENT/THERM"), index=GAS)) == pytest.approx(
+    assert fixed_legs(booked((1.0, "LOT", 30.0, ("CENT", "THERM")), index=GAS)) == pytest.approx(
         [30_000.0], **CLOSE
     )
-    assert fixed_legs(booked((1.0, "LOT", 3.0, "DOLLAR/MMBTU"), index=GAS)) == [30_000.0]
-    assert refused((1.0, "LOT", 10.0, "DOLLAR/MWH"), index=GAS) == (
-        "fixed_price_unit of trade 1 at row 1 is 'DOLLAR/MWH', expected a unit of heat after "
-        "the /, as the index quotes in, MMBTU, BTU, THERM or GJ; a price of power against fuel "
-        "is struck at a heat rate, which is not built"
+    assert fixed_legs(booked((1.0, "LOT", 3.0, ("DOLLAR", "MMBTU")), index=GAS)) == [30_000.0]
+    assert refused((1.0, "LOT", 10.0, ("DOLLAR", "MWH")), index=GAS) == (
+        "fixed_price_quantity_unit of trade 1 at row 1 is 'MWH', expected a unit of heat as the "
+        "index quotes in, MMBTU, BTU, THERM or GJ; a price of power against fuel is struck at a "
+        "heat rate, which is not built"
     )
     # 400 MWh at 4 cents a kilowatt hour: 400,000 kWh at 0.04, 16,000 dollars.
-    assert fixed_legs(booked((1.0, "LOT", 4.0, "CENT/KWH"), index=POWER)) == pytest.approx(
+    assert fixed_legs(booked((1.0, "LOT", 4.0, ("CENT", "KWH")), index=POWER)) == pytest.approx(
         [16_000.0], **CLOSE
     )
-    assert refused((1.0, "LOT", 3.0, "DOLLAR/MMBTU"), index=POWER) == (
-        "fixed_price_unit of trade 1 at row 1 is 'DOLLAR/MMBTU', expected a unit of electricity "
-        "after the /, as the index quotes in, MWH or KWH; a price of power against fuel is "
+    assert refused((1.0, "LOT", 3.0, ("DOLLAR", "MMBTU")), index=POWER) == (
+        "fixed_price_quantity_unit of trade 1 at row 1 is 'MMBTU', expected a unit of "
+        "electricity as the index quotes in, MWH or KWH; a price of power against fuel is "
         "struck at a heat rate, which is not built"
     )
 
@@ -477,8 +540,8 @@ def test_a_price_restated_by_hand_in_another_unit_is_the_same_fixed_leg(
     restated = (
         price * UNITS.factor("USD", money, other_money) / UNITS.factor("MASS", per, other_per)
     )
-    one = booked((quantity, "MT", price, f"{money}/{per}"))
-    other = booked((quantity, "MT", restated, f"{other_money}/{other_per}"))
+    one = booked((quantity, "MT", price, (money, per)))
+    other = booked((quantity, "MT", restated, (other_money, other_per)))
     np.testing.assert_allclose(one.encoded.offset, other.encoded.offset, rtol=1e-12, atol=1e-300)
     # And the floating side never moves with the price's unit.
     np.testing.assert_array_equal(
@@ -491,15 +554,15 @@ def test_a_price_restated_by_hand_in_another_unit_is_the_same_fixed_leg(
 
 def test_negative_and_zero_prices_and_quantities_are_booked_as_they_always_were() -> None:
     batch = booked(
-        (50.0, "MT", -12.5, "DOLLAR/MT"),  # a negative price: the fixed leg is received
-        (50.0, "MT", 0.0, "DOLLAR/MT"),
-        (-50.0, "MT", 1870.0, "DOLLAR/MT"),  # sold
-        (0.0, "MT", 1870.0, "DOLLAR/MT"),
+        (50.0, "MT", -12.5, ("DOLLAR", "MT")),  # a negative price: the fixed leg is received
+        (50.0, "MT", 0.0, ("DOLLAR", "MT")),
+        (-50.0, "MT", 1870.0, ("DOLLAR", "MT")),  # sold
+        (0.0, "MT", 1870.0, ("DOLLAR", "MT")),
     )
     assert batch.encoded.offset.tolist() == [625.0, -0.0, 93_500.0, -0.0]
     # A zero row is kept ready, and its unit is read like any other row's.
-    assert refused((0.0, "MT", 1870.0, "DOLLAR/BBL")).startswith(
-        "fixed_price_unit of trade 1 at row 1 is 'DOLLAR/BBL', expected a MASS unit"
+    assert refused((0.0, "MT", 1870.0, ("DOLLAR", "BBL"))).startswith(
+        "fixed_price_quantity_unit of trade 1 at row 1 is 'BBL', expected a MASS unit"
     )
 
 
@@ -563,7 +626,7 @@ def test_a_price_tick_moves_the_floating_side_alone_and_a_rate_tick_the_discount
 
 def test_a_strip_carries_its_rows_unit_to_every_month() -> None:
     strip = booked(
-        (50.0, "MT", 1870.0, "DOLLAR/MT"), (1.0, "LOT", 0.91, "DOLLAR/LB"), code="G27-H27"
+        (50.0, "MT", 1870.0, ("DOLLAR", "MT")), (1.0, "LOT", 0.91, ("DOLLAR", "LB")), code="G27-H27"
     )
     assert strip.resolved.occurrence.tolist() == [0, 0, 1, 1]
     assert fixed_legs(strip) == pytest.approx(
@@ -571,7 +634,7 @@ def test_a_strip_carries_its_rows_unit_to_every_month() -> None:
     )
     # Per calendar day: 2 tonnes a day over February's 28 days at 1,870 a tonne.
     daily = booked(
-        (2.0, "MT", 1870.0, "DOLLAR/MT"),
+        (2.0, "MT", 1870.0, ("DOLLAR", "MT")),
         template={**BILATERAL, "quantity_per": "calday"},
         code="G27",
     )
@@ -581,7 +644,7 @@ def test_a_strip_carries_its_rows_unit_to_every_month() -> None:
         {
             **{
                 k: v
-                for k, v in ticket((3.0, "MT", 1870.0, "DOLLAR/MT")).items()
+                for k, v in ticket((3.0, "MT", 1870.0, ("DOLLAR", "MT"))).items()
                 if k != "contract_code"
             },
             "start_date": ["2027-02-14"],
@@ -596,7 +659,8 @@ def test_a_pairs_one_outright_price_takes_a_unit_too() -> None:
     # two-index-one-price.md's pair, A plus B, 10,000 MMBTU at an outright of 3.00 a MMBTU:
     # typed as 30 cents a therm it is the same 30,000 dollars, the payment 1,000 and the mark 950.
     typed = booked_pair(
-        PAIR_BILATERAL, {**PAIR_TICKET, "fixed_price": [30.0], "fixed_price_unit": ["CENT/THERM"]}
+        PAIR_BILATERAL,
+        {**PAIR_TICKET, "fixed_price": [30.0], MONEY: ["CENT"], PER: ["THERM"]},
     )
     assert [leg.index for leg in typed.resolved.legs] == [A, B]
     close(typed.encoded.offset, [-30_000.0])
@@ -611,8 +675,11 @@ def test_the_fees_follow_the_quantity_and_never_the_prices_unit() -> None:
     # cent a tonne on the tonne row and 551.16 a lot: the reserves are the quantities' and stand
     # whatever unit the prices are in.
     index = an_index("FEE", ("DOLLAR", "LB"), fees=(0.01, 0.005))
-    rows: tuple[Row, ...] = ((50.0, "MT", 1870.0, "DOLLAR/MT"), (2.0, "LOT", 1880.0, "DOLLAR/MT"))
-    restated = [(q, word, price / LB_PER_MT, "DOLLAR/LB") for q, word, price, _ in rows]
+    rows: tuple[Row, ...] = (
+        (50.0, "MT", 1870.0, ("DOLLAR", "MT")),
+        (2.0, "LOT", 1880.0, ("DOLLAR", "MT")),
+    )
+    restated = [(q, word, price / LB_PER_MT, ("DOLLAR", "LB")) for q, word, price, _ in rows]
     omitted = [(q, word, price / LB_PER_MT, None) for q, word, price, _ in rows]
     reserves = [
         made(ticket(*each, broker=["ION", "ION"]), CLEARED, (index,)).encoded.reserves
@@ -634,8 +701,8 @@ def test_a_closed_physical_contract_is_cash_at_its_converted_fixed_legs() -> Non
         if not k.startswith("payment_")
     }
     flat = booked(
-        (3.0, "MT", 1870.0, "DOLLAR/MT"),
-        (-3.0, "MT", 90.0, "CENT/LB"),
+        (3.0, "MT", 1870.0, ("DOLLAR", "MT")),
+        (-3.0, "MT", 90.0, ("CENT", "LB")),
         template=physical,
         code="F27",
     )
@@ -644,8 +711,8 @@ def test_a_closed_physical_contract_is_cash_at_its_converted_fixed_legs() -> Non
     assert results.cash == pytest.approx(3 * LB_PER_MT * 0.90 - 3 * 1870.0, **CLOSE)
     assert results.mark == 0.0
     left_open = booked(
-        (3.0, "MT", 1870.0, "DOLLAR/MT"),
-        (-2.0, "MT", 90.0, "CENT/LB"),
+        (3.0, "MT", 1870.0, ("DOLLAR", "MT")),
+        (-2.0, "MT", 90.0, ("CENT", "LB")),
         template=physical,
         code="F27",
     )
@@ -655,101 +722,91 @@ def test_a_closed_physical_contract_is_cash_at_its_converted_fixed_legs() -> Non
 
 # --- what is refused ------------------------------------------------------------------------------
 
-NO_FORM = "expected a currency unit and a quantity unit joined by one /, such as DOLLAR/MT"
+MONEY_UNITS = "DOLLAR or CENT"
+MASS_UNITS = "a MASS unit, KG, LB, MT, ST, LT, G, OZT or CWT_US"
 
 
 @pytest.mark.parametrize(
-    "text",
-    ["DOLLAR", "DOLLAR/", "/MT", "/", "DOLLAR/MT/LB", "DOLLAR//MT", "DOLLAR-MT", "DOLLAR MT"],
-)
-def test_a_unit_that_is_not_two_codes_and_one_slash_is_refused_by_its_field_and_row(
-    text: str,
-) -> None:
-    good: Row = (1.0, "MT", 1870.0, "DOLLAR/MT")
-    assert (
-        refused(good, (1.0, "MT", 1870.0, text)) == f"fixed_price_unit row 2 is {text!r}, {NO_FORM}"
-    )
-    # In a template the form is read when the template is made, by the field alone.
-    with pytest.raises(ValueError) as refusal:
-        a_template({**BILATERAL, "fixed_price_unit": text})
-    assert str(refusal.value) == f"fixed_price_unit is {text!r}, {NO_FORM}"
-
-
-MASS_UNITS = "a MASS unit, KG, LB, MT, ST, LT, G, OZT or CWT_US, after the /"
-
-
-@pytest.mark.parametrize(
-    ("text", "expected"),
+    ("unit", "field", "expected"),
     [
-        ("USD/MT", "DOLLAR or CENT before the /"),  # the currency's name is no unit of it
-        ("dollar/MT", "DOLLAR or CENT before the /"),
-        (" DOLLAR/MT", "DOLLAR or CENT before the /"),
-        ("DOLLAR /MT", "DOLLAR or CENT before the /"),
-        ("MT/DOLLAR", "DOLLAR or CENT before the /"),
-        ("DOLLAR/mt", MASS_UNITS),
-        ("DOLLAR/ MT", MASS_UNITS),
-        ("DOLLAR/MT ", MASS_UNITS),
-        ("DOLLAR/BBL", MASS_UNITS),  # a volume under a mass index: a density, which is not here
-        ("DOLLAR/MMBTU", MASS_UNITS),
-        ("DOLLAR/LOT", MASS_UNITS),  # the desk's word for a specification is no unit
-        ("DOLLAR/TONNE", MASS_UNITS),
+        (("USD", "MT"), MONEY, MONEY_UNITS),  # the currency's name is no unit of it
+        (("dollar", "MT"), MONEY, MONEY_UNITS),
+        ((" DOLLAR", "MT"), MONEY, MONEY_UNITS),
+        (("DOLLAR ", "MT"), MONEY, MONEY_UNITS),
+        (("MT", "DOLLAR"), MONEY, MONEY_UNITS),  # the two the wrong way round
+        (("DOLLAR/MT", "MT"), MONEY, MONEY_UNITS),  # a unit with a slash is no code
+        (("USD", "BBL"), MONEY, MONEY_UNITS),  # both wrong: the currency unit is read first
+        (("DOLLAR", "mt"), PER, MASS_UNITS),
+        (("DOLLAR", " MT"), PER, MASS_UNITS),
+        (("DOLLAR", "MT "), PER, MASS_UNITS),
+        (("DOLLAR", "BBL"), PER, MASS_UNITS),  # a volume under a mass index: a density
+        (("DOLLAR", "MMBTU"), PER, MASS_UNITS),
+        (("DOLLAR", "LOT"), PER, MASS_UNITS),  # the desk's word for a specification is no unit
+        (("DOLLAR", "TONNE"), PER, MASS_UNITS),
+        (("DOLLAR", "DOLLAR/MT"), PER, MASS_UNITS),
     ],
 )
-def test_a_code_the_tables_do_not_hold_for_the_index_is_refused_by_its_trade(
-    text: str, expected: str
+def test_a_code_the_tables_do_not_hold_for_the_index_is_refused_by_its_field_and_trade(
+    unit: Unit, field: str, expected: str
 ) -> None:
-    good: Row = (1.0, "MT", 1870.0, "DOLLAR/MT")
-    assert refused(good, (1.0, "MT", 1870.0, text)) == (
-        f"fixed_price_unit of trade 2 at row 2 is {text!r}, expected {expected}"
+    good: Row = (1.0, "MT", 1870.0, ("DOLLAR", "MT"))
+    code = unit[(MONEY, PER).index(field)]
+    assert refused(good, (1.0, "MT", 1870.0, unit)) == (
+        f"{field} of trade 2 at row 2 is {code!r}, expected {expected}"
     )
-    # The template's one unit is every row's, and the first row's trade names it.
+    # A template's unit is every row's: the template is made, no table being at hand to read a
+    # code by, and the batch is refused naming the first row's trade.
+    by_template = {**BILATERAL, MONEY: unit[0], PER: unit[1]}
     assert (
-        refused((1.0, "MT", 1870.0, None), template={**BILATERAL, "fixed_price_unit": text})
-        == f"fixed_price_unit of trade 1 at row 1 is {text!r}, expected {expected}"
+        refused((1.0, "MT", 1870.0, None), template=by_template)
+        == f"{field} of trade 1 at row 1 is {code!r}, expected {expected}"
     )
 
 
 def test_the_first_row_from_the_top_with_a_bad_unit_is_the_one_named() -> None:
-    good: Row = (1.0, "MT", 1870.0, "DOLLAR/MT")
-    # "DOLLAR/ZZ" at row 2 and "DOLLAR/AA" at row 3: row 2, whichever text sorts first.
-    assert refused(good, (1.0, "MT", 1.0, "DOLLAR/ZZ"), (1.0, "MT", 1.0, "DOLLAR/AA")) == (
-        f"fixed_price_unit of trade 2 at row 2 is 'DOLLAR/ZZ', expected {MASS_UNITS}"
-    )
-    assert refused(good, (1.0, "MT", 1.0, "ZZ-MT"), (1.0, "MT", 1.0, "AA-MT")) == (
-        f"fixed_price_unit row 2 is 'ZZ-MT', {NO_FORM}"
+    good: Row = (1.0, "MT", 1870.0, ("DOLLAR", "MT"))
+    # ZZ at row 2 and AA at row 3: row 2, whichever text sorts first, and whichever of the two
+    # fields the row below it breaks.
+    for below in (("DOLLAR", "AA"), ("AA", "MT")):
+        assert refused(good, (1.0, "MT", 1.0, ("DOLLAR", "ZZ")), (1.0, "MT", 1.0, below)) == (
+            f"{PER} of trade 2 at row 2 is 'ZZ', expected {MASS_UNITS}"
+        )
+    assert refused(good, (1.0, "MT", 1.0, ("ZZ", "MT")), (1.0, "MT", 1.0, ("DOLLAR", "AA"))) == (
+        f"{MONEY} of trade 2 at row 2 is 'ZZ', expected {MONEY_UNITS}"
     )
 
 
 def test_a_supplied_column_never_falls_back_to_the_default_on_a_row() -> None:
-    # A column on the ticket holds a unit on every row. A blank cell and an empty text never
+    # A column on the ticket holds a code on every row. A blank cell and an empty text never
     # reach the library: the seam refuses each for a field whose cells must hold a value, as it
     # does for any field but the three of a period.
-    field = next(field for field in FIXED_FLOAT.fields if field.name == "fixed_price_unit")
-    assert not field.may_be_unsupplied
+    for name in (MONEY, PER):
+        field = next(field for field in FIXED_FLOAT.fields if field.name == name)
+        assert not field.may_be_unsupplied
     count = bridge.entry("CountFieldRows")
-    headers = Cells.from_rows([["quantity", "fixed_price_unit"]])
-    assert (
-        count("fixed_float", headers, Cells.from_rows([[1.0, "DOLLAR/MT"], [2.0, "CENT/LB"]]))
-        == 2.0
-    )
-    for held, words in ((None, "blank"), ("", "empty text")):
-        body = Cells.from_rows([[1.0, "DOLLAR/MT"], [2.0, held]])
-        assert count("fixed_float", headers, body) == (
-            f"#ERROR CountFieldRows: rows cell (2, 2) is {words}, expected text"
-        )
+    headers = Cells.from_rows([["quantity", MONEY, PER]])
+    whole: list[list[object]] = [[1.0, "DOLLAR", "MT"], [2.0, "CENT", "LB"]]
+    assert count("fixed_float", headers, Cells.from_rows(whole)) == 2.0
+    for column in (2, 3):
+        for held, words in ((None, "blank"), ("", "empty text")):
+            second = list(whole[1])
+            second[column - 1] = held
+            assert count("fixed_float", headers, Cells.from_rows([whole[0], second])) == (
+                f"#ERROR CountFieldRows: rows cell (2, {column}) is {words}, expected text"
+            )
 
 
 def test_a_conversion_or_a_fixed_leg_past_the_largest_number_is_refused_by_its_trade() -> None:
     # On an index quoted per tonne, 1e306 tonnes is a quantity the floating side holds, and a
     # million times as many grams is not: the fixed price's own coefficient outruns.
     tonnes = an_index("MWT", ("DOLLAR", "MT"))
-    assert refused((1e306, "MT", 1.0, "DOLLAR/G"), index=tonnes) == (
+    assert refused((1e306, "MT", 1.0, ("DOLLAR", "G")), index=tonnes) == (
         "trade 1 at row 1 has inf of fixed coefficient, expected a finite amount of DOLLAR per "
         "DOLLAR/G; its count times its specification's size in the fixed price's unit and the "
         "currency factor outruns the largest number"
     )
     # And a coefficient that stands times a price too large is the fixed leg's, as before.
-    assert refused((1e300, "MT", 1e10, "DOLLAR/MT"), index=tonnes) == (
+    assert refused((1e300, "MT", 1e10, ("DOLLAR", "MT")), index=tonnes) == (
         "trade 1 at row 1 has -inf of fixed leg, expected a finite amount of DOLLAR; its "
         "coefficient times its fixed price outruns the largest number"
     )
@@ -843,12 +900,17 @@ def _observed(terms: ResolvedTrades) -> Any:
 # one contract, each its own quantity word and its own price unit.
 
 SHEET_ROWS: tuple[Row, ...] = (
-    (50.0, "MT", 1870.0, "DOLLAR/MT"),
-    (275_578.0, "LB", 0.91, "DOLLAR/LB"),
-    (2.0, "LOT", 1870.0, "DOLLAR/MT"),
-    (50.0, "MT", 91.0, "CENT/LB"),
+    (50.0, "MT", 1870.0, ("DOLLAR", "MT")),
+    (275_578.0, "LB", 0.91, ("DOLLAR", "LB")),
+    (2.0, "LOT", 1870.0, ("DOLLAR", "MT")),
+    (50.0, "MT", 91.0, ("CENT", "LB")),
 )
-SHEET_UNITS = ["DOLLAR/MT", "DOLLAR/LB", "DOLLAR/MT", "CENT/LB"]
+SHEET_UNITS: list[tuple[object, object]] = [
+    ("DOLLAR", "MT"),
+    ("DOLLAR", "LB"),
+    ("DOLLAR", "MT"),
+    ("CENT", "LB"),
+]
 # Each row's fixed leg by hand: 50 x 1,870; 275,578 x 0.91; 110,232 lb as tonnes x 1,870; and
 # 50 tonnes as pounds x 0.91.
 SHEET_FIXED = [93_500.0, 250_775.98, 93_500.7370228008, 100_310.3292941193]
@@ -856,11 +918,17 @@ SHEET_FIXED = [93_500.0, 250_775.98, 93_500.7370228008, 100_310.3292941193]
 SHEET_PAYMENT = 37_871.60275871356
 
 
-def test_the_readback_shows_each_price_as_entered_with_its_unit_in_the_last_column() -> None:
+def units_of(table: list[list[object]]) -> list[tuple[object, object]]:
+    """Each component's fixed price's unit as a readback shows it, under the two fields."""
+    return list(zip(under(table, MONEY), under(table, PER), strict=True))
+
+
+def test_the_readback_shows_each_price_as_entered_with_its_unit_in_the_last_columns() -> None:
     table = grid(booked(*SHEET_ROWS))
-    assert table[0][-2:] == ["payment_holiday_key", "fixed_price_unit"]  # last, no column moved
-    assert table[1][-1] == "str"
-    assert under(table, "fixed_price_unit") == SHEET_UNITS
+    # The two fields last, in the definition's order, and no column before them moved.
+    assert table[0][-3:] == ["payment_holiday_key", MONEY, PER]
+    assert table[1][-2:] == ["str", "str"]
+    assert units_of(table) == SHEET_UNITS
     assert under(table, "fixed_price") == [1870.0, 0.91, 1870.0, 91.0]  # as entered
     assert under(table, "quantity_unit") == ["MT", "LB", "LOT", "MT"]
     assert [-float(str(each)) for each in under(table, "offset")] == pytest.approx(
@@ -875,44 +943,49 @@ def test_the_readback_shows_each_price_as_entered_with_its_unit_in_the_last_colu
 
 def test_the_readback_says_the_indexes_unit_where_none_was_typed() -> None:
     # The price never stands without its unit: no column and no template value, and the
-    # readback shows the unit the index quotes in on every row.
+    # readback shows the two units the index quotes in on every row.
     table = grid(booked(*[(q, word, price, None) for q, word, price, _ in SHEET_ROWS]))
-    assert table[0][-1] == "fixed_price_unit"
-    assert under(table, "fixed_price_unit") == ["DOLLAR/LB"] * 4
+    assert table[0][-2:] == [MONEY, PER]
+    assert units_of(table) == [("DOLLAR", "LB")] * 4
     cents = an_index("MWC", ("CENT", "LB"))
-    assert under(grid(booked((1.0, "MT", 20.0, None), index=cents)), "fixed_price_unit") == [
-        "CENT/LB"
-    ]
-    # A template's one unit is every row's, and a strip carries its row's unit to each month.
+    assert units_of(grid(booked((1.0, "MT", 20.0, None), index=cents))) == [("CENT", "LB")]
+    # A template's unit is every row's, and a strip carries its row's unit to each month.
     by_template = grid(
-        booked(
-            (50.0, "MT", 1870.0, None),
-            template={**BILATERAL, "fixed_price_unit": "DOLLAR/MT"},
-            code="G27-H27",
+        booked((50.0, "MT", 1870.0, None), template={**BILATERAL, **TONNE}, code="G27-H27")
+    )
+    assert units_of(by_template) == [("DOLLAR", "MT")] * 2
+    # So does a strip whose rows take the money from the template and the rest from the ticket.
+    split = grid(
+        made(
+            {
+                **ticket((50.0, "MT", 1870.0, None), (2.0, "LOT", 0.91, None), code="G27-H27"),
+                PER: ["MT", "LB"],
+            },
+            {**BILATERAL, MONEY: "DOLLAR"},
         )
     )
-    assert under(by_template, "fixed_price_unit") == ["DOLLAR/MT", "DOLLAR/MT"]
-    # A physical batch has no payment key before it; the unit is still the last column.
+    assert units_of(split) == [("DOLLAR", "MT")] * 2 + [("DOLLAR", "LB")] * 2
+    # A physical batch has no payment key before them; the unit is still the last two columns.
     physical = {
         k: v
         for k, v in {**CLEARED, "settlement_method": "physical"}.items()
         if not k.startswith("payment_")
     }
-    table = grid(booked((3.0, "MT", 1870.0, "DOLLAR/MT"), template=physical))
-    assert table[0][-2:] == ["nearby", "fixed_price_unit"]
-    assert cell(table, 0, "fixed_price_unit") == "DOLLAR/MT"
+    table = grid(booked((3.0, "MT", 1870.0, ("DOLLAR", "MT")), template=physical))
+    assert table[0][-3:] == ["nearby", MONEY, PER]
+    assert units_of(table) == [("DOLLAR", "MT")]
 
 
 def test_a_pairs_readback_shows_its_outright_prices_unit() -> None:
     typed = grid(
         booked_pair(
             PAIR_BILATERAL,
-            {**PAIR_TICKET, "fixed_price": [30.0], "fixed_price_unit": ["CENT/THERM"]},
+            {**PAIR_TICKET, "fixed_price": [30.0], MONEY: ["CENT"], PER: ["THERM"]},
         )
     )
-    assert cell(typed, 0, "fixed_price") == 30.0 and typed[0][-1] == "fixed_price_unit"
-    assert cell(typed, 0, "fixed_price_unit") == "CENT/THERM"
-    assert cell(grid(booked_pair()), 0, "fixed_price_unit") == "DOLLAR/MMBTU"
+    assert cell(typed, 0, "fixed_price") == 30.0 and typed[0][-2:] == [MONEY, PER]
+    assert units_of(typed) == [("CENT", "THERM")]
+    assert units_of(grid(booked_pair())) == [("DOLLAR", "MMBTU")]
 
 
 # --- on the sheet ---------------------------------------------------------------------------------
@@ -967,6 +1040,7 @@ def sheet() -> dict[str, Any]:
         "payment_holiday_key",
     )
     values = ("month", "monthly", 1.0, "lastday", "cleared", "financial", "CME Clearing", "+2bd")
+    names = ("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price")
     return {
         "index": index,
         "history": history,
@@ -978,33 +1052,30 @@ def sheet() -> dict[str, Any]:
         "template": SEAM["_CreateTradeTemplate"](
             "fixed_float", across(*fields), across(*values, seam_key(holidays))
         ),
-        "headers": across(
-            "trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price"
-        ),
-        "unit_headers": across(
-            "trade_id",
-            "trade_date",
-            "contract_code",
-            "quantity",
-            "quantity_unit",
-            "fixed_price",
-            "fixed_price_unit",
-        ),
+        "names": names,
+        "headers": across(*names),
+        "unit_headers": across(*names, MONEY, PER),
     }
 
 
-def sheet_rows(*rows: tuple[float, str, float, object]) -> Cells:
-    """Ticket rows on G27 as the sheet holds them, the last cell each row's price unit."""
+def sheet_rows(*rows: tuple[object, ...]) -> Cells:
+    """Ticket rows on G27 as the sheet holds them: each row's quantity, quantity unit and fixed
+    price, then whatever cells of the price's unit its ticket has columns for."""
     return Cells.from_rows(
-        [
-            [float(i + 1), serial("2026-12-15"), "G27", quantity, word, price, unit]
-            for i, (quantity, word, price, unit) in enumerate(rows)
-        ]
+        [[float(i + 1), serial("2026-12-15"), "G27", *row] for i, row in enumerate(rows)]
     )
 
 
 SHEET_WORDS = {"MT": "mt", "LB": "lb", "LOT": "lots"}
-ON_SHEET = tuple((q, SHEET_WORDS[word], price, unit) for q, word, price, unit in SHEET_ROWS)
+ON_SHEET = tuple(
+    (q, SHEET_WORDS[word], price, *unit)
+    for (q, word, price, _), unit in zip(SHEET_ROWS, SHEET_UNITS, strict=True)
+)
+PARTIAL = (
+    "fixed_price_quantity_unit is missing, expected a value in the template or a column in the "
+    "ticket beside fixed_price_currency_unit; a fixed price's unit is both fields, or neither "
+    "for the index's quote units"
+)
 
 
 def test_the_sheet_books_mixed_units_values_them_and_reads_them_back(
@@ -1015,8 +1086,8 @@ def test_the_sheet_books_mixed_units_values_them_and_reads_them_back(
     )
     assert re.fullmatch(rf"{PID}:trades:AUP:\d+", str(batch))
     table = read(batch)
-    assert table[0][-1] == "fixed_price_unit" and table[1][-1] == "str"
-    assert under(table, "fixed_price_unit") == SHEET_UNITS
+    assert table[0][-2:] == [MONEY, PER] and table[1][-2:] == ["str", "str"]
+    assert units_of(table) == SHEET_UNITS
     assert under(table, "fixed_price") == [1870.0, 0.91, 1870.0, 91.0]
     assert [-float(str(each)) for each in under(table, "offset")] == pytest.approx(
         SHEET_FIXED, rel=1e-12
@@ -1035,84 +1106,115 @@ def test_the_sheet_books_mixed_units_values_them_and_reads_them_back(
 
 def test_the_sheet_reads_the_default_and_a_templates_unit(sheet: dict[str, Any]) -> None:
     # No column and no template value: every price in the index's unit, and the readback says so.
-    rows = Cells.from_rows([[2.0, serial("2026-12-15"), "G27", 275_578.0, "lb", 0.91]])
+    rows = sheet_rows((275_578.0, "lb", 0.91))
     plain = read(SEAM["_CreateTrades"](sheet["index"], sheet["headers"], rows, sheet["template"]))
-    assert under(plain, "fixed_price_unit") == ["DOLLAR/LB"]
+    assert units_of(plain) == [("DOLLAR", "LB")]
     assert under(plain, "offset") == [-250_775.98]
-    # The template's one unit, every row's.
+    # The template's unit, every row's.
     tonne_template = SEAM["_CreateTradeTemplate"](
         "fixed_float",
-        across(*sheet["fields"], "fixed_price_unit"),
-        across(*sheet["values"], "DOLLAR/MT"),
+        across(*sheet["fields"], MONEY, PER),
+        across(*sheet["values"], "DOLLAR", "MT"),
     )
-    rows = Cells.from_rows([[1.0, serial("2026-12-15"), "G27", 50.0, "mt", 1870.0]])
+    rows = sheet_rows((50.0, "mt", 1870.0))
     priced = read(SEAM["_CreateTrades"](sheet["index"], sheet["headers"], rows, tonne_template))
-    assert under(priced, "fixed_price_unit") == ["DOLLAR/MT"]
+    assert units_of(priced) == [("DOLLAR", "MT")]
     assert under(priced, "offset") == [-93_500.0]
-    # And never both.
+    # And never both, each field refused by its own name.
     assert SEAM["_CreateTrades"](
         sheet["index"],
         sheet["unit_headers"],
-        sheet_rows((50.0, "mt", 1870.0, "DOLLAR/MT")),
+        sheet_rows((50.0, "mt", 1870.0, "DOLLAR", "MT")),
         tonne_template,
     ) == (
-        "#ERROR _CreateTrades: ValueError: fixed_price_unit is supplied by the template and by "
-        "the ticket, expected by one of them"
+        "#ERROR _CreateTrades: ValueError: fixed_price_currency_unit is supplied by the template "
+        "and by the ticket, expected by one of them"
     )
 
 
-SHEET_REFUSALS: list[tuple[object, str]] = [
+def test_the_sheet_takes_the_money_from_the_template_and_the_rest_from_the_ticket(
+    sheet: dict[str, Any],
+) -> None:
+    # Dollars once, on the template, and the tonne and the pound down the ticket: the first two
+    # rows of the mixed batch, to the cent.
+    dollars = SEAM["_CreateTradeTemplate"](
+        "fixed_float", across(*sheet["fields"], MONEY), across(*sheet["values"], "DOLLAR")
+    )
+    assert spilled(SEAM["util_ReadHandle"](dollars))[0][-1] == MONEY  # the half it holds
+    rows = sheet_rows((50.0, "mt", 1870.0, "MT"), (275_578.0, "lb", 0.91, "LB"))
+    split = read(SEAM["_CreateTrades"](sheet["index"], across(*sheet["names"], PER), rows, dollars))
+    assert units_of(split) == SHEET_UNITS[:2]
+    assert [-float(str(each)) for each in under(split, "offset")] == SHEET_FIXED[:2]
+    # The template's half with no other half on the ticket is refused by the field to supply.
+    rows = sheet_rows((50.0, "mt", 1870.0))
+    assert (
+        SEAM["_CreateTrades"](sheet["index"], sheet["headers"], rows, dollars)
+        == f"#ERROR _CreateTrades: ValueError: {PARTIAL}"
+    )
+
+
+MASS_ON_SHEET = "expected a MASS unit, KG, LB, MT, ST, LT, G, OZT or CWT_US"
+SHEET_REFUSALS: list[tuple[object, object, str]] = [
     (
-        "DOLLAR-MT",
-        "ValueError: fixed_price_unit row 2 is 'DOLLAR-MT', expected a currency unit and a "
-        "quantity unit joined by one /, such as DOLLAR/MT",
+        "USD",
+        "MT",
+        f"ValueError: {MONEY} of trade 2 at row 2 is 'USD', expected DOLLAR or CENT",
     ),
     (
-        "USD/MT",
-        "ValueError: fixed_price_unit of trade 2 at row 2 is 'USD/MT', expected DOLLAR or CENT "
-        "before the /",
+        "DOLLAR/MT",  # a unit with a slash is no code
+        "MT",
+        f"ValueError: {MONEY} of trade 2 at row 2 is 'DOLLAR/MT', expected DOLLAR or CENT",
     ),
+    ("DOLLAR", "BBL", f"ValueError: {PER} of trade 2 at row 2 is 'BBL', {MASS_ON_SHEET}"),
     (
-        "DOLLAR/BBL",
-        "ValueError: fixed_price_unit of trade 2 at row 2 is 'DOLLAR/BBL', expected a MASS unit, "
-        "KG, LB, MT, ST, LT, G, OZT or CWT_US, after the /",
+        "DOLLAR",
+        "lots",  # the row's own quantity word is a specification and no unit
+        f"ValueError: {PER} of trade 2 at row 2 is 'lots', {MASS_ON_SHEET}",
     ),
-    (
-        "DOLLAR/lots",  # the row's own quantity word is a specification and no unit
-        "ValueError: fixed_price_unit of trade 2 at row 2 is 'DOLLAR/lots', expected a MASS unit, "
-        "KG, LB, MT, ST, LT, G, OZT or CWT_US, after the /",
-    ),
-    (None, "trade_rows cell (2, 7) is blank, expected text"),
-    ("", "trade_rows cell (2, 7) is empty text, expected text"),
-    (1870.0, "trade_rows cell (2, 7) is number 1870.0, expected text"),
+    (None, "MT", "trade_rows cell (2, 7) is blank, expected text"),
+    ("", "MT", "trade_rows cell (2, 7) is empty text, expected text"),
+    ("DOLLAR", None, "trade_rows cell (2, 8) is blank, expected text"),
+    ("DOLLAR", "", "trade_rows cell (2, 8) is empty text, expected text"),
+    ("DOLLAR", 1870.0, "trade_rows cell (2, 8) is number 1870.0, expected text"),
 ]
 
 
 @pytest.mark.parametrize(
-    ("unit", "words"), SHEET_REFUSALS, ids=[repr(u) for u, _ in SHEET_REFUSALS]
+    ("money", "per", "words"), SHEET_REFUSALS, ids=[repr(case[:2]) for case in SHEET_REFUSALS]
 )
-def test_the_sheet_refuses_a_unit_by_its_row_in_the_librarys_words_or_the_seams(
-    sheet: dict[str, Any], unit: object, words: str
+def test_the_sheet_refuses_a_unit_by_its_field_and_row_in_the_librarys_words_or_the_seams(
+    sheet: dict[str, Any], money: object, per: object, words: str
 ) -> None:
-    rows = sheet_rows((50.0, "mt", 1870.0, "DOLLAR/MT"), (2.0, "lots", 1870.0, unit))
+    rows = sheet_rows((50.0, "mt", 1870.0, "DOLLAR", "MT"), (2.0, "lots", 1870.0, money, per))
     assert (
         SEAM["_CreateTrades"](sheet["index"], sheet["unit_headers"], rows, sheet["template"])
         == f"#ERROR _CreateTrades: {words}"
     )
 
 
-def test_the_sheet_refuses_the_field_where_it_is_none_of_the_instruments() -> None:
-    # A template reads the form when it is made; a spread has its own two unit fields.
-    assert SEAM["_CreateTradeTemplate"](
-        "fixed_float", across("fixed_price_unit"), across("DOLLAR")
-    ) == (
-        "#ERROR _CreateTradeTemplate: ValueError: fixed_price_unit is 'DOLLAR', expected a "
-        "currency unit and a quantity unit joined by one /, such as DOLLAR/MT"
-    )
+def test_the_sheet_refuses_the_one_cell_field_and_a_spread_the_two(sheet: dict[str, Any]) -> None:
+    # fixed_price_unit, one cell with a slash, is no field of the instrument: a template's row
+    # and a ticket's column of that name are each refused as any unknown field is. A spread has
+    # its own two unit fields and takes neither of a fixed price's.
+    for instrument, field in (
+        ("fixed_float", "fixed_price_unit"),
+        ("float_float", MONEY),
+        ("float_float", PER),
+    ):
+        refusal = str(SEAM["_CreateTradeTemplate"](instrument, across(field), across("DOLLAR")))
+        assert refusal.startswith(
+            f"#ERROR _CreateTradeTemplate: fields cell (1, 1) is text {field!r}, expected a "
+            f"field of {instrument}: "
+        )
     refusal = str(
-        SEAM["_CreateTradeTemplate"]("float_float", across("fixed_price_unit"), across("DOLLAR/MT"))
+        SEAM["_CreateTrades"](
+            sheet["index"],
+            across(*sheet["names"], "fixed_price_unit"),
+            sheet_rows((50.0, "mt", 1870.0, "DOLLAR/MT")),
+            sheet["template"],
+        )
     )
     assert refusal.startswith(
-        "#ERROR _CreateTradeTemplate: fields cell (1, 1) is text 'fixed_price_unit', expected a "
-        "field of float_float: "
+        "#ERROR _CreateTrades: fields cell (1, 7) is text 'fixed_price_unit', expected a field "
+        "of fixed_float: "
     )

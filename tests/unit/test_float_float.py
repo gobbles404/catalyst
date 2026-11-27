@@ -619,11 +619,12 @@ def test_the_created_spread_reads_back_its_price_under_its_own_name() -> None:
     # Its unit follows it, as typed, float-float-units.md, and no other column moves.
     units = ["spread_price_currency_unit", "spread_price_quantity_unit"]
     assert headings[at + 1 : at + 3] == units
-    # A pair's last column, since #273, is its fixed price's unit, which a spread shows as
-    # the two beside its price and so not again.
-    assert pair[-1] == "fixed_price_unit" and "fixed_price_unit" not in headings
+    # A pair's last two columns, since #273, are its fixed price's unit, which a spread shows
+    # as the two beside its price and so not again.
+    fixed_units = ["fixed_price_currency_unit", "fixed_price_quantity_unit"]
+    assert pair[-2:] == fixed_units and not set(fixed_units) & set(headings)
     assert [h for h in headings if h not in ("spread_price", *units)] == [
-        h for h in pair if h not in ("fixed_price", "fixed_price_unit")
+        h for h in pair if h not in ("fixed_price", *fixed_units)
     ]
     assert cell(table, 0, "spread_price") == 0.10
     assert [cell(table, 0, unit) for unit in units] == ["DOLLAR", "MMBTU"]
@@ -782,8 +783,10 @@ FIELDS = (
 SPREAD_FIELDS = FIELDS.format(
     price="spread_price, spread_price_currency_unit, spread_price_quantity_unit"
 )
-# A fixed_float's own list: its fixed price, and last, since #273, that price's unit.
-FIXED_FIELDS = FIELDS.format(price="fixed_price") + ", fixed_price_unit"
+# A fixed_float's own list: its fixed price, and last, since #273, that price's two units.
+FIXED_FIELDS = (
+    FIELDS.format(price="fixed_price") + ", fixed_price_currency_unit, fixed_price_quantity_unit"
+)
 TEMPLATE_FIELDS = (
     "spread_price_currency_unit",
     "spread_price_quantity_unit",

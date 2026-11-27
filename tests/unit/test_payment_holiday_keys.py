@@ -115,10 +115,11 @@ def paid(batch: Trades) -> list[str]:
 
 def keys_read_back(batch: Trades) -> list[str]:
     """Each row's key as entered, read off the trades readback: its last column, but for a
-    fixed_float's fixed price's unit, which stands after it since #273."""
+    fixed_float's fixed price's two units, which stand after it since #273."""
     table = grid(batch)
     at = table[0].index("payment_holiday_key")
-    assert table[0][at + 1 :] in ([], ["fixed_price_unit"]) and table[1][at] == "str"
+    fixed_units = ["fixed_price_currency_unit", "fixed_price_quantity_unit"]
+    assert table[0][at + 1 :] in ([], fixed_units) and table[1][at] == "str"
     return [str(key) for key in under(table, "payment_holiday_key")]
 
 
@@ -467,8 +468,12 @@ def test_the_sheet_books_each_row_on_the_calendar_its_key_selects(sheet: dict[st
         serial("2027-02-01"),
         serial("2027-02-01"),
     ]
-    assert table[0][-2:] == ["payment_holiday_key", "fixed_price_unit"]
-    assert table[1][-2:] == ["str", "str"]
+    assert table[0][-3:] == [
+        "payment_holiday_key",
+        "fixed_price_currency_unit",
+        "fixed_price_quantity_unit",
+    ]
+    assert table[1][-3:] == ["str", "str", "str"]
     assert under(table, "payment_holiday_key") == ["OPEN", "JAN_28", "JAN_28+OPEN"]
 
 
