@@ -186,7 +186,7 @@ def test_the_float_float_is_the_fixed_float_with_a_spread_price_and_both_methods
         "bilateral",
         "financial",
     ]
-    assert by_name["settlement_frequency"].options == "monthly"
+    assert by_name["settlement_frequency"].options == "monthly, onetime"  # since #279
     assert by_name["nearby"].options == "1"
     # The fields booked as a fixed_float books them are that definition's own, but for the quote.
     booked = {field.name: field for field in FIXED_FLOAT.fields}

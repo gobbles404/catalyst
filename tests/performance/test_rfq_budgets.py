@@ -223,7 +223,6 @@ def test_creation_runs_the_resolution_once_and_nothing_of_the_pricing(
         "schedule_months": 1,
         "month_and_year": 13,  # the schedule's thirteen codes; the rows' twelve go through the
         # period grammar below
-        "contract_days": 1,  # the days the schedule's contracts price on, a window's search key
         "resolve_periods": 1,  # each row's period by the booking's rule, since dated-quotes.md
         "resolve_periods.<locals>.<lambda>": 12,  # each distinct code named for its first row
         "_where": 12,
@@ -494,6 +493,8 @@ def test_a_request_of_windows_resolves_each_row_once_and_reprices_resolving_noth
     by_dates = call_profile(lambda: rfq(CAL, WINDOWS, ONETIME, WorkCounter()))
     assert by_dates == {
         **{name: count for name, count in by_code.items() if name not in BY_CODE},
+        "_the_averaged": 1,  # the method's look under onetime, a step of its own since #279
+        "contract_days": 1,  # a window's search key, made since #279 for windows alone
         "FieldValues.dates": 2,
         "FieldValues.supplied_rows": 2,
         "month_bounds": 2,  # and the windows' last months' ends

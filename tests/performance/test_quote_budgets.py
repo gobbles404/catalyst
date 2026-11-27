@@ -457,6 +457,7 @@ def test_two_dates_run_the_quotes_functions_once_but_the_labels(call_profile: Ca
     )
     assert window == {
         **shared,
+        "_the_averaged": 1,  # the method's look under onetime, a step of its own since #279
         "quote_by_dates": 1,
         "quote_by_dates.<locals>.<lambda>": 1,
         "_the_dates": 1,

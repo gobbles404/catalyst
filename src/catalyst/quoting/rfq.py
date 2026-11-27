@@ -52,7 +52,6 @@ from catalyst.trades.resolution import (
     PAYMENT_SHIFTS,
     SCHEDULE_CODES_READ,
     TICKET_CODES_READ,
-    contract_days,
     last_days,
     resolve_periods,
 )
@@ -148,8 +147,7 @@ def rfq(index: Index, ticket: FieldValues, template: QuoteTemplate, counter: Wor
         ends,
         _where,
         np.full(n, onetime, dtype=np.bool_),
-        ((schedule_months(schedule), "the index's schedule"),),
-        contract_days(schedule),
+        ((schedule_months(schedule), "the index's schedule", schedule),),
     )
     counter.hit(TICKET_CODES_READ, periods.codes_read)
     occurrence, contract = periods.occurrence, periods.contracts[0]

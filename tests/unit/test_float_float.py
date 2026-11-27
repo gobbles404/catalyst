@@ -735,9 +735,11 @@ def test_the_pairs_rules_stand_in_their_words() -> None:
         "settlement_frequency": "onetime",
         "quantity_per": "period",
     }
+    # A onetime spread is two futures indexes', since #279: B is a published index.
     assert refused(onetime, window, (A, B)) == (
-        "settlement_frequency of trade 1 at row 1 is 'onetime', expected 'monthly' with two "
-        "indexes; a onetime period on a pair is not built"
+        "settlement_frequency of trade 1 at row 1 is 'onetime', expected 'monthly' with a "
+        "published second index; one average across months would weight each month by its "
+        "number of prints, and a strip settles month by month"
     )
     assert refused({**BILATERAL, "schedule_method": "asian", "nearby": 2.0}, indexes=(A, B)) == (
         "nearby of trade 1 at row 1 is 2, expected 1 with two indexes; a later nearby on a pair "

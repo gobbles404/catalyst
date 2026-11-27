@@ -552,13 +552,19 @@ FLOAT_FLOAT = Instrument(
         _as_booked("cva_reserve"),
         Field(
             "settlement_frequency",
-            "How many calculation periods the row's days make, one per calendar month",
+            "How many calculation periods the row's days make, one per calendar month or one "
+            "in all",
             True,
             NONE,
             FieldType.CODE,
-            "monthly",
-            "monthly exactly: one period per calendar month the row covers, each with its own "
-            "observations, weights and quantity and one net payment; onetime is refused by name",
+            "monthly, onetime",
+            "monthly makes one period per calendar month the row covers, each with its own "
+            "observations, weights and quantity and one net payment; onetime makes one period "
+            "across the row's start_date and end_date, each index's price averaged over every "
+            "pricing day of its own the window covers and the two averages settled against the "
+            "spread price in one net payment, booked with both methods asian on two futures "
+            "indexes and quantity_per = period or calday; a published index or another method "
+            "refuses onetime by name",
         ),
         Field(
             "nearby",

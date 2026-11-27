@@ -297,13 +297,15 @@ def test_a_fraction_on_a_float_float_spread(
     assert cell(grid(batch), 0, "quantity") == quantity
 
 
-def test_a_period_on_a_pair_is_unbuilt_as_before_whatever_the_quantity() -> None:
-    # A whole period is one futures index's average, onetime-averaging.md: on two indexes it is
-    # refused by name for a fraction as for a whole number, the quantity changing nothing.
+def test_a_period_on_a_pair_is_refused_as_before_whatever_the_quantity() -> None:
+    # A fixed_float's pair over a window is not built, and since #279 a spread's is, on two
+    # futures indexes: here the spread's second index is a published one, so both are
+    # refused by name, for a fraction as for a whole number, the quantity changing nothing.
     onetime = {"quantity_per": "period", "settlement_frequency": "onetime"}
     assert refused_pair({**PAIR, **onetime}, {**PAIR_TICKET, "quantity": [0.5]}) == (
         "settlement_frequency of trade 1 at row 1 is 'onetime', expected 'monthly' with two "
-        "indexes; a onetime period on a pair is not built"
+        "indexes on a fixed_float; a onetime period on two indexes is built for a float_float "
+        "alone"
     )
     fraction = refused_spread({**SPREAD, **onetime}, {**SPREAD_TICKET, "quantity": [0.5]})
     whole = refused_spread({**SPREAD, **onetime}, SPREAD_TICKET)

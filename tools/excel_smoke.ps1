@@ -2762,6 +2762,61 @@ $formulas = [ordered]@{
     "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ26,ZU1)" = "#ERROR _CreateTrades: ValueError: spread_price_currency_unit is 'EUR', expected DOLLAR or CENT"
     "=_CreateTrades(YJ7:YJ8,YL4:YP4,YL5:YP5,YJ27,ZU1)" = "#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     "=_CreateTrades(VSTACK(YJ7,WJ5),YL4:YP4,YL5:YP5,YJ19,ZU1)" = "#ERROR _CreateTrades: ValueError: index 2 'A' measures ENERGY, expected VOLUME as index 1 'RB'; a spread across two measures needs a density or a heat content, which the unit tables do not carry"
+    # A window on a spread, issue #279: the crack as one onetime period, 1,000 BBL of RB less WTI
+    # from 20 January to 10 February 2027 at 15.00, both methods asian, WTI closed besides on the
+    # 10th, booked in ACB10 as one row read back by its two dates. Prepared in ACB11: RB counts
+    # 16 days, six of G27's and ten of H27's, a sixteenth of a lot each, and WTI 15, its last the
+    # 9th. Valued in ACB12 with RB at 2.10 and 2.14 and WTI at 70 and 71: 89,250 less 70,600
+    # less 15,000, one net payment of 3,650, mark 3,467.50 at 0.95; the lots by the month of the
+    # contract that prices them, six and ten sixteenths of RB, six and nine fifteenths of WTI
+    # sold. 100 BBL a calendar day in ACB14, the window's 22 days; and another method on either
+    # leg, a quantity by the month and a fixed_float's pair, by name.
+    '=MID(ACB10,FIND(":",ACB10)+1,14)' = "trades:RB-WTI:"
+    "=ROWS(util_ReadHandle(ACB10))"       = "3"
+    "=INDEX(util_ReadHandle(ACB10),3,4)"  = "2027-01-20 to 2027-02-10"
+    "=INDEX(util_ReadHandle(ACB10),3,5)"  = "asian"
+    "=INDEX(util_ReadHandle(ACB10),3,6)"  = "asian"
+    "=INDEX(util_ReadHandle(ACB10),3,13)" = "period"
+    "=INDEX(util_ReadHandle(ACB10),3,22)" = "22"
+    "=INDEX(util_ReadHandle(ACB10),3,23)" = "1000"
+    "=INDEX(util_ReadHandle(ACB10),3,24)" = "42000"
+    "=INDEX(util_ReadHandle(ACB10),3,26)" = "-15000"
+    "=INDEX(util_ReadHandle(ACB10),3,27)" = "onetime"
+    "=ROWS(util_ReadHandle(ACB11))"       = "33"
+    "=INDEX(util_ReadHandle(ACB11),18,2)" = "RB"
+    "=INDEX(util_ReadHandle(ACB11),19,2)" = "WTI"
+    "=INDEX(util_ReadHandle(ACB11),8,3)"  = "G27"
+    "=INDEX(util_ReadHandle(ACB11),9,3)"  = "H27"
+    '=TEXT(INDEX(util_ReadHandle(ACB11),18,5),"yyyy-mm-dd")' = "2027-02-10"
+    '=TEXT(INDEX(util_ReadHandle(ACB11),33,5),"yyyy-mm-dd")' = "2027-02-09"
+    "=INDEX(util_ReadHandle(ACB11),3,10)" = "0.0625"
+    "=ROUND(INDEX(util_ReadHandle(ACB11),19,10)*15,9)" = "-1"
+    '=MID(ACB12,FIND(":",ACB12)+1,21)' = "trade_results:RB-WTI:"
+    "=ROUND(INDEX(_ReportValues(ACB12),3,1),6)" = "3467.5"
+    "=INDEX(_ReportValues(ACB12),3,2)" = "0"
+    "=ROUND(INDEX(util_ReadHandle(ACB12),3,18),6)" = "3650"
+    "=INDEX(util_ReadHandle(ACB12),3,31)" = "2.1"
+    "=INDEX(util_ReadHandle(ACB12),9,31)" = "2.14"
+    "=ROUND(INDEX(util_ReadHandle(ACB12),3,33),6)" = "5512.5"
+    "=ROUND(INDEX(util_ReadHandle(ACB12),9,33),6)" = "5617.5"
+    "=ROUND(INDEX(util_ReadHandle(ACB12),19,33)*15,6)" = "-70000"
+    "=ROUND(INDEX(util_ReadHandle(ACB12),33,33)*15,6)" = "-71000"
+    '=ROUND(INDEX(_ReportRisk(ACB12,"all","month"),4,2),9)' = "1"
+    '=ROUND(INDEX(_ReportRisk(ACB12,"all","month"),4,4),9)' = "-1"
+    '=ROUND(INDEX(_ReportRisk(ACB12,"all","month"),4,6),9)' = "-0.34675"
+    '=TEXT(INDEX(_ReportRisk(ACB12,"all","month"),6,1),"yyyy-mm-dd")' = "2027-02-01"
+    '=ROUND(INDEX(_ReportRisk(ACB12,"all","month"),6,2),9)' = "0.375"
+    '=ROUND(INDEX(_ReportRisk(ACB12,"all","month"),6,4),9)' = "-0.4"
+    '=TEXT(INDEX(_ReportRisk(ACB12,"all","month"),7,1),"yyyy-mm-dd")' = "2027-03-01"
+    '=ROUND(INDEX(_ReportRisk(ACB12,"all","month"),7,2),9)' = "0.625"
+    '=ROUND(INDEX(_ReportRisk(ACB12,"all","month"),7,4),9)' = "-0.6"
+    "=INDEX(util_ReadHandle(ACB14),3,13)" = "calday"
+    "=INDEX(util_ReadHandle(ACB14),3,23)" = "2200"
+    "=INDEX(util_ReadHandle(ACB14),3,26)" = "-33000"
+    "=_CreateTrades(VSTACK(YJ7,ACB2),ACD1:ACI1,ACD2:ACI2,ACB15,ZU1)" = "#ERROR _CreateTrades: ValueError: second_schedule_method of trade 1 at row 1 is 'lastday', expected 'asian' under settlement_frequency = onetime; a onetime period averages every pricing day it covers, and the expiry-based methods take their contract's month"
+    "=_CreateTrades(VSTACK(YJ7,ACB2),ACD1:ACI1,ACD2:ACI2,ACB16,ZU1)" = "#ERROR _CreateTrades: ValueError: schedule_method of trade 1 at row 1 is 'last3day', expected 'asian' under settlement_frequency = onetime; a onetime period averages every pricing day it covers, and the expiry-based methods take their contract's month"
+    "=_CreateTrades(VSTACK(YJ7,ACB2),ACD1:ACI1,ACD2:ACI2,ACB17,ZU1)" = "#ERROR _CreateTrades: ValueError: quantity_per of trade 1 at row 1 is 'month', expected 'period' or 'calday' under settlement_frequency = onetime; month says nothing of a window, period is its total and calday its days"
+    '=_CreateTrades(VSTACK(YJ7,ACB2),HSTACK(ACD1:ACH1,"fixed_price"),ACD2:ACI2,ACB18,ZU1)' = "#ERROR _CreateTrades: ValueError: settlement_frequency of trade 1 at row 1 is 'onetime', expected 'monthly' with two indexes on a fixed_float; a onetime period on two indexes is built for a float_float alone"
     '=_CreateTradeTemplate("fixed_float",HSTACK("route","spread_price_currency_unit"),HSTACK("bilateral","DOLLAR"))' = "#ERROR _CreateTradeTemplate: fields cell (1, 2) is text 'spread_price_currency_unit', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, second_schedule_method, payment_day, payment_holiday_key, marketing_reserve, cva_reserve, settlement_frequency, nearby, fixed_price_unit"
     # A closed physical contract past its expiry, expired-physical-cash.md: one LOT of Z26 bought
     # at 3.00 and sold at 3.10 through ION under one clearing house, in ZJ19. On the expiry day,
@@ -4298,7 +4353,7 @@ $cells = [ordered]@{
     # holiday-keys.md: every calendar on the sheet is made under a name, its own cell's address,
     # and collected in ZU1; a key is that name, text, or several joined by a plus sign, and every
     # index, batch, quote template and date shift on the sheet names ZU1 as its collection.
-    "ZU1" = "=_CollectHolidayCalendars(VSTACK(AM1,AM2,CT10,FM4,HC1,HC2,IC1,IC2,JD1,KF1,KF2,MC3,NK2,PA2,PB2,PF1,QJ5,QJ9,SA12,TC1,TC2,TC3,TE7,UZ1,VE1,WJ2,XV2,YJ2,ZJ2))"
+    "ZU1" = "=_CollectHolidayCalendars(VSTACK(AM1,AM2,CT10,FM4,HC1,HC2,IC1,IC2,JD1,KF1,KF2,MC3,NK2,PA2,PB2,PF1,QJ5,QJ9,SA12,TC1,TC2,TC3,TE7,UZ1,VE1,WJ2,XV2,YJ2,ZJ2,ACB1))"
     # holiday-keys.md: two calendars under names of their own, and their collection.
     "TA20" = "26-Nov-2026"; "TB20" = "27-Nov-2026"; "TB21" = "30-Nov-2026"
     "TC20" = '=_CreateHolidayCalendar("PAY_A",TA20)'
@@ -4583,6 +4638,39 @@ $cells = [ordered]@{
     "YJ25" = '=_CreateTradeTemplate("float_float",YM1:YY1,YM2:YY2)'
     "YJ26" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK("EUR",YM2:YY2))'
     "YJ27" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK("DOLLAR","MMBTU",YN2:YY2))'
+    # A window on a spread, issue #279, on the crack's cells. A second WTI closed on 1 January
+    # and on 10 February 2027, ACA1:ACA2, its calendar ACB1 and the index ACB2 on the crack's
+    # schedule, conventions and specifications, with the crack's two December settles behind
+    # its history in ACB5; RB quoted 2.10 and 2.14 in ACA4:ACA5, its market ACB7, and WTI's 70
+    # and 71 on the new history in ACB8. The crack's template with a onetime period, both
+    # methods asian and the quantity the period's in ACB9; the window's row, 1,000 BBL from 20
+    # January to 10 February at 15.00, in ACD1:ACI2, booked in ACB10, prepared in ACB11 and
+    # valued in ACB12; 100 BBL a calendar day in ACD3:ACI3 under ACB13, booked in ACB14; and
+    # four templates no window is booked under: the second method lastday in ACB15, the first
+    # last3day in ACB16, the quantity a month's in ACB17 and a fixed_float's pair in ACB18.
+    "ACA1" = "1-Jan-2027"; "ACA2" = "10-Feb-2027"
+    "ACA4" = "2.1"; "ACA5" = "2.14"
+    "ACD1" = "trade_id"; "ACE1" = "trade_date"; "ACF1" = "start_date"; "ACG1" = "end_date"; "ACH1" = "quantity"; "ACI1" = "spread_price"
+    "ACD2" = "1"; "ACE2" = "15-Dec-2026"; "ACF2" = "20-Jan-2027"; "ACG2" = "10-Feb-2027"; "ACH2" = "1000"; "ACI2" = "15"
+    "ACD3" = "2"; "ACE3" = "15-Dec-2026"; "ACF3" = "20-Jan-2027"; "ACG3" = "10-Feb-2027"; "ACH3" = "100"; "ACI3" = "15"
+    "ACB1" = '=_CreateHolidayCalendar("ACB1",ACA1:ACA2)'
+    "ACB2" = '=_CreateIndex("WTI","Crack leg WTI, closed on 10 February",YJ1,YJ4,YJ6,"ACB1","LOT",ZU1)'
+    "ACB3" = "=_CreateCalendar(YJ9,ACB2)"
+    "ACB4" = "=_CreateFuturesFixings(YA12:YA13,YC12:YC13,ACB2)"
+    "ACB5" = "=_CreateMarketHistory(ACB3,ACB4)"
+    "ACB6" = '=_CreatePriceVector("RB",ACA4:ACA5)'
+    "ACB7" = "=_CreateMarket(YJ14,ACB6)"
+    "ACB8" = "=_CreateMarket(ACB5,YJ17)"
+    "ACB9" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK(YL2:YN2,"period","asian","asian",YR2:YW2,"onetime",YY2))'
+    "ACB10" = "=_CreateTrades(VSTACK(YJ7,ACB2),ACD1:ACI1,ACD2:ACI2,ACB9,ZU1)"
+    "ACB11" = "=_PrepareTrades(ACB10,VSTACK(YJ14,ACB5))"
+    "ACB12" = "=_EvaluateTrades(ACB11,HSTACK(ACB7,ACB8),WJ20)"
+    "ACB13" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK(YL2:YN2,"calday","asian","asian",YR2:YW2,"onetime",YY2))'
+    "ACB14" = "=_CreateTrades(VSTACK(YJ7,ACB2),ACD1:ACI1,ACD3:ACI3,ACB13,ZU1)"
+    "ACB15" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK(YL2:YN2,"period","asian","lastday",YR2:YW2,"onetime",YY2))'
+    "ACB16" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK(YL2:YN2,"period","last3day","asian",YR2:YW2,"onetime",YY2))'
+    "ACB17" = '=_CreateTradeTemplate("float_float",YL1:YY1,HSTACK(YL2:YN2,"month","asian","asian",YR2:YW2,"onetime",YY2))'
+    "ACB18" = '=_CreateTradeTemplate("fixed_float",YN1:YY1,HSTACK(YN2,"period","asian","asian",YR2:YW2,"onetime",YY2))'
     # expired-physical-cash.md: a closed physical contract past its expiry. A futures index over
     # X26, Z26 and F27 in ZA1:ZB3, Z26 expiring 18 November 2026, Christmas closed, quoted in DOLLAR
     # per MMBTU with a LOT of 10,000 MMBTU charging 10 and 4 a lot and a one-MMBTU unit, in ZJ5;
