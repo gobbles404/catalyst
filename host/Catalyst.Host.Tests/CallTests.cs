@@ -1085,6 +1085,97 @@ namespace Catalyst.Host.Tests
             Assert.Equal("#ERROR _CreateTrades: ValueError: spread_price_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3", Trades(Column(rb, wti), headers, row, energy));
         }
 
+        // A onetime period on a float_float, issue #279: the crack's two indexes, WTI closed besides on 10
+        // February 2027, and 1,000 BBL of RB less WTI from 20 January to 10 February at 15.00, both methods
+        // asian. RB counts 16 days, six at G27's 2.10 and ten at H27's 2.14, 89,250; WTI counts 15, six at 70
+        // and nine at 71, 70,600; less 15,000, one net payment of 3,650 a year on at 0.95, 3,467.50. One row
+        // for the window, read back by its two dates; the lots six and ten sixteenths of one of RB and six and
+        // nine fifteenths of one of WTI, sold; 100 BBL a calendar day the window's 22 days; then another
+        // method on either leg, a quantity by the month and a fixed_float's pair, by name.
+        [Fact]
+        public void a_float_float_window_averages_each_leg_over_its_own_days_and_pays_once()
+        {
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), 46388.0);
+            var shut = (string)Seam.Call("_CreateHolidayCalendar", Fresh(), Column(46388.0, 46428.0));
+            var rb = VolumeIndex("RB", "GAL", 42000.0, holidays);
+            var wti = VolumeIndex("WTI", "BBL", 1000.0, shut);
+            var date = (string)Seam.Call("_CreateValuationDate", 46391.0, 0.5);
+            var historyRb = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", date, rb), (string)Seam.Call("_CreateFuturesFixings", Column(46387.0, 46386.0), Column(2.05, 2.04), rb));
+            var historyWti = (string)Seam.Call("_CreateMarketHistory", (string)Seam.Call("_CreateCalendar", date, wti), (string)Seam.Call("_CreateFuturesFixings", Column(46387.0, 46386.0), Column(70.50, 70.40), wti));
+            var marketRb = (string)Seam.Call("_CreateMarket", historyRb, (string)Seam.Call("_CreatePriceVector", "RB", Column(2.10, 2.14)));
+            var marketWti = (string)Seam.Call("_CreateMarket", historyWti, (string)Seam.Call("_CreatePriceVector", "WTI", Column(70.00, 71.00)));
+            var curves = (string)Seam.Call("_CollectDiscountCurves", (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 } }));
+            var fields = Row("spread_price_currency_unit", "spread_price_quantity_unit", "quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_key");
+            string Window(string per, string first, string second)
+            {
+                return (string)Template("_CreateTradeTemplate", "float_float", fields, Row("DOLLAR", "BBL", "BBL", per, "onetime", 1.0, first, second, "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays));
+            }
+            var template = Window("period", "asian", "asian");
+            var headers = Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "spread_price");
+            var row = Row(1.0, 46371.0, 46407.0, 46428.0, 1000.0, 15.0);
+            var trades = (string)Trades(Column(rb, wti), headers, row, template);
+            Assert.StartsWith(Pid + ":trades:RB-WTI:", trades);
+            var booked = (object[,])Seam.Call("util_ReadHandle", trades);
+            Assert.Equal(3, booked.GetLength(0));  // one row for the window, whatever months it crosses
+            Assert.Equal("2027-01-20 to 2027-02-10", booked[2, Heading(booked, "booked_period")]);
+            Assert.Equal("onetime", booked[2, Heading(booked, "settlement_frequency")]);
+            Assert.Equal("period", booked[2, Heading(booked, "quantity_per")]);
+            Assert.Equal(22.0, (double)booked[2, Heading(booked, "covered_days")], 12);
+            Assert.Equal(1000.0, (double)booked[2, Heading(booked, "component_quantity")], 9);  // the window's total
+            Assert.Equal(42000.0, (double)booked[2, Heading(booked, "quote_quantity")], 9);
+            Assert.Equal(-15000.0, (double)booked[2, Heading(booked, "offset")], 9);  // one spread leg for the window
+            var prepared = (string)Seam.Call("_PrepareTrades", trades, Column(historyRb, historyWti));
+            var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
+            Assert.Equal(33, slots.GetLength(0));  // sixteen days of RB and fifteen of WTI under two heading rows
+            Assert.Equal("RB", slots[17, Heading(slots, "index")]);
+            Assert.Equal(46428.0, slots[17, Heading(slots, "observation_date")]);  // RB's last day, the 10th
+            Assert.Equal("WTI", slots[18, Heading(slots, "index")]);
+            Assert.Equal(46427.0, slots[32, Heading(slots, "observation_date")]);  // WTI's, the 9th: it is closed on the 10th
+            Assert.Equal("G27", slots[7, Heading(slots, "pricing_contract")]);  // RB's sixth day, G27's expiry
+            Assert.Equal("H27", slots[8, Heading(slots, "pricing_contract")]);
+            Assert.Equal(1.0 / 16, (double)slots[2, Heading(slots, "live_lots")], 12);
+            Assert.Equal(-1.0 / 15, (double)slots[18, Heading(slots, "live_lots")], 12);
+            var results = (string)Seam.Call("_EvaluateTrades", prepared, Row(marketRb, marketWti), curves);
+            Assert.StartsWith(Pid + ":trade_results:RB-WTI:", results);
+            var values = (object[,])Seam.Call("_ReportValues", results);
+            Assert.Equal(3467.5, (double)values[2, 0], 9);
+            Assert.Equal(0.0, (double)values[2, 1], 9);
+            var read = (object[,])Seam.Call("util_ReadHandle", results);
+            Assert.Equal(3650.0, (double)read[2, Heading(read, "payment_amount")], 9);  // 89,250 less 70,600 less 15,000
+            Assert.Equal(2.10, (double)read[2, Heading(read, "observation_price")], 12);
+            Assert.Equal(2.14, (double)read[8, Heading(read, "observation_price")], 12);
+            Assert.Equal(5512.5, (double)read[2, Heading(read, "floating_contribution")], 9);  // 2,625 GAL a day at 2.10
+            Assert.Equal(5617.5, (double)read[8, Heading(read, "floating_contribution")], 9);
+            Assert.Equal(-70000.0 / 15, (double)read[18, Heading(read, "floating_contribution")], 9);  // a fifteenth of 1,000 BBL at 70
+            Assert.Equal(-71000.0 / 15, (double)read[32, Heading(read, "floating_contribution")], 9);
+            // The lots by the month of the contract that prices them: February's G27 and March's H27.
+            var risk = (object[,])Seam.Call("_ReportRisk", results, "all", "month");
+            Assert.Equal(8, risk.GetLength(1));
+            Assert.Equal("Total", risk[3, 0]);
+            Assert.Equal(1.0, (double)risk[3, 1], 12);
+            Assert.Equal(0.95, (double)risk[3, 2], 12);
+            Assert.Equal(-1.0, (double)risk[3, 3], 12);
+            Assert.Equal(-0.95, (double)risk[3, 4], 12);
+            Assert.Equal(-0.34675, (double)risk[3, 5], 12);
+            Assert.Equal(46419.0, risk[5, 0]);
+            Assert.Equal(0.375, (double)risk[5, 1], 12);
+            Assert.Equal(-0.4, (double)risk[5, 3], 12);
+            Assert.Equal(46447.0, risk[6, 0]);
+            Assert.Equal(0.625, (double)risk[6, 1], 12);
+            Assert.Equal(-0.6, (double)risk[6, 3], 12);
+            // 100 BBL a calendar day is the window's 22 days: 2,200 BBL.
+            var daily = (object[,])Seam.Call("util_ReadHandle", (string)Trades(Column(rb, wti), headers, Row(2.0, 46371.0, 46407.0, 46428.0, 100.0, 15.0), Window("calday", "asian", "asian")));
+            Assert.Equal(2200.0, (double)daily[2, Heading(daily, "component_quantity")], 9);
+            Assert.Equal(-33000.0, (double)daily[2, Heading(daily, "offset")], 9);
+            // A window averages: both methods asian, and the quantity the window's or a day's.
+            Assert.Equal("#ERROR _CreateTrades: ValueError: second_schedule_method of trade 1 at row 1 is 'lastday', expected 'asian' under settlement_frequency = onetime; a onetime period averages every pricing day it covers, and the expiry-based methods take their contract's month", Trades(Column(rb, wti), headers, row, Window("period", "asian", "lastday")));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: schedule_method of trade 1 at row 1 is 'last3day', expected 'asian' under settlement_frequency = onetime; a onetime period averages every pricing day it covers, and the expiry-based methods take their contract's month", Trades(Column(rb, wti), headers, row, Window("period", "last3day", "asian")));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: quantity_per of trade 1 at row 1 is 'month', expected 'period' or 'calday' under settlement_frequency = onetime; month says nothing of a window, period is its total and calday its days", Trades(Column(rb, wti), headers, row, Window("month", "asian", "asian")));
+            // The same two indexes and the same window under a fixed_float: a pair's window is not built.
+            var pair = (string)Template("_CreateTradeTemplate", "fixed_float", Row("quantity_unit", "quantity_per", "settlement_frequency", "nearby", "schedule_method", "second_schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_key"), Row("BBL", "period", "onetime", 1.0, "asian", "asian", "bilateral", "financial", "ACME Trading", "SOFR", 46756.0, holidays));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: settlement_frequency of trade 1 at row 1 is 'onetime', expected 'monthly' with two indexes on a fixed_float; a onetime period on two indexes is built for a float_float alone", Trades(Column(rb, wti), Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price"), row, pair));
+        }
+
         // Since expired-physical-cash.md a physical contract past its expiry is cash where the batch holds no
         // position on it. GAS in DOLLAR per MMBTU, LOT 10,000 MMBTU at 10 of brokerage and 4 of clearing a lot;
         // X26 expires 46342, Z26 on 46344, 18 November 2026, and F27 on 46385. One lot bought at 3.00 and sold

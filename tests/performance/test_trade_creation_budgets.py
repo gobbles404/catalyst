@@ -281,7 +281,6 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "schedule_rows": 1,
         "_the_contracts": 1,  # each component's row, a month's by its month, a window's by its
         # first day, since the review of onetime-averaging.md's third slice
-        "contract_days": 1,  # the days the schedule's contracts price on, a window's search key
         "month_bounds": 2,  # the first and last day of each component's month, and since
         # onetime-averaging.md the terms' calculation period of each component, that month
         "_each_distinct": 5,  # the units, the methods, the bases and the frequencies; the rules
@@ -1122,6 +1121,11 @@ def test_a_onetime_window_is_one_component_across_its_month_end_and_nothing_runs
         "month_bounds": 3,  # and the windows' last months' ends
         "window_rows": 1,  # the windows' contracts, the first pricing each one's first day, one
         # search shared with the dated quote since dated-quotes.md
+        "contract_days": 1,  # the days the schedule's contracts price on, a window's search
+        # key, made since #279 where a row is a window and for no batch of months
+        "_the_averaged": 2,  # since #279 the method's look under onetime is a step of its own,
+        # shared with a second leg's, once in each of the rule's two runs; the look itself is
+        # the one it was
     }
     assert numpy_calls(
         lambda: resolved((ASIAN_GAS,), ticket, template, WorkCounter(), CALENDARS)
@@ -1359,11 +1363,13 @@ MONTHLY_RESOLUTION_NUMPY = {
         # observation. A month of one print goes the road a month of five does, where the
         # dedicated IFERC kind gathered one date per component: any 33, cumsum 14, repeat 1,
         # searchsorted 1, arange 5, empty 33, reduce 38 and no sum before issue #271's step 5.
-        "ndarray.searchsorted": 4,
+        # One search and one range fewer since #279, 4 and 7 before: the days the months' last
+        # prints fall on, a window's search key, are no longer made for a batch of months.
+        "ndarray.searchsorted": 3,
         "ndarray.repeat": 5,
         "ndarray.cumsum": 15,
         "ndarray.sum": 1,
-        "numpy.arange": 7,
+        "numpy.arange": 6,
         "numpy.empty": 32,
         "ufunc.reduce": 43,
     }.items()

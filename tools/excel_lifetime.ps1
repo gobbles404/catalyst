@@ -43,9 +43,10 @@
 #   pairs  a pair of indexes, two-index-fixed-float.md, booked over a column of two index
 #          handles, prepared over two histories and valued over two markets: a tick on the
 #          second index's quote, a changed settle on the first, the histories retyped in the
-#          other order, the second index cleared and typed back. check.ps1 runs this group
-#          beside core.
-#   rfq    a request for quote on the chain's index under the quotes group's template, on the
+#          other order, the second index cleared and typed back; a float_float beside it, by
+#          the month and across a onetime window on two futures indexes. check.ps1 runs this
+#          group beside core.
+#   rfq   a request for quote on the chain's index under the quotes group's template, on the
 #          template's payment day and on its own: a quote tick repricing the standing request,
 #          a changed quantity remaking it, a code naming nothing and a payment day on the
 #          expiry failing it and typed back rebuilding it. check.ps1 runs this group beside
@@ -1679,7 +1680,10 @@ $quotes = {
 # indexes, float-float-spread.md, A less B at a spread price of 3.80, booked beside the pair in
 # J31, prepared in J32 and valued in J33: four creators more, its handles a difference, A-B; a
 # tick on B moves the two marks opposite ways and remakes both results; a new spread price
-# remakes the spread alone.
+# remakes the spread alone. Then a window on a spread, issue #279, a onetime period on A less a
+# second futures index C, booked in J47, prepared in J48 and valued in J49: ten creators more;
+# a new end date remakes the window alone, another second method fails it in the rule's words
+# and typed back rebuilds it, and the same window on the published B is refused and owns nothing.
 $pairs = {
     param($state)
     $book = New-Book $state
@@ -1853,6 +1857,78 @@ $pairs = {
     Check "the pair's results stand" ((Text $state $sheet "J24") -eq $pairResults) (Text $state $sheet "J24")
     $c = Settle $state $sheet { param($c) $c.Live -eq 29 -and $c.Released -ge 25 }
     Check "the spread's old batch, preparation and results are released; no misses, no disposal errors" ($c.Live -eq 29 -and $c.Released -eq 25 -and $c.Published -eq 54 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+
+    # A window on a spread, issue #279: a second futures index C beside A, on A's schedule,
+    # calendar and specification, quoted 3.00 and 3.20, in J40 with its calendar, fixings,
+    # history, vector and market below it; a float_float template of a onetime period, both
+    # methods asian, the second method's cell L15, in J46; one lot of A less C from 20 January
+    # to 10 February 2027 at a spread price of 0.40 in L12:Q13, booked in J47, prepared in J48
+    # and valued in J49: ten creators more. A averages 3.5625 over the window's sixteen days and
+    # C 3.125, 0.4375 against 0.40 on 10,000 MMBTU: 375 at 0.95.
+    $monthly = Text $state $sheet "J33"
+    Put $state $sheet "A20" "3"; Put $state $sheet "A21" "3.2"
+    Put $state $sheet "B20" "3.1"; Put $state $sheet "B21" "3.08"
+    Put $state $sheet "L12" "trade_id"; Put $state $sheet "M12" "trade_date"; Put $state $sheet "N12" "start_date"; Put $state $sheet "O12" "end_date"; Put $state $sheet "P12" "quantity"; Put $state $sheet "Q12" "spread_price"
+    Put $state $sheet "L13" "1"; Put $state $sheet "M13" "15-Dec-2026"; Put $state $sheet "N13" "20-Jan-2027"; Put $state $sheet "O13" "10-Feb-2027"; Put $state $sheet "P13" "1"; Put $state $sheet "Q13" "0.4"
+    Put $state $sheet "L15" "asian"
+    Put $state $sheet "J40" '=_CreateIndex("C","Spread leg C, a futures index",J1,J3,J4,"PAYS","NYMEX NG",K2)'
+    Put $state $sheet "J41" "=_CreateCalendar(J8,J40)"
+    Put $state $sheet "J42" "=_CreateFuturesFixings(A12:A13,B20:B21,J40)"
+    Put $state $sheet "J43" "=_CreateMarketHistory(J41,J42)"
+    Put $state $sheet "J44" '=_CreatePriceVector("C",A20:A21)'
+    Put $state $sheet "J45" "=_CreateMarket(J43,J44)"
+    Put $state $sheet "J46" '=_CreateTradeTemplate("float_float",HSTACK(L1:V1,"nearby","spread_price_currency_unit","spread_price_quantity_unit"),HSTACK(L2,"period","asian",L15,P2:U2,"onetime",1,"DOLLAR","MMBTU"))'
+    Put $state $sheet "J47" "=_CreateTrades(VSTACK(J5,J40),L12:Q12,L13:Q13,J46,K2)"
+    Put $state $sheet "J48" "=_PrepareTrades(J47,VSTACK(J13,J43))"
+    Put $state $sheet "J49" "=_EvaluateTrades(J48,HSTACK(J17,J45),J20)"
+    Put $state $sheet "J50" "=ROUND(INDEX(_ReportValues(J49),3,1),6)"
+    Put $state $sheet "J51" "=INDEX(util_ReadHandle(J47),3,4)"
+    $window = Text $state $sheet "J47"
+    Check "the window's cell shows its handle, a difference in leg order" ($window.StartsWith("${id}:trades:A-C:")) $window
+    $windowPrepared = Text $state $sheet "J48"
+    Check "its preparation is named for the spread" ($windowPrepared.StartsWith("${id}:prepared_trades:A-C:")) $windowPrepared
+    $windowResults = Text $state $sheet "J49"
+    Check "and its results" ($windowResults.StartsWith("${id}:trade_results:A-C:")) $windowResults
+    Check "the readback names the window by its two dates" ((Text $state $sheet "J51") -eq "2027-01-20 to 2027-02-10") (Text $state $sheet "J51")
+    Check "the window's mark reads 356.25" ((Text $state $sheet "J50") -eq "356.25") (Text $state $sheet "J50")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 39 }
+    Check "ten creators more, thirty-nine live" ($c.Live -eq 39 -and $c.Published -eq 64 -and $c.Released -eq 25) $c.Text
+
+    # The window's end retyped, 27 January: the batch, its preparation and its results publish
+    # anew, the old three released; six days of G27 alone, 3.50 less 3.00 against 0.40, 1,000 at
+    # 0.95. The pair and the monthly spread stand.
+    Put $state $sheet "O13" "27-Jan-2027"
+    Check "a new end date gives the window a new handle, named A-C still" ((Text $state $sheet "J47") -ne $window -and (Text $state $sheet "J47").StartsWith("${id}:trades:A-C:")) (Text $state $sheet "J47")
+    Check "read back by its new dates" ((Text $state $sheet "J51") -eq "2027-01-20 to 2027-01-27") (Text $state $sheet "J51")
+    Check "and its mark reads 950" ((Text $state $sheet "J50") -eq "950") (Text $state $sheet "J50")
+    Check "the pair's results and the monthly spread's stand" ((Text $state $sheet "J24") -eq $pairResults -and (Text $state $sheet "J33") -eq $monthly) ((Text $state $sheet "J24") + " " + (Text $state $sheet "J33"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 39 -and $c.Released -ge 28 }
+    Check "the window's old batch, preparation and results are released; three more published" ($c.Live -eq 39 -and $c.Released -eq 28 -and $c.Published -eq 67) $c.Text
+
+    # The second method retyped, lastday: the template publishes anew and the batch fails in the
+    # rule's words, its preparation and results as consumers, the old four released; typed back,
+    # the four publish anew and the lastday template is released.
+    $template = Text $state $sheet "J46"
+    Put $state $sheet "L15" "lastday"
+    Check "another second method gives the template a new handle" ((Text $state $sheet "J46") -ne $template -and (Text $state $sheet "J46").StartsWith("${id}:trade_template:")) (Text $state $sheet "J46")
+    $failed = Text $state $sheet "J47"
+    Check "and fails the window in the rule's words, by its field and trade" ($failed -eq "#ERROR _CreateTrades: ValueError: second_schedule_method of trade 1 at row 1 is 'lastday', expected 'asian' under settlement_frequency = onetime; a onetime period averages every pricing day it covers, and the expiry-based methods take their contract's month") $failed
+    Check "the preparation fails as its consumer, the creator's text carried once" ((Text $state $sheet "J48") -eq "#ERROR _PrepareTrades: trades is the creator's failure, expected trades handle: $failed") (Text $state $sheet "J48")
+    Check "and the reads show #REF!, no number" ((Text $state $sheet "J50") -eq "#REF!" -and (Text $state $sheet "J51") -eq "#REF!") ((Text $state $sheet "J50") + " " + (Text $state $sheet "J51"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 36 }
+    Check "the old template and the window's batch, preparation and results are released; one more published" ($c.Live -eq 36 -and $c.Released -eq 32 -and $c.Published -eq 68) $c.Text
+    Put $state $sheet "L15" "asian"
+    Check "the method typed back rebuilds the window" ((Text $state $sheet "J47").StartsWith("${id}:trades:A-C:")) (Text $state $sheet "J47")
+    Check "and its mark reads 950 again" ((Text $state $sheet "J50") -eq "950") (Text $state $sheet "J50")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 39 }
+    Check "thirty-nine live again, four more published and the lastday template released" ($c.Live -eq 39 -and $c.Published -eq 72 -and $c.Released -eq 33) $c.Text
+
+    # The same window on A less B, a published index: refused by name, and a failed creator
+    # owns nothing.
+    Put $state $sheet "J52" "=_CreateTrades(J5:J6,L12:Q12,L13:Q13,J46,K2)"
+    Check "the same window on a published second index is refused by name" ((Text $state $sheet "J52") -eq "#ERROR _CreateTrades: ValueError: settlement_frequency of trade 1 at row 1 is 'onetime', expected 'monthly' with a published second index; one average across months would weight each month by its number of prints, and a strip settles month by month") (Text $state $sheet "J52")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 39 }
+    Check "and owns nothing: thirty-nine live, nothing published, no misses, no disposal errors" ($c.Live -eq 39 -and $c.Published -eq 72 -and $c.Released -eq 33 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Close-Book $state $book
 }
 

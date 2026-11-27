@@ -464,8 +464,9 @@ def resolved_trades(
         schedule_method,
         settlement,
         index.kind,
-        second_leg is not None,
+        None if second_leg is None else second_leg.index.kind,
         partial(named_trade, trade_ids),
+        spread,
     )
     _the_nearbys(nearby, occurrences)
     nearby_rules(
@@ -493,7 +494,14 @@ def resolved_trades(
         legs = (
             *legs,
             _the_second_leg(
-                index, second_leg, settlement, trade_ids, occurrence, occurrences, spread
+                index,
+                second_leg,
+                settlement,
+                settlement_frequency,
+                trade_ids,
+                occurrence,
+                occurrences,
+                spread,
             ),
         )
     pays = _the_payment(settlement, payment, occurrences, occurrence.size)
@@ -721,6 +729,7 @@ def _the_second_leg(
     first: Index,
     second: LegInputs,
     settlement: Settlement,
+    settlement_frequency: NDArray[np.intp],
     trade_ids: NDArray[np.int64] | None,
     occurrence: NDArray[np.intp],
     occurrences: int,
@@ -731,7 +740,8 @@ def _the_second_leg(
     first's quote currency, quote quantity and settlement currency units, its two prices adding
     in one unit, and on a float_float, since float-float-units.md, the spread's pair rules,
     spread_pair, each leg quoting in its own; a financial settlement; then the first leg's
-    rules over this index and these columns, each refusal naming the second leg's field. No
+    rules over this index and these columns, each refusal naming the second leg's field, its
+    method asian under a onetime row since #279, second_frequency_rules. No
     price of its own since two-index-one-price.md. Subtracted, since float-float-spread.md,
     when the batch is a float_float."""
     index = second.index
@@ -774,6 +784,9 @@ def _the_second_leg(
         index.kind,
         "second_schedule_method",
         paired=True,
+    )
+    second_frequency_rules(
+        settlement_frequency, second.schedule_method, partial(named_trade, trade_ids)
     )
     _the_contract_column(second.contract, occurrence, len(schedule.codes), "second_contract")
     return _the_leg(
@@ -855,21 +868,26 @@ def frequency_rules(
     schedule_method: NDArray[np.intp],
     settlement: Settlement,
     kind: Kind,
-    paired: bool,
+    second: Kind | None,
     named: Callable[[int], str],
+    spread: bool = False,
 ) -> None:
     """Each occurrence's frequency with the terms it stands under, since onetime-averaging.md,
     the kernel's rule, applied by the resolution before any period is built or observed so that
     a refused onetime row is refused in these words and never in an observation's, and since
     dated-quotes.md by a quote and a request for quote over their template's one set of terms.
     A onetime period, one average over every pricing day of the row's window, is priced on a
-    futures index alone, a published index settling month by month; on one index, a pair's
-    onetime period not being built; under a financial settlement, since it is cash settled on
-    its average; under the asian method, the expiry-based methods taking their contract's month;
-    and in a quantity of period, the window's total, or calday, never month, which says nothing
-    of a window. Under monthly the basis is month or calday, period being a window's total. The
-    first occurrence that breaks a rule is refused in the words `named` gives it, a trade by its
-    row or the quote, the rules in this order."""
+    futures index alone, a published index settling month by month; under a financial
+    settlement, since it is cash settled on its average; under the asian method, the
+    expiry-based methods taking their contract's month; and in a quantity of period, the
+    window's total, or calday, never month, which says nothing of a window. `second` is the
+    second index's kind, None on one index. With two indexes a onetime period is a
+    float_float's, `spread`, since #279: each leg averaged over its own pricing days of the
+    window and the two averages settled against the spread price in one payment, the second
+    index a futures index as the first is and its method asian, second_frequency_rules; a
+    fixed_float's pair over a window is not built. Under monthly the basis is month or calday,
+    period being a window's total. The first occurrence that breaks a rule is refused in the
+    words `named` gives it, a trade by its row or the quote, the rules in this order."""
 
     def first(rows: NDArray[np.bool_]) -> str:
         """The words for the first occurrence at fault, found only when a rule refuses."""
@@ -883,25 +901,24 @@ def frequency_rules(
                 "published index; one average across months would weight each month by its "
                 "number of prints, and a strip settles month by month"
             )
-        if paired:
+        if second is not None and not spread:
             raise ValueError(
                 f"settlement_frequency of {first(onetime)} is 'onetime', expected 'monthly' with "
-                "two indexes; a onetime period on a pair is not built"
+                "two indexes on a fixed_float; a onetime period on two indexes is built for a "
+                "float_float alone"
+            )
+        if second is Kind.PUBLISHED:
+            raise ValueError(
+                f"settlement_frequency of {first(onetime)} is 'onetime', expected 'monthly' with "
+                "a published second index; one average across months would weight each month by "
+                "its number of prints, and a strip settles month by month"
             )
         if settlement is Settlement.PHYSICAL:
             raise ValueError(
                 f"settlement_method is 'physical', expected 'financial' with settlement_frequency "
                 f"= onetime of {first(onetime)}; a onetime period is cash settled on its average"
             )
-        unaveraged = onetime & (schedule_method != METHODS.index(ScheduleMethod.ASIAN))
-        if unaveraged.any():
-            k = int(unaveraged.argmax())
-            raise ValueError(
-                f"schedule_method of {named(k)} is "
-                f"{METHODS[int(schedule_method[k])].value!r}, expected 'asian' under "
-                "settlement_frequency = onetime; a onetime period averages every pricing day it "
-                "covers, and the expiry-based methods take their contract's month"
-            )
+        _the_averaged(onetime, schedule_method, named, "schedule_method")
         by_month = onetime & (quantity_per == BASES.index(QuantityPer.MONTH))
         if by_month.any():
             raise ValueError(
@@ -915,6 +932,38 @@ def frequency_rules(
             f"quantity_per of {first(period)} is 'period', expected 'month' or 'calday' under "
             "settlement_frequency = monthly; period is the total of a onetime period and says "
             "nothing of a month"
+        )
+
+
+def second_frequency_rules(
+    settlement_frequency: NDArray[np.intp],
+    second_schedule_method: NDArray[np.intp],
+    named: Callable[[int], str],
+) -> None:
+    """A second leg's method under its row's frequency, since #279, the kernel's rule, applied
+    by the resolution as well before the leg is observed: under onetime the second index's
+    method is asian, as the first's is, each leg of a window averaging its own pricing days;
+    the first row at fault refused by its trade and the field it came from."""
+    onetime = settlement_frequency == FREQUENCIES.index(SettlementFrequency.ONETIME)
+    if onetime.any():
+        _the_averaged(onetime, second_schedule_method, named, "second_schedule_method")
+
+
+def _the_averaged(
+    onetime: NDArray[np.bool_],
+    schedule_method: NDArray[np.intp],
+    named: Callable[[int], str],
+    field: str,
+) -> None:
+    """Each onetime occurrence's method on one leg is asian, the first other refused naming the
+    field it came from, schedule_method or a second leg's second_schedule_method."""
+    unaveraged = onetime & (schedule_method != METHODS.index(ScheduleMethod.ASIAN))
+    if unaveraged.any():
+        k = int(unaveraged.argmax())
+        raise ValueError(
+            f"{field} of {named(k)} is {METHODS[int(schedule_method[k])].value!r}, expected "
+            "'asian' under settlement_frequency = onetime; a onetime period averages every "
+            "pricing day it covers, and the expiry-based methods take their contract's month"
         )
 
 

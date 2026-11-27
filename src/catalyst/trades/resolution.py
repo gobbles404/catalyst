@@ -77,6 +77,7 @@ from catalyst.trades.terms import (
     price_words,
     reporting_lot_of,
     resolved_trades,
+    second_frequency_rules,
     spread_legs,
     spread_pair,
     spread_rules,
@@ -332,20 +333,21 @@ def resolved(
         schedule_method,
         settlement,
         index.kind,
-        paired,
+        indexes[1].kind if paired else None,
         partial(named_trade, trade_ids),
+        spread,
     )
     onetime_rows = settlement_frequency == FREQUENCIES.index(SettlementFrequency.ONETIME)
     schedule = trade_schedule_of(index)
     reporting_lot_of(index)
     months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
-    schedules = [(months, _schedule_of(index, paired))]
+    schedules: list[LegSchedule] = [(months, _schedule_of(index, paired), schedule)]
     second = None
     if paired:
         second = _the_second_schedule(indexes[1], counter)
-        schedules.append((second[1], _schedule_of(indexes[1], True)))
-    periods = _the_periods(fields, tuple(schedules), onetime_rows, contract_days(schedule))
+        schedules.append((second[1], _schedule_of(indexes[1], True), second[2]))
+    periods = _the_periods(fields, tuple(schedules), onetime_rows)
     counter.hit(TICKET_CODES_READ, periods.codes_read)
     occurrence = periods.occurrence
     start, end = periods.start, periods.end
@@ -382,7 +384,10 @@ def resolved(
             end,
             trade_ids,
             second[1],
+            second[2],
             periods.dated,
+            settlement_frequency,
+            periods.window,
         )
         legs = (observations, second_observations)
     payment = _the_payments(settlement, fields, legs, occurrence, trade_ids, counter, calendars)
@@ -691,6 +696,12 @@ def _each_distinct[T](
     )
 
 
+# One leg's schedule as the periods read it: the calendar month of each of its rows, the words
+# a refusal names the schedule by, and the schedule itself, whose contract days are the search
+# key of a window's row, each leg's own since #279 and made only where a row is a window.
+type LegSchedule = tuple[NDArray[np.int64], str, TradeSchedule]
+
+
 @dataclass(frozen=True, slots=True)
 class RowPeriods:
     """What the rows' periods resolved to, a booking's and since dated-quotes.md a request's: per
@@ -714,9 +725,8 @@ class RowPeriods:
 
 def _the_periods(
     fields: _Fields,
-    schedules: tuple[tuple[NDArray[np.int64], str], ...],
+    schedules: tuple[LegSchedule, ...],
     onetime_rows: NDArray[np.bool_],
-    contract_day: NDArray[np.datetime64],
 ) -> RowPeriods:
     """The batch's rows' periods, resolve_periods over the three period fields as the template or
     the ticket supplied them, each named with its row where the ticket did."""
@@ -733,7 +743,6 @@ def _the_periods(
         fields.where,
         onetime_rows,
         schedules,
-        contract_day,
     )
 
 
@@ -746,8 +755,7 @@ def resolve_periods(
     ends: NDArray[np.datetime64],
     where: Callable[[str, int], str],
     onetime_rows: NDArray[np.bool_],
-    schedules: tuple[tuple[NDArray[np.int64], str], ...],
-    contract_day: NDArray[np.datetime64],
+    schedules: tuple[LegSchedule, ...],
 ) -> RowPeriods:
     """Each row's period chosen row by row and resolved to its components, one per calendar month
     it covers, or since onetime-averaging.md one for the whole of it where the row is onetime, in
@@ -767,8 +775,10 @@ def resolve_periods(
     schedule by, a month without a contract refused by the row and the month, the first leg's
     schedule first, and each component's days its month's, a dated row's first and last clipped
     to its dates. A onetime row is one component whatever months it spans, its days the whole
-    window, a dated row's two dates or a code's first day to its last, and its schedule row the
-    contract pricing its first day, the first whose day, contract_day, the first leg's expiries,
+    window, a dated row's two dates or a code's first day to its last, and its schedule row on
+    each leg the contract pricing its first day there, the first whose day, the leg's own
+    contract days since #279, a pair's two schedules expiring on their own days, made where a
+    row is a window and not otherwise,
     is on or after it by the calendar's rule, one search over the windows and no month looked up,
     since a window may open in a month the schedule has no contract for while every day of it
     prices, since onetime-averaging.md and the review of its third slice. The month bounds are one
@@ -856,10 +866,10 @@ def resolve_periods(
                 period_of,
                 words,
                 window if windows else None,
-                contract_day,
+                schedule,
                 start,
             )
-            for months, words in schedules
+            for months, words, schedule in schedules
         ]
     )
     entered = np.array(code_on, dtype=bool)  # the batch's own copy of which rows entered a code
@@ -919,27 +929,26 @@ def _the_contracts(
     month: NDArray[np.int64],
     occurrence: NDArray[np.intp],
     period_of: Callable[[int], str],
-    schedule: str,
+    words: str,
     window: NDArray[np.bool_] | None,
-    contract_day: NDArray[np.datetime64],
+    schedule: TradeSchedule,
     start: NDArray[np.datetime64],
 ) -> NDArray[np.intp]:
     """Each component's row on one leg's schedule: a monthly component's the row of its calendar
     month, schedule_rows over those components, and since the review of onetime-averaging.md's
     third slice a onetime component's the row of the contract pricing its first day, window_rows
-    over the windows, a window opening after the last day the schedule's contracts price refused
-    by its row. window is None when no row is a window, the monthly lookup then over every
-    component as it was."""
+    over the windows and the leg's own contract days, made here and only here, since #279, a
+    window opening after the last day the schedule's contracts price refused by its row. window
+    is None when no row is a window, the monthly lookup then over every component as it was,
+    and no contract day made."""
     if window is None:
-        return schedule_rows(months, month, occurrence, period_of, schedule)
+        return schedule_rows(months, month, occurrence, period_of, words)
     monthly = ~window
     contract = np.empty(window.size, dtype=np.intp)
-    contract[monthly] = schedule_rows(
-        months, month[monthly], occurrence[monthly], period_of, schedule
-    )
+    contract[monthly] = schedule_rows(months, month[monthly], occurrence[monthly], period_of, words)
     windows = occurrence[window]
     contract[window] = window_rows(
-        contract_day, start[window], lambda k: period_of(int(windows[k])), schedule
+        contract_days(schedule), start[window], lambda k: period_of(int(windows[k])), words
     )
     return contract
 
@@ -966,15 +975,18 @@ def _the_leg_fields(fields: _Fields, paired: bool) -> None:
             raise ValueError(f"{name} is {fields.shown(name)}, expected none unless two indexes")
 
 
-def _the_second_schedule(index: Index, counter: WorkCounter) -> tuple[Index, NDArray[np.int64]]:
-    """The second index and its schedule's months, since two-index-fixed-float.md, read before
-    the rows' periods are resolved against it: a futures or a published index made with a reporting
-    lot, every code of its schedule read for its month, reported to the counter."""
+def _the_second_schedule(
+    index: Index, counter: WorkCounter
+) -> tuple[Index, NDArray[np.int64], TradeSchedule]:
+    """The second index, its schedule's months and, since #279, the schedule itself, since
+    two-index-fixed-float.md read before the rows' periods are resolved against it: a futures
+    or a published index made with a reporting lot, every code of its schedule read for its
+    month, reported to the counter."""
     schedule = trade_schedule_of(index)
     reporting_lot_of(index)
     months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
-    return index, months
+    return index, months, schedule
 
 
 def _the_second_leg(
@@ -986,20 +998,27 @@ def _the_second_leg(
     end: NDArray[np.datetime64],
     trade_ids: NDArray[np.int64] | None,
     months: NDArray[np.int64],
+    schedule: TradeSchedule,
     dated: NDArray[np.bool_],
+    settlement_frequency: NDArray[np.intp],
+    window: NDArray[np.bool_],
 ) -> tuple[LegInputs, Observations]:
     """The second leg's inputs and observations, since two-index-fixed-float.md, over the rows
     the first leg resolved and the contract rows the periods resolved on this index's schedule:
     the quantity unit resolved on this index, each distinct text once; second_schedule_method
-    read from the list, each distinct text once; and the observations this leg's methods give the
-    components over the same days, by code or by dates as the first leg's are, named as the
-    first leg's are. No price of its own since
+    read from the list, each distinct text once, and held to its row's frequency before the
+    leg is observed, since #279, the kernel's second_frequency_rules, so that a onetime row
+    whose second method is not asian is refused in the rule's words; and the observations this
+    leg's methods give the components over the same days, by code or by dates as the first
+    leg's are, named as the first leg's are, a window by those words and a month by this
+    schedule's code. No price of its own since
     two-index-one-price.md: the trade's one fixed price is the outright."""
     specifications, by_unit = _each_distinct(
         fields, "quantity_unit", partial(_the_specification, index, owner=_owner(index, True))
     )
     methods, by_method = _each_distinct(fields, "second_schedule_method", schedule_method_of)
     schedule_method = np.array([METHODS.index(m) for m in methods], dtype=np.intp)[by_method]
+    second_frequency_rules(settlement_frequency, schedule_method, partial(named_trade, trade_ids))
     observations = observed(
         schedule_method[occurrence],
         index,
@@ -1008,6 +1027,7 @@ def _the_second_leg(
         end,
         lambda k: named_trade(trade_ids, int(occurrence[k])),
         "second_schedule_method",
+        booked=lambda k: "the window" if window[k] else schedule.codes[int(contract[k])],
         dated=dated,
     )
     leg = LegInputs(

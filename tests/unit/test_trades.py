@@ -4973,7 +4973,7 @@ def test_the_frequency_is_kept_and_its_rules_name_the_first_row_that_breaks_them
     asian = one_choice(METHODS, ScheduleMethod.ASIAN, 1)
     with pytest.raises(ValueError) as refused:
         frequency_rules(
-            onetime, period, asian, Settlement.FINANCIAL, Kind.PUBLISHED, False, unlabeled
+            onetime, period, asian, Settlement.FINANCIAL, Kind.PUBLISHED, None, unlabeled
         )
     assert str(refused.value) == (
         "settlement_frequency of trade at row 1 is 'onetime', expected 'monthly' on a published "
@@ -4981,13 +4981,16 @@ def test_the_frequency_is_kept_and_its_rules_name_the_first_row_that_breaks_them
         "a strip settles month by month"
     )
     with pytest.raises(ValueError) as refused:
-        frequency_rules(onetime, period, asian, Settlement.FINANCIAL, Kind.FUTURES, True, unlabeled)
+        frequency_rules(
+            onetime, period, asian, Settlement.FINANCIAL, Kind.FUTURES, Kind.FUTURES, unlabeled
+        )
     assert str(refused.value) == (
         "settlement_frequency of trade at row 1 is 'onetime', expected 'monthly' with two "
-        "indexes; a onetime period on a pair is not built"
+        "indexes on a fixed_float; a onetime period on two indexes is built for a float_float "
+        "alone"
     )
     with pytest.raises(ValueError) as refused:
-        frequency_rules(onetime, period, asian, Settlement.PHYSICAL, Kind.FUTURES, False, unlabeled)
+        frequency_rules(onetime, period, asian, Settlement.PHYSICAL, Kind.FUTURES, None, unlabeled)
     assert str(refused.value) == (
         "settlement_method is 'physical', expected 'financial' with settlement_frequency = "
         "onetime of trade at row 1; a onetime period is cash settled on its average"

@@ -278,7 +278,7 @@ def the_frequency(terms: Terms, kind: Kind, who: str) -> None:
         np.array([METHODS.index(terms.method)], dtype=np.intp),
         terms.settlement,
         kind,
-        False,
+        None,
         lambda _: who,
     )
 
